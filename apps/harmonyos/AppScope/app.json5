@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "com.c4ai.hormony",
+    "vendor": "c4ai",
+    "versionCode": 1000000,
+    "versionName": "1.0.0",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

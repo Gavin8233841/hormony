@@ -1,0 +1,163 @@
+# 接口规范
+
+> 所有接口由 `apps/web` 的 Next.js API Routes 提供，鸿蒙端通过 HTTP/SSE 调用。
+> Base URL: `http://<host>:3000/api`
+
+## 通用约定
+
+- 请求/响应均为 JSON（流式接口除外）
+- 认证：`Authorization: Bearer <token>`（初期可省略）
+- 错误格式：`{ "error": string, "code": string }`
+
+---
+
+## POST /api/chat
+
+多 Agent 对话主入口，支持流式输出。
+
+**请求**
+```json
+{
+  "userId": "string",
+  "message": "string",
+  "context": {
+    "courseId": "string?",
+    "sessionId": "string?"
+  }
+}
+```
+
+**响应（SSE 流）**
+```
+data: {"type":"thinking","agent":"Retrieval"}\n\n
+data: {"type":"delta","content":"根据课程资料"}\n\n
+data: {"type":"citation","source":{"doc":"数据结构.pdf","page":12}}\n\n
+data: {"type":"done","sessionId":"xxx"}\n\n
+```
+
+---
+
+## GET /api/profile?userId=...
+
+获取用户学习画像。
+
+**响应**
+```json
+{
+  "userId": "string",
+  "name": "string",
+  "stage": "本科",
+  "weakTopics": ["树", "图论"],
+  "strongTopics": ["数组"],
+  "learningStyle": "视觉型",
+  "stats": { "totalQuestions": 120, "accuracy": 0.78 }
+}
+```
+
+---
+
+## GET /api/courses?userId=...
+
+获取课程列表。
+
+**响应**
+```json
+{
+  "courses": [
+    { "id": "cs101", "title": "数据结构", "progress": 0.65, "docCount": 12 }
+  ]
+}
+```
+
+---
+
+## POST /api/plan
+
+生成学习计划。
+
+**请求**
+```json
+{
+  "userId": "string",
+  "goal": "两周内复习数据结构期末考试",
+  "durationDays": 14,
+  "dailyMinutes": 90
+}
+```
+
+**响应**
+```json
+{
+  "planId": "string",
+  "tasks": [
+    { "id": "t1", "title": "复习树与二叉树", "date": "2026-06-25", "estimatedMin": 45, "type": "review" }
+  ]
+}
+```
+
+---
+
+## POST /api/quiz
+
+生成测验题。
+
+**请求**
+```json
+{
+  "userId": "string",
+  "courseId": "cs101",
+  "topic": "树",
+  "count": 5,
+  "difficulty": "medium"
+}
+```
+
+**响应**
+```json
+{
+  "quizId": "string",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "stem": "二叉搜索树中序遍历的结果是？",
+      "options": ["A. 升序", "B. 降序", "C. 随机", "D. 不确定"],
+      "answer": "A",
+      "explanation": "二叉搜索树中序遍历得到有序序列。"
+    }
+  ]
+}
+```
+
+---
+
+## POST /api/safety-review
+
+内容安全审核（内部调用，也可独立测试）。
+
+**请求**
+```json
+{
+  "content": "string",
+  "userId": "string?"
+}
+```
+
+**响应**
+```json
+{
+  "passed": true,
+  "flags": [],
+  "hallucinationRisk": "low",
+  "suggestion": "string?"
+}
+```
+
+---
+
+## POST /api/knowledge
+
+上传/检索知识库（简化版 RAG）。
+
+**上传**: `POST /api/knowledge/upload` (multipart, courseId + file)
+**检索**: `POST /api/knowledge/search` → `{ query, courseId } → { chunks: [{text, source, score}] }`
