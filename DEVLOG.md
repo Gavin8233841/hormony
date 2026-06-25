@@ -112,3 +112,55 @@
 
 - 首轮判断：项目不是空壳，Web Agent 演示链路已经可运行；但距离可参赛作品还缺少真实知识库导入、模型 API 接入、HarmonyOS 可构建工程、端侧导航闭环和系统级鸿蒙亮点。
 - 下一步建议优先顺序：补齐 HarmonyOS 工程构建能力 → 补 `/api/knowledge/search` 与 Web/ArkTS 调用 → 接入豆包 OpenAI 兼容 API → 用 DevEco CLI/MCP 做 ArkTS 检查、构建、模拟器验证 → 准备作品说明文档与演示脚本。
+
+---
+
+## [2026-06-25T04:44:00Z] [2026-06-25 12:44:00 CST] 模型: Claude (WorkBuddy)
+
+### 操作
+
+第二轮环境复核 + DevEco MCP 可用性验证 + Git 首次提交 + Codex 接手指引文档创建
+
+#### 环境复核结果
+
+复核确认所有开发工具就绪（与第一轮记录一致）：
+- DevEco Studio 26.0.0.461 + SDK + 模拟器镜像 6.1.1 + ohpm 26.0.0.410 + hvigor + hdc
+- Node v22.22.2 / npm 10.9.7 / pnpm 11.9.0 / Python 3.13.12 / Git 2.54.0 / OpenJDK 17.0.14
+- 环境差异记录：Codex 终端为 Node v24.16.0 + npm 11.13.0（system fallback），pnpm 不在 PATH
+
+#### DevEco MCP 可用性验证
+
+调用 `harmonyos_knowledge_search`（关键词：Stage模型、module.json5、工程结构），成功返回 Stage 模型 module.json5 完整配置文档（含 abilities/skills/extensionAbilities/routerMap 等全部标签说明）。确认 MCP 链路畅通，10 个工具可用。配置文件 `~/.workbuddy/mcp.json` 已就绪。
+
+#### Git 首次提交
+
+- 暂存 64 个文件（排除 `tsconfig.tsbuildinfo` 构建缓存，已加入 .gitignore）
+- 提交 hash：`690b07f`，分支 `main`
+- .gitignore 已配置：node_modules / .next / oh_modules / .hvigor / .env / .workbuddy / *.tsbuildinfo
+- 工作区现已干净
+
+#### Codex 接手指引文档
+
+创建 `docs/CODEX-HANDOFF.md`，包含：
+1. 竞赛信息对齐（赛事全貌/关键规则/官方附件）
+2. 用户明确指令（不沿用初稿/先搭基础设施/日志规范/文件安全/标识符规则）
+3. 环境核查结果（已就绪工具/环境差异说明/待配置项）
+4. DevEco MCP 连接（配置/10 个工具/验证记录/官方替代方案）
+5. 当前项目状态（Git 状态/初稿代码现状/已知缺陷/待评估事项）
+6. Codex 建议的下一步（来自上一条记录）
+7. 协作约定（日志/文件安全/AI 工具声明）
+8. 关键文件索引
+
+### 涉及文件
+
+- `.gitignore`（修改：新增 `*.tsbuildinfo` 排除规则）
+- `DEVLOG.md`（追加本记录）
+- `docs/CODEX-HANDOFF.md`（新建：Codex 接手指引文档）
+- `~/.workbuddy/mcp.json`（读取确认：DevEco MCP 配置已就绪）
+
+### 备注
+
+- 基础设施搭建完成：Git 干净基线 + MCP 验证可用 + 接手文档齐备
+- 鸿蒙端缺少 Hvigor 工程文件的问题已记录，待 Codex 评估是否用 DevEco Studio 新建标准工程还是补齐现有骨架
+- 用户明确要求：先搭好一切基础设施，再评估是否复用初稿，不要直接确定沿用
+- 下一步等待 Codex 接手：审查代码质量、评估架构、决定鸿蒙端工程方案、给出开发指引
