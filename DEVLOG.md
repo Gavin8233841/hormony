@@ -628,3 +628,85 @@ Codex 本轮工作扎实，无遗漏、无猜测、无标识符不匹配问题�
 - 待用户决定是否提交 Codex 本轮改动以保持工作区干净。
 
 ---
+
+## [2026-06-25T06:40:53Z] [2026-06-25 14:40:53 CST] 模型: Codex
+
+### 操作
+
+模型服务端封装完成。
+
+### 目标
+
+完成豆包 Ark 模型调用的 Web 服务端封装，建立统一调用入口、状态检查接口和演示模式兜底，确保模型密钥只在服务端进程环境中使用，不进入源码、日志、文档或鸿蒙端。
+
+### 执行内容
+
+1. **重构模型统一入口**
+   - `apps/web/src/lib/agents/model.ts` 默认使用豆包 Ark OpenAI 兼容配置：
+     - `MODEL_BASE_URL=https://ark.cn-beijing.volces.com/api/v3`
+     - `MODEL_NAME=doubao-seed-2-1-pro-260628`
+     - `MODEL_TIMEOUT_MS=60000`
+   - `MODEL_API_KEY` 只从服务端进程环境读取。
+   - 空值与已知占位值均视为未配置，自动进入演示模式。
+   - 真实模型调用失败或返回空内容时，自动降级到演示模式，不向前端暴露底层错误细节。
+
+2. **增加模型状态接口**
+   - 新增 `GET /api/model/status`。
+   - 返回 `configured`、`mode`、`provider`、`baseURL`、`modelName`、`timeoutMs`。
+   - 响应不包含任何密钥字段，用于后续 Web / HarmonyOS 联调确认当前模型状态。
+
+3. **增强结构化输出兼容**
+   - 新增 `extractJsonPayload()`，兼容模型返回纯 JSON、Markdown JSON 代码块、前后带说明文字的 JSON。
+   - `planner-agent.ts` 与 `quiz-agent.ts` 改用统一 JSON 提取逻辑，减少真实模型输出格式轻微偏差导致的解析失败。
+
+4. **整理 RAG 命名约束**
+   - `apps/web/src/lib/rag/index.ts` 中旧变量名等价改为 `knowledgePool`，行为不变。
+
+5. **同步配置与交接文档**
+   - `apps/web/.env.example` 改为不包含任何密钥占位值，并补 `MODEL_TIMEOUT_MS`。
+   - `docs/api-spec.md` 补 `GET /api/model/status`。
+   - `docs/notes/env-setup.md`、`docs/project-status.md`、`docs/CODEX-HANDOFF.md` 同步密钥注入规则与当前 API 状态。
+
+### 验证结果
+
+| 项目 | 结果 |
+|------|------|
+| 禁用表述检索 | 无命中 |
+| 密钥模式串检索 | 无命中 |
+| Web lint | 通过 |
+| Web typecheck | 通过 |
+| Web build | 通过，路由包含 `/api/model/status` |
+| `GET /api/model/status` | 200，未配置密钥时返回 `mode=demo` |
+| `POST /api/plan` | 200，返回 3 个任务 |
+| `POST /api/quiz` | 200，返回 2 道题 |
+| `POST /api/chat` | SSE 返回 `delta` 与 `done` |
+| `git diff --check` | 通过，仅 Windows 换行提示 |
+
+### 当前判断
+
+- 模型服务端封装已完成，后续真实密钥只需在启动 Web 服务前注入当前进程环境变量。
+- 鸿蒙端不需要、也不应直接接触模型密钥；端侧继续调用 Web 后端 API。
+- 当前阶段可进入端侧导航闭环和 Chat 流式渲染联调。
+
+### 可交给 WorkBuddy 的下一步
+
+1. 只读梳理鸿蒙端 `Index.ets`、`Chat.ets`、`Course.ets`、`Plan.ets`、`Knowledge.ets` 的入口、返回、按钮触发和 API 调用关系，输出精确文件清单。
+2. 不修改 `apps/web/src/lib/agents/model.ts`、`orchestrator.ts` 和模型相关 API。
+3. 优先补齐鸿蒙端 Dashboard / 页面跳转 / Chat 输入发送 / Plan 生成 / Knowledge 搜索的可演示闭环。
+4. 每次 ArkTS 改动后执行 DevEco MCP `check_ets_files`，最后执行 `build_project`。
+
+### 涉及文件
+
+- `apps/web/src/lib/agents/model.ts`
+- `apps/web/src/app/api/model/status/route.ts`
+- `apps/web/src/lib/agents/planner-agent.ts`
+- `apps/web/src/lib/agents/quiz-agent.ts`
+- `apps/web/src/lib/rag/index.ts`
+- `apps/web/.env.example`
+- `docs/api-spec.md`
+- `docs/notes/env-setup.md`
+- `docs/project-status.md`
+- `docs/CODEX-HANDOFF.md`
+- `DEVLOG.md`
+
+---

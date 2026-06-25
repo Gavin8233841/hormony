@@ -8,6 +8,27 @@
 - 请求/响应均为 JSON（流式接口除外）
 - 认证：`Authorization: Bearer <token>`（初期可省略）
 - 错误格式：`{ "error": string, "code": string }`
+- 模型密钥只由 Web 服务端进程环境变量读取，不出现在任何接口响应中
+
+---
+
+## GET /api/model/status
+
+获取模型服务端配置状态，用于联调确认当前处于真实模型模式还是演示模式。
+
+**响应**
+```json
+{
+  "configured": false,
+  "mode": "demo",
+  "provider": "openai-compatible",
+  "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+  "modelName": "doubao-seed-2-1-pro-260628",
+  "timeoutMs": 60000
+}
+```
+
+> 响应不包含 `MODEL_API_KEY`。
 
 ---
 

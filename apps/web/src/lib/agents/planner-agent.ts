@@ -1,6 +1,6 @@
 // Planner Agent：学习计划生成与任务拆解
 
-import { callModel } from "./model";
+import { callModel, extractJsonPayload } from "./model";
 import { getProfileContext } from "./profile-agent";
 import { generateId } from "@/lib/utils";
 import type { AgentResult, PlanTask, StudyPlan } from "@/lib/types";
@@ -40,7 +40,7 @@ export async function runPlannerAgent(
 
 function parseTasks(raw: string, durationDays: number): PlanTask[] {
   try {
-    const arr = JSON.parse(raw);
+    const arr = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
       return arr.slice(0, 10).map((t: Record<string, unknown>, i: number) => ({
         id: generateId("task"),

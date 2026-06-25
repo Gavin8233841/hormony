@@ -54,6 +54,7 @@ DevEco Studio 安装完成后，将以下路径加入系统 PATH（路径以实�
 
 - `MODEL_BASE_URL`: `https://ark.cn-beijing.volces.com/api/v3`
 - `MODEL_NAME`: `doubao-seed-2-1-pro-260628`
+- `MODEL_TIMEOUT_MS`: `60000`
 
 `MODEL_API_KEY` 不写入仓库、日志或 `.env.local`。启动 Web 服务前只通过当前进程环境变量注入。
 

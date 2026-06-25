@@ -1,6 +1,6 @@
 // Quiz Agent：测验题生成
 
-import { callModel } from "./model";
+import { callModel, extractJsonPayload } from "./model";
 import { generateId } from "@/lib/utils";
 import { store } from "@/lib/store/db";
 import type { AgentResult, Quiz, QuizQuestion } from "@/lib/types";
@@ -37,7 +37,7 @@ export async function runQuizAgent(
 
 function parseQuestions(raw: string, count: number, topic: string): QuizQuestion[] {
   try {
-    const arr = JSON.parse(raw);
+    const arr = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
       return arr.slice(0, count).map((q: Record<string, unknown>, i: number) => ({
         id: generateId("q"),

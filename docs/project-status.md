@@ -88,7 +88,7 @@ Hormony/
 | 鸿蒙端骨架 | ✅ | 6 个 ArkTS 页面 + HttpClient + 配置 |
 | 官方附件 | ⏳ | 需登录茶思屋下载 |
 | DevEco Studio | ✅ | 26.0.0.461 已安装 |
-| 模型 API Key | ⏳ | 需配置到 .env.local |
+| 模型 API Key | ⏳ | 不写入文件，启动 Web 服务前通过当前进程环境变量注入 |
 | PPT/视频 | ⏳ | 待后续阶段 |
 
 ## 运行方式
@@ -96,7 +96,7 @@ Hormony/
 ### Web 后端
 ```bash
 cd apps/web
-cp .env.example .env.local   # 填入 MODEL_API_KEY（可选，不填走演示模式）
+cp .env.example .env.local   # 只复制非密钥配置
 pnpm dev                     # http://localhost:3000
 ```
 

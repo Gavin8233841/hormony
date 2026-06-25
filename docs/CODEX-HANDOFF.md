@@ -83,7 +83,7 @@ Codex 在其终端中报告 Node v24.16.0 + npm 11.13.0、pnpm 不在 PATH。这
 |------|------|
 | JAVA_HOME | 未设置，建议指向 JDK 17 安装目录 |
 | HOS_SDK_HOME | 未设置，建议指向 SDK 目录 |
-| 模型 API Key | 需在 `apps/web/.env.local` 中配置 `MODEL_API_KEY`（豆包 OpenAI 兼容接口） |
+| 模型 API Key | 不写入文件，启动 Web 服务前通过当前进程环境变量注入 |
 | 官方第三附件 | 作品说明文档，需登录茶思屋下载 |
 
 ---
@@ -156,14 +156,14 @@ WorkBuddy 于 2026-06-25 调用 `harmonyos_knowledge_search`（关键词：Stage
 - Next.js 14 生产构建通过
 - `npm run typecheck` 通过
 - `next start -p 3001` + `scripts/test-chat.mjs` 验证 SSE 对话链路返回 Retrieval 轨迹、正文、Citation
-- 6 个 API 路由：`/api/chat`、`/api/courses`、`/api/plan`、`/api/profile`、`/api/quiz`、`/api/safety-review`
-- 7 个 Agent + 编排器，演示模式回退正常
+- 8 个 API 路由：`/api/chat`、`/api/courses`、`/api/knowledge/search`、`/api/model/status`、`/api/plan`、`/api/profile`、`/api/quiz`、`/api/safety-review`
+- 7 个 Agent + 编排器，模型服务端封装与演示模式回退正常
 
 **已知缺陷（Codex 指出）：**
 1. 鸿蒙端缺少完整 Hvigor 工程文件（根级 `build-profile.json5`、`hvigorfile.ts`、`oh-package.json5`；entry 级同名文件也缺失），无法命令行构建
-2. 文档写了 `/api/knowledge/upload` 和 `/api/knowledge/search`，源码无对应路由
+2. 知识库上传接口 `POST /api/knowledge/upload` 暂未实现
 3. Web 课程页与画像页使用硬编码演示数据，未调用已有 `/api/courses` 与 `/api/profile`
-4. 鸿蒙端首页快捷入口路由跳转为注释状态；知识库页用本地演示数据，未调后端检索接口
+4. 鸿蒙端首页快捷入口路由跳转为注释状态；知识库页已接入后端检索接口，但课程过滤尚未进入 UI 闭环
 
 ### 待评估事项（用户要求：先搭好基础设施再决定是否复用初稿）
 
@@ -176,11 +176,10 @@ WorkBuddy 于 2026-06-25 调用 `harmonyos_knowledge_search`（关键词：Stage
 
 ## 六、Codex 建议的下一步（来自 DEVLOG.md，供参考）
 
-1. 补齐 HarmonyOS 可构建工程，让 DevEco Studio / DevEco CLI / MCP 能真正检查和构建 ArkTS
-2. 补 `/api/knowledge/search`，让 Web 和 ArkTS 知识库页都走后端检索
-3. 接入豆包 OpenAI 兼容 API，但保留演示模式兜底
-4. 做鸿蒙端页面跳转、对话、计划、知识库的端到端闭环
-5. 再加服务卡片、通知或元服务中的一个作为鸿蒙赛道亮点
+1. 继续完善豆包 Ark 模型调用的提示词、流式输出与错误体验
+2. 做鸿蒙端页面跳转、对话、计划、知识库的端到端闭环
+3. 补知识库上传与索引构建流程
+4. 再加服务卡片、通知或元服务中的一个作为鸿蒙赛道亮点
 
 ---
 

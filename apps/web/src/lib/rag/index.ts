@@ -26,12 +26,12 @@ function score(queryTokens: string[], chunk: KnowledgeChunk): number {
 }
 
 export function retrieve(query: string, courseId?: string, topK = 3): KnowledgeChunk[] {
-  const candidates = store.getKnowledge(courseId);
+  const knowledgePool = store.getKnowledge(courseId);
   const queryTokens = tokenize(query);
   const queryLower = query.toLowerCase();
 
   // 1. 尝试 token 重叠匹配
-  let results: KnowledgeChunk[] = candidates
+  let results: KnowledgeChunk[] = knowledgePool
     .map((c) => ({ chunk: c, s: score(queryTokens, c) }))
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s)
@@ -40,7 +40,7 @@ export function retrieve(query: string, courseId?: string, topK = 3): KnowledgeC
 
   // 2. token 匹配为空时，回退到子串匹配（兼容中文无分词场景）
   if (results.length === 0) {
-    results = candidates
+    results = knowledgePool
       .filter((c) => c.text.toLowerCase().includes(queryLower))
       .slice(0, topK);
   }
@@ -48,7 +48,7 @@ export function retrieve(query: string, courseId?: string, topK = 3): KnowledgeC
   // 3. 仍为空时，用查询中的关键名词做子串匹配（提取 2 字以上片段）
   if (results.length === 0) {
     const keywords = extractKeywords(query);
-    results = candidates
+    results = knowledgePool
       .map((c) => {
         const textLower = c.text.toLowerCase();
         let hits = 0;
