@@ -349,3 +349,149 @@ DevEco Studio 内置工具路径：
 - 项目目录下的 `hvigorw.js`（1.15MB bundled 文件）已加入 .gitignore，不会被提交（hvigorw.bat wrapper 不再引用它）。
 - Codex MCP 配置修改需要 Codex 重启会话才能生效。
 - 下一步可交由 Codex 评估：是否复用现有 Web 初稿、鸿蒙端开发方向、知识库 API 补充、模型 API 接入。
+
+---
+
+## [2026-06-25T05:35:54Z] [2026-06-25 13:35:54 CST] 模型: Codex (GPT-5)
+
+### 操作
+
+读取最新 DEVLOG 并复核 WorkBuddy 设施修复结果，形成下一步开发决策。
+
+#### 核查结果
+
+1. Git 基线确认：最新提交为 `58efce7 feat: 补齐 HarmonyOS Hvigor 工程 + 修复 hvigorw 构建 + Web ESLint/类型检查`，读取时工作区干净。
+2. 新增基础设施文件存在：HarmonyOS Hvigor 工程文件、`apps/harmonyos/hvigorw.bat`、Web `.eslintrc.json`、Web `tsconfig.typecheck.json` 均已落地。
+3. Web 端验证通过：`pnpm lint` 无 ESLint warning/error，`pnpm typecheck` 通过，`pnpm build` 通过。
+4. DevEco MCP 已在当前 Codex 会话暴露并可用：`harmonyos_knowledge_search` 成功返回 HarmonyOS Stage 模型 `module.json5` 官方文档内容。
+5. HarmonyOS 工程可识别：`apps/harmonyos/hvigorw.bat tasks --no-daemon` 返回 `BUILD SUCCESSFUL`。
+6. DevEco MCP `project_sync` 成功：ohpm install 完成，hvigor init exit code 0。
+7. ArkTS 静态检查未通过：`Plan.ets`、`Knowledge.ets`、`Course.ets`、`Chat.ets`、`HttpClient.ets`、`EntryAbility.ets` 仍有 ArkTS Error；主要集中在未声明接口的对象字面量、内联对象类型、`any/unknown`、stand-alone 回调中的 `this` 使用。
+8. HAP 模块构建未通过：`build_project` 进入资源编译阶段后失败，错误为 `$media:app_icon` 未定义；当前 `AppScope/resources` 与 `entry/src/main/resources` 下没有 media 资源目录或 `app_icon` 资源。
+9. `project_sync` 曾自动修改 `apps/harmonyos/oh-package-lock.json5` 的 generated metadata；该验证副作用已恢复，避免污染 WorkBuddy 的提交基线。
+
+### 涉及文件
+
+- `DEVLOG.md`（读取并追加本记录）
+- `apps/web/package.json`（读取与脚本验证）
+- `apps/web/tsconfig.typecheck.json`（读取与脚本验证）
+- `apps/web/.eslintrc.json`（存在性验证）
+- `apps/harmonyos/hvigorw.bat`（读取与脚本验证）
+- `apps/harmonyos/build-profile.json5`（读取）
+- `apps/harmonyos/entry/build-profile.json5`（读取）
+- `apps/harmonyos/entry/src/main/ets/**/*.ets`（DevEco MCP 静态检查）
+- `apps/harmonyos/AppScope/resources/**`（资源存在性核查）
+- `apps/harmonyos/entry/src/main/resources/**`（资源存在性核查）
+
+### 备注
+
+- 下一步开发决策：先不做新功能，不先接模型 API；优先打通 HarmonyOS 编译闭环。顺序为补 `app_icon` 资源 → 修 ArkTS 静态错误 → `build_project` 成功生成 HAP → 再评估现有 Web/ArkTS 初稿复用范围。
+- Web 初稿可暂时复用为演示后端基座；鸿蒙端当前只能复用页面意图和部分 UI 结构，源码需先按 ArkTS 严格规则修正。
+
+---
+
+## [2026-06-25T05:51:08Z] [2026-06-25 13:51:08 CST] 模型: Claude (WorkBuddy)
+
+### 操作
+
+执行 Codex 下一步决策：补 app_icon 资源 → 修 ArkTS 静态错误 → build_project 成功生成 HAP。
+
+#### 1. 补 app_icon media 资源（build_project 资源编译失败已解决）
+
+**根本原因**：AppScope/app.json5 和 module.json5 引用 `$media:app_icon`，但项目缺少 media 资源目录。
+
+**解决方案**：对齐 DevEco Studio 26.0 官方模板（previewProjectTemplate）的媒体资源命名规范。
+
+从官方模板复制到项目：
+- `AppScope/resources/base/media/`: background.png, foreground.png, layered_image.json
+- `entry/src/main/resources/base/media/`: background.png, foreground.png, layered_image.json, startIcon.png
+- `entry/src/main/resources/base/element/float.json`（页面字体大小）
+- `entry/src/main/resources/base/profile/backup_config.json`（备份配置）
+- `entry/src/main/resources/dark/element/color.json`（暗色模式启动窗背景色）
+
+修改引用命名（对齐官方模板）：
+- `AppScope/app.json5`: `"icon": "$media:app_icon"` → `"$media:layered_image"`
+- `entry/src/main/module.json5`: ability `"icon"` → `"$media:layered_image"`，`"startWindowIcon"` → `"$media:startIcon"`
+
+#### 2. 修 ArkTS 严格检查错误（全部 10 个文件 0 Error）
+
+通过 DevEco MCP check_ets_files 逐步迭代修复，最终全部 10 个 .ets 文件 0 Error。
+
+修复明细：
+
+| 文件 | Error | 修复方式 |
+|------|-------|---------|
+| EntryAbility.ets | onCreate 参数无类型 | 对齐官方模板：`import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit'`，`onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void` |
+| HttpClient.ets | `body: object` + 索引签名 + `this.decodeArrayBuffer` | 改 body 类型为 `Object`；`this.decodeArrayBuffer` 改为 `HttpClient.decodeArrayBuffer`（静态方法在回调中不能用 this）；移除 RequestBody 索引签名接口 |
+| Knowledge.ets | 内联对象类型 `{ text: string; source: string }` + filter 回调无返回类型 | 新增 KnowledgeChunk interface；filter 回调加 `: boolean` 返回类型 |
+| Plan.ets | 对象字面量未声明接口 | 新增 PlanRequest interface，对象字面量赋值给显式声明的变量 |
+| Course.ets | 内联类型 `{ courses: Course[] }` 作泛型参数 | 新增 CoursesResponse interface |
+| Chat.ets | 对象字面量 + `as unknown as` 转型 | 新增 ChatRequest interface；`event as unknown as StreamEvent` 改为显式构造 StreamEvent 对象；`[...this.messages]` 改为 `this.messages.slice()` |
+| DataModels.ets | — | 新增导出：KnowledgeChunk, PlanRequest, ChatRequest, CoursesResponse |
+
+DataModels.ets 新增 4 个 interface：
+```typescript
+export interface KnowledgeChunk { text: string; source: string; }
+export interface PlanRequest { userId: string; goal: string; durationDays: number; dailyMinutes: number; }
+export interface ChatRequest { userId: string; message: string; }
+export interface CoursesResponse { courses: Course[]; }
+```
+
+剩余 Warning（不影响编译）：
+- colorConsistentWarning：建议颜色使用分层资源
+- invalidInitOfList：List 组件建议初始化宽高
+- unusedSymbol：未使用的变量（ChatMessage, index, want, launchParam, target）
+- addTryCatch：建议 try-catch
+- escape deprecated：escape() 已废弃
+
+#### 3. build_project 成功生成 HAP
+
+DevEco MCP build_project（clean + debug + entry@default）：
+
+```
+> hvigor BUILD SUCCESSFUL in 14 s 494 ms
+```
+
+关键阶段全部通过：
+- CompileResource: 512ms ✓（资源编译，之前 $media:app_icon 失败已解决）
+- CompileArkTS: 6s 776ms ✓（ArkTS 编译，之前 Error 已解决）
+- PackageHap: 740ms ✓（HAP 打包）
+- SignHap: 跳过（未配置签名，需在 DevEco Studio 配置 signingConfigs）
+
+HAP 产物：
+- 路径: `entry/build/default/outputs/default/entry-default-unsigned.hap`
+- 大小: 269,327 bytes (~263KB)
+- 状态: unsigned（需配置签名后才能真机安装）
+
+### 涉及文件
+
+**新增**：
+- `apps/harmonyos/AppScope/resources/base/media/background.png`
+- `apps/harmonyos/AppScope/resources/base/media/foreground.png`
+- `apps/harmonyos/AppScope/resources/base/media/layered_image.json`
+- `apps/harmonyos/entry/src/main/resources/base/media/background.png`
+- `apps/harmonyos/entry/src/main/resources/base/media/foreground.png`
+- `apps/harmonyos/entry/src/main/resources/base/media/layered_image.json`
+- `apps/harmonyos/entry/src/main/resources/base/media/startIcon.png`
+- `apps/harmonyos/entry/src/main/resources/base/element/float.json`
+- `apps/harmonyos/entry/src/main/resources/base/profile/backup_config.json`
+- `apps/harmonyos/entry/src/main/resources/dark/element/color.json`
+
+**修改**：
+- `apps/harmonyos/AppScope/app.json5`（icon 引用改为 $media:layered_image）
+- `apps/harmonyos/entry/src/main/module.json5`（icon/startWindowIcon 引用改为官方模板命名）
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`（新增 4 个 interface）
+- `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`（body 类型 Object + 静态方法调用）
+- `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`（对齐 @kit.AbilityKit 导入 + 类型注解）
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`（PlanRequest interface）
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`（KnowledgeChunk interface + 返回类型）
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`（CoursesResponse interface）
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`（ChatRequest interface + 显式构造 StreamEvent）
+- `DEVLOG.md`（追加本记录）
+
+### 备注
+
+- HarmonyOS 编译闭环已完全打通：hvigorw tasks ✓ → check_ets_files 0 Error ✓ → build_project BUILD SUCCESSFUL ✓ → HAP 产物生成 ✓
+- HAP 为 unsigned 状态，真机安装需要在 DevEco Studio 中配置 signingConfigs（自动签名或手动签名）。
+- ArkTS 严格模式关键规则总结：① 对象字面量必须对应已声明的 interface；② 不能用 `any`/`unknown`；③ 不能用索引签名 `[key: string]`；④ 函数/箭头函数参数和返回值需要显式类型；⑤ 静态方法在回调中用类名调用而非 this。
+- 下一步可交由 Codex 评估：Web/ArkTS 初稿复用范围、知识库 API 补充、模型 API 接入、端侧导航闭环。

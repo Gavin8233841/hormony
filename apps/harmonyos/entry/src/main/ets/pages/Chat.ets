@@ -5,7 +5,7 @@
 
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { ChatMessage, Citation, StreamEvent } from '../model/DataModels';
+import { ChatMessage, Citation, StreamEvent, ChatRequest } from '../model/DataModels';
 
 interface DisplayMessage {
   role: string;
@@ -118,11 +118,21 @@ struct Chat {
     this.inputText = '';
     this.loading = true;
 
+    const req: ChatRequest = {
+      userId: Constants.DEMO_USER_ID,
+      message: message,
+    };
     HttpClient.postSSE(
       Constants.API_CHAT,
-      { userId: Constants.DEMO_USER_ID, message: message },
+      req,
       (event: Record<string, Object>) => {
-        const evt = event as unknown as StreamEvent;
+        const evt: StreamEvent = {
+          type: event['type'] as string,
+          agent: event['agent'] as string | undefined,
+          content: event['content'] as string | undefined,
+          source: event['source'] as Citation | undefined,
+          sessionId: event['sessionId'] as string | undefined,
+        };
         const last = this.messages[this.messages.length - 1];
 
         if (evt.type === 'thinking' && evt.agent) {
@@ -136,7 +146,7 @@ struct Chat {
         }
 
         // 触发刷新
-        this.messages = [...this.messages];
+        this.messages = this.messages.slice();
       },
       () => {
         this.loading = false;
@@ -145,7 +155,7 @@ struct Chat {
         const last = this.messages[this.messages.length - 1];
         last.content = `请求失败: ${err.message}`;
         this.loading = false;
-        this.messages = [...this.messages];
+        this.messages = this.messages.slice();
       }
     );
   }

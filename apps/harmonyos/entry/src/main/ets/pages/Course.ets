@@ -4,7 +4,7 @@
 
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Course } from '../model/DataModels';
+import { Course, CoursesResponse } from '../model/DataModels';
 
 @Entry
 @Component
@@ -18,16 +18,15 @@ struct CoursePage {
 
   async loadCourses() {
     try {
-      const res = await HttpClient.get<{ courses: Course[] }>(
+      const res = await HttpClient.get<CoursesResponse>(
         `${Constants.API_COURSES}?userId=${Constants.DEMO_USER_ID}`
       );
       this.courses = res.courses;
     } catch (e) {
       // 回退演示数据
-      this.courses = [
-        { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 12, topics: ['数组', '链表', '树', '图'] },
-        { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 8, topics: ['进程', '调度', '内存管理'] },
-      ];
+      const c1: Course = { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 12, topics: ['数组', '链表', '树', '图'] };
+      const c2: Course = { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 8, topics: ['进程', '调度', '内存管理'] };
+      this.courses = [c1, c2];
     } finally {
       this.loading = false;
     }

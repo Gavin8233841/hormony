@@ -32,8 +32,9 @@ export class HttpClient {
 
   /**
    * 发送 POST 请求
+   * body 参数须为已声明的 interface 实例（ArkTS 严格模式不允许未类型化对象字面量）
    */
-  static async post<T>(path: string, body: object): Promise<T> {
+  static async post<T>(path: string, body: Object): Promise<T> {
     const httpRequest = http.createHttp();
     try {
       const url = `${Constants.BASE_URL}${path}`;
@@ -60,7 +61,7 @@ export class HttpClient {
    */
   static async postSSE(
     path: string,
-    body: object,
+    body: Object,
     onEvent: (event: Record<string, Object>) => void,
     onDone: () => void,
     onError: (err: Error) => void
@@ -70,12 +71,16 @@ export class HttpClient {
       const url = `${Constants.BASE_URL}${path}`;
 
       // 注册数据接收回调（流式）
+      // 注意：使用 HttpClient.decodeArrayBuffer 而非 this.decodeArrayBuffer，
+      // 因为 dataReceive 回调中 this 绑定不保证指向 HttpClient 类
       httpRequest.on('dataReceive', (data: ArrayBuffer) => {
-        const text = this.decodeArrayBuffer(data);
+        const text = HttpClient.decodeArrayBuffer(data);
         const lines = text.split('\n\n');
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) continue;
+          if (!trimmed.startsWith('data:')) {
+            continue;
+          }
           const jsonStr = trimmed.replace(/^data:\s*/, '');
           try {
             const evt = JSON.parse(jsonStr) as Record<string, Object>;

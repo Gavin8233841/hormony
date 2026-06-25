@@ -53,6 +53,12 @@ export interface Citation {
   snippet?: string;
 }
 
+// 知识库检索结果条目
+export interface KnowledgeChunk {
+  text: string;
+  source: string;
+}
+
 // SSE 流式事件
 export interface StreamEvent {
   type: string; // 'thinking' | 'delta' | 'citation' | 'trace' | 'done'
@@ -60,4 +66,22 @@ export interface StreamEvent {
   content?: string;
   source?: Citation;
   sessionId?: string;
+}
+
+// API 请求体接口
+export interface PlanRequest {
+  userId: string;
+  goal: string;
+  durationDays: number;
+  dailyMinutes: number;
+}
+
+export interface ChatRequest {
+  userId: string;
+  message: string;
+}
+
+// API 响应体接口
+export interface CoursesResponse {
+  courses: Course[];
 }

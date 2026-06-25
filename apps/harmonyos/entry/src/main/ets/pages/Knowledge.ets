@@ -2,13 +2,15 @@
  * 知识库页
  */
 
+import { KnowledgeChunk } from '../model/DataModels';
+
 @Entry
 @Component
 struct KnowledgePage {
   @State query: string = '';
-  @State results: { text: string; source: string }[] = [];
+  @State results: KnowledgeChunk[] = [];
 
-  private demoChunks = [
+  private demoChunks: KnowledgeChunk[] = [
     { text: '二叉搜索树（BST）是一种节点值满足左子树均小于根、右子树均大于根的二叉树。中序遍历 BST 可得到升序序列。', source: '数据结构.pdf' },
     { text: '动态规划通过将复杂问题分解为重叠子问题并存储子问题解来避免重复计算。', source: '数据结构.pdf' },
     { text: '进程调度算法包括 FCFS、SJF、时间片轮转、多级反馈队列等。', source: '操作系统.pdf' },
@@ -58,7 +60,7 @@ struct KnowledgePage {
           .margin({ left: 16, bottom: 8 })
 
         List({ space: 12 }) {
-          ForEach(this.results, (item: { text: string; source: string }) => {
+          ForEach(this.results, (item: KnowledgeChunk) => {
             ListItem() {
               Column() {
                 Text(item.source)
@@ -87,14 +89,14 @@ struct KnowledgePage {
     .backgroundColor('#0f172a')
   }
 
-  search() {
+  search(): void {
     const q = this.query.toLowerCase().trim();
     if (q.length === 0) {
       this.results = this.demoChunks;
       return;
     }
     this.results = this.demoChunks.filter(
-      (c) => c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q)
+      (c: KnowledgeChunk): boolean => c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q)
     );
   }
 }

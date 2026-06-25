@@ -4,7 +4,7 @@
 
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { StudyPlan, PlanTask } from '../model/DataModels';
+import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 
 @Entry
 @Component
@@ -122,19 +122,19 @@ struct PlanPage {
     this.loading = true;
     this.tasks = [];
     try {
-      const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, {
+      const req: PlanRequest = {
         userId: Constants.DEMO_USER_ID,
         goal: this.goal.trim(),
         durationDays: this.days,
         dailyMinutes: 90,
-      });
+      };
+      const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, req);
       this.tasks = plan.tasks;
     } catch (e) {
       // 回退演示
-      this.tasks = [
-        { id: '1', title: '复习树与二叉树', date: '2026-06-25', estimatedMin: 45, type: 'review' },
-        { id: '2', title: '练习 BST 习题', date: '2026-06-26', estimatedMin: 30, type: 'practice' },
-      ];
+      const task1: PlanTask = { id: '1', title: '复习树与二叉树', date: '2026-06-25', estimatedMin: 45, type: 'review' };
+      const task2: PlanTask = { id: '2', title: '练习 BST 习题', date: '2026-06-26', estimatedMin: 30, type: 'practice' };
+      this.tasks = [task1, task2];
     } finally {
       this.loading = false;
     }
