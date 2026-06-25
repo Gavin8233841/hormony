@@ -16,6 +16,7 @@ export class Constants {
   static readonly API_PLAN: string = '/api/plan';
   static readonly API_QUIZ: string = '/api/quiz';
   static readonly API_SAFETY: string = '/api/safety-review';
+  static readonly API_KNOWLEDGE_SEARCH: string = '/api/knowledge/search';
 
   // 演示用户
   static readonly DEMO_USER_ID: string = 'demo';

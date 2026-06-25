@@ -495,3 +495,136 @@ HAP 产物：
 - HAP 为 unsigned 状态，真机安装需要在 DevEco Studio 中配置 signingConfigs（自动签名或手动签名）。
 - ArkTS 严格模式关键规则总结：① 对象字面量必须对应已声明的 interface；② 不能用 `any`/`unknown`；③ 不能用索引签名 `[key: string]`；④ 函数/箭头函数参数和返回值需要显式类型；⑤ 静态方法在回调中用类名调用而非 this。
 - 下一步可交由 Codex 评估：Web/ArkTS 初稿复用范围、知识库 API 补充、模型 API 接入、端侧导航闭环。
+
+---
+
+## 2026-06-25 14:08 CST - Codex 接手：知识库 API 闭环与模型配置约束
+
+### 目标
+
+在 WorkBuddy 已打通 HarmonyOS 编译闭环的基础上，完成 Codex 侧基础设施复核、知识库查询接口补齐、Web/ArkTS 初稿复用判断，并为后续豆包 Ark 模型接入建立不泄露凭据的配置边界。
+
+### 执行内容
+
+1. **复核设施可用性**
+   - DevEco MCP 已可在 Codex 会话内调用，完成 HarmonyOS 官方知识检索、项目同步、ArkTS 检查与构建验证。
+   - Web 工程 `lint`、`typecheck`、`build` 均通过。
+   - HarmonyOS 工程 `check_ets_files` 无 Error，`build_project` 成功。
+
+2. **补齐知识库查询 API**
+   - 新增 `POST /api/knowledge/search`。
+   - 请求结构：`query`、`courseId`、`topK`。
+   - 响应结构：`chunks`，复用现有 `retrieve()` 检索逻辑。
+   - Web 知识库页面由本地演示搜索改为调用后端 API。
+
+3. **同步 ArkTS 端知识库页面**
+   - 新增 `Constants.API_KNOWLEDGE_SEARCH`。
+   - 扩展 `KnowledgeChunk`，新增 `KnowledgeSearchRequest`、`KnowledgeSearchResponse`。
+   - `Knowledge.ets` 改为通过 `HttpClient.post` 调用后端知识库接口；接口不可用时保留本地演示降级路径。
+
+4. **建立模型配置边界**
+   - `apps/web/.env.example` 写入非密钥参数：`MODEL_BASE_URL`、`MODEL_NAME`。
+   - `apps/web/.env.local` 只保留非密钥本地配置，并保持在 Git 忽略范围内。
+   - `MODEL_API_KEY` 不写入仓库、日志或 `.env.local`；启动 Web 服务前只通过当前进程环境变量注入。
+   - 未设置 `MODEL_API_KEY` 时 Web 后端保持演示模式，避免开发和展示流程被外部模型可用性阻断。
+
+5. **更新文档**
+   - `README.md` 快速开始说明改为密钥通过进程环境变量注入。
+   - `docs/notes/env-setup.md` 更新模型配置方式。
+   - `docs/api-spec.md` 明确 `POST /api/knowledge/search` 请求与响应格式。
+
+### 验证结果
+
+| 项目 | 结果 |
+|------|------|
+| Web lint | 通过 |
+| Web typecheck | 通过 |
+| Web build | 通过，路由包含 `/api/knowledge/search` |
+| 知识库 API 运行时请求 | 200，返回 `chunks` |
+| DevEco project_sync | 通过 |
+| DevEco check_ets_files | 无 Error，仅保留样式与 try-catch 建议类 Warning |
+| DevEco build_project | BUILD SUCCESSFUL |
+
+### 当前判断
+
+- Web 初稿中课程、计划、知识库、Agent Chat 的接口结构可继续复用；展示层仍需后续统一竞赛叙事和端侧体验。
+- ArkTS 初稿已具备继续接入 Web API 的基础；下一步应优先打通端侧导航与关键页面之间的数据闭环。
+- 模型接入应优先在 Web 服务端完成，ArkTS 端只调用自有后端接口，避免端侧暴露模型密钥。
+- 知识库上传、索引构建、课程维度过滤和模型流式输出仍是后续关键任务。
+
+### 建议分工
+
+- Codex：负责后端 API 合同、模型调用封装、知识库数据结构、端侧关键闭环与竞赛主线约束。
+- WorkBuddy：负责页面补齐、样式统一、资源整理、文档同步、重复性 ArkTS 类型修复与构建回归。
+
+---
+
+## [2026-06-25T06:14:02Z] [2026-06-25 14:14:02 CST] 模型: Claude (WorkBuddy)
+
+### 操作
+
+复核 Codex 本轮"知识库 API 闭环 + 模型配置边界"工作。
+
+#### 复核范围
+
+逐项核对 Codex 在 DEVLOG line 501-559 描述的改动：
+
+1. `apps/web/src/app/api/knowledge/search/route.ts`：存在，POST handler；`retrieve(query, body.courseId, topK)` 调用与 `apps/web/src/lib/rag/index.ts` 函数签名 `retrieve(query: string, courseId?: string, topK = 3)` 完全匹配；topK 限制 `Math.min(Math.max(body.topK ?? 5, 1), 20)` 合理。
+2. `apps/web/src/app/knowledge/page.tsx`：改为 fetch `/api/knowledge/search`，请求/响应结构与 route.ts 和 `types.ts` 中 `KnowledgeChunk` 接口一致。
+3. `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`：改为 `HttpClient.post<KnowledgeSearchResponse>`；失败时降级到本地 `demoChunks` 子串匹配。
+4. `apps/harmonyos/entry/src/main/ets/common/Constants.ets`：新增 `API_KNOWLEDGE_SEARCH = '/api/knowledge/search'`。
+5. `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`：新增 `KnowledgeSearchRequest`、`KnowledgeSearchResponse`；扩展 `KnowledgeChunk` 增加 `id?` / `courseId?` / `score?` 可选字段。
+6. `docs/api-spec.md`：补齐 `POST /api/knowledge/search` 请求/响应格式。
+7. `apps/web/.env.example`：写入 `MODEL_BASE_URL`、`MODEL_NAME`、`MODEL_API_KEY=your-api-key-here` 占位。
+8. `apps/web/.env.local`：仅含非密钥参数（`MODEL_BASE_URL`、`MODEL_NAME`），无 `MODEL_API_KEY`。
+9. `.gitignore`：第 33 行 `.env.local` 已覆盖，第 34 行 `.env.*.local` 兜底。
+10. `README.md`：快速开始说明改为"MODEL_API_KEY 通过当前进程环境变量注入"。
+11. `docs/notes/env-setup.md`：模型 API 章节更新为"启动 Web 服务前通过当前进程环境变量注入"。
+12. `apps/web/src/lib/agents/model.ts`：Grep 命中 `MODEL_API_KEY` 读取逻辑，符合"未注入时进入演示模式"。
+
+#### 安全审计
+
+- `MODEL_API_KEY` 未写入任何文件、日志或 `.env.local` ✓
+- `.gitignore` 已覆盖 `.env.*.local` 模式 ✓
+- 所有标识符（路径、字段、类型名）均与源码实际定义一致，无猜测 ✓
+
+#### 工作区状态
+
+- 9 个文件 modified + 1 个新增目录 `apps/web/src/app/api/knowledge/`，全部为 Codex 本轮工作产物。
+- 与 Codex 在 DEVLOG 中的"涉及文件"描述一致。
+- 复核时未修改任何业务文件。
+
+#### 潜在改进项（非阻塞，待后续迭代）
+
+1. Web `knowledge/page.tsx` 第 21 行 `throw new Error("检索失败")` 抛出后无 catch 显示给用户，UI 上看不到失败原因。
+2. HarmonyOS `Knowledge.ets` 请求体未传 `courseId`，无法按课程过滤（功能不完整，非 bug）。
+3. HarmonyOS `Knowledge.ets` UI 未显示 `score` 字段（可选展示）。
+
+#### 复核结论
+
+Codex 本轮工作扎实，无遗漏、无猜测、无标识符不匹配问题，与 DEVLOG 描述完全一致。可提交以保持工作区干净。
+
+### 涉及文件
+
+- `DEVLOG.md`（追加本记录）
+- `apps/web/src/app/api/knowledge/search/route.ts`（读取核对）
+- `apps/web/src/app/knowledge/page.tsx`（读取核对）
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`（读取核对）
+- `apps/harmonyos/entry/src/main/ets/common/Constants.ets`（读取核对）
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`（读取核对）
+- `apps/web/src/lib/rag/index.ts`（读取核对 retrieve 签名）
+- `apps/web/src/lib/types.ts`（读取核对 KnowledgeChunk）
+- `apps/web/.env.local`（读取核对无密钥）
+- `apps/web/.env.example`（读取核对）
+- `apps/web/src/lib/agents/model.ts`（Grep 核对 MODEL_API_KEY 引用）
+- `docs/api-spec.md`（读取核对）
+- `README.md`（读取核对）
+- `docs/notes/env-setup.md`（读取核对）
+- `.gitignore`（读取核对 .env.local 覆盖）
+
+### 备注
+
+- 下一步建议（与 Codex 一致）：① 模型服务端封装（model.ts/orchestrator.ts 真实调用豆包 API + 演示模式兜底）；② 端侧导航闭环（Dashboard/TabBar/页面跳转/Chat 流式渲染）；③ 鸿蒙赛道亮点择一（服务卡片/通知/元服务）。
+- 待用户决定是否提交 Codex 本轮改动以保持工作区干净。
+
+---

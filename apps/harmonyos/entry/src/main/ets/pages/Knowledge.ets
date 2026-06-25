@@ -2,13 +2,17 @@
  * 知识库页
  */
 
-import { KnowledgeChunk } from '../model/DataModels';
+import { HttpClient } from '../common/HttpClient';
+import { Constants } from '../common/Constants';
+import { KnowledgeChunk, KnowledgeSearchRequest, KnowledgeSearchResponse } from '../model/DataModels';
 
 @Entry
 @Component
 struct KnowledgePage {
   @State query: string = '';
   @State results: KnowledgeChunk[] = [];
+  @State loading: boolean = false;
+  @State message: string = '';
 
   private demoChunks: KnowledgeChunk[] = [
     { text: '二叉搜索树（BST）是一种节点值满足左子树均小于根、右子树均大于根的二叉树。中序遍历 BST 可得到升序序列。', source: '数据结构.pdf' },
@@ -47,10 +51,19 @@ struct KnowledgePage {
           .backgroundColor('#2563eb')
           .fontColor('#ffffff')
           .borderRadius(12)
+          .enabled(!this.loading)
           .onClick(() => { this.search(); })
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 16 })
+
+      if (this.message.length > 0) {
+        Text(this.message)
+          .fontSize(12)
+          .fontColor('#94a3b8')
+          .margin({ left: 16, bottom: 8 })
+          .width('100%')
+      }
 
       // 结果
       if (this.results.length > 0) {
@@ -66,6 +79,10 @@ struct KnowledgePage {
                 Text(item.source)
                   .fontSize(13)
                   .fontColor('#3b82f6')
+                  .margin({ bottom: 6 })
+                Text(item.courseId ? item.courseId : 'local')
+                  .fontSize(11)
+                  .fontColor('#64748b')
                   .margin({ bottom: 6 })
                 Text(item.text)
                   .fontSize(13)
@@ -89,14 +106,32 @@ struct KnowledgePage {
     .backgroundColor('#0f172a')
   }
 
-  search(): void {
+  async search(): Promise<void> {
     const q = this.query.toLowerCase().trim();
     if (q.length === 0) {
       this.results = this.demoChunks;
+      this.message = '显示本地演示资料';
       return;
     }
-    this.results = this.demoChunks.filter(
-      (c: KnowledgeChunk): boolean => c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q)
-    );
+
+    this.loading = true;
+    this.message = '检索中...';
+    const request: KnowledgeSearchRequest = {
+      query: q,
+      topK: 5,
+    };
+
+    try {
+      const response = await HttpClient.post<KnowledgeSearchResponse>(Constants.API_KNOWLEDGE_SEARCH, request);
+      this.results = response.chunks;
+      this.message = `后端检索到 ${this.results.length} 条资料`;
+    } catch (e) {
+      this.results = this.demoChunks.filter(
+        (c: KnowledgeChunk): boolean => c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q)
+      );
+      this.message = '后端暂不可用，已切换本地演示检索';
+    } finally {
+      this.loading = false;
+    }
   }
 }

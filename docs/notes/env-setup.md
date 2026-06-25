@@ -28,7 +28,7 @@
 | PATH 环境变量 | ohpm / hvigor / hdc 不在系统 PATH | 可通过 DevEco Studio 或 MCP 使用，建议手动添加 |
 | JAVA_HOME | 未设置 | 建议指向 JDK 17 安装目录 |
 | HOS_SDK_HOME | 未设置 | 建议指向 `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony` |
-| 模型 API Key | 需在 `apps/web/.env.local` 中配置 | 待配置 |
+| 模型 API Key | 不写入仓库、日志或 `.env.local`，启动服务前通过当前进程环境变量注入 | 待注入 |
 | 官方第三附件 | 作品说明文档 | 需登录茶思屋下载 |
 | DevEco MCP | 已写入 `~/.workbuddy/mcp.json` | 需在连接器管理页面 Trust 启用 |
 
@@ -48,6 +48,19 @@ DevEco Studio 安装完成后，将以下路径加入系统 PATH（路径以实�
 <HarmonyOS_SDK>\toolchains              # hdc
 ```
 
-## 模型 API Key
+## 模型 API
 
-在 `apps/web/.env.local` 中配置 `MODEL_API_KEY` 与 `MODEL_BASE_URL`（OpenAI 兼容接口）。
+豆包 Ark 非密钥参数已配置：
+
+- `MODEL_BASE_URL`: `https://ark.cn-beijing.volces.com/api/v3`
+- `MODEL_NAME`: `doubao-seed-2-1-pro-260628`
+
+`MODEL_API_KEY` 不写入仓库、日志或 `.env.local`。启动 Web 服务前只通过当前进程环境变量注入。
+
+```powershell
+$env:MODEL_API_KEY="<在本机手动填入>"
+cd apps/web
+pnpm dev
+```
+
+未设置 `MODEL_API_KEY` 时，Web 后端自动使用演示模式。

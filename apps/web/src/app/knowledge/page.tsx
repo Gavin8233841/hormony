@@ -13,23 +13,14 @@ export default function KnowledgePage() {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      // 简化版：直接调后端 chat 接口的检索能力，或本地展示
-      const res = await fetch(
-        `/api/courses?userId=demo`
-      );
-      // 这里用内置演示知识库展示
-      const demoChunks: KnowledgeChunk[] = [
-        { id: "k1", text: "二叉搜索树（BST）是一种节点值满足左子树均小于根、右子树均大于根的二叉树。中序遍历 BST 可得到升序序列。", source: "数据结构.pdf", courseId: "cs101" },
-        { id: "k2", text: "动态规划通过将复杂问题分解为重叠子问题并存储子问题解来避免重复计算，适用于具有最优子结构和重叠子问题性质的问题。", source: "数据结构.pdf", courseId: "cs101" },
-        { id: "k3", text: "进程调度算法包括先来先服务（FCFS）、短作业优先（SJF）、时间片轮转、多级反馈队列等。", source: "操作系统.pdf", courseId: "cs102" },
-        { id: "k4", text: "TCP 三次握手：SYN → SYN+ACK → ACK，建立可靠连接；四次挥手用于安全关闭连接。", source: "计算机网络.pdf", courseId: "cs103" },
-        { id: "k5", text: "图的遍历分为深度优先搜索（DFS）和广度优先搜索（BFS），DFS 使用栈/递归，BFS 使用队列。", source: "数据结构.pdf", courseId: "cs101" },
-      ];
-      const q = query.toLowerCase();
-      const matched = demoChunks.filter(
-        (c) => c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q)
-      );
-      setResults(matched.length > 0 ? matched : demoChunks);
+      const res = await fetch("/api/knowledge/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim(), topK: 5 }),
+      });
+      if (!res.ok) throw new Error("检索失败");
+      const data = (await res.json()) as { chunks?: KnowledgeChunk[] };
+      setResults(data.chunks ?? []);
     } finally {
       setLoading(false);
     }

@@ -55,8 +55,11 @@ export interface Citation {
 
 // 知识库检索结果条目
 export interface KnowledgeChunk {
+  id?: string;
   text: string;
   source: string;
+  courseId?: string;
+  score?: number;
 }
 
 // SSE 流式事件
@@ -81,7 +84,17 @@ export interface ChatRequest {
   message: string;
 }
 
+export interface KnowledgeSearchRequest {
+  query: string;
+  courseId?: string;
+  topK: number;
+}
+
 // API 响应体接口
 export interface CoursesResponse {
   courses: Course[];
+}
+
+export interface KnowledgeSearchResponse {
+  chunks: KnowledgeChunk[];
 }

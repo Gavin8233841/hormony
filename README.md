@@ -302,9 +302,11 @@ Base URL: `http://<host>:3000/api`
 ```bash
 cd apps/web
 pnpm install
-cp .env.example .env.local   # 填入 MODEL_API_KEY（可选，不填走演示模式）
+cp .env.example .env.local   # 只复制非密钥配置；MODEL_API_KEY 通过当前进程环境变量注入
 pnpm dev                     # http://localhost:3000
 ```
+
+豆包 Ark 默认 Base URL 和模型名已写入 `apps/web/.env.example`。`MODEL_API_KEY` 不写入仓库、日志或 `.env.local`；未注入时 Web 后端自动使用演示模式。
 
 ### 鸿蒙端
 

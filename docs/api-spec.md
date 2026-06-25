@@ -155,9 +155,32 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 
 ---
 
-## POST /api/knowledge
+## POST /api/knowledge/search
 
-上传/检索知识库（简化版 RAG）。
+检索知识库（简化版 RAG）。
 
-**上传**: `POST /api/knowledge/upload` (multipart, courseId + file)
-**检索**: `POST /api/knowledge/search` → `{ query, courseId } → { chunks: [{text, source, score}] }`
+**请求**
+```json
+{
+  "query": "二叉搜索树",
+  "courseId": "cs101",
+  "topK": 5
+}
+```
+
+**响应**
+```json
+{
+  "chunks": [
+    {
+      "id": "k1",
+      "text": "二叉搜索树（BST）...",
+      "source": "数据结构.pdf",
+      "courseId": "cs101",
+      "score": 1
+    }
+  ]
+}
+```
+
+> 上传接口暂未实现。初赛阶段先保持内置课程切片，后续再补 `POST /api/knowledge/upload`。
