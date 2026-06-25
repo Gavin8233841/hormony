@@ -19,6 +19,7 @@ oh_modules/
 *.hsp
 *.app
 local.properties
+hvigorw.js
 
 # Python
 __pycache__/

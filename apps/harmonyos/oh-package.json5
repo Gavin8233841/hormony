@@ -1,0 +1,8 @@
+{
+  "modelVersion": "5.0.0",
+  "description": "C4-AI HarmonyOS Study Agent - 鸿蒙 AI 学习/校园助理 Agent",
+  "dependencies": {
+  },
+  "devDependencies": {
+  }
+}

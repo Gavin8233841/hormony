@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "entry module for C4-AI HarmonyOS Study Agent",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {}
+}
