@@ -3,6 +3,7 @@
  * 统计卡片 + 快捷入口 + Agent 架构概览
  */
 
+import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { UserProfile } from '../model/DataModels';
@@ -56,6 +57,8 @@ struct Index {
         this.EntryItem('AI 对话辅导', '向 Tutor Agent 提问，获取带引用的讲解', '/pages/Chat')
         this.EntryItem('生成学习计划', 'Planner Agent 拆解目标为任务', '/pages/Plan')
         this.EntryItem('知识库检索', 'RAG 检索课程资料', '/pages/Knowledge')
+        this.EntryItem('我的课程', '查看课程资料纳入 RAG 知识库', '/pages/Course')
+        this.EntryItem('个人画像', 'Profile Agent 维护的学习画像', '/pages/Profile')
       }
       .width('100%')
       .padding(16)
@@ -129,8 +132,9 @@ struct Index {
     .backgroundColor('#1e293b')
     .borderRadius(12)
     .onClick(() => {
-      // 页面跳转需在路由配置中注册
-      // router.pushUrl({ url: target });
+      router.pushUrl({ url: target }).catch((err: Error) => {
+        console.error(`router.pushUrl failed: ${err.message}`);
+      });
     })
   }
 

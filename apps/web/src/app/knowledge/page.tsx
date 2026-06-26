@@ -8,19 +8,24 @@ export default function KnowledgePage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<KnowledgeChunk[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const search = async () => {
     if (!query.trim()) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/knowledge/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: query.trim(), topK: 5 }),
       });
-      if (!res.ok) throw new Error("检索失败");
+      if (!res.ok) throw new Error(`检索失败 (HTTP ${res.status})`);
       const data = (await res.json()) as { chunks?: KnowledgeChunk[] };
       setResults(data.chunks ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "检索失败");
+      setResults([]);
     } finally {
       setLoading(false);
     }
@@ -56,6 +61,12 @@ export default function KnowledgePage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="card border-red-500/30">
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className="space-y-3">

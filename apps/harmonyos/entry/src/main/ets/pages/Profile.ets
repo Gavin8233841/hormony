@@ -2,6 +2,7 @@
  * 个人画像页
  */
 
+import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { UserProfile } from '../model/DataModels';
@@ -36,17 +37,33 @@ struct ProfilePage {
 
   build() {
     Column() {
-      Text('个人画像')
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 20, bottom: 4, left: 20 })
-        .width('100%')
-
-      Text('Profile Agent 维护的学习画像')
-        .fontSize(13)
-        .fontColor('#94a3b8')
-        .margin({ bottom: 20, left: 20 })
-        .width('100%')
+      // 标题栏
+      Row() {
+        Text('‹')
+          .fontSize(28)
+          .fontColor('#e2e8f0')
+          .width(36)
+          .height(36)
+          .textAlign(TextAlign.Center)
+          .onClick(() => {
+            router.back();
+          })
+        Column() {
+          Text('个人画像')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#e2e8f0')
+          Text('Profile Agent 维护的学习画像')
+            .fontSize(12)
+            .fontColor('#94a3b8')
+            .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 4 })
+      }
+      .width('100%')
+      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
 
       if (this.profile) {
         // 基本信息卡片

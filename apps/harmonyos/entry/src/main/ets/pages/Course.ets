@@ -2,6 +2,7 @@
  * 课程页
  */
 
+import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { Course, CoursesResponse } from '../model/DataModels';
@@ -34,17 +35,33 @@ struct CoursePage {
 
   build() {
     Column() {
-      Text('我的课程')
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 20, bottom: 4, left: 20 })
-        .width('100%')
-
-      Text('课程资料已纳入 RAG 知识库')
-        .fontSize(13)
-        .fontColor('#94a3b8')
-        .margin({ bottom: 20, left: 20 })
-        .width('100%')
+      // 标题栏
+      Row() {
+        Text('‹')
+          .fontSize(28)
+          .fontColor('#e2e8f0')
+          .width(36)
+          .height(36)
+          .textAlign(TextAlign.Center)
+          .onClick(() => {
+            router.back();
+          })
+        Column() {
+          Text('我的课程')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#e2e8f0')
+          Text('课程资料已纳入 RAG 知识库')
+            .fontSize(12)
+            .fontColor('#94a3b8')
+            .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 4 })
+      }
+      .width('100%')
+      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
 
       if (this.loading) {
         Column() {

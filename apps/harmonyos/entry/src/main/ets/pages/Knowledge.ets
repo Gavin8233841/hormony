@@ -2,6 +2,7 @@
  * 知识库页
  */
 
+import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { KnowledgeChunk, KnowledgeSearchRequest, KnowledgeSearchResponse } from '../model/DataModels';
@@ -24,17 +25,33 @@ struct KnowledgePage {
 
   build() {
     Column() {
-      Text('知识库')
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 20, bottom: 4, left: 20 })
-        .width('100%')
-
-      Text('RAG 检索演示 · Retrieval Agent 语义匹配')
-        .fontSize(13)
-        .fontColor('#94a3b8')
-        .margin({ bottom: 16, left: 20 })
-        .width('100%')
+      // 标题栏
+      Row() {
+        Text('‹')
+          .fontSize(28)
+          .fontColor('#e2e8f0')
+          .width(36)
+          .height(36)
+          .textAlign(TextAlign.Center)
+          .onClick(() => {
+            router.back();
+          })
+        Column() {
+          Text('知识库')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#e2e8f0')
+          Text('RAG 检索演示 · Retrieval Agent 语义匹配')
+            .fontSize(12)
+            .fontColor('#94a3b8')
+            .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 4 })
+      }
+      .width('100%')
+      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
 
       // 搜索栏
       Row({ space: 12 }) {
@@ -84,6 +101,12 @@ struct KnowledgePage {
                   .fontSize(11)
                   .fontColor('#64748b')
                   .margin({ bottom: 6 })
+                if (item.score !== undefined) {
+                  Text(`相关度: ${(item.score * 100).toFixed(0)}%`)
+                    .fontSize(11)
+                    .fontColor('#10b981')
+                    .margin({ bottom: 6 })
+                }
                 Text(item.text)
                   .fontSize(13)
                   .fontColor('#cbd5e1')

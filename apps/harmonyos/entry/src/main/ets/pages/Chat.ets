@@ -3,6 +3,7 @@
  * 通过 SSE 流式接收多 Agent 协作结果
  */
 
+import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { ChatMessage, Citation, StreamEvent, ChatRequest } from '../model/DataModels';
@@ -25,15 +26,26 @@ struct Chat {
 
   build() {
     Column() {
-      // 标题
+      // 标题栏
       Row() {
+        Text('‹')
+          .fontSize(28)
+          .fontColor('#e2e8f0')
+          .width(36)
+          .height(36)
+          .textAlign(TextAlign.Center)
+          .onClick(() => {
+            router.back();
+          })
         Text('AI 对话辅导')
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor('#e2e8f0')
+          .layoutWeight(1)
+          .margin({ left: 4 })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 16, bottom: 12 })
+      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
 
       // 消息列表
       List({ scroller: this.scroller }) {

@@ -4,6 +4,7 @@
  */
 
 import http from '@ohos.net.http';
+import { util } from '@kit.ArkTS';
 import { Constants } from './Constants';
 
 export class HttpClient {
@@ -113,18 +114,10 @@ export class HttpClient {
 
   /**
    * ArrayBuffer 转字符串（UTF-8）
+   * 使用 @kit.ArkTS 的 util.TextDecoder 替代已废弃的 escape()/decodeURIComponent()
    */
   private static decodeArrayBuffer(buf: ArrayBuffer): string {
-    const bytes = new Uint8Array(buf);
-    let result = '';
-    for (let i = 0; i < bytes.length; i++) {
-      result += String.fromCharCode(bytes[i]);
-    }
-    // 简单解码，完整 UTF-8 应使用 TextDecoder
-    try {
-      return decodeURIComponent(escape(result));
-    } catch (e) {
-      return result;
-    }
+    const decoder = util.TextDecoder.create('utf-8');
+    return decoder.decodeToString(new Uint8Array(buf));
   }
 }
