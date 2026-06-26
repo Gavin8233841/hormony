@@ -710,3 +710,291 @@ Codex 本轮工作扎实，无遗漏、无猜测、无标识符不匹配问题�
 - `DEVLOG.md`
 
 ---
+
+## 2026-06-25 14:56 +0800 · GLM-5.2 (WorkBuddy) · 端侧导航闭环
+
+### 任务
+按 Codex 指令，补齐 HarmonyOS 端 Dashboard / 页面跳转 / Chat / Plan / Knowledge 的可演示导航闭环。仅改 ArkTS 端，不触碰 apps/web/src/lib/agents/model.ts、orchestrator.ts 及模型相关 API，不接触 MODEL_API_KEY。
+
+### 只读梳理结论
+- `main_pages.json` 已注册全部 6 个页面（Index/Chat/Course/Plan/Knowledge/Profile），路由表完整。
+- 核心问题：Index 的 `EntryItem.onClick` 跳转代码被注释，点击无响应；5 个子页面无返回按钮，进入后无法回 Dashboard；Index 缺 Course、Profile 入口。
+- API 调用链路（Chat SSE / Plan POST / Knowledge POST / Course GET / Profile GET）均已实现，无需改动业务逻辑。
+
+### 改动文件清单
+1. `apps/harmonyos/entry/src/main/ets/pages/Index.ets`
+   - 导入 `router from '@ohos.router'`
+   - `EntryItem.onClick` 启用 `router.pushUrl({ url: target })`，加 `.catch()` 异常处理
+   - 补 Course、Profile 两个快捷入口项
+2. `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+   - 导入 `router`；标题栏左侧加返回按钮 `router.back()`
+3. `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
+   - 导入 `router`；标题栏左侧加返回按钮
+4. `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+   - 导入 `router`；标题栏左侧加返回按钮
+5. `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`
+   - 导入 `router`；标题栏左侧加返回按钮
+6. `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+   - 导入 `router`；标题栏左侧加返回按钮
+
+### 验证
+- `check_ets_files`（6 文件）：无 Error。Index.ets 首轮有 `addAsyncCatch` 警告（pushUrl 返回 Promise 未捕获），已加 `.catch()` 修复，复检通过。其余 Warning（router API deprecated、List 未初始化宽高、颜色分层、未使用导入）均为历史遗留，不在本轮范围。
+- `build_project`（debug 模式）：`BUILD SUCCESSFUL in 12s 584ms`，exit code 0。WARN 仅 deprecated 提示与 HttpClient 原有 addAsyncCatch，无 Error。签名跳过属正常（未配置 signingConfigs）。
+
+### 遗留技术债（非本轮范围）
+- `@ohos.router` 的 `pushUrl`/`back` 被标记 deprecated，华为推荐迁移到 `Navigation` 组件。当前原型阶段 router 仍可用，后续可统一重构。
+- `HttpClient.decodeArrayBuffer` 使用已废弃的 `escape()`。
+- 多个页面 List 组件未显式初始化 width/height。
+
+### 工作区状态
+本轮 6 个 ArkTS 文件有未提交改动，待 Codex 复核后提交。
+
+---
+
+## [2026-06-25T08:24:39Z] [2026-06-25 16:24:39 CST] 模型: GLM-5.2 (WorkBuddy)
+
+### 操作
+
+解决端侧导航闭环后的遗留技术债（低风险代码修复，不涉及架构级迁移）。
+
+#### 遗留问题梳理
+
+DEVLOG line 744-747 列出的 3 项遗留技术债 + line 598-601 的潜在改进项，按职责与风险分级：
+
+| 遗留项 | 性质 | 处理方 |
+|--------|------|--------|
+| HttpClient.escape() 废弃 | 明确的废弃 API 替换，低风险 | WorkBuddy（本轮修复）|
+| Web knowledge/page.tsx 错误无提示 | 明确的 bug，低风险 | WorkBuddy（本轮修复）|
+| Knowledge.ets 未显示 score | 简单 UI 补全 | WorkBuddy（本轮修复）|
+| router → Navigation 组件迁移 | 架构级重构，影响全部 6 页面 | 留给 Codex 决策 |
+| List invalidInitOfList Warning | 样式建议，layoutWeight(1) 为正确弹性布局做法，加固定 height 可能破坏布局 | 标注，不强改 |
+
+#### 改动明细
+
+1. `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`
+   - 新增 `import { util } from '@kit.ArkTS'`
+   - `decodeArrayBuffer` 用 `util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf))` 替代 `escape()` + `decodeURIComponent()` + `String.fromCharCode` 循环
+   - API 用法来自 DevEco MCP harmonyos_knowledge_search 官方文档，非猜测
+
+2. `apps/web/src/app/knowledge/page.tsx`
+   - 新增 `error` state
+   - `search()` 加 catch，失败时 setError + setResults([])
+   - UI 在搜索栏后、结果前加 error 提示卡片
+   - 该文件非模型相关 API，符合约束（不动 model.ts/orchestrator.ts/模型 API）
+
+3. `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`
+   - 结果项在 courseId 后、text 前加 score 显示（`item.score !== undefined` 时显示"相关度: xx%"）
+
+#### 验证结果
+
+| 项目 | 结果 |
+|------|------|
+| Web lint | ✔ No ESLint warnings or errors |
+| Web typecheck | ✔ exit 0 |
+| ArkTS check_ets_files（HttpClient.ets）| 0 Error，escape deprecated Warning 已消除，仅剩 2 个历史 addTryCatch Warning |
+| ArkTS check_ets_files（Knowledge.ets）| 0 Error，剩 router.back deprecated(Information) + colorConsistent/invalidInitOfList Warning |
+| DevEco build_project（entry@default debug）| ✔ BUILD SUCCESSFUL in 10s 989ms，exit 0 |
+
+#### 遗留（留给 Codex）
+
+- `@ohos.router` pushUrl/back 全部 deprecated，华为推荐迁移到 Navigation 组件。影响 Index.ets(pushUrl) + 5 子页面(back)。属架构级重构，需 Codex 给出迁移指引。
+- List invalidInitOfList Warning：当前用 layoutWeight(1) 撑开高度是正确弹性布局，加固定 height 可能破坏布局，建议保留。
+- Knowledge.ets 请求体仍未传 courseId（需课程选择器 UI，涉及 UI 设计决策，待 Codex 指引）。
+
+### 涉及文件
+
+- `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`（修改：escape→TextDecoder）
+- `apps/web/src/app/knowledge/page.tsx`（修改：加 error 提示）
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`（修改：加 score 显示）
+- `DEVLOG.md`（追加本记录）
+
+### 备注
+
+- 本轮未触碰 apps/web/src/lib/agents/model.ts、orchestrator.ts 及模型相关 API，未接触 MODEL_API_KEY。
+- 端侧导航闭环（上一轮 GLM-5.2）+ 本轮遗留修复的 ArkTS 改动均未提交，待 Codex 复核后统一提交。
+
+---
+
+## [2026-06-25T09:15:46Z] [2026-06-25 17:15:46 CST] 模型: GLM-5.2 (WorkBuddy)
+
+### 操作
+
+产品命名决定（用于 C4-AI 报名）
+
+#### 背景
+
+用户打断端侧导航闭环开发，要求先为产品项目确定名称用于 C4-AI 报名。WorkBuddy 列出 4 个不同风格的候选名，由用户最终选定。
+
+#### 候选方案
+
+| 方向 | 名称 | 风格定位 |
+|------|------|----------|
+| 直白亲切 | 鸿学伴 | 鸿蒙 + 学习伙伴，一眼点明赛道与定位 |
+| 文化底蕴 | 启思 | 启发思考，简洁有内涵 |
+| 哲学感 | 知行 | 知行合一，契合学习与实践结合 |
+| 现代活泼 | 慧学星 | 智慧学习之星，年轻化校园感 |
+
+#### 决定
+
+选定：**鸿学伴**
+
+理由：
+- 信息密度最高：鸿蒙赛道 + 学习场景 + 伙伴定位一眼可读，降低评委理解成本。
+- 便于报名材料、PPT、演示视频统一传播命名。
+- 中性偏正式，符合参赛调性，又不失亲和力。
+
+### 涉及文件
+
+- `DEVLOG.md`（追加本记录）
+- 待同步：`README.md` 产品名、文档抬头、PPT 封面等（后续统一更新，本轮不动）
+
+### 备注
+
+- 本决定由用户在 4 个候选中选定，非 WorkBuddy 单方面决定。
+- 后续报名、文档、PPT、源码包命名均以「鸿学伴」为准。
+- 英文/拼音备选暂定 HongXueBan / HongMate，如报名表需英文名再定。
+- 本轮仅为命名决定，未触碰任何源码、模型相关文件及 MODEL_API_KEY。
+
+---
+
+## [2026-06-26T14:07:00Z] [2026-06-26 22:07:00 CST] 模型: GLM-5.2 (WorkBuddy)
+
+### 操作
+
+工作接力文档创建：因额度问题，WorkBuddy 执行角色由 Trae 接手，同步通知 Codex 角色变化。
+
+#### 背景
+
+用户决定由于额度问题，WorkBuddy 的执行角色暂时由 Trae AI Agent 接手接力。需制作详尽的接力文档，让 Trae 直接清晰自己接下来该干什么，特别是 DevEco MCP 连接方法（防止 Trae 重复探索浪费 token）；同时给 Codex 做角色改变说明文档。
+
+#### 创建文件
+
+1. **`docs/HANDOFF-TO-TRAE.md`**（给 Trae 的接力指引，详尽版）
+   - 项目背景与产品命名（鸿学伴）
+   - 竞赛信息精确对齐（C4-AI / 鸿蒙高校创新赛 / Agent 创新）
+   - 用户明确指令（6 条）
+   - 当前项目状态（Git 6 次提交 + 9 个未提交改动清单）
+   - 已完成工作清单 + 待完成工作清单
+   - **DevEco MCP 连接方法（关键，第四节）**：含标准 JSON 配置、两个环境变量、各 IDE 配置文件位置、Codex TOML 配置参考、10 个可用工具、验证方法、ArkTS 严格模式 5 条规则
+   - Trae 角色定位（接替 WorkBuddy 执行角色，听从 Codex 指挥）
+   - 环境信息（已就绪，无需重新配置）
+   - 技术架构概览
+   - 关键文件索引（鸿蒙端 + Web 后端）
+   - WorkBuddy 操作经验总结（验证流程、常见坑）
+   - Trae 接手后建议首步
+   - AI 协作工具声明
+
+2. **`docs/CODEX-ROLE-CHANGE.md`**（给 Codex 的角色改变说明）
+   - 角色变化概要（Codex 不变，WorkBuddy 退出，Trae 接替）
+   - Codex 与 Trae 的新协作方式和分工原则
+   - 当前项目状态（供 Codex 参考决策）
+   - 交接文档索引
+
+#### 角色变化说明
+
+| 角色 | 调整前 | 调整后 |
+|------|--------|--------|
+| 架构师/指挥 | Codex (GPT-5) | Codex (GPT-5)（不变） |
+| 执行者 | WorkBuddy (GLM-5.2) | Trae（接替） |
+| 退出执行 | — | WorkBuddy（暂时退出） |
+
+#### Trae 的约束（写入接力文档）
+
+1. 不修改 model.ts、orchestrator.ts 和模型相关 API
+2. 不接触 MODEL_API_KEY
+3. 不擅自做架构级重构
+4. 遵守文件安全规则和标识符规则
+5. 每次 ArkTS 改动后执行 check_ets_files，完成后执行 build_project
+6. 所有改动追加写入 DEVLOG.md
+
+### 涉及文件
+
+- `docs/HANDOFF-TO-TRAE.md`（新建：给 Trae 的详尽接力指引）
+- `docs/CODEX-ROLE-CHANGE.md`（新建：给 Codex 的角色改变说明）
+- `DEVLOG.md`（追加本记录）
+
+### 备注
+
+- 本轮仅创建交接文档，未触碰任何源码、模型相关文件及 MODEL_API_KEY。
+- 工作区原有 9 个未提交改动（端侧导航闭环 + 遗留修复）保持不变，待 Codex/Trae 复核后提交。
+- WorkBuddy 执行角色交接完成，后续由 Trae 接手执行，Codex 继续担任架构师/指挥。
+- Trae 需先配置 DevEco MCP（详见 HANDOFF-TO-TRAE.md 第四节），验证可用后再开始执行任务。
+
+---
+
+## [2026-06-26T14:25:12Z] [2026-06-26 22:25:12 CST] 模型: Trae
+
+### 操作
+
+接替 WorkBuddy 执行角色：通读全部接力文档与项目资产 → 校验本机鸿蒙开发平台能力 → 复核 WorkBuddy 遗留未提交改动 → 闭环遗留工程（README 产品名同步）→ 准备向 Codex 汇报。
+
+#### 1. 通读接力文档与项目资产
+
+依次阅读以下文件，建立完整上下文：
+- `docs/HANDOFF-TO-TRAE.md`（WorkBuddy 给 Trae 的详尽接力指引）
+- `.workbuddy/memory/MEMORY.md`（项目长期记忆）
+- `DEVLOG.md`（全部开发历史，12 条记录）
+- `docs/CODEX-ROLE-CHANGE.md`（给 Codex 的角色改变说明）
+- `docs/project-status.md`、`README.md`（项目全貌）
+
+确认角色定位：Trae 接替 WorkBuddy 担任执行者，听从 Codex 指挥；不修改 model.ts/orchestrator.ts/模型 API，不接触 MODEL_API_KEY，不擅自做架构级重构。
+
+#### 2. 校验本机鸿蒙开发平台能力
+
+当前 Trae 会话未挂载 DevEco MCP 工具（MCP 需单独配置并重启会话生效），故通过 hvigorw.bat 命令行 wrapper 等效校验（包含 ArkTS 编译 = 语法检查 + 资源编译 + HAP 打包）。
+
+| 校验项 | 命令 | 结果 |
+|--------|------|------|
+| Hvigor wrapper | `hvigorw.bat tasks --no-daemon` | BUILD SUCCESSFUL（entry + harmonyos 节点均识别） |
+| HAP 构建 | `hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --no-daemon` | BUILD SUCCESSFUL in 23s（CompileResource/CompileArkTS/PackageHap 全通过，SignHap 跳过属正常） |
+| Web lint | `pnpm lint` | No ESLint warnings or errors |
+| Web typecheck | `tsc --noEmit --project tsconfig.typecheck.json` | exit 0 |
+| Trae 终端环境 | `node --version` / `pnpm --version` | Node v22.16.0 / pnpm 11.9.0 |
+
+结论：鸿蒙开发平台连接正常，HarmonyOS 编译闭环 + Web 工具链均可用。
+
+#### 3. 复核 WorkBuddy 遗留未提交改动
+
+`git status` 确认 9 个 modified + 2 个 untracked（交接文档），与接力文档描述一致。逐文件审查 diff：
+
+- `HttpClient.ets`：escape()/decodeURIComponent() → util.TextDecoder.create('utf-8').decodeToString()，废弃 API 替换正确，来自官方文档。
+- `Index.ets`：router.pushUrl 启用 + .catch() 异常处理 + 补 Course/Profile 入口，导航闭环正确。
+- `Chat.ets`/`Course.ets`/`Plan.ets`/`Knowledge.ets`/`Profile.ets`：各加返回按钮 router.back()。
+- `knowledge/page.tsx`：新增 error state + catch + 错误提示卡片。
+- HAP 构建（含上述全部改动）BUILD SUCCESSFUL，ArkTS 编译 0 Error，印证 WorkBuddy 验证结论。
+
+#### 4. 闭环遗留工程
+
+- **回退非预期改动**：运行 `pnpm --version` 时 corepack 自动向 `apps/web/package.json` 写入 `packageManager` 字段，非 WorkBuddy 产物，已移除以保持提交基线干净。
+- **README 产品名同步**（接力文档明确列为待完成第 8 项）：
+  - 标题改为「鸿学伴 — 鸿蒙 AI 学习/校园助理 Agent」+ 产品名说明
+  - AI 协作工具分工表更新为 Codex(架构师)/Trae(执行者)/WorkBuddy(已退出) 三方
+  - AI Coding 工具声明表补 Trae 行 + 模型列
+- Web lint/typecheck 复检通过。
+
+#### 5. DevEco MCP 连接状态说明
+
+Trae 当前会话无 DevEco MCP 工具。接力文档第四节已给出标准 JSON 配置（`@deveco-codegenie/mcp@beta`，DEVECO_PATH + PROJECT_PATH 两个环境变量）。WorkBuddy/Codex 已分别用 JSON/TOML 格式验证可用。Trae 侧需按自身 MCP 配置机制添加后重启会话生效；在此之前以 hvigorw.bat 命令行等效完成 ArkTS 检查与构建。
+
+### 涉及文件
+
+- `docs/HANDOFF-TO-TRAE.md`（读取）
+- `.workbuddy/memory/MEMORY.md`（读取）
+- `DEVLOG.md`（读取 + 追加本记录）
+- `docs/CODEX-ROLE-CHANGE.md`（读取）
+- `docs/project-status.md`（读取）
+- `README.md`（修改：产品名同步 + AI 协作工具分工更新）
+- `apps/web/package.json`（修改：移除 corepack 自动写入的 packageManager 字段）
+- `apps/harmonyos/hvigorw.bat`（执行验证）
+- `apps/harmonyos/entry/src/main/ets/**/*.ets`（构建验证）
+- `apps/web/src/app/knowledge/page.tsx`（diff 审查）
+
+### 备注
+
+- 本轮未触碰 apps/web/src/lib/agents/model.ts、orchestrator.ts 及模型相关 API，未接触 MODEL_API_KEY。
+- WorkBuddy 的 9 个未提交改动（端侧导航闭环 + 遗留修复）已独立复核通过（HAP 构建 + Web lint/typecheck），可提交闭环。
+- README 产品名同步完成，待与 WorkBuddy 改动一并提交。
+- 下一步待 Codex 决策：router→Navigation 迁移、鸿蒙赛道亮点、知识库上传接口等架构级任务优先级。
+- 建议为 Trae 配置 DevEco MCP 以恢复 ArkTS 单文件检查能力（check_ets_files）。
+
+---
