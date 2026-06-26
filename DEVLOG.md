@@ -1559,3 +1559,58 @@ Trae 当前会话无 DevEco MCP 工具。接力文档第四节已给出标准 JS
 - 下一步按 Codex 指令继续改 Chat.ets / Plan.ets / Knowledge.ets / Profile.ets。
 
 ---
+
+## 2026-06-27 前端交互框架研究 + 文档建立
+
+**时间**: 2026-06-27 01:30 UTC+8
+**模型**: Trae (Claude)
+**操作**: 基于竞品分析 + HarmonyOS Design 规范 + 开源项目调研，建立前端交互框架设计文档
+
+### 研究方法
+
+3 路并行 Explore 代理调研：
+1. HarmonyOS 官方设计规范（ArkUI 组件、Navigation、状态管理、多端部署）
+2. 8 款学习助手竞品深度分析（得到/百词斩/知乎/Flomo/学习强国/夸克学习/中国大学MOOC/Duolingo）
+3. GitHub/Gitee 开源项目调研（OpenHarmony 官方示例 1447 star、HMRouter、便单、开眼App 等）
+
+DevEco MCP 知识检索尝试（harmonyos_knowledge_search）— 仍返回空（云端问题持续）。
+
+### 产出文件
+
+- `docs/FRONTEND-INTERACTION-FRAMEWORK.md` — 完整前端交互框架设计文档（685 行）
+  - 设计哲学（5 项核心原则 + 差异化定位）
+  - 视觉设计系统（色彩/字体/间距/圆角/阴影/动效）
+  - 信息架构与导航模式
+  - 6 个页面设计规范（含 ASCII 布局图 + 具体色值 + 竞品借鉴）
+  - 交互模式（三态反馈/按钮状态/列表交互/输入交互/转场动画）
+  - 技术架构（状态管理/组件封装/列表性能/工程分层/路由迁移）
+  - 竞品借鉴矩阵（15 项可操作借鉴点）
+  - 实施路线图（3 批）
+  - 信息缺口与待核实项
+  - 25 条来源引用（P0/P1/P2 分级）
+
+### 关键发现
+
+1. **竞品差异化**: 鸿学伴的"多 Agent 协作 AI + RAG 知识库 + 自动学习计划"组合在 8 款竞品中无人覆盖
+2. **HarmonyOS Design**: 轻拟物美学、HarmonyOS Sans 字体、断点响应式布局、系统蓝 #007DFF [待核实]
+3. **路由迁移**: @ohos.router 已废弃，Navigation 或 HMRouter 是官方推荐方向（Codex 架构决策）
+4. **状态管理**: 华为官方推荐 @ObjectLink 优先于 @Prop（避免深拷贝）、状态变量关联组件 <20
+5. **竞品亮点**: Flomo 热力图、学习强国 13 类积分体系、得到走势图、知乎回答排序
+
+### 信息缺口（诚实标注）
+
+- HarmonyOS Design 官方文档原文未能获取（官网 SPA，WebFetch 无法抓取）
+- `#007DFF`、`8vp`、`500ms` 等参数来自社区转述，需官方文档核实
+- Duolingo 游戏化机制细节、中国大学 MOOC 交互细节 [INSUFFICIENT DATA]
+
+### Git 状态
+
+本轮新增 `docs/FRONTEND-INTERACTION-FRAMEWORK.md` + DEVLOG 追加。
+
+### 备注
+
+- 未触碰模型相关文件、HarmonyOS API、Navigation、服务卡片、通知、元服务代码
+- 框架文档中 Navigation 迁移仅作为"未来路线"记录，不执行
+- 所有结论有来源引用，标注了来源层级（P0/P1/P2），未编造信息
+
+---
