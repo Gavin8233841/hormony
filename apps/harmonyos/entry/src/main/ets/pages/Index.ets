@@ -1,6 +1,6 @@
 /**
- * 仪表盘首页
- * 统计卡片 + 快捷入口 + Agent 架构概览
+ * 鸿学伴 - 首页
+ * 今日学习概览 + 快捷入口
  */
 
 import router from '@ohos.router';
@@ -30,122 +30,269 @@ struct Index {
 
   build() {
     Column() {
-      // 标题
-      Text('学习仪表盘')
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 20, bottom: 4, left: 20 })
-        .width('100%')
+      // 顶部问候
+      Column() {
+        Text('鸿学伴')
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#1a1a1a')
+          .width('100%')
 
-      Text('多智能体协作的校园学习助理')
-        .fontSize(13)
-        .fontColor('#94a3b8')
-        .margin({ bottom: 20, left: 20 })
-        .width('100%')
+        Text('今天学什么？')
+          .fontSize(14)
+          .fontColor('#929292')
+          .margin({ top: 4 })
+          .width('100%')
+      }
+      .width('100%')
+      .padding({ left: 24, right: 24, top: 36, bottom: 20 })
 
-      // 统计卡片
-      Row({ space: 12 }) {
-        this.StatCard('累计提问', this.profile?.stats?.totalQuestions?.toString() ?? '--', '#3b82f6')
-        this.StatCard('正确率', this.profile ? `${Math.round(this.profile.stats.accuracy * 100)}%` : '--', '#10b981')
-        this.StatCard('学习天数', this.profile?.stats?.studyDays?.toString() ?? '--', '#f59e0b')
+      // 学习概览卡片
+      Row({ space: 10 }) {
+        // 提问数
+        Column() {
+          Text(this.profile?.stats?.totalQuestions?.toString() ?? '0')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#0a59f7')
+          Text('提问')
+            .fontSize(12)
+            .fontColor('#929292')
+            .margin({ top: 4 })
+        }
+        .layoutWeight(1)
+        .padding(14)
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .alignItems(HorizontalAlign.Center)
+
+        // 正确率
+        Column() {
+          Text(this.profile ? `${Math.round(this.profile.stats.accuracy * 100)}%` : '0%')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#4caf50')
+          Text('正确率')
+            .fontSize(12)
+            .fontColor('#929292')
+            .margin({ top: 4 })
+        }
+        .layoutWeight(1)
+        .padding(14)
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .alignItems(HorizontalAlign.Center)
+
+        // 学习天数
+        Column() {
+          Text(this.profile?.stats?.studyDays?.toString() ?? '0')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#ff9800')
+          Text('学习天')
+            .fontSize(12)
+            .fontColor('#929292')
+            .margin({ top: 4 })
+        }
+        .layoutWeight(1)
+        .padding(14)
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .alignItems(HorizontalAlign.Center)
       }
       .width('100%')
       .padding({ left: 16, right: 16 })
 
-      // 快捷入口
-      Column({ space: 12 }) {
-        this.EntryItem('AI 对话辅导', '向 Tutor Agent 提问，获取带引用的讲解', '/pages/Chat')
-        this.EntryItem('生成学习计划', 'Planner Agent 拆解目标为任务', '/pages/Plan')
-        this.EntryItem('知识库检索', 'RAG 检索课程资料', '/pages/Knowledge')
-        this.EntryItem('我的课程', '查看课程资料纳入 RAG 知识库', '/pages/Course')
-        this.EntryItem('个人画像', 'Profile Agent 维护的学习画像', '/pages/Profile')
-      }
-      .width('100%')
-      .padding(16)
+      // 快捷功能区标题
+      Text('学习功能')
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#1a1a1a')
+        .width('100%')
+        .padding({ left: 24, top: 28, bottom: 8 })
 
-      // Agent 架构
-      Column() {
-        Text('多 Agent 协作架构')
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .margin({ bottom: 12 })
+      // 功能入口 - 直接内联，不使用 @Builder
+      Column({ space: 10 }) {
+        // 问问鸿学伴
+        Row() {
+          Column() {
+            Text('问问鸿学伴')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#1a1a1a')
+            Text('向 AI 助教提问，获取带引用的讲解')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 3 })
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
 
-        Flex({ wrap: FlexWrap.Wrap }) {
-          this.AgentTag('Profile', '#3b82f6')
-          this.AgentTag('Retrieval', '#10b981')
-          this.AgentTag('Planner', '#f59e0b')
-          this.AgentTag('Tutor', '#a855f7')
-          this.AgentTag('Quiz', '#ec4899')
-          this.AgentTag('Evaluator', '#06b6d4')
-          this.AgentTag('Safety', '#ef4444')
+          Text('›')
+            .fontSize(22)
+            .fontColor('#cccccc')
         }
         .width('100%')
+        .padding({ left: 20, right: 16, top: 14, bottom: 14 })
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .border({ width: { left: 4 }, color: { left: '#0a59f7' } })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/Chat' }).catch((err: Error) => {
+            console.error(`router.pushUrl failed: ${err.message}`);
+          });
+        })
+
+        // 学习计划
+        Row() {
+          Column() {
+            Text('学习计划')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#1a1a1a')
+            Text('输入目标，自动拆解为每日任务')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 3 })
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          Text('›')
+            .fontSize(22)
+            .fontColor('#cccccc')
+        }
+        .width('100%')
+        .padding({ left: 20, right: 16, top: 14, bottom: 14 })
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .border({ width: { left: 4 }, color: { left: '#4caf50' } })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/Plan' }).catch((err: Error) => {
+            console.error(`router.pushUrl failed: ${err.message}`);
+          });
+        })
+
+        // 搜课程资料
+        Row() {
+          Column() {
+            Text('搜课程资料')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#1a1a1a')
+            Text('搜索课程知识点和相关资料')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 3 })
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          Text('›')
+            .fontSize(22)
+            .fontColor('#cccccc')
+        }
+        .width('100%')
+        .padding({ left: 20, right: 16, top: 14, bottom: 14 })
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .border({ width: { left: 4 }, color: { left: '#ff9800' } })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/Knowledge' }).catch((err: Error) => {
+            console.error(`router.pushUrl failed: ${err.message}`);
+          });
+        })
+
+        // 我的课程
+        Row() {
+          Column() {
+            Text('我的课程')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#1a1a1a')
+            Text('查看课程进度和学习资料')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 3 })
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          Text('›')
+            .fontSize(22)
+            .fontColor('#cccccc')
+        }
+        .width('100%')
+        .padding({ left: 20, right: 16, top: 14, bottom: 14 })
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .border({ width: { left: 4 }, color: { left: '#9c27b0' } })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/Course' }).catch((err: Error) => {
+            console.error(`router.pushUrl failed: ${err.message}`);
+          });
+        })
+
+        // 学习画像
+        Row() {
+          Column() {
+            Text('学习画像')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#1a1a1a')
+            Text('查看薄弱点和优势，针对性提升')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 3 })
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          Text('›')
+            .fontSize(22)
+            .fontColor('#cccccc')
+        }
+        .width('100%')
+        .padding({ left: 20, right: 16, top: 14, bottom: 14 })
+        .backgroundColor('#ffffff')
+        .borderRadius(12)
+        .border({ width: { left: 4 }, color: { left: '#00bcd4' } })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/Profile' }).catch((err: Error) => {
+            console.error(`router.pushUrl failed: ${err.message}`);
+          });
+        })
       }
       .width('100%')
-      .padding(16)
-      .backgroundColor('#1e293b')
-      .borderRadius(12)
-      .margin({ left: 16, right: 16, bottom: 20 })
+      .padding({ left: 16, right: 16 })
+
+      // 底部留白
+      Blank().height(40)
 
       if (this.message.length > 0) {
-        Text(this.message).fontSize(12).fontColor('#ef4444').padding(16)
+        Text(this.message)
+          .fontSize(12)
+          .fontColor('#e53935')
+          .padding({ left: 24, right: 24, bottom: 8 })
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#0f172a')
-  }
-
-  @Builder
-  StatCard(label: string, value: string, color: string) {
-    Column() {
-      Text(value)
-        .fontSize(28)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(color)
-      Text(label)
-        .fontSize(12)
-        .fontColor('#94a3b8')
-        .margin({ top: 4 })
-    }
-    .layoutWeight(1)
-    .padding(16)
-    .backgroundColor('#1e293b')
-    .borderRadius(12)
-    .alignItems(HorizontalAlign.Center)
-  }
-
-  @Builder
-  EntryItem(title: string, desc: string, target: string) {
-    Row() {
-      Column() {
-        Text(title).fontSize(15).fontWeight(FontWeight.Medium).fontColor('#e2e8f0')
-        Text(desc).fontSize(12).fontColor('#94a3b8').margin({ top: 4 })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
-      Text('›').fontSize(20).fontColor('#475569')
-    }
-    .width('100%')
-    .padding(16)
-    .backgroundColor('#1e293b')
-    .borderRadius(12)
-    .onClick(() => {
-      router.pushUrl({ url: target }).catch((err: Error) => {
-        console.error(`router.pushUrl failed: ${err.message}`);
-      });
-    })
-  }
-
-  @Builder
-  AgentTag(name: string, color: string) {
-    Text(name)
-      .fontSize(11)
-      .fontColor(color)
-      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-      .backgroundColor(`${color}20`)
-      .borderRadius(12)
-      .margin(4)
+    .backgroundColor('#f5f6f8')
   }
 }

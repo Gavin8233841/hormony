@@ -1463,3 +1463,99 @@ Trae 当前会话无 DevEco MCP 工具。接力文档第四节已给出标准 JS
 - 下一步由 Trae 按 `docs/TRAE-DEVECO-UI-REDESIGN-BRIEF.md` 执行第一批 HarmonyOS UI 产品化改版。
 
 ---
+
+## [2026-06-26T17:30:00Z] [2026-06-27 01:30:00 CST] 模型: Trae
+
+### 操作
+
+执行 Codex 第一批 UI 产品化改版：重写 Index.ets + Course.ets，从临时功能骨架改为可展示的鸿蒙 App 原型。不改 HarmonyOS API、Navigation、服务卡片、通知、元服务代码。
+
+#### 1. Index.ets 重写
+
+**改动前**：深色背景（#0a0e27）、"学习仪表盘"标题、Agent 架构展示栏（7 个 Agent 标签）、技术化文案（"AI 对话辅导"/"Tutor Agent"）。
+
+**改动后**：
+- 浅色背景 `#f5f6f8`
+- 标题改为"鸿学伴"+ 副标题"今天学什么？"
+- 3 列统计卡片（提问/正确率/学习天），白底圆角，蓝色/绿色/橙色数值
+- 5 个功能入口卡片：问问鸿学伴 / 学习计划 / 搜课程资料 / 我的课程 / 学习画像
+- 每个入口左侧色条（border-left 4px），右侧箭头
+- 用户化描述文案（"向 AI 助教提问，获取带引用的讲解"等）
+- **删除 Agent 架构展示栏**
+- 保持 `router.pushUrl` 导航逻辑和 `loadProfile()` API 调用不变
+
+#### 2. Course.ets 重写
+
+**改动前**：深色背景、技术化文案（"课程资料已纳入 RAG 知识库"）。
+
+**改动后**：
+- 浅色背景 `#f5f6f8`
+- 白色圆角课程卡片
+- 课程标题 + 资料数 + 学习进度标签 + 绿色进度条 + 百分比 + 知识点标签
+- 副标题改为"查看课程进度和学习资料"（去掉 RAG 术语）
+- 保持 `loadCourses()` API 调用和演示数据回退逻辑不变
+
+#### 3. 关键 Bug 修复：router.pushUrl URI 格式
+
+**问题**：点击首页入口无法跳转，hilog E 级报错 `router.pushUrl failed: Uri error. The URI of the page to redirect is incorrect or does not exist.`
+
+**根因**：`main_pages.json` 注册路径为 `pages/Chat`（无前导斜杠），但代码用 `router.pushUrl({ url: '/pages/Chat' })`（有前导斜杠）。Clean build 后路由表严格匹配，前导斜杠导致 URI 不匹配。
+
+**修复**：5 个 pushUrl 调用全部移除前导斜杠：`'/pages/Chat'` → `'pages/Chat'`，其余 4 个同理。
+
+**验证**：hilog 确认 `call pushUrl with mode: 0, url: pages/Course` 成功跳转，UI 树确认课程页内容渲染。
+
+#### 4. DevEco MCP 工具使用情况
+
+| 工具 | 用途 | 结果 |
+|------|------|------|
+| `harmonyos_knowledge_search` | 查询 ArkUI 浅色主题/配色规范 | 返回空 `[]`（云端服务问题） |
+| `check_ets_files` | 检查 Index.ets + Course.ets | 管道错误（语言服务异常，3 次重试均失败） |
+| `build_project` | 编译构建（含 CompileArkTS 全量检查） | BUILD SUCCESSFUL，0 Error |
+| `start_app` | 部署到 Pura 90 Pro Max 模拟器 | 安装并启动成功 |
+| `perform_ui_action(screenshot)` | 截图首页 + 课程页 | 2 张截图成功 |
+| `perform_ui_action(click)` | 点击"我的课程"导航 | 成功跳转（URI 修复后） |
+| `get_app_ui_tree` | UI 树验证页面内容 | 首页 24 节点 + 课程页 31 节点确认 |
+| `get_hilog_or_faultlog_recent` | 诊断导航失败原因 | E 级日志定位 URI 错误 |
+
+> `check_ets_files` 持续管道错误（"Failed to flush stdin: 管道正在被关闭"），project_sync 后仍未恢复。以 `build_project` 的 CompileArkTS 阶段等效替代语法检查。
+
+#### 5. 运行态验证结果
+
+**首页**：
+- 标题"鸿学伴"+ 副标题"今天学什么？"
+- 统计卡片显示真实数据：128 提问 / 76% 正确率 / 23 学习天（API 加载成功）
+- 5 个功能入口可见，左侧色条（蓝/绿/橙/紫/青）
+- 点击"我的课程"成功跳转到课程页
+
+**课程页**：
+- 标题栏"‹ 我的课程"+ 副标题"查看课程进度和学习资料"
+- 3 门课程：数据结构（65%, 12 份资料）、操作系统（42%, 8 份资料）、计算机网络（30%, 6 份资料）
+- 绿色进度条 + 知识点标签（数组/链表/树/图 等）
+- 浅色背景，白色圆角卡片，无技术术语
+
+### 涉及文件
+
+- `apps/harmonyos/entry/src/main/ets/pages/Index.ets`（全文重写 + URI 修复）
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`（全文重写）
+- `screenshots/harmonyos/index-redesign.png`（首页改版截图）
+- `screenshots/harmonyos/course-redesign.png`（课程页改版截图）
+
+### Git 状态
+
+```
+提交前：工作区干净（上一轮可视化演示提交）
+本轮修改 2 个 ArkTS 页面文件 + 截图 + DEVLOG 追加。
+```
+
+### 备注
+
+- 本轮未触碰模型相关文件（model.ts / orchestrator.ts / MODEL_API_KEY）。
+- 未改 HarmonyOS API、Navigation、服务卡片、通知、元服务代码（遵守开发边界）。
+- router.pushUrl URI 前导斜杠问题是 clean build 后才暴露的（之前增量构建未触发），已修复。
+- `check_ets_files` 工具管道异常需后续排查（可能需要重启 DevEco Studio 的语言服务）。
+- `harmonyos_knowledge_search` 云端返回空，属服务端问题。
+- 首页改版后不再有 Scroll 容器（内容在一屏内显示完整），避免了 Scroll 拦截点击事件的问题。
+- 下一步按 Codex 指令继续改 Chat.ets / Plan.ets / Knowledge.ets / Profile.ets。
+
+---

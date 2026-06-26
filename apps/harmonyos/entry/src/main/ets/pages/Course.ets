@@ -1,5 +1,5 @@
 /**
- * 课程页
+ * 课程页 - 课程列表
  */
 
 import router from '@ohos.router';
@@ -39,21 +39,22 @@ struct CoursePage {
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor('#e2e8f0')
-          .width(36)
-          .height(36)
+          .fontColor('#1a1a1a')
+          .width(40)
+          .height(40)
           .textAlign(TextAlign.Center)
           .onClick(() => {
             router.back();
           })
+
         Column() {
           Text('我的课程')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#e2e8f0')
-          Text('课程资料已纳入 RAG 知识库')
+            .fontColor('#1a1a1a')
+          Text('查看课程进度和学习资料')
             .fontSize(12)
-            .fontColor('#94a3b8')
+            .fontColor('#929292')
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
@@ -65,65 +66,83 @@ struct CoursePage {
 
       if (this.loading) {
         Column() {
-          LoadingProgress().width(40).height(40).color('#3b82f6')
+          LoadingProgress()
+            .width(36)
+            .height(36)
+            .color('#0a59f7')
         }
         .width('100%')
-        .height('60%')
+        .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        List({ space: 12 }) {
+        List({ space: 10 }) {
           ForEach(this.courses, (c: Course) => {
             ListItem() {
               Column() {
+                // 课程标题行
                 Row() {
-                  Text(c.title).fontSize(16).fontWeight(FontWeight.Medium).fontColor('#e2e8f0')
-                  Text(`${c.docCount} 份资料`).fontSize(12).fontColor('#94a3b8')
+                  Text(c.title)
+                    .fontSize(17)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#1a1a1a')
+                  Text(`${c.docCount} 份资料`)
+                    .fontSize(12)
+                    .fontColor('#929292')
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
+
+                // 进度行
+                Row() {
+                  Text('学习进度')
+                    .fontSize(12)
+                    .fontColor('#929292')
+                  Text(`${Math.round(c.progress * 100)}%`)
+                    .fontSize(12)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor('#4caf50')
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.SpaceBetween)
+                .margin({ top: 12, bottom: 6 })
 
                 // 进度条
-                Row() {
-                  Text('学习进度').fontSize(11).fontColor('#64748b')
-                  Text(`${Math.round(c.progress * 100)}%`).fontSize(11).fontColor('#94a3b8')
-                }
-                .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
-                .margin({ top: 10, bottom: 4 })
-
                 Progress({ value: c.progress * 100, total: 100, type: ProgressType.Linear })
                   .width('100%')
-                  .color('#3b82f6')
+                  .color('#4caf50')
+                  .backgroundColor('#e8e8e8')
+                  .borderRadius(4)
 
-                // 主题标签
+                // 知识点标签
                 Flex({ wrap: FlexWrap.Wrap }) {
                   ForEach(c.topics, (t: string) => {
                     Text(t)
                       .fontSize(11)
-                      .fontColor('#94a3b8')
-                      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                      .backgroundColor('#334155')
+                      .fontColor('#666666')
+                      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                      .backgroundColor('#f0f0f2')
                       .borderRadius(8)
-                      .margin({ right: 4, bottom: 4 })
+                      .margin({ right: 6, bottom: 6 })
                   })
                 }
                 .width('100%')
-                .margin({ top: 10 })
+                .margin({ top: 12 })
               }
               .width('100%')
               .padding(16)
-              .backgroundColor('#1e293b')
-              .borderRadius(12)
+              .backgroundColor('#ffffff')
+              .borderRadius(14)
             }
           })
         }
         .width('100%')
         .layoutWeight(1)
         .padding({ left: 16, right: 16 })
+        .scrollBar(BarState.Off)
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#0f172a')
+    .backgroundColor('#f5f6f8')
   }
 }
