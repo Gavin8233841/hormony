@@ -1820,3 +1820,54 @@ hvigor BUILD SUCCESSFUL in 9 s 374 ms
 - Skills 参考文件路径已确认，Trae 可直接 Read 获取 HarmonyOS 专家知识
 - harmonyos_knowledge_search 根因确认为网络问题（非关键词或 OAuth 问题）
 - 代码扫描发现的 P1/P2 问题已记录为技术债务，不阻塞当前竞赛进度
+
+---
+
+## [2026-06-27T11:10:00Z] [2026-06-27 19:10:00 CST] 模型: Trae
+
+### 操作
+
+DevEco Code 全能力测试 + 组合拳工作流规范文档创建
+
+#### 1. DevEco Code 全能力实测
+
+| 测试项 | 命令 | 结果 |
+|--------|------|------|
+| 代码审查 (Index.ets) | `deveco run '分析 ArkUI 问题'` | ✅ 发现 3 个真实问题 |
+| SSE 分析 (Chat.ets) | `deveco run '分析 SSE 流式接收逻辑'` | ✅ 发现 4 个问题（内存泄漏等） |
+| ArkTS 合规 (HttpClient.ets) | `deveco run '检查 ArkTS 语法合规性'` | ✅ 发现 3 个违规（as断言/Object/Record） |
+| 术语扫描 (全部页面) | `deveco run '检查技术架构术语暴露'` | ✅ 未发现 UI 可见术语 |
+| 方案生成 (Plan.ets) | `deveco run '给出完成任务标记方案'` | ✅ 生成完整方案+代码片段 |
+| 完整文件重写 (HttpClient.ets) | `deveco run '给出修复后完整文件'` | ⏳ 耗时超 3 分钟未完成（大文件生成慢） |
+| probe-faultlogger.mjs | 脚本链测试 | ✅ status: not_found（正常） |
+| collect-hilog.mjs | 脚本链测试 | ✅ status: collected + 日志文件 |
+
+#### 2. 关键发现
+
+- DevEco Code 代码审查/分析/方案生成能力强大，能发现 Trae 遗漏的专业问题
+- 完整文件重写（大文件）耗时较长，建议用"方案+关键代码片段"模式替代
+- arkts-runtime-fix 脚本链全部可用，需设置 DEVECO_HOME 环境变量
+- Skills 5 个技能包参考文件路径已确认，Trae 可直接 Read 获取知识
+
+#### 3. 组合拳工作流规范文档
+
+创建 `docs/INTEGRATED-WORKFLOW-SPEC.md`，包含：
+- 工具能力矩阵（全部实测验证）
+- 组合拳工作流（6 阶段强制性规范）
+- 任务分配原则（9 类任务的主力/辅助工具）
+- 6 条强制性规则（工作流边界）
+- 5 个 `deveco run` 任务模板
+- arkts-runtime-fix 崩溃诊断流程图
+- 环境配置清单和 PowerShell 调用模板
+- 实测验证记录
+
+### 涉及文件
+
+- `docs/INTEGRATED-WORKFLOW-SPEC.md`（新建）
+- `DEVLOG.md`（追加本条记录）
+
+### 备注
+
+- DevEco Code 已正式纳入 Trae 工作流，不再是"仅代码审查"角色
+- 后续每次代码改写必须按 INTEGRATED-WORKFLOW-SPEC.md 的 6 阶段流程执行
+- DevEco Code 发现的 Chat.ets SSE 内存泄漏和 HttpClient.ets ArkTS 违规问题已记录为技术债务
