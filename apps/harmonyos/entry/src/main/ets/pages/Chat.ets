@@ -6,7 +6,7 @@
 import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { ChatMessage, Citation, StreamEvent, ChatRequest } from '../model/DataModels';
+import { Citation, StreamEvent, ChatRequest } from '../model/DataModels';
 
 interface DisplayMessage {
   role: string;

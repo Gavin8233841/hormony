@@ -26,12 +26,33 @@ Trae (Claude)  ←→  DevEco MCP (社区版 @deveco-codegenie/mcp v0.2.4)
               DevEco Studio SDK (hvigorw / hdc / LSP)
                          ↓
               Pura 90 Pro Max 模拟器
+
+Trae (Claude)  ←→  DevEco Code (@deveco/deveco-code v0.1.0, 已安装)
+                         ↓
+              deveco run / deveco serve (非交互 AI Agent)
+                         ↓
+              内置 GLM-5.1 / OpenAI gpt-5.3 + 5 个鸿蒙 Skills
 ```
 
-### 1.3 迁移路线
+### 1.3 DevEco Code 本地安装状态（2026-06-27 核实）
 
-- **当前（竞赛阶段）**: 继续用社区 MCP + hvigorw 命令行
-- **赛后**: 迁移到官方 DevEco CLI (`npm install -g @deveco/deveco-cli`) + DevEco Code
+| 项目 | 值 |
+|------|-----|
+| npm 包名 | `@deveco/deveco-code` |
+| 版本 | `0.1.0` |
+| 安装路径 | `C:\Users\guo82\AppData\Local\Programs\nodejs-portable\node-v24.16.0-win-x64\node_modules\@deveco\deveco-code` |
+| CLI 命令 | `deveco` (非 `deveco-code`) |
+| 数据目录 | `C:\Users\guo82\.local\share\deveco` |
+| 配置目录 | `C:\Users\guo82\.config\deveco` |
+| Skills 目录 | `C:\Users\guo82\.local\share\deveco\skills\` |
+| 当前模型 | `gpt-5.3-chat-latest` (已配置 OpenAI Provider) |
+| 内置免费模型 | `deveco/GLM-5.1` (50 req/min) |
+| MCP 服务器 | 未配置（可通过 `deveco mcp add` 添加） |
+
+### 1.4 迁移路线
+
+- **当前（竞赛阶段）**: 双轨并行 — DevEco MCP（MCP 工具调用）+ DevEco Code（AI 代码分析）
+- **赛后**: 迁移到官方 DevEco CLI (`npm install -g @deveco/deveco-cli`) + DevEco Code 完整集成
 
 ---
 
@@ -118,12 +139,27 @@ outputDirectory: dump JSON 保存路径
 | **arkts-runtime-fix** | 运行时崩溃排查、JS Crash 解析 | 应用闪退诊断 |
 | **deveco-create-project** | 新工程模板生成 | 未来新项目 |
 
-### 3.2 Skills 调用方式
+### 3.2 Skills 调用方式与文件路径
 
-Skills **不是 MCP 工具那样直接调用**。它们是 DevEco Code Agent 自动加载的知识/指令包：
-- 在 DevEco Code 终端中，Agent 根据任务自动参考
-- 在我们的 Trae 环境中，Skills 表现为指令文件约束——在对话中提及 skill 名，AI 即按其约束生成代码
-- 华为宣称集成 "70+ 鸿蒙专属 Skill 能力"，核心打包 5 个，其余为扩展
+**文件路径**（2026-06-27 核实）: `C:\Users\guo82\.local\share\deveco\skills\`
+
+Skills 有三种使用方式：
+1. **DevEco Code 自动加载**: 在 `deveco run` 或 TUI 中，Agent 根据任务自动参考对应 Skill
+2. **Trae 直接读取**: Trae 可通过 Read 工具读取 Skill 参考文件，注入知识到当前会话
+3. **运行时脚本调用**: arkts-runtime-fix 的脚本链可直接通过 `node` 执行
+
+**Trae 可读取的关键参考文件**:
+
+| Skill | 参考文件 | 用途 |
+|-------|----------|------|
+| arkui-knowledge | `references/common-mistakes.md` | ArkUI 常见错误（Tabs/ForEach/State/Builder） |
+| arkui-knowledge | `references/ui-quality-checklist.md` | UI 质量检查清单 |
+| arkui-knowledge | `references/component-cookbook.md` | 组件用法手册 |
+| arkui-knowledge | `references/api-guardrails.md` | API 安全护栏 |
+| arkts-grammar-standards | `references/ts-diff.md` | TypeScript vs ArkTS 差异 |
+| arkts-grammar-standards | `references/restrictions.md` | ArkTS 语法限制 |
+| arkts-error-fixes | `reference/*.md` (30+ 文件) | 每种编译错误的修复指南 |
+| arkts-runtime-fix | `scripts/*.mjs` | hilog 收集/faultlog 拉取/jscrash 解析脚本 |
 
 ### 3.3 arkts-error-fixes 覆盖的错误类型
 
@@ -166,6 +202,82 @@ jscrash-report.mjs   → 报告生成（未注册为 MCP 工具，仅 skill 内�
 
 ---
 
+## 四点五、DevEco Code CLI 能力（2026-06-27 实测）
+
+### 4.5.1 CLI 命令总览
+
+| 命令 | 功能 | Trae 集成价值 |
+|------|------|---------------|
+| `deveco run [message..]` | 非交互执行 AI Agent | **高** — Trae 可调用获取 HarmonyOS 专家分析 |
+| `deveco serve` | 启动 headless 服务器 | **中** — 持久服务，多会话复用 |
+| `deveco mcp add/list/auth` | MCP 服务器管理 | **中** — 可将 DevEco MCP 加入 DevEco Code |
+| `deveco models [provider]` | 列出可用模型 | **低** — 信息查询 |
+| `deveco debug skill` | 列出所有 Skills | **低** — 信息查询 |
+| `deveco debug config` | 查看解析后配置 | **低** — 信息查询 |
+| `deveco debug paths` | 查看全局路径 | **低** — 信息查询 |
+| `deveco agent list` | 列出可用 Agent | **低** — 信息查询 |
+| `deveco plugin <module>` | 安装插件 | **中** — 扩展能力 |
+
+### 4.5.2 `deveco run` 非交互执行（已验证）
+
+**实测命令**:
+```powershell
+$nodePath = 'C:\Users\guo82\AppData\Local\Programs\nodejs-portable\node-v24.16.0-win-x64'
+& "$nodePath\deveco.cmd" run '分析 Index.ets 的 ArkUI 问题' `
+  --dir 'C:\Users\guo82\Desktop\Hormony\apps\harmonyos' `
+  --skip-agreement
+```
+
+**实测结果**:
+- ✅ 成功读取 `Index.ets` 并分析
+- ✅ 自动加载 arkui-knowledge Skill
+- ✅ 识别出真实问题：stats 判空、error 类型安全、@Builder 重复结构
+- ✅ 输出格式化文本，可被 Trae 捕获和处理
+- 使用模型：`gpt-5.3-chat-latest`（build 模式）
+
+**关键参数**:
+- `--dir`: 指定项目目录
+- `--skip-agreement`: 跳过协议确认（仍需登录）
+- `--format json`: 输出原始 JSON 事件（可程序化解析）
+- `--print-logs`: 输出日志到 stderr（调试用）
+- `--log-level ERROR`: 仅输出错误级日志
+- `-m, --model`: 指定模型（如 `-m deveco/GLM-5.1`）
+- `--dangerously-skip-permissions`: 自动批准权限（自动化场景）
+
+### 4.5.3 Trae + DevEco Code 集成工作流
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Trae (Claude) 工作流                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. 代码改写（Trae 直接编辑 .ets 文件）                       │
+│       ↓                                                     │
+│  2. 语法检查（MCP build_project → CompileArkTS）              │
+│       ↓                                                     │
+│  3. AI 代码审查（deveco run '分析代码问题' --dir 项目路径）    │
+│       ↓                                                     │
+│  4. 修复发现的问题（Trae 直接编辑）                           │
+│       ↓                                                     │
+│  5. 重新构建（MCP build_project）                             │
+│       ↓                                                     │
+│  6. 部署运行（MCP start_app）                                 │
+│       ↓                                                     │
+│  7. UI 验证（MCP perform_ui_action screenshot）               │
+│       ↓                                                     │
+│  8. 知识查询（deveco run '查询 ArkUI API' 或读取 Skill 文件）  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**集成策略**:
+1. **代码审查**: 在每次代码改写后，调用 `deveco run` 进行 HarmonyOS 专项审查
+2. **知识注入**: 在编写 ArkUI 代码前，读取 Skill 参考文件获取最佳实践
+3. **错误修复**: 编译报错时，读取 `arkts-error-fixes/reference/` 对应错误指南
+4. **崩溃诊断**: 应用闪退时，执行 `arkts-runtime-fix/scripts/` 脚本链收集日志
+
+---
+
 ## 五、故障排除经验库
 
 ### 5.1 check_ets_files 管道错误
@@ -177,13 +289,18 @@ jscrash-report.mjs   → 报告生成（未注册为 MCP 工具，仅 skill 内�
 
 ### 5.2 harmonyos_knowledge_search 返回空
 
-**症状**: 调用返回 `[]`
-**原因**: 华为云端知识库服务波动 / OAuth token 未验证 / 关键词不匹配
+**症状**: 调用返回 `[]` 或 `-32603: API调用失败`
+**原因**: 知识库 API 服务器 `8.152.217.126`（阿里云公网 IP）网络不通 [GitHub Issue #15/#18]
+**验证**: 浏览器直接访问 `https://8.152.217.126/api/knowledge/search` 也打不开
 **解决**:
-1. 用精确 API 名/类名/错误码作为关键词
-2. 调大 maxCharSize 参数
-3. 持续空结果时判断为服务端问题，改用 WebSearch + 官方文档 URL
-**状态**: 云端问题持续，已用替代方案
+1. 检查网络代理设置，确保能访问 `8.152.217.126`
+2. 配置环境变量：`HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`
+3. 企业 CA 证书问题：设置 `NODE_EXTRA_CA_CERTS=/path/to/ca-cert.pem`
+4. 持续不通时改用替代方案：
+   - WebSearch 查社区文档
+   - `deveco run '查询 ArkUI API'` 调用 DevEco Code 内置知识
+   - 直接读取 Skills 参考文件（`arkui-knowledge/references/`）
+**状态**: 云端网络问题持续，已建立多层替代方案
 
 ### 5.3 start_app 自动启动模拟器失败
 
@@ -230,10 +347,13 @@ Stop-Process -Name "emulator-crash-service" -Force -ErrorAction SilentlyContinue
 
 ## 六、工具链优化建议
 
-### 6.1 当前流程（已优化）
+### 6.1 当前流程（已优化，含 DevEco Code 集成）
 
 ```
 代码改写 → hvigorw assembleHap (构建+语法检查)
+         → deveco run '审查代码' (DevEco Code AI 审查)
+         → 修复 AI 发现的问题
+         → MCP build_project (重新构建验证)
          → MCP start_app (部署到模拟器)
          → MCP perform_ui_action screenshot (截图)
          → 读取截图自行确认
@@ -247,7 +367,9 @@ Stop-Process -Name "emulator-crash-service" -Force -ErrorAction SilentlyContinue
 | verify_ui 启用 | 未用 | 配置 AI 视觉模型 + 自然语言测试 | 自动化 UI 功能验证 |
 | check_ets_files 修复 | 降级到 build | 重启 DevEco Studio LSP | 独立语法检查，更快 |
 | 模拟器启动 | 手动 Emulator.exe | 脚本化自动启动+等待+部署 | 减少人工等待 |
-| harmonyos_knowledge_search | 返回空 | 等待云端恢复 / 用 CodeGenie 替代 | 官方知识检索 |
+| DevEco Code MCP 集成 | 未配置 | `deveco mcp add` 添加 DevEco MCP | DevEco Code 也能调用构建/部署工具 |
+| DevEco Code Goal 模式 | 未用 | 编写 Spec 文档 + Goal 模式自动交付 | SDD 全自动开发 |
+| 知识检索 | WebSearch 替代 | `deveco run` + Skills 文件读取 | 多层知识获取 |
 | 批量页面验证 | 逐页导航截图 | verify_ui 自然语言批量测试 | 全流程自动化 |
 
 ### 6.3 verify_ui 启用方案（待执行）

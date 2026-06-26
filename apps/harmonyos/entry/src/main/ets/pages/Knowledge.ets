@@ -153,8 +153,6 @@ struct KnowledgePage {
   async search(): Promise<void> {
     const q = this.query.toLowerCase().trim();
     if (q.length === 0) {
-      this.results = this.demoChunks;
-      this.message = '显示本地演示资料';
       return;
     }
 

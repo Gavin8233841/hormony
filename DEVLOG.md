@@ -1739,3 +1739,84 @@ DevEco MCP 知识检索尝试（harmonyos_knowledge_search）— 仍返回空（
 本轮变更: 框架文档修正 + DevEco Code 参考文档 + DEVLOG + 调试文件清理
 
 ---
+
+---
+
+## [2026-06-27T10:36:00Z] [2026-06-27 18:36:00 CST] 模型: Trae
+
+### 操作
+
+残余问题清理 + 数据真实性落实 + DevEco Code 平台研究 + 工具链集成测试
+
+#### 1. 代码残余全面扫描（9 个 ETS 源文件）
+
+逐文件扫描发现：
+- P0: Chat.ets 死导入 `ChatMessage`（已修复）
+- P0: Knowledge.ets 空查询回退演示数据（已修复为空状态）
+- P1: 10 处废弃 `router.pushUrl`/`router.back` 调用（Codex 架构决策，暂不迁移）
+- P1: 14 类硬编码颜色值未收口到 Constants（技术债务记录）
+- P2: 4 个页面 catch 块演示数据回退（原型期可接受）
+- P2: 5 处 `console.error`（建议改 hilog）
+- `#007DFF` 未出现，合规
+
+#### 2. P0 修复
+
+| 文件 | 修复内容 |
+|------|----------|
+| `pages/Chat.ets` | 移除死导入 `ChatMessage`（ArkTS 严格模式告警） |
+| `pages/Knowledge.ets` | 空查询不再回退 demoChunks，改为直接 return（空状态 UI 已存在） |
+| `pages/Index.ets` | error 类型安全：`${e}` → `${(e as Error).message ?? String(e)}` |
+
+#### 3. DevEco Code 平台深度研究
+
+**研究方式**: 2 个 Explore subagent（无搜索限制）+ 本地实测
+
+**关键发现**:
+- DevEco Code (`@deveco/deveco-code@0.1.0`) 已安装在本地
+- CLI 命令为 `deveco`（非 `deveco-code`）
+- 三产品关系：DevEco Code（AI Agent）= DevEco CLI（工具集）+ DevEco MCP（MCP 服务）
+- 内置 5 个 Skills 在 `C:\Users\guo82\.local\share\deveco\skills\`
+- `harmonyos_knowledge_search` 失败根因：阿里云端 `8.152.217.126` 网络不通
+
+**`deveco run` 非交互执行实测**:
+- ✅ 成功读取 `Index.ets` 并分析
+- ✅ 自动加载 arkui-knowledge Skill
+- ✅ 识别出真实问题（stats 判空、error 类型安全、@Builder 重复结构）
+- 使用模型：`gpt-5.3-chat-latest`
+
+#### 4. 文档更新
+
+- `docs/DEVECO-CODE-CAPABILITIES.md`: 新增 Section 4.5（CLI 能力 + Trae 集成策略）
+- 更新 Section 1.2/1.3（本地安装状态）
+- 更新 Section 3.2（Skills 文件路径和读取方式）
+- 更新 Section 5.2（harmonyos_knowledge_search 网络诊断）
+- 更新 Section 6.1/6.2（含 DevEco Code 的优化流程）
+
+#### 5. 构建验证
+
+```
+hvigor BUILD SUCCESSFUL in 9 s 374 ms
+```
+仅废弃 API 警告（router.pushUrl/back），无错误。
+
+### 涉及文件
+
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`（移除死导入）
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`（修正空查询逻辑）
+- `apps/harmonyos/entry/src/main/ets/pages/Index.ets`（error 类型安全修复）
+- `docs/DEVECO-CODE-CAPABILITIES.md`（大幅更新）
+- `DEVLOG.md`（追加本条记录）
+
+### Git 状态
+
+```
+提交前：9320fa5 docs: 数据真实性核实 + DevEco Code平台研究 + 调试产物清理
+本轮追加：P0 修复 + DevEco Code 集成测试 + 文档更新
+```
+
+### 备注
+
+- DevEco Code `deveco run` 已验证可用，正式纳入 Trae 工作流
+- Skills 参考文件路径已确认，Trae 可直接 Read 获取 HarmonyOS 专家知识
+- harmonyos_knowledge_search 根因确认为网络问题（非关键词或 OAuth 问题）
+- 代码扫描发现的 P1/P2 问题已记录为技术债务，不阻塞当前竞赛进度

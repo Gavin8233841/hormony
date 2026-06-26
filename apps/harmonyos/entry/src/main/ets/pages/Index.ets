@@ -24,7 +24,7 @@ struct Index {
         `${Constants.API_PROFILE}?userId=${Constants.DEMO_USER_ID}`
       );
     } catch (e) {
-      this.message = `加载失败: ${e}`;
+      this.message = `加载失败: ${(e as Error).message ?? String(e)}`;
     }
   }
 
