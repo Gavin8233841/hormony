@@ -1871,3 +1871,49 @@ DevEco Code 全能力测试 + 组合拳工作流规范文档创建
 - DevEco Code 已正式纳入 Trae 工作流，不再是"仅代码审查"角色
 - 后续每次代码改写必须按 INTEGRATED-WORKFLOW-SPEC.md 的 6 阶段流程执行
 - DevEco Code 发现的 Chat.ets SSE 内存泄漏和 HttpClient.ets ArkTS 违规问题已记录为技术债务
+
+---
+
+## [2026-06-27T11:35:00Z] [2026-06-27 19:35:00 CST] 模型: Trae (Work)
+
+### 操作
+
+项目从 Trae Work 转交至 Trae IDE（支持 hook，可 loop engineering）
+
+#### 转交原因
+
+Trae Work 会话不支持 hook 和 loop engineering，为持续推动工程，转至 Trae IDE。记忆和项目资产共享，但对话记录无法迁移。
+
+#### 转交内容
+
+- 创建 `docs/PROJECT-HANDOVER.md` 项目交接文档（294 行），包含项目概览、当前状态、工具链配置、设计系统、约定禁忌、待完成工作
+- 已提供直接发给 Trae IDE 的提示词（含必须阅读文件顺序、待办优先级、工具链信息、强制规则）
+
+#### ⚠️ 重要提醒（给下一个修改此日志的 IDE）
+
+**从此刻起，所有新日志条目的"模型"字段必须写明 `Trae IDE`（而非 `Trae` 或 `Trae (Work)`），以区分工作来源。**
+
+格式示例：
+```
+## [时间戳] 模型: Trae IDE
+```
+
+之前的条目保持原样（`Trae` 或 `Trae (Claude)`），不改不删。
+
+### 涉及文件
+
+- `docs/PROJECT-HANDOVER.md`（新建，已提交 e5e065d）
+- `DEVLOG.md`（追加本条记录）
+
+### Git 状态
+
+```
+最新提交: e5e065d docs: 项目交接文档(Trae Work→Trae IDE)
+工作区: 本条日志待提交
+```
+
+### 备注
+
+- Trae Work 会话到此结束，后续由 Trae IDE 接管
+- Trae IDE 应先读 `docs/PROJECT-HANDOVER.md` 再开始工作
+- 工作流必须遵循 `docs/INTEGRATED-WORKFLOW-SPEC.md` 强制性规范
