@@ -1683,3 +1683,59 @@ DevEco MCP 知识检索尝试（harmonyos_knowledge_search）— 仍返回空（
 待提交: Chat.ets, Profile.ets, Knowledge.ets, Plan.ets + 5 张截图 + DEVLOG
 
 ---
+
+## 2026-06-27 清理残余 + 数据真实性核实 + DevEco Code 平台研究
+
+**时间**: 2026-06-27 02:20 UTC+8
+**模型**: Trae (Claude)
+**操作**: 清理调试产物、核实设计规范数值、深度研究 DevEco Code 平台能力
+
+### 1. 清理调试产物
+
+删除 12 个调试文件（11 个 simple_dump_*.txt + 1 个 test-after-click.png）：
+- 这些是 MCP get_app_ui_tree 和 perform_ui_action 产生的调试 dump 文件
+- 已从文件系统删除，不再需要
+
+### 2. 数据真实性核实（P0 级官方文档核实）
+
+2 路并行 Explore 代理深度调研，无搜索额度限制：
+
+**核实结果**:
+| 数值 | 社区转述 | 官方结论 | 状态 |
+|------|----------|----------|------|
+| 系统蓝 | #007DFF | brand=#0a59f7，#007DFF 仅是光标色 | **[P0-已否定]** |
+| 圆角 | 8vp | 无统一规范，Button 默认 14~20vp | **[P0-已否定]** |
+| 动效 | ≤500ms | 按场景 100~350ms | **[P0-已否定]** |
+| 字体 | HarmonyOS Sans | 默认字体，9 种字重 | **[P0-已确认]** |
+| 断点 | sm/md/lg | 横向 5 档 + 纵向 3 档 | **[P0-已确认]** |
+| 色彩 | — | 三层 Token，brand=#0a59f7 | **[P0-已确认]** |
+
+**关键结论**: 项目代码使用的 `#0a59f7` 是官方品牌色（brand token），完全正确。社区转述的三项数值全部被官方文档否定。
+
+**框架文档已更新**: 4 处数值修正 + 第九节信息缺口更新为核实结果
+
+### 3. DevEco Code 平台深度研究
+
+**关键发现**:
+- 我们用的社区 MCP (`@deveco-codegenie/mcp`) 已进入维护模式，官方 DevEco CLI 是未来方向
+- DevEco Code 有 5 个内置 Skills（arkui-knowledge / arkts-grammar-standards / arkts-error-fixes / arkts-runtime-fix / deveco-create-project）
+- MCP 工具集共 11 个（含 2 个可选：verify_ui / init_project_path），我们已用 9 个
+- verify_ui（自然语言 UI 验证）未启用，需配置 AI 视觉模型（阿里云百炼 Qwen3-VL）
+- 官方推荐工具闭环：check → build → run → verify_ui → ui_tree → screenshot
+
+**产出文件**: `docs/DEVECO-CODE-CAPABILITIES.md`（完整平台能力参考文档）
+
+### 4. 工具链优化方向
+
+| 优化项 | 当前 | 优化后 | 状态 |
+|--------|------|--------|------|
+| verify_ui | 未启用 | 配置 AI 视觉模型 | 待执行 |
+| check_ets_files | 降级到 build | 重启 LSP | 待 DevEco Studio 重启 |
+| 模拟器启动 | 手动 Emulator.exe | 脚本化 | 已有方案 |
+| 知识检索 | 返回空 | 等待云端/用 CodeGenie | 待恢复 |
+
+### Git 状态
+
+本轮变更: 框架文档修正 + DevEco Code 参考文档 + DEVLOG + 调试文件清理
+
+---
