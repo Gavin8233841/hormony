@@ -1,6 +1,6 @@
 /**
- * AI 对话页
- * 通过 SSE 流式接收多 Agent 协作结果
+ * AI 辅导页
+ * 浅色主题 · 用户友好文案 · SSE 流式接收
  */
 
 import router from '@ohos.router';
@@ -14,6 +14,7 @@ interface DisplayMessage {
   citations: Citation[];
   agentTrace: string[];
   thinking: string[];
+  citationExpanded: boolean;
 }
 
 @Entry
@@ -30,17 +31,17 @@ struct Chat {
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor('#e2e8f0')
+          .fontColor('#1a1a1a')
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
           .onClick(() => {
             router.back();
           })
-        Text('AI 对话辅导')
-          .fontSize(20)
+        Text('AI 辅导')
+          .fontSize(18)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#e2e8f0')
+          .fontColor('#1a1a1a')
           .layoutWeight(1)
           .margin({ left: 4 })
       }
@@ -51,7 +52,7 @@ struct Chat {
       List({ scroller: this.scroller }) {
         ForEach(this.messages, (msg: DisplayMessage, index: number) => {
           ListItem() {
-            this.MessageBubble(msg)
+            this.MessageBubble(msg, index)
           }
         })
       }
@@ -59,13 +60,13 @@ struct Chat {
       .width('100%')
       .padding({ left: 16, right: 16 })
 
-      // Agent 思考状态
+      // 思考状态
       if (this.loading) {
         Row({ space: 8 }) {
-          LoadingProgress().width(16).height(16).color('#3b82f6')
-          Text('Agent 协作中...')
-            .fontSize(12)
-            .fontColor('#94a3b8')
+          LoadingProgress().width(16).height(16).color('#0a59f7')
+          Text('正在思考...')
+            .fontSize(13)
+            .fontColor('#929292')
         }
         .width('100%')
         .padding({ left: 20, bottom: 8 })
@@ -76,7 +77,7 @@ struct Chat {
         TextInput({ text: this.inputText, placeholder: '输入你的问题...' })
           .layoutWeight(1)
           .fontSize(14)
-          .backgroundColor('#1e293b')
+          .backgroundColor('#ffffff')
           .borderRadius(12)
           .onChange((value: string) => {
             this.inputText = value;
@@ -87,7 +88,7 @@ struct Chat {
 
         Button('发送')
           .fontSize(14)
-          .backgroundColor('#2563eb')
+          .backgroundColor('#0a59f7')
           .fontColor('#ffffff')
           .borderRadius(12)
           .enabled(!this.loading && this.inputText.length > 0)
@@ -100,7 +101,7 @@ struct Chat {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#0f172a')
+    .backgroundColor('#f5f6f8')
   }
 
   sendMessage() {
@@ -114,6 +115,7 @@ struct Chat {
       citations: [],
       agentTrace: [],
       thinking: [],
+      citationExpanded: false,
     };
     this.messages.push(userMsg);
 
@@ -123,6 +125,7 @@ struct Chat {
       citations: [],
       agentTrace: [],
       thinking: [],
+      citationExpanded: false,
     };
     this.messages.push(assistantMsg);
 
@@ -173,7 +176,7 @@ struct Chat {
   }
 
   @Builder
-  MessageBubble(msg: DisplayMessage) {
+  MessageBubble(msg: DisplayMessage, index: number) {
     Column() {
       if (msg.role === 'user') {
         // 用户消息右对齐
@@ -181,75 +184,58 @@ struct Chat {
           Column() {
             Text(msg.content)
               .fontSize(14)
-              .fontColor('#e2e8f0')
+              .fontColor('#ffffff')
               .padding(12)
-              .backgroundColor('#2563eb40')
+              .backgroundColor('#0a59f7')
               .borderRadius(12)
           }
           .alignItems(HorizontalAlign.End)
+          .constraintSize({ maxWidth: '80%' })
         }
         .width('100%')
         .justifyContent(FlexAlign.End)
       } else {
-        // 助手消息
+        // AI 消息
         Column() {
-          // Agent 思考标签
-          if (msg.thinking.length > 0) {
-            Flex({ wrap: FlexWrap.Wrap }) {
-              ForEach(msg.thinking, (agent: string) => {
-                Text(agent)
-                  .fontSize(10)
-                  .fontColor('#94a3b8')
-                  .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                  .backgroundColor('#334155')
-                  .borderRadius(8)
-                  .margin({ right: 4, bottom: 4 })
-              })
-            }
-            .width('100%')
-            .margin({ bottom: 6 })
-          }
-
           Text(msg.content.length > 0 ? msg.content : '思考中...')
             .fontSize(14)
-            .fontColor('#e2e8f0')
+            .fontColor('#1a1a1a')
             .padding(12)
-            .backgroundColor('#1e293b')
+            .backgroundColor('#ffffff')
             .borderRadius(12)
             .width('100%')
 
-          // 引用
+          // 引用（折叠式）
           if (msg.citations.length > 0) {
-            Column() {
-              Text('资料引用：')
-                .fontSize(11)
-                .fontColor('#64748b')
-                .margin({ top: 8, bottom: 4 })
-              ForEach(msg.citations, (c: Citation, i: number) => {
-                Text(`[${i + 1}] ${c.doc}${c.snippet ? ' — ' + c.snippet : ''}`)
-                  .fontSize(11)
-                  .fontColor('#94a3b8')
-                  .margin({ bottom: 2 })
-              })
+            Row() {
+              Text(`参考资料 (${msg.citations.length})`)
+                .fontSize(12)
+                .fontColor('#0a59f7')
+                .padding({ left: 4, right: 4, top: 4, bottom: 4 })
+              Text(msg.citationExpanded ? '收起' : '展开')
+                .fontSize(12)
+                .fontColor('#929292')
+                .margin({ left: 4 })
             }
             .width('100%')
-          }
+            .margin({ top: 4 })
+            .onClick(() => {
+              msg.citationExpanded = !msg.citationExpanded;
+              this.messages = this.messages.slice();
+            })
 
-          // Agent 轨迹
-          if (msg.agentTrace.length > 0) {
-            Column() {
-              Text('Agent 执行轨迹：')
-                .fontSize(11)
-                .fontColor('#64748b')
-                .margin({ top: 8, bottom: 4 })
-              ForEach(msg.agentTrace, (trace: string) => {
-                Text(trace)
-                  .fontSize(11)
-                  .fontColor('#94a3b8')
-                  .margin({ bottom: 2 })
-              })
+            if (msg.citationExpanded) {
+              Column() {
+                ForEach(msg.citations, (c: Citation, i: number) => {
+                  Text(`[${i + 1}] ${c.doc}${c.snippet ? ' — ' + c.snippet : ''}`)
+                    .fontSize(11)
+                    .fontColor('#929292')
+                    .margin({ bottom: 2 })
+                })
+              }
+              .width('100%')
+              .padding({ left: 4, top: 4 })
             }
-            .width('100%')
           }
         }
         .width('100%')

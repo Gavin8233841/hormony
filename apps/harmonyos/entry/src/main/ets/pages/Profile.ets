@@ -1,5 +1,6 @@
 /**
- * 个人画像页
+ * 学习画像页
+ * 浅色主题 · 加载状态 · 内联统计卡片
  */
 
 import router from '@ohos.router';
@@ -11,12 +12,14 @@ import { UserProfile } from '../model/DataModels';
 @Component
 struct ProfilePage {
   @State profile: UserProfile | null = null;
+  @State loading: boolean = true;
 
   aboutToAppear() {
     this.loadProfile();
   }
 
   async loadProfile() {
+    this.loading = true;
     try {
       this.profile = await HttpClient.get<UserProfile>(
         `${Constants.API_PROFILE}?userId=${Constants.DEMO_USER_ID}`
@@ -32,6 +35,8 @@ struct ProfilePage {
         learningStyle: '视觉型',
         stats: { totalQuestions: 128, accuracy: 0.76, studyDays: 23 },
       };
+    } finally {
+      this.loading = false;
     }
   }
 
@@ -41,7 +46,7 @@ struct ProfilePage {
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor('#e2e8f0')
+          .fontColor('#1a1a1a')
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -49,14 +54,10 @@ struct ProfilePage {
             router.back();
           })
         Column() {
-          Text('个人画像')
-            .fontSize(20)
+          Text('学习画像')
+            .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#e2e8f0')
-          Text('Profile Agent 维护的学习画像')
-            .fontSize(12)
-            .fontColor('#94a3b8')
-            .margin({ top: 2 })
+            .fontColor('#1a1a1a')
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
@@ -65,52 +66,113 @@ struct ProfilePage {
       .width('100%')
       .padding({ left: 8, right: 20, top: 16, bottom: 12 })
 
-      if (this.profile) {
+      if (this.loading) {
+        Column() {
+          LoadingProgress().width(36).height(36).color('#0a59f7')
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else if (this.profile) {
         // 基本信息卡片
         Row({ space: 16 }) {
           Text(this.profile.name.charAt(0))
             .fontSize(28)
-            .fontColor('#3b82f6')
+            .fontColor('#0a59f7')
             .width(56)
             .height(56)
-            .backgroundColor('#3b82f620')
+            .backgroundColor('#0a59f720')
             .borderRadius(28)
             .textAlign(TextAlign.Center)
 
           Column() {
-            Text(this.profile.name).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#e2e8f0')
+            Text(this.profile.name)
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#1a1a1a')
             Text(`${this.profile.stage} · ${this.profile.learningStyle}`)
               .fontSize(13)
-              .fontColor('#94a3b8')
+              .fontColor('#929292')
               .margin({ top: 4 })
           }
           .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
         }
         .width('100%')
         .padding(16)
-        .backgroundColor('#1e293b')
+        .backgroundColor('#ffffff')
         .borderRadius(12)
         .margin({ left: 16, right: 16, bottom: 16 })
 
-        // 统计
-        Row({ space: 12 }) {
-          this.StatBox(`${Math.round(this.profile.stats.accuracy * 100)}%`, '正确率', '#10b981')
-          this.StatBox(this.profile.stats.totalQuestions.toString(), '累计答题', '#f59e0b')
-          this.StatBox(this.profile.stats.studyDays.toString(), '学习天数', '#3b82f6')
+        // 统计卡片（内联，不用 @Builder）
+        Row({ space: 10 }) {
+          // 正确率
+          Column() {
+            Text(`${Math.round(this.profile.stats.accuracy * 100)}%`)
+              .fontSize(24)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#4caf50')
+            Text('正确率')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 4 })
+          }
+          .layoutWeight(1)
+          .padding(14)
+          .backgroundColor('#ffffff')
+          .borderRadius(12)
+          .alignItems(HorizontalAlign.Center)
+
+          // 累计答题
+          Column() {
+            Text(this.profile.stats.totalQuestions.toString())
+              .fontSize(24)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#ff9800')
+            Text('累计答题')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 4 })
+          }
+          .layoutWeight(1)
+          .padding(14)
+          .backgroundColor('#ffffff')
+          .borderRadius(12)
+          .alignItems(HorizontalAlign.Center)
+
+          // 学习天数
+          Column() {
+            Text(this.profile.stats.studyDays.toString())
+              .fontSize(24)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#0a59f7')
+            Text('学习天数')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ top: 4 })
+          }
+          .layoutWeight(1)
+          .padding(14)
+          .backgroundColor('#ffffff')
+          .borderRadius(12)
+          .alignItems(HorizontalAlign.Center)
         }
         .width('100%')
         .padding({ left: 16, right: 16, bottom: 16 })
 
         // 薄弱知识点
         Column() {
-          Text('薄弱知识点').fontSize(15).fontWeight(FontWeight.Medium).fontColor('#e2e8f0')
+          Text('薄弱知识点')
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#1a1a1a')
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.profile.weakTopics, (t: string) => {
               Text(t)
                 .fontSize(12)
-                .fontColor('#fca5a5')
+                .fontColor('#e53935')
                 .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                .backgroundColor('#ef444420')
+                .backgroundColor('#e5393520')
                 .borderRadius(10)
                 .margin({ right: 6, bottom: 6, top: 8 })
             })
@@ -119,21 +181,24 @@ struct ProfilePage {
         }
         .width('100%')
         .padding(16)
-        .backgroundColor('#1e293b')
+        .backgroundColor('#ffffff')
         .borderRadius(12)
         .margin({ left: 16, right: 16, bottom: 12 })
         .alignItems(HorizontalAlign.Start)
 
         // 已掌握知识点
         Column() {
-          Text('已掌握知识点').fontSize(15).fontWeight(FontWeight.Medium).fontColor('#e2e8f0')
+          Text('已掌握知识点')
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#1a1a1a')
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.profile.strongTopics, (t: string) => {
               Text(t)
                 .fontSize(12)
-                .fontColor('#6ee7b7')
+                .fontColor('#4caf50')
                 .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                .backgroundColor('#10b98120')
+                .backgroundColor('#4caf5020')
                 .borderRadius(10)
                 .margin({ right: 6, bottom: 6, top: 8 })
             })
@@ -142,7 +207,7 @@ struct ProfilePage {
         }
         .width('100%')
         .padding(16)
-        .backgroundColor('#1e293b')
+        .backgroundColor('#ffffff')
         .borderRadius(12)
         .margin({ left: 16, right: 16 })
         .alignItems(HorizontalAlign.Start)
@@ -150,19 +215,6 @@ struct ProfilePage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#0f172a')
-  }
-
-  @Builder
-  StatBox(value: string, label: string, color: string) {
-    Column() {
-      Text(value).fontSize(24).fontWeight(FontWeight.Bold).fontColor(color)
-      Text(label).fontSize(11).fontColor('#94a3b8').margin({ top: 4 })
-    }
-    .layoutWeight(1)
-    .padding(16)
-    .backgroundColor('#1e293b')
-    .borderRadius(12)
-    .alignItems(HorizontalAlign.Center)
+    .backgroundColor('#f5f6f8')
   }
 }

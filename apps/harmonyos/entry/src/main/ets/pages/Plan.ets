@@ -1,5 +1,6 @@
 /**
  * 学习计划页
+ * 浅色主题 · 用户友好文案 · 任务列表
  */
 
 import router from '@ohos.router';
@@ -21,7 +22,7 @@ struct PlanPage {
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor('#e2e8f0')
+          .fontColor('#1a1a1a')
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -30,12 +31,12 @@ struct PlanPage {
           })
         Column() {
           Text('学习计划')
-            .fontSize(20)
+            .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#e2e8f0')
-          Text('Planner Agent 根据目标拆解任务')
+            .fontColor('#1a1a1a')
+          Text('输入目标，自动拆解任务')
             .fontSize(12)
-            .fontColor('#94a3b8')
+            .fontColor('#929292')
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
@@ -49,16 +50,19 @@ struct PlanPage {
       Column({ space: 12 }) {
         TextInput({ text: this.goal, placeholder: '学习目标，如：两周复习数据结构' })
           .fontSize(14)
-          .backgroundColor('#1e293b')
+          .backgroundColor('#ffffff')
           .borderRadius(12)
           .onChange((v: string) => { this.goal = v; })
 
         Row({ space: 12 }) {
           Column() {
-            Text('周期（天）').fontSize(12).fontColor('#94a3b8').margin({ bottom: 4 })
+            Text('周期（天）')
+              .fontSize(12)
+              .fontColor('#929292')
+              .margin({ bottom: 4 })
             TextInput({ text: this.days.toString() })
               .fontSize(14)
-              .backgroundColor('#1e293b')
+              .backgroundColor('#ffffff')
               .borderRadius(12)
               .width('100%')
               .onChange((v: string) => { this.days = parseInt(v) || 14; })
@@ -67,7 +71,7 @@ struct PlanPage {
 
           Button('生成计划')
             .fontSize(14)
-            .backgroundColor('#2563eb')
+            .backgroundColor('#0a59f7')
             .fontColor('#ffffff')
             .borderRadius(12)
             .height(40)
@@ -83,7 +87,7 @@ struct PlanPage {
       if (this.tasks.length > 0) {
         Text(`计划任务（${this.tasks.length} 项）`)
           .fontSize(14)
-          .fontColor('#94a3b8')
+          .fontColor('#929292')
           .margin({ left: 16, bottom: 8 })
 
         List({ space: 8 }) {
@@ -92,17 +96,25 @@ struct PlanPage {
               Row({ space: 12 }) {
                 Text(`${i + 1}`)
                   .fontSize(14)
-                  .fontColor('#64748b')
+                  .fontColor('#929292')
                   .width(24)
 
                 Column() {
-                  Text(t.title).fontSize(14).fontColor('#e2e8f0')
+                  Text(t.title)
+                    .fontSize(14)
+                    .fontColor('#1a1a1a')
                   Row({ space: 12 }) {
-                    Text(t.date).fontSize(11).fontColor('#64748b')
-                    Text(`${t.estimatedMin} 分钟`).fontSize(11).fontColor('#64748b')
-                    Text(t.type).fontSize(11).fontColor('#64748b')
+                    Text(t.date)
+                      .fontSize(11)
+                      .fontColor('#929292')
+                    Text(`${t.estimatedMin} 分钟`)
+                      .fontSize(11)
+                      .fontColor('#929292')
+                    Text(t.type)
+                      .fontSize(11)
+                      .fontColor('#929292')
                       .padding({ left: 6, right: 6, top: 1, bottom: 1 })
-                      .backgroundColor('#334155')
+                      .backgroundColor('#f0f1f3')
                       .borderRadius(6)
                   }
                   .margin({ top: 4 })
@@ -112,8 +124,8 @@ struct PlanPage {
               }
               .width('100%')
               .padding(12)
-              .backgroundColor('#1e293b')
-              .borderRadius(10)
+              .backgroundColor('#ffffff')
+              .borderRadius(12)
             }
           })
         }
@@ -122,7 +134,17 @@ struct PlanPage {
         .padding({ left: 16, right: 16 })
       } else if (this.loading) {
         Column() {
-          LoadingProgress().width(36).height(36).color('#3b82f6')
+          LoadingProgress().width(36).height(36).color('#0a59f7')
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else {
+        // 空状态
+        Column() {
+          Text('输入学习目标，生成每日计划')
+            .fontSize(14)
+            .fontColor('#cccccc')
         }
         .width('100%')
         .layoutWeight(1)
@@ -131,7 +153,7 @@ struct PlanPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#0f172a')
+    .backgroundColor('#f5f6f8')
   }
 
   async generate() {
@@ -149,8 +171,8 @@ struct PlanPage {
       this.tasks = plan.tasks;
     } catch (e) {
       // 回退演示
-      const task1: PlanTask = { id: '1', title: '复习树与二叉树', date: '2026-06-25', estimatedMin: 45, type: 'review' };
-      const task2: PlanTask = { id: '2', title: '练习 BST 习题', date: '2026-06-26', estimatedMin: 30, type: 'practice' };
+      const task1: PlanTask = { id: '1', title: '复习树与二叉树', date: '2026-06-25', estimatedMin: 45, type: '复习' };
+      const task2: PlanTask = { id: '2', title: '练习 BST 习题', date: '2026-06-26', estimatedMin: 30, type: '练习' };
       this.tasks = [task1, task2];
     } finally {
       this.loading = false;

@@ -1614,3 +1614,72 @@ DevEco MCP 知识检索尝试（harmonyos_knowledge_search）— 仍返回空（
 - 所有结论有来源引用，标注了来源层级（P0/P1/P2），未编造信息
 
 ---
+
+## 2026-06-27 第二批 UI 改版 — Chat/Profile/Knowledge/Plan
+
+**时间**: 2026-06-27 01:45 UTC+8
+**模型**: Trae (Claude)
+**操作**: 基于前端交互框架文档，改版剩余 4 个页面
+
+### 改版文件
+
+1. **Chat.ets** — AI 辅导页
+   - 浅色主题 `#f5f6f8` + 白色消息卡片
+   - "Agent 协作中..." → "正在思考..."
+   - Agent thinking/trace 对用户隐藏（仍接收但不展示）
+   - 引用折叠式展示: "参考资料 (N)" → 点击展开/收起
+   - 用户消息: 蓝色背景右对齐 / AI 消息: 白色卡片左对齐
+   - 输入栏: 白色 TextInput + 蓝色"发送"按钮（空值禁用）
+   - SSE 流式逻辑完全保留
+
+2. **Profile.ets** — 学习画像页
+   - 浅色主题 + 加载状态（LoadingProgress）
+   - "Profile Agent 维护的学习画像" → "学习画像"
+   - 头像: 首字母 + 蓝色圆形背景
+   - 统计卡片内联（移除 @Builder StatBox）
+   - 薄弱知识点: 红色标签 `#e53935` / 已掌握: 绿色标签 `#4caf50`
+   - 演示数据回退保留
+
+3. **Knowledge.ets** — 搜课程资料页
+   - 浅色主题 + 搜索栏
+   - "RAG 检索演示 · Retrieval Agent 语义匹配" → "搜课程资料 · 搜索知识点和相关资料"
+   - **修复 courseId**: 请求体添加 `courseId: 'cs101'`
+   - 搜索结果: 白色卡片 + 来源文件 + 相关度百分比
+   - 空状态: "输入关键词开始搜索"
+
+4. **Plan.ets** — 学习计划页
+   - 浅色主题 + 目标输入区
+   - "Planner Agent 根据目标拆解任务" → "输入目标，自动拆解任务"
+   - 任务列表: 序号 + 标题 + 日期/时长/类型标签
+   - 空状态: "输入学习目标，生成每日计划"
+
+### 验证链路
+
+| 步骤 | 工具 | 结果 |
+|------|------|------|
+| 构建 | hvigorw assembleHap | BUILD SUCCESSFUL (仅 router 废弃警告) |
+| 部署 | MCP start_app (Pura 90 Pro Max) | 安装+启动成功 |
+| 首页截图 | MCP perform_ui_action screenshot | ✅ 浅色主题+统计卡片+功能入口 |
+| Chat 截图 | 导航→screenshot | ✅ 浅色+AI辅导+输入栏+无Agent术语 |
+| Plan 截图 | 导航→screenshot | ✅ 浅色+学习计划+目标输入+生成按钮 |
+| Knowledge 截图 | 导航→screenshot | ✅ 浅色+搜索栏+无RAG术语 |
+| Profile 截图 | 导航→screenshot | ✅ 浅色+头像+统计+红绿标签 |
+
+### 故障排除
+
+- 模拟器自动启动失败: MCP start_app 返回空 → 发现 Emulator.exe 命令行可用 → 接受许可协议 → 清理残留进程 → `-noWindow` 模式启动成功 → hdc 检测到 127.0.0.1:5555
+- check_ets_files 返回空（0 错误或管道问题），用 hvigorw 构建作为等效语法检查
+
+### 代码约束遵守
+
+- 未触碰 model.ts / orchestrator.ts / MODEL_API_KEY
+- 未改 HarmonyOS API / Navigation / 服务卡片 / 通知 / 元服务
+- router.pushUrl 保持 `pages/X` 格式（无前导斜杠）
+- SSE 流式逻辑完全保留
+- Knowledge courseId 修复仅添加请求参数，未改 API 接口
+
+### Git 状态
+
+待提交: Chat.ets, Profile.ets, Knowledge.ets, Plan.ets + 5 张截图 + DEVLOG
+
+---
