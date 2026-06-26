@@ -1401,3 +1401,65 @@ Trae 当前会话无 DevEco MCP 工具。接力文档第四节已给出标准 JS
 - 关于用户提问"能不能把项目导入到 DevEco Studio"：可以。项目路径 `C:\Users\guo82\Desktop\Hormony\apps\harmonyos` 是标准 Hvigor 工程，在 DevEco Studio 中 File → Open → 选择该目录即可导入。
 
 ---
+
+## [2026-06-26T16:23:33Z] [2026-06-27 00:23:33 CST] 模型: Codex
+
+### 操作
+
+回应用户对当前 UI 质量与开发方式的不安，明确 Web / HarmonyOS 两端定位，研究 DevEco Code 可用能力，并新增 Trae 下一阶段端侧 UI 产品化改版指令文档。
+
+### 关键判断
+
+1. Web 端是服务端、调试台和管理后台，不是最终参赛主界面，不应继续投入大量视觉美化。
+2. HarmonyOS 端才是用户端和竞赛交付主界面，当前页面仍是功能骨架，尚未进入真正的端侧产品设计阶段。
+3. 当前 UI 难看不是 HarmonyOS 或 ArkUI 的问题，而是前面优先级放在工程闭环、接口闭环和构建验收，尚未做原生体验设计。
+4. 下一阶段应暂停堆功能，先对 HarmonyOS 端进行产品化重设计。
+5. DevEco Code 已安装，可作为 Trae 的 HarmonyOS 专用执行工具，帮助其调用 ArkUI/ArkTS skills 与 check/build/run/log/knowledge tools。
+
+### DevEco Code 核查结果
+
+| 项目 | 结果 |
+|------|------|
+| 全局包 | `@deveco/deveco-code@0.1.0` 已安装 |
+| 命令 | `deveco` 可用 |
+| `deveco --version` | `0.1.0` |
+| 内置说明 | 面向 HarmonyOS 开发，支持代码编写、编译构建、设备运行、文档查阅、运行时调试、ArkTS 问题修复 |
+| Skills | `arkui-knowledge`、`arkts-grammar-standards`、`arkts-error-fixes`、`arkts-runtime-fix` 等可见 |
+| Tools | DevEco Studio UI 中可见 `check`、`build`、`run`、`log`、`knowledge` |
+| `deveco mcp list` | 当前无额外 MCP server 配置 |
+
+### 新增文档
+
+新增 `docs/TRAE-DEVECO-UI-REDESIGN-BRIEF.md`，内容包括：
+
+1. Web 端与 HarmonyOS 端的角色分工。
+2. 当前 UI 问题和用户反馈。
+3. DevEco Code 的使用方法。
+4. Trae 必须使用的 skills 和 tools。
+5. HarmonyOS 端设计方向。
+6. 第一批 UI 改版范围：仅 `Index.ets` 和 `Course.ets`。
+7. 验收标准：check、build、run、截图、DEVLOG。
+8. 禁止事项：不做 Web 美化、不动模型、不做 Navigation 迁移、不做服务卡片等。
+9. 可直接复制给 Trae 的启动提示词。
+
+### 当前注意事项
+
+- `apps/web/package.json` 目前存在包管理器自动写入的 `packageManager` 字段改动；本轮未处理，后续提交 UI 改版时不得混入。
+- 后续第一批 UI 改版必须先给用户截图确认，再继续改 Chat / Plan / Knowledge / Profile。
+
+### 涉及文件
+
+- `docs/TRAE-DEVECO-UI-REDESIGN-BRIEF.md`（新增）
+- `DEVLOG.md`（追加本记录）
+- `apps/web/package.json`（只读核对自动改动）
+- `apps/harmonyos/entry/src/main/ets/pages/Index.ets`（只读核对当前 UI 状态）
+- `screenshots/harmonyos/home.png`（查看当前鸿蒙首页截图）
+- `screenshots/harmonyos/course.png`（查看当前鸿蒙课程页截图）
+- `screenshots/web/courses.png`（查看当前 Web 课程页截图）
+
+### 备注
+
+- 本轮未改业务代码，未触碰模型相关文件，未接触 `MODEL_API_KEY`。
+- 下一步由 Trae 按 `docs/TRAE-DEVECO-UI-REDESIGN-BRIEF.md` 执行第一批 HarmonyOS UI 产品化改版。
+
+---
