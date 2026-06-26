@@ -1061,3 +1061,165 @@ Trae 当前会话无 DevEco MCP 工具。接力文档第四节已给出标准 JS
 - 当前建议优先级：运行态验证当前端侧闭环 → Web 课程页/画像页接入已有 API → Knowledge 课程过滤方案 → Navigation 迁移调研 → 服务卡片亮点调研。
 
 ---
+
+## [2026-06-26T15:30:00Z] [2026-06-26 23:30:00 CST] 模型: Trae
+
+### 操作
+
+执行 Codex 首批任务：① DevEco MCP 自证可用 ② 只读梳理 6 个 ArkTS 页面跳转链路。不改代码。
+
+#### 1. DevEco MCP 自证可用
+
+用户已手动为 Trae 配置 DevEco MCP。按 `docs/TRAE-DEVELOPMENT-BOUNDARIES.md` 第三节优先验收线执行三项验证：
+
+| 工具 | 输入 | 结果摘要 |
+|------|------|----------|
+| `harmonyos_knowledge_search` | keywords: ["Stage模型", "module.json5"] | 返回空数组 `[]`（云端服务未返回内容，与 Codex 记录的"本次云端请求失败"一致） |
+| `check_ets_files` | 6 个页面 .ets 文件绝对路径 | 成功返回诊断信息；6 文件均 0 Error |
+| `build_project` | module=entry@default, build_mode=debug, clean=false | BUILD SUCCESSFUL in 2s 844ms, exit code 0 |
+
+**结论**：DevEco MCP 已挂载且 `check_ets_files` + `build_project` 两项核心工具可用。`harmonyos_knowledge_search` 云端返回空，属于知识库服务端问题而非 MCP 连接问题（MCP 通道本身畅通，其余两个工具均成功响应）。
+
+#### check_ets_files 诊断明细（6 文件，0 Error）
+
+| 文件 | Error | Information（deprecated） | Warning |
+|------|-------|--------------------------|---------|
+| Index.ets | 0 | 1（router.pushUrl deprecated, line 135） | 0 |
+| Chat.ets | 0 | 1（router.back deprecated, line 38） | 3（ChatMessage unused line 9; index unused line 52; invalidInitOfList line 51） |
+| Course.ets | 0 | 1（router.back deprecated, line 47） | 1（invalidInitOfList line 74） |
+| Plan.ets | 0 | 1（router.back deprecated, line 29） | 1（invalidInitOfList line 89） |
+| Knowledge.ets | 0 | 1（router.back deprecated, line 37） | 1（invalidInitOfList line 92） |
+| Profile.ets | 0 | 1（router.back deprecated, line 49） | 0 |
+
+> 所有 deprecated Information 均为 `@ohos.router` API，属已知技术债（router → Navigation 迁移由 Codex 决策）。
+> invalidInitOfList Warning 为 List 组件未初始化宽高，当前用 layoutWeight(1) 弹性布局，属历史遗留。
+> Chat.ets 的 ChatMessage 未使用导入和 ForEach index 未使用参数，属可清理项。
+
+#### 2. 只读梳理 6 个 ArkTS 页面跳转链路
+
+路由注册确认（`entry/src/main/resources/base/profile/main_pages.json`）：
+```json
+{ "src": ["pages/Index", "pages/Chat", "pages/Course", "pages/Plan", "pages/Knowledge", "pages/Profile"] }
+```
+6 个页面全部注册。
+
+##### Index.ets（仪表盘首页，入口页）
+
+| 维度 | 结论 | 源码位置 |
+|------|------|----------|
+| 页面入口 | `@Entry @Component struct Index` | line 11-13 |
+| 生命周期 | `aboutToAppear()` → `loadProfile()` | line 17-19 |
+| 依赖 API | `GET /api/profile?userId=demo`（`HttpClient.get<UserProfile>`, `Constants.API_PROFILE`） | line 23-24 |
+| 跳转按钮 | 5 个 `EntryItem` builder，每个 `.onClick()` → `router.pushUrl({ url: target })` | line 134-138 |
+| 跳转目标 | Chat(`/pages/Chat`)、Plan(`/pages/Plan`)、Knowledge(`/pages/Knowledge`)、Course(`/pages/Course`)、Profile(`/pages/Profile`) | line 57-61 |
+| 返回方式 | 无（入口页，无返回按钮） | — |
+| 未验证点 | ① profile 加载期间无 loading 状态；② 加载失败仅显示文本 message，无重试按钮；③ profile 为 null 时统计卡片显示 '--'，无空态提示；④ router.pushUrl deprecated | line 14, 27, 48-50, 135 |
+
+##### Chat.ets（AI 对话页）
+
+| 维度 | 结论 | 源码位置 |
+|------|------|----------|
+| 页面入口 | `@Entry @Component struct Chat` | line 19-21 |
+| 返回方式 | `Text('‹').onClick()` → `router.back()` | line 31-39 |
+| 输入控件 | `TextInput` + `Button('发送')`，`.onSubmit()` 和 `.onClick()` 均调用 `sendMessage()` | line 76-96 |
+| 发送按钮禁用条件 | `!this.loading && this.inputText.length > 0` | line 93 |
+| 依赖 API | `POST /api/chat`（`HttpClient.postSSE`, `Constants.API_CHAT`），SSE 流式 | line 137-138 |
+| 请求体 | `ChatRequest { userId: 'demo', message: string }` | line 133-136 |
+| SSE 事件处理 | thinking → push agent; trace → push trace; delta → append content; citation → push source | line 150-158 |
+| 未验证点 | ① SSE dataReceive 按 `\n\n` 分割，未处理跨 chunk 不完整 JSON 分片（line 79-94）；② scroller 已创建但未调用 scrollEdge，新消息不自动滚底（line 25, 51）；③ 请求失败时仅修改 last message content，无重发按钮（line 167-171）；④ ChatMessage 导入未使用（Warning）；⑤ ForEach index 参数未使用（Warning） | — |
+
+##### Course.ets（课程页）
+
+| 维度 | 结论 | 源码位置 |
+|------|------|----------|
+| 页面入口 | `@Entry @Component struct CoursePage` | line 10-12 |
+| 生命周期 | `aboutToAppear()` → `loadCourses()` | line 16-18 |
+| 返回方式 | `Text('‹').onClick()` → `router.back()` | line 40-48 |
+| 依赖 API | `GET /api/courses?userId=demo`（`HttpClient.get<CoursesResponse>`, `Constants.API_COURSES`） | line 22-24 |
+| 加载状态 | `this.loading` 为 true 时显示 LoadingProgress | line 66-72 |
+| 错误降级 | catch 块回退硬编码演示数据（cs101 数据结构、cs102 操作系统），无错误提示 | line 27-33 |
+| 未验证点 | ① API 失败时静默回退演示数据，用户无感知（line 27-33）；② 点击课程项无跳转/详情（line 75-118）；③ 无下拉刷新；④ router.back deprecated | — |
+
+##### Plan.ets（学习计划页）
+
+| 维度 | 结论 | 源码位置 |
+|------|------|----------|
+| 页面入口 | `@Entry @Component struct PlanPage` | line 10-12 |
+| 返回方式 | `Text('‹').onClick()` → `router.back()` | line 22-30 |
+| 输入控件 | `TextInput`（goal）+ `TextInput`（days）+ `Button('生成计划')` | line 50-76 |
+| 生成按钮禁用条件 | `!this.loading && this.goal.length > 0` | line 74 |
+| 依赖 API | `POST /api/plan`（`HttpClient.post<StudyPlan>`, `Constants.API_PLAN`） | line 148 |
+| 请求体 | `PlanRequest { userId: 'demo', goal: string, durationDays: number, dailyMinutes: 90 }` | line 142-147 |
+| 错误降级 | catch 块回退硬编码演示任务，无错误提示 | line 151-154 |
+| 加载状态 | `this.loading` 为 true 时显示 LoadingProgress | line 123-130 |
+| 未验证点 | ① dailyMinutes 硬编码 90，无 UI 调整（line 146）；② API 失败静默回退，无错误提示（line 151-154）；③ parseInt 无效输入默认 14 但无用户反馈（line 64）；④ 无任务交互（完成/编辑/删除）；⑤ router.back deprecated | — |
+
+##### Knowledge.ets（知识库页）
+
+| 维度 | 结论 | 源码位置 |
+|------|------|----------|
+| 页面入口 | `@Entry @Component struct KnowledgePage` | line 10-12 |
+| 返回方式 | `Text('‹').onClick()` → `router.back()` | line 29-38 |
+| 输入控件 | `TextInput`（query）+ `Button('检索')` | line 57-73 |
+| 检索按钮禁用条件 | `!this.loading` | line 71 |
+| 依赖 API | `POST /api/knowledge/search`（`HttpClient.post<KnowledgeSearchResponse>`, `Constants.API_KNOWLEDGE_SEARCH`） | line 148 |
+| 请求体 | `KnowledgeSearchRequest { query: string, topK: 5 }` — **courseId 未传** | line 142-145 |
+| 错误降级 | catch 块回退 demoChunks 子串匹配，显示降级提示 | line 151-155 |
+| 空查询 | 显示全部 demoChunks + 提示"显示本地演示资料" | line 134-137 |
+| 未验证点 | ① **请求体未传 courseId**（DataModels.KnowledgeSearchRequest 有 courseId? 字段但 search() 未设置，无法按课程过滤）（line 142-145）；② 空查询返回全部演示数据，可能误导用户（line 134-137）；③ 无搜索历史/建议；④ score 显示依赖后端返回（line 104-109）；⑤ router.back deprecated | — |
+
+##### Profile.ets（个人画像页）
+
+| 维度 | 结论 | 源码位置 |
+|------|------|----------|
+| 页面入口 | `@Entry @Component struct ProfilePage` | line 10-12 |
+| 生命周期 | `aboutToAppear()` → `loadProfile()` | line 15-17 |
+| 返回方式 | `Text('‹').onClick()` → `router.back()` | line 41-50 |
+| 依赖 API | `GET /api/profile?userId=demo`（`HttpClient.get<UserProfile>`, `Constants.API_PROFILE`） | line 21-23 |
+| 错误降级 | catch 块回退硬编码演示画像 | line 25-35 |
+| 加载状态 | **无 loading 状态**（profile 为 null 时页面空白，加载完成后突然显示） | line 68 |
+| 未验证点 | ① 无 loading 状态，加载期间页面空白（line 68）；② API 失败静默回退演示数据，无错误提示（line 25-35）；③ 无编辑功能；④ router.back deprecated | — |
+
+#### 3. 公共依赖汇总
+
+| 文件 | 关键定义 | 源码位置 |
+|------|----------|----------|
+| `Constants.ets` | `BASE_URL = 'http://10.0.2.2:3000'`（模拟器访问宿主机） | line 10 |
+| `Constants.ets` | API 路径：API_CHAT/API_PROFILE/API_COURSES/API_PLAN/API_QUIZ/API_SAFETY/API_KNOWLEDGE_SEARCH | line 13-19 |
+| `Constants.ets` | `DEMO_USER_ID = 'demo'`，`REQUEST_TIMEOUT = 30000` | line 22, 25 |
+| `HttpClient.ets` | `get<T>`/`post<T>`/`postSSE` 三方法，基于 `@ohos.net.http` | line 14, 38, 63 |
+| `HttpClient.ets` | `decodeArrayBuffer` 用 `util.TextDecoder.create('utf-8')` | line 119-122 |
+| `DataModels.ets` | 12 个 interface：UserProfile/UserStats/Course/PlanTask/StudyPlan/ChatMessage/Citation/KnowledgeChunk/StreamEvent/PlanRequest/ChatRequest/KnowledgeSearchRequest/CoursesResponse/KnowledgeSearchResponse | line 1-100 |
+
+### 涉及文件（只读）
+
+- `docs/TRAE-DEVELOPMENT-BOUNDARIES.md`（读取）
+- `apps/harmonyos/entry/src/main/ets/pages/Index.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/common/Constants.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`（读取分析）
+- `apps/harmonyos/entry/src/main/resources/base/profile/main_pages.json`（读取确认路由注册）
+
+### Git 状态
+
+```
+提交前：工作区干净（3befcad docs: Trae 接力汇报（致 Codex））
+本轮不改代码，仅追加 DEVLOG 记录。
+```
+
+### 备注
+
+- 本轮未触碰任何源码、模型相关文件及 MODEL_API_KEY。
+- DevEco MCP 已自证可用（check_ets_files + build_project 成功；harmonyos_knowledge_search 云端返回空，属服务端问题）。
+- 6 个页面跳转链路梳理完成，所有结论均有源码行号支撑。
+- 关键发现：Knowledge.ets 请求体未传 courseId（line 142-145），与 DataModels.KnowledgeSearchRequest 的 courseId? 字段不一致，属功能缺口。
+- 关键发现：Profile.ets 无 loading 状态（line 68），加载期间页面空白。
+- 关键发现：3 个页面（Course/Plan/Profile）API 失败时静默回退演示数据，用户无错误感知。
+- 下一步按 Codex 指令执行低风险 Web 页面接入任务（courses/page.tsx + profile/page.tsx）。
+
+---
