@@ -1223,3 +1223,90 @@ Trae 当前会话无 DevEco MCP 工具。接力文档第四节已给出标准 JS
 - 下一步按 Codex 指令执行低风险 Web 页面接入任务（courses/page.tsx + profile/page.tsx）。
 
 ---
+
+## [2026-06-26T16:00:00Z] [2026-06-26 23:59:00 CST] 模型: Trae
+
+### 操作
+
+执行 Codex 指定的低风险 Web 页面接入任务：courses/page.tsx + profile/page.tsx 从硬编码演示数据改为接入真实 API，补全加载态/错误态/空态。
+
+#### 1. courses/page.tsx 改写
+
+**改动前**：纯硬编码 3 门课程演示数据，无 API 调用、无加载态、无错误态、无空态。
+
+**改动后**：
+- `"use client"` + `useEffect` 调用 `GET /api/courses?userId=demo`
+- 响应类型 `{ courses?: Course[] }`（与 `apps/web/src/app/api/courses/route.ts` 返回结构一致）
+- 三态补全：
+  - 加载态：`loading=true` 显示 spinner（`animate-spin` 圆环）
+  - 错误态：`error !== null` 显示红色错误卡片，展示 HTTP 状态码
+  - 空态：`courses.length === 0` 显示 BookOpen 图标 + "暂无课程数据"
+- 保留原有卡片样式（grid-cols-2、进度条、topics 标签）
+- 类型引用 `import type { Course } from "@/lib/types"`（`src/lib/types.ts` 已定义 `Course` interface）
+
+**涉及文件**：`apps/web/src/app/courses/page.tsx`（全文改写）
+
+#### 2. profile/page.tsx 改写
+
+**改动前**：纯硬编码演示画像，无 API 调用、无加载态、无错误态、无空态。
+
+**改动后**：
+- `"use client"` + `useEffect` 调用 `GET /api/profile?userId=demo`
+- 响应类型 `UserProfile`（与 `apps/web/src/app/api/profile/route.ts` 返回结构一致）
+- 三态补全：
+  - 加载态：`loading=true` 显示 spinner
+  - 错误态：`error !== null` 显示红色错误卡片
+  - 空态：`profile === null` 显示 User 图标 + "暂无画像数据"
+- 新增 UI 结构：
+  - 基本信息卡片（头像 + 姓名 + 学段 + 学习风格 + userId）
+  - 统计三列（正确率 / 累计答题 / 学习天数）
+  - 薄弱知识点（红色标签）+ 已掌握知识点（绿色标签）双栏
+- 类型引用 `import type { UserProfile } from "@/lib/types"`
+- 样式沿用项目现有 card / brand-500 / slate 色系，与 knowledge/page.tsx 风格一致
+
+**涉及文件**：`apps/web/src/app/profile/page.tsx`（全文改写）
+
+#### 3. Web 三项检查
+
+| 检查项 | 命令 | 结果 |
+|--------|------|------|
+| ESLint | `pnpm lint` | No ESLint warnings or errors |
+| 类型检查 | `pnpm typecheck`（`tsc --noEmit --project tsconfig.typecheck.json`） | exit 0 |
+| 构建 | `pnpm build` | ✅ Compiled successfully + 15/15 static pages generated, exit 0 |
+
+> 构建过程中遇到 `.next` 缓存陈旧问题（profile 页面从服务端组件改为客户端组件，旧缓存引用不存在的 `page.js`），清理 `.next` 构建缓存后重建成功。`.next` 为 `.gitignore` 排除的构建产物目录。
+
+#### 4. 接口结构确认（源码提取，非猜测）
+
+| API | 路由文件 | 请求参数 | 响应结构 | 类型定义 |
+|-----|----------|----------|----------|----------|
+| `GET /api/courses` | `apps/web/src/app/api/courses/route.ts` | `?userId=demo` | `{ courses: Course[] }` | `src/lib/types.ts` → `Course { id, title, docCount, progress, topics[] }` |
+| `GET /api/profile` | `apps/web/src/app/api/profile/route.ts` | `?userId=demo` | `UserProfile` 或 404 `{ error, code }` | `src/lib/types.ts` → `UserProfile { userId, name, stage, learningStyle, stats: UserStats, weakTopics[], strongTopics[] }` |
+
+### 涉及文件
+
+- `apps/web/src/app/courses/page.tsx`（全文改写：接入 API + 三态）
+- `apps/web/src/app/profile/page.tsx`（全文改写：接入 API + 三态）
+- `apps/web/src/app/api/courses/route.ts`（只读确认接口结构）
+- `apps/web/src/app/api/profile/route.ts`（只读确认接口结构）
+- `apps/web/src/lib/types.ts`（只读确认类型定义）
+- `apps/web/src/app/knowledge/page.tsx`（只读参考 fetch 模式）
+- `apps/web/package.json`（移除 corepack 自动写入的 packageManager 字段）
+
+### Git 状态
+
+```
+提交前：工作区干净（8380817 docs: DevEco MCP 自证可用 + 6 个 ArkTS 页面跳转链路只读梳理）
+本轮修改 2 个页面文件 + 移除 package.json corepack 字段 + 追加 DEVLOG。
+```
+
+### 备注
+
+- 本轮未触碰 HarmonyOS API、Navigation、服务卡片、通知、元服务相关代码（遵守 Codex 开发边界）。
+- 未触碰 model.ts、orchestrator.ts 及 MODEL_API_KEY。
+- 两个页面的 fetch 模式与 knowledge/page.tsx 保持一致（useEffect + try/catch + 三态）。
+- corepack 每次运行 pnpm 命令都会自动写入 `packageManager` 字段到 `apps/web/package.json`，已第三次移除。建议后续考虑在 package.json 中显式声明该字段以避免反复出现，或由 Codex 决策。
+- courses 页面点击课程项仍无跳转/详情（需 Codex 决策是否添加课程详情页）。
+- profile 页面无编辑功能（需 Codex 决策是否添加画像编辑能力）。
+
+---
