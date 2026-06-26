@@ -998,3 +998,66 @@ Trae 当前会话无 DevEco MCP 工具。接力文档第四节已给出标准 JS
 - 建议为 Trae 配置 DevEco MCP 以恢复 ArkTS 单文件检查能力（check_ets_files）。
 
 ---
+
+## [2026-06-26T15:13:26Z] [2026-06-26 23:13:26 CST] 模型: Codex
+
+### 操作
+
+复核 Trae 接力报告，独立验证当前工程基线，并编写 Trae 后续开发边界与验收线。
+
+### 复核结论
+
+1. Trae 报告已提交为 `3befcad docs: Trae 接力汇报（致 Codex）`，当前 Git 工作区在 Codex 写入边界文档前为干净状态。
+2. Trae 报告中“鸿蒙开发平台连接正常”的表述需要收窄：Trae 当前未挂载 DevEco MCP，只能证明 `hvigorw.bat` 命令行构建闭环可用，不能证明 Trae 已具备完整 DevEco MCP 能力。
+3. Codex 当前会话可调用 DevEco MCP，本轮独立验收了 `project_sync`、`check_ets_files`、`build_project`。
+4. DevEco MCP `harmonyos_knowledge_search` 本次云端请求失败，说明后续 HarmonyOS API 迁移不能跳过官方资料核验；Trae 在自身 MCP 未配置前不得凭经验推进 API 迁移。
+
+### 验收结果
+
+| 项目 | 结果 |
+|------|------|
+| Git 状态 | 复核前干净；新增边界文档与本 DEVLOG 记录后待提交 |
+| DevEco MCP `project_sync` | 通过 |
+| DevEco MCP `check_ets_files` | 10 个 `.ets` 文件无 Error |
+| DevEco MCP `build_project` | `entry@default` debug 构建成功 |
+| DevEco MCP `harmonyos_knowledge_search` | 本次请求失败，需后续重试或让 Trae 配好 MCP 后自证 |
+| Web lint | 通过 |
+| Web typecheck | 通过；pnpm 输出 `.bin\tsc` shim 创建警告，但命令成功 |
+| Web build | 通过，15 个路由生成成功 |
+| 密钥模式串检索 | 无命中 |
+| 禁用表述检索 | 无命中 |
+
+### 新增边界文档
+
+新增 `docs/TRAE-DEVELOPMENT-BOUNDARIES.md`，明确：
+
+1. Trae 的可执行范围与禁止范围。
+2. DevEco MCP 可用与不可用两种验收线。
+3. UI 行为、Web、ArkTS、Git 的交付证据格式。
+4. 当前下一阶段优先级。
+5. Trae 首批任务：先只读梳理 HarmonyOS 页面跳转链路；配置自身 DevEco MCP 并自证后，再执行低风险 Web 页面接入任务。
+
+### 涉及文件
+
+- `docs/TRAE-REPORT-TO-CODEX.md`（读取复核）
+- `docs/HANDOFF-TO-TRAE.md`（读取复核）
+- `DEVLOG.md`（追加本记录）
+- `docs/TRAE-DEVELOPMENT-BOUNDARIES.md`（新增）
+- `apps/harmonyos/entry/src/main/ets/pages/Index.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/common/Constants.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`（DevEco MCP 检查）
+- `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`（DevEco MCP 检查）
+
+### 备注
+
+- 后续 Trae 不得把 hvigor 构建成功等同于 DevEco MCP 完整可用。
+- 涉及 HarmonyOS API、Navigation、服务卡片、通知、元服务等能力时，必须先完成官方资料检索或由 Codex 提供已核验资料。
+- 当前建议优先级：运行态验证当前端侧闭环 → Web 课程页/画像页接入已有 API → Knowledge 课程过滤方案 → Navigation 迁移调研 → 服务卡片亮点调研。
+
+---
