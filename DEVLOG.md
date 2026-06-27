@@ -2861,3 +2861,59 @@ Loop第21-22轮: 子Agent CLI并行工作流正式运行 + 全页面按压反馈
 - apps/web/.env.example (ORIGIN_ALLOWLIST文档)
 - apps/web/BACKEND_P1_FIX_DEVLOG.md (后端修复开发文档)
 
+---
+
+## [2026-06-28T00:39:48Z] [2026-06-28 08:39:48 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+Loop第23-25轮: 后端P2清理 + deprecated API迁移 + HttpClient修复 + 全页面导航演示
+
+#### 1. 后端P2代码清理 (子Agent完成)
+- 移除5个未使用依赖: @ai-sdk/openai, ai, zod, clsx, tailwind-merge (卸载57个包)
+- 移除2个死代码函数: cn() + addKnowledge()
+- 净减少498行代码, 68/68测试通过
+
+#### 2. Deprecated API全部迁移到UIContext (Loop 24)
+- router.pushUrl(5处) → this.getUIContext().getRouter().pushUrl (Index.ets)
+- animateTo(1处) → this.getUIContext().animateTo (Index.ets)
+- router.back(2处) → GradientHeader onBack回调参数 (Builders.ets + 5个页面)
+- 移除Index.ets和Builders.ets的router import
+- 构建日志确认: deprecated警告全部消除
+
+#### 3. HttpClient.ets显式错误处理 (Loop 25)
+- get<T>()和post<T>()添加catch块: throw e instanceof Error ? e : new Error('Network request failed')
+- ArkTS顾问性警告仍存(编译器对httpRequest.request()的固定警告), 功能正确
+
+#### 4. 全页面导航演示 (模拟器可视化)
+- 通过MCP perform_ui_action点击正确的UI坐标(基于UI树)
+- 6页面全部截图验证: 首页 + Chat(AI辅导+禁用态按钮) + Course(3课程卡片) + Profile(用户信息+统计+标签)
+- 模拟器保持可见, 用户可实时查看操作
+
+#### 5. 子Agent CLI并行工作流正式运行
+- 主线程: 代码编辑 + MCP ETS检查 + MCP UI操作(截图/点击/导航)
+- 子Agent(Build): 通过hdc/hvigorw CLI完成构建+安装+启动+截图全流程
+- 子Agent(Backend): 后端代码审计(31文件21项) + P0安全修复 + P1性能修复 + P2清理
+- 子Agent(Research): HarmonyOS API研究(deprecated替代方案+List警告+stateStyles)
+- 并行效率: 主线程编辑代码时, 子Agent同时跑后端测试和API研究
+
+#### 验证结果
+- ETS检查: 7个文件 0 diagnostics
+- 构建: BUILD SUCCESSFUL (deprecated警告全部消除)
+- 后端: 68/68测试通过, tsc 0错误
+- 模拟器: 6页面全部渲染正确
+- 7/7验收项全部通过
+
+#### 涉及文件
+- apps/harmonyos/entry/src/main/ets/common/Builders.ets (onBack回调参数)
+- apps/harmonyos/entry/src/main/ets/common/HttpClient.ets (显式catch错误处理)
+- apps/harmonyos/entry/src/main/ets/pages/Index.ets (UIContext API迁移)
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets (GradientHeader onBack)
+- apps/harmonyos/entry/src/main/ets/pages/Course.ets (GradientHeader onBack)
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets (GradientHeader onBack)
+- apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets (GradientHeader onBack)
+- apps/harmonyos/entry/src/main/ets/pages/Profile.ets (GradientHeader onBack)
+- apps/web/package.json (移除5个未使用依赖)
+- apps/web/src/lib/utils.ts (移除cn函数)
+- apps/web/src/lib/store/db.ts (移除addKnowledge函数)
+
