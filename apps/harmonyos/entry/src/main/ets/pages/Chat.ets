@@ -330,4 +330,11 @@ struct Chat {
     .width('100%')
     .padding({ top: 8, bottom: 8 })
   }
+
+  pageTransition() {
+    PageTransitionEnter({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Left)
+    PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Right)
+  }
 }

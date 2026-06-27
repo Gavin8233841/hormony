@@ -17,6 +17,7 @@ struct Index {
   @State message: string = '';
   @State appearOpacity: number = 0;
   @State appearOffset: number = 20;
+  @State pressedId: number = -1;
 
   aboutToAppear() {
     // 调试模式：先加载演示数据，避免网络等待时空白
@@ -55,7 +56,7 @@ struct Index {
   }
 
   @Builder
-  FunctionEntry(title: string, subtitle: string, accentColor: ResourceColor, action: () => void) {
+  FunctionEntry(index: number, title: string, subtitle: string, accentColor: ResourceColor, action: () => void) {
     Row() {
       // 左侧色条
       Column()
@@ -90,8 +91,17 @@ struct Index {
     .borderRadius(Constants.RADIUS_LG)
     .shadow({ radius: 16, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
     .alignItems(VerticalAlign.Center)
-    .scale({ x: 1, y: 1 })
-    .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
+    .scale({ x: this.pressedId === index ? 0.97 : 1, y: this.pressedId === index ? 0.97 : 1 })
+    .animation({ duration: 100, curve: Curve.EaseOut })
+    .onTouch((event?: TouchEvent) => {
+      if (event) {
+        if (event.type === TouchType.Down) {
+          this.pressedId = index;
+        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+          this.pressedId = -1;
+        }
+      }
+    })
     .onClick(() => {
       action();
     })
@@ -153,27 +163,27 @@ struct Index {
 
         // 功能入口
         Column({ space: 10 }) {
-          this.FunctionEntry('问问鸿学伴', '向 AI 助教提问，获取带引用的讲解', Constants.COLOR_BRAND, () => {
+          this.FunctionEntry(0, '问问鸿学伴', '向 AI 助教提问，获取带引用的讲解', Constants.COLOR_BRAND, () => {
             router.pushUrl({ url: 'pages/Chat' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
-          this.FunctionEntry('学习计划', '输入目标，自动拆解为每日任务', Constants.COLOR_SUCCESS, () => {
+          this.FunctionEntry(1, '学习计划', '输入目标，自动拆解为每日任务', Constants.COLOR_SUCCESS, () => {
             router.pushUrl({ url: 'pages/Plan' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
-          this.FunctionEntry('搜课程资料', '搜索课程知识点和相关资料', Constants.COLOR_WARNING, () => {
+          this.FunctionEntry(2, '搜课程资料', '搜索课程知识点和相关资料', Constants.COLOR_WARNING, () => {
             router.pushUrl({ url: 'pages/Knowledge' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
-          this.FunctionEntry('我的课程', '查看课程进度和学习资料', Constants.COLOR_ACCENT_PURPLE, () => {
+          this.FunctionEntry(3, '我的课程', '查看课程进度和学习资料', Constants.COLOR_ACCENT_PURPLE, () => {
             router.pushUrl({ url: 'pages/Course' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
-          this.FunctionEntry('学习画像', '查看薄弱点和优势，针对性提升', Constants.COLOR_ACCENT_CYAN, () => {
+          this.FunctionEntry(4, '学习画像', '查看薄弱点和优势，针对性提升', Constants.COLOR_ACCENT_CYAN, () => {
             router.pushUrl({ url: 'pages/Profile' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
@@ -201,5 +211,12 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor(Constants.COLOR_BG_PAGE)
+  }
+
+  pageTransition() {
+    PageTransitionEnter({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Left)
+    PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Right)
   }
 }

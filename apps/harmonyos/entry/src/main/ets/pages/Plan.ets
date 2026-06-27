@@ -155,4 +155,11 @@ struct PlanPage {
       this.loading = false;
     }
   }
+
+  pageTransition() {
+    PageTransitionEnter({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Left)
+    PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Right)
+  }
 }

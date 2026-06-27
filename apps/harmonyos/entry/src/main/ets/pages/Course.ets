@@ -124,4 +124,11 @@ struct CoursePage {
     .height('100%')
     .backgroundColor(Constants.COLOR_BG_PAGE)
   }
+
+  pageTransition() {
+    PageTransitionEnter({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Left)
+    PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
+      .slide(SlideEffect.Right)
+  }
 }
