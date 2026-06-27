@@ -1,7 +1,7 @@
 // 简化版内存数据存储（初期零依赖，验证流程后再换 SQLite/PostgreSQL）
 // 使用 globalThis 单例，避免 Next.js 开发模式下模块多实例导致数据丢失
 
-import type { UserProfile, Course, StudyPlan, Quiz, KnowledgeChunk } from "@/lib/types";
+import type { UserProfile, Course, StudyPlan, Quiz, KnowledgeChunk, QuizResult, ConversationRecord, DashboardStats, RecentActivity } from "@/lib/types";
 
 interface DB {
   profiles: Map<string, UserProfile>;
@@ -9,6 +9,9 @@ interface DB {
   plans: Map<string, StudyPlan>;
   quizzes: Map<string, Quiz>;
   knowledge: KnowledgeChunk[];
+  quizResults: QuizResult[];
+  conversations: ConversationRecord[];
+  activityLog: RecentActivity[];
 }
 
 declare global {
@@ -22,6 +25,9 @@ const db: DB = globalThis.__APP_DB__ ?? {
   plans: new Map(),
   quizzes: new Map(),
   knowledge: [],
+  quizResults: [],
+  conversations: [],
+  activityLog: [],
 };
 
 if (!globalThis.__APP_DB__) {
@@ -65,25 +71,135 @@ if (db.profiles.size === 0) {
 }
 
 export const store = {
+  // ========== Profile ==========
   getProfile(userId: string): UserProfile | undefined {
     return db.profiles.get(userId);
   },
+  updateProfile(userId: string, updates: Partial<UserProfile>): UserProfile | undefined {
+    const existing = db.profiles.get(userId);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    db.profiles.set(userId, updated);
+    return updated;
+  },
+
+  // ========== Courses ==========
   getCourses(userId: string): Course[] {
     return db.courses.get(userId) ?? [];
   },
+  addCourse(userId: string, course: Course): void {
+    const courses = db.courses.get(userId) ?? [];
+    courses.push(course);
+    db.courses.set(userId, courses);
+  },
+
+  // ========== Knowledge ==========
   getKnowledge(courseId?: string): KnowledgeChunk[] {
     return courseId ? db.knowledge.filter((c) => c.courseId === courseId) : db.knowledge;
   },
   addKnowledge(chunk: KnowledgeChunk) {
     db.knowledge.push(chunk);
   },
+  addKnowledgeBatch(chunks: KnowledgeChunk[]) {
+    db.knowledge.push(...chunks);
+  },
+
+  // ========== Plans ==========
   savePlan(plan: StudyPlan) {
     db.plans.set(plan.userId, plan);
   },
   getPlan(userId: string): StudyPlan | undefined {
     return db.plans.get(userId);
   },
+  updatePlanTask(userId: string, taskId: string, done: boolean): StudyPlan | undefined {
+    const plan = db.plans.get(userId);
+    if (!plan) return undefined;
+    const task = plan.tasks.find((t) => t.id === taskId);
+    if (task) {
+      task.done = done;
+    }
+    return plan;
+  },
+
+  // ========== Quiz ==========
   saveQuiz(quiz: Quiz) {
     db.quizzes.set(quiz.quizId, quiz);
+  },
+  getQuiz(quizId: string): Quiz | undefined {
+    return db.quizzes.get(quizId);
+  },
+
+  // ========== Quiz Results ==========
+  recordQuizResult(result: QuizResult) {
+    db.quizResults.push(result);
+    // 同步更新用户画像的答题统计
+    const profile = db.profiles.get(result.userId);
+    if (profile) {
+      const newTotal = profile.stats.totalQuestions + result.totalQuestions;
+      const oldCorrect = Math.round(profile.stats.totalQuestions * profile.stats.accuracy);
+      const newCorrect = oldCorrect + result.correctCount;
+      profile.stats.totalQuestions = newTotal;
+      profile.stats.accuracy = newTotal > 0 ? newCorrect / newTotal : 0;
+      // 更新薄弱知识点
+      if (result.weakTopics.length > 0) {
+        const weakSet = new Set([...profile.weakTopics, ...result.weakTopics]);
+        profile.weakTopics = Array.from(weakSet).slice(0, 10);
+      }
+    }
+    // 记录活动
+    db.activityLog.unshift({
+      type: "quiz",
+      description: `完成测验：${result.correctCount}/${result.totalQuestions} 题正确`,
+      timestamp: result.submittedAt,
+    });
+  },
+  getQuizResults(userId: string): QuizResult[] {
+    return db.quizResults.filter((r) => r.userId === userId);
+  },
+
+  // ========== Conversations ==========
+  addConversation(record: ConversationRecord) {
+    db.conversations.unshift(record);
+    if (db.conversations.length > 100) {
+      db.conversations = db.conversations.slice(0, 100);
+    }
+    db.activityLog.unshift({
+      type: "chat",
+      description: record.message.slice(0, 50),
+      timestamp: record.createdAt,
+    });
+  },
+  getConversations(userId: string, limit = 20): ConversationRecord[] {
+    return db.conversations.filter((c) => c.userId === userId).slice(0, limit);
+  },
+
+  // ========== Stats ==========
+  getStats(userId: string): DashboardStats {
+    const profile = db.profiles.get(userId);
+    const courses = db.courses.get(userId) ?? [];
+    const plan = db.plans.get(userId);
+    const quizResults = db.quizResults.filter((r) => r.userId === userId);
+    const totalTasks = plan?.tasks.length ?? 0;
+    const completedTasks = plan?.tasks.filter((t) => t.done).length ?? 0;
+
+    return {
+      userId,
+      totalQuestions: profile?.stats.totalQuestions ?? 0,
+      accuracy: profile?.stats.accuracy ?? 0,
+      studyDays: profile?.stats.studyDays ?? 0,
+      activeCourses: courses.length,
+      totalTasks,
+      completedTasks,
+      totalQuizSubmissions: quizResults.length,
+      recentActivity: db.activityLog.slice(0, 10),
+    };
+  },
+
+  // ========== Activity ==========
+  logActivity(activity: RecentActivity) {
+    db.activityLog.unshift(activity);
+    if (db.activityLog.length > 50) {
+      db.activityLog = db.activityLog.slice(0, 50);
+    }
   },
 };

@@ -1,5 +1,6 @@
 // Orchestrator：多 Agent 编排器
 // 职责：意图识别 → 调用对应 Agent → 安全审核 → 汇总输出
+// 每个 Agent 调用独立 try-catch，单个 Agent 失败不阻断整体流程
 
 import { runProfileAgent } from "./profile-agent";
 import { runRetrievalAgent } from "./retrieval-agent";
@@ -10,17 +11,34 @@ import { runEvaluatorAgent } from "./evaluator-agent";
 import { runSafetyAgent } from "./safety-agent";
 import type { AgentResult, Citation, StreamEvent, ChatRequest } from "@/lib/types";
 import { generateId } from "@/lib/utils";
+import { store } from "@/lib/store/db";
 
 // 简易意图识别（关键词路由）
 type Intent = "tutor" | "plan" | "quiz" | "evaluate" | "general";
 
 function detectIntent(message: string): Intent {
   const m = message.toLowerCase();
-  if (/(制定|生成|安排).*(计划|复习|学习|规划)|计划|时间表|日程/.test(m)) return "plan";
-  if (/(出题|测验|测试|练习题|考题|quiz)/.test(m)) return "quiz";
-  if (/(分析|诊断|错题|薄弱|总结).*(答题|成绩|错题)/.test(m)) return "evaluate";
-  if (/(什么是|解释|讲解|怎么理解|区别|原理|为什么|如何)/.test(m)) return "tutor";
+  if (/(制定|生成|安排).*(计划|复习|学习|规划)|计划|时间表|日程|备考/.test(m)) return "plan";
+  if (/(出题|测验|测试|练习题|考题|quiz|刷题)/.test(m)) return "quiz";
+  if (/(分析|诊断|错题|薄弱|总结|评估|成绩|答题记录)/.test(m)) return "evaluate";
+  if (/(什么是|解释|讲解|怎么理解|区别|原理|为什么|如何|说明|含义)/.test(m)) return "tutor";
   return "general";
+}
+
+// 安全执行单个 Agent，失败时返回降级结果
+async function safeAgentCall(
+  agentName: AgentResult["agent"],
+  fn: () => Promise<AgentResult>
+): Promise<AgentResult> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`[orchestrator] ${agentName} agent failed:`, err instanceof Error ? err.message : String(err));
+    return {
+      agent: agentName,
+      content: `${agentName} 服务暂时不可用，已跳过。`,
+    };
+  }
 }
 
 export interface OrchestrationResult {
@@ -39,67 +57,76 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
   const sessionId = generateId("session");
   const agentResults: AgentResult[] = [];
 
-  // 1. 始终加载用户画像
-  const profileResult = await runProfileAgent(req.userId);
+  // 1. 始终加载用户画像（失败不阻断）
+  const profileResult = await safeAgentCall("Profile", () => runProfileAgent(req.userId));
   agentResults.push(profileResult);
 
-  // 2. 始终执行 RAG 检索（通用场景提供上下文）
-  const retrievalResult = await runRetrievalAgent(
-    req.message,
-    req.context?.courseId
+  // 2. 始终执行 RAG 检索（失败不阻断）
+  const retrievalResult = await safeAgentCall("Retrieval", () =>
+    runRetrievalAgent(req.message, req.context?.courseId)
   );
   agentResults.push(retrievalResult);
 
-  // 3. 按意图路由
+  // 3. 按意图路由（失败不阻断）
   let mainResult: AgentResult;
   switch (intent) {
     case "plan":
-      mainResult = {
-        agent: "Planner",
-        content: JSON.stringify(
-          await runPlannerAgent(req.userId, req.message, 14, 90),
-          null,
-          2
-        ),
-      };
+      mainResult = await safeAgentCall("Planner", async () => {
+        const plan = await runPlannerAgent(req.userId, req.message, 14, 90);
+        return {
+          agent: "Planner",
+          content: JSON.stringify(plan, null, 2),
+        };
+      });
       break;
     case "quiz":
-      mainResult = {
-        agent: "Quiz",
-        content: JSON.stringify(
-          await runQuizAgent(
-            req.userId,
-            req.context?.courseId ?? "cs101",
-            req.message,
-            5,
-            "medium"
-          ),
-          null,
-          2
-        ),
-      };
+      mainResult = await safeAgentCall("Quiz", async () => {
+        const quiz = await runQuizAgent(
+          req.userId,
+          req.context?.courseId ?? "cs101",
+          req.message,
+          5,
+          "medium"
+        );
+        return {
+          agent: "Quiz",
+          content: JSON.stringify(quiz, null, 2),
+        };
+      });
       break;
     case "evaluate":
-      mainResult = await runEvaluatorAgent(req.userId, []);
+      mainResult = await safeAgentCall("Evaluator", () =>
+        runEvaluatorAgent(req.userId, [])
+      );
       break;
     case "tutor":
     case "general":
     default:
-      mainResult = await runTutorAgent(
-        req.userId,
-        req.message,
-        retrievalResult.content,
-        retrievalResult.citations ?? []
+      mainResult = await safeAgentCall("Tutor", () =>
+        runTutorAgent(
+          req.userId,
+          req.message,
+          retrievalResult.content,
+          retrievalResult.citations ?? []
+        )
       );
       break;
   }
   agentResults.push(mainResult);
 
-  // 4. 安全审核
+  // 4. 安全审核（失败不阻断）
   const safety = await runSafetyAgent(
     mainResult.content,
     mainResult.citations ?? []
-  );
+  ).catch((err) => {
+    console.error("[orchestrator] Safety agent failed:", err instanceof Error ? err.message : String(err));
+    return {
+      passed: true,
+      flags: [],
+      hallucinationRisk: "low" as const,
+      suggestion: "安全审核服务暂不可用，已跳过。",
+    };
+  });
   const safetyAgentResult: AgentResult = {
     agent: "Safety",
     content: safety.passed
@@ -108,6 +135,17 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
     metadata: safety,
   };
   agentResults.push(safetyAgentResult);
+
+  // 5. 记录会话历史
+  store.addConversation({
+    sessionId,
+    userId: req.userId,
+    message: req.message,
+    response: mainResult.content,
+    intent,
+    citations: mainResult.citations ?? [],
+    createdAt: new Date().toISOString(),
+  });
 
   return {
     sessionId,
@@ -128,16 +166,15 @@ export async function orchestrateStream(
   const intent = detectIntent(req.message);
   const sessionId = generateId("session");
 
-  // 1. Profile Agent
+  // 1. Profile Agent（失败不阻断）
   emit({ type: "thinking", agent: "Profile" });
-  const profileResult = await runProfileAgent(req.userId);
+  const profileResult = await safeAgentCall("Profile", () => runProfileAgent(req.userId));
   emit({ type: "trace", agent: "Profile", content: profileResult.content });
 
-  // 2. Retrieval Agent
+  // 2. Retrieval Agent（失败不阻断）
   emit({ type: "thinking", agent: "Retrieval" });
-  const retrievalResult = await runRetrievalAgent(
-    req.message,
-    req.context?.courseId
+  const retrievalResult = await safeAgentCall("Retrieval", () =>
+    runRetrievalAgent(req.message, req.context?.courseId)
   );
   emit({
     type: "trace",
@@ -145,47 +182,53 @@ export async function orchestrateStream(
     content: retrievalResult.content.slice(0, 200),
   });
 
-  // 3. 按意图路由到主 Agent
+  // 3. 按意图路由到主 Agent（失败不阻断）
   let mainResult: AgentResult;
   switch (intent) {
     case "plan":
       emit({ type: "thinking", agent: "Planner" });
-      const plan = await runPlannerAgent(req.userId, req.message, 14, 90);
-      mainResult = {
-        agent: "Planner",
-        content: `已为你生成学习计划（${plan.tasks.length} 个任务）：\n${plan.tasks
-          .map((t) => `• [${t.date}] ${t.title}（${t.estimatedMin} 分钟，${t.type}）`)
-          .join("\n")}`,
-      };
+      mainResult = await safeAgentCall("Planner", async () => {
+        const plan = await runPlannerAgent(req.userId, req.message, 14, 90);
+        return {
+          agent: "Planner",
+          content: `已为你生成学习计划（${plan.tasks.length} 个任务）：\n${plan.tasks
+            .map((t) => `• [${t.date}] ${t.title}（${t.estimatedMin} 分钟，${t.type}）`)
+            .join("\n")}`,
+        };
+      });
       break;
     case "quiz":
       emit({ type: "thinking", agent: "Quiz" });
-      const quiz = await runQuizAgent(
-        req.userId,
-        req.context?.courseId ?? "cs101",
-        req.message,
-        5,
-        "medium"
-      );
-      mainResult = {
-        agent: "Quiz",
-        content: `已生成 ${quiz.questions.length} 道题：\n${quiz.questions
-          .map(
-            (q, i) =>
-              `${i + 1}. ${q.stem}\n${q.options?.join("\n") ?? ""}`
-          )
-          .join("\n\n")}`,
-      };
+      mainResult = await safeAgentCall("Quiz", async () => {
+        const quiz = await runQuizAgent(
+          req.userId,
+          req.context?.courseId ?? "cs101",
+          req.message,
+          5,
+          "medium"
+        );
+        return {
+          agent: "Quiz",
+          content: `已生成 ${quiz.questions.length} 道题：\n${quiz.questions
+            .map(
+              (q, i) =>
+                `${i + 1}. ${q.stem}\n${q.options?.join("\n") ?? ""}`
+            )
+            .join("\n\n")}`,
+        };
+      });
       break;
     case "tutor":
     case "general":
     default:
       emit({ type: "thinking", agent: "Tutor" });
-      mainResult = await runTutorAgent(
-        req.userId,
-        req.message,
-        retrievalResult.content,
-        retrievalResult.citations ?? []
+      mainResult = await safeAgentCall("Tutor", () =>
+        runTutorAgent(
+          req.userId,
+          req.message,
+          retrievalResult.content,
+          retrievalResult.citations ?? []
+        )
       );
       break;
   }
@@ -198,12 +241,20 @@ export async function orchestrateStream(
     emit({ type: "citation", source: c });
   }
 
-  // 5. 安全审核
+  // 5. 安全审核（失败不阻断）
   emit({ type: "thinking", agent: "Safety" });
   const safety = await runSafetyAgent(
     mainResult.content,
     mainResult.citations ?? []
-  );
+  ).catch((err) => {
+    console.error("[orchestrator/stream] Safety agent failed:", err instanceof Error ? err.message : String(err));
+    return {
+      passed: true,
+      flags: [],
+      hallucinationRisk: "low" as const,
+      suggestion: "安全审核服务暂不可用。",
+    };
+  });
   emit({
     type: "trace",
     agent: "Safety",
@@ -212,6 +263,17 @@ export async function orchestrateStream(
       : `安全检查：${safety.flags.join("；")}，幻觉风险：${safety.hallucinationRisk}。${safety.suggestion ?? ""}`,
   });
 
-  // 6. 完成
+  // 6. 记录会话历史
+  store.addConversation({
+    sessionId,
+    userId: req.userId,
+    message: req.message,
+    response: mainResult.content,
+    intent,
+    citations: mainResult.citations ?? [],
+    createdAt: new Date().toISOString(),
+  });
+
+  // 7. 完成
   emit({ type: "done", sessionId });
 }

@@ -115,3 +115,84 @@ export type StreamEvent =
   | { type: "citation"; source: Citation }
   | { type: "trace"; agent: AgentName; content: string }
   | { type: "done"; sessionId: string };
+
+// ========== 测验提交与评分 ==========
+
+export interface QuizSubmission {
+  quizId: string;
+  userId: string;
+  answers: QuizAnswer[];
+}
+
+export interface QuizAnswer {
+  questionId: string;
+  userAnswer: string;
+}
+
+export interface QuizResult {
+  quizId: string;
+  userId: string;
+  totalQuestions: number;
+  correctCount: number;
+  accuracy: number;
+  details: QuizResultDetail[];
+  evaluation: string;
+  weakTopics: string[];
+  submittedAt: string;
+}
+
+export interface QuizResultDetail {
+  questionId: string;
+  stem: string;
+  userAnswer: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+  explanation: string;
+}
+
+// ========== 仪表盘统计 ==========
+
+export interface DashboardStats {
+  userId: string;
+  totalQuestions: number;
+  accuracy: number;
+  studyDays: number;
+  activeCourses: number;
+  totalTasks: number;
+  completedTasks: number;
+  totalQuizSubmissions: number;
+  recentActivity: RecentActivity[];
+}
+
+export interface RecentActivity {
+  type: "chat" | "quiz" | "plan" | "study";
+  description: string;
+  timestamp: string;
+}
+
+// ========== 会话历史 ==========
+
+export interface ConversationRecord {
+  sessionId: string;
+  userId: string;
+  message: string;
+  response: string;
+  intent: string;
+  citations: Citation[];
+  createdAt: string;
+}
+
+// ========== 知识上传 ==========
+
+export interface KnowledgeUploadRequest {
+  courseId: string;
+  source: string;
+  text: string;
+}
+
+// ========== 计划任务打卡 ==========
+
+export interface PlanTaskUpdate {
+  taskId: string;
+  done: boolean;
+}
