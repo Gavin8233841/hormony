@@ -1,8 +1,25 @@
+// GET /api/plan — 获取学习计划
 // POST /api/plan — 生成学习计划
 
 import { runPlannerAgent } from "@/lib/agents/planner-agent";
+import { store } from "@/lib/store/db";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId") ?? "demo";
+    const plan = store.getPlan(userId);
+    if (!plan) {
+      return Response.json({ error: "未找到学习计划", code: "NOT_FOUND" }, { status: 404 });
+    }
+    return Response.json(plan);
+  } catch (err) {
+    console.error("[plan/GET] error:", err instanceof Error ? err.message : String(err));
+    return Response.json({ error: "获取计划失败", code: "INTERNAL_ERROR" }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   let body: { userId?: string; goal?: string; durationDays?: number; dailyMinutes?: number };
@@ -25,7 +42,11 @@ export async function POST(req: Request) {
     const plan = await runPlannerAgent(userId, goal, durationDays, dailyMinutes);
     return Response.json(plan);
   } catch (err) {
-    console.error("[plan] error:", err instanceof Error ? err.message : String(err));
+    console.error("[plan/POST] error:", err instanceof Error ? err.message : String(err));
     return Response.json({ error: "生成计划失败，请稍后重试", code: "INTERNAL_ERROR" }, { status: 500 });
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 });
 }

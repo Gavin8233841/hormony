@@ -32,3 +32,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "生成测验失败，请稍后重试", code: "INTERNAL_ERROR" }, { status: 500 });
   }
 }
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 });
+}
