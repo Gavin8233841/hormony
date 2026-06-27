@@ -7,30 +7,34 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit --project tsconfig.typecheck.json",
     "typecheck:full": "next build && tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/openai": "0.0.66",
+    "ai": "3.4.33",
+    "clsx": "2.1.1",
+    "lucide-react": "0.460.0",
     "next": "14.2.18",
+    "openai": "4.73.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "ai": "3.4.33",
-    "@ai-sdk/openai": "0.0.66",
-    "zod": "3.23.8",
-    "clsx": "2.1.1",
     "tailwind-merge": "2.5.4",
-    "lucide-react": "0.460.0",
-    "openai": "4.73.1"
+    "zod": "3.23.8"
   },
   "devDependencies": {
-    "typescript": "5.6.3",
     "@types/node": "22.9.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
-    "tailwindcss": "3.4.15",
-    "postcss": "8.4.49",
     "autoprefixer": "10.4.20",
     "eslint": "8.57.1",
-    "eslint-config-next": "14.2.18"
-  }
+    "eslint-config-next": "14.2.18",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.15",
+    "typescript": "5.6.3",
+    "vitest": "^4.1.9"
+  },
+  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b"
 }
