@@ -102,6 +102,61 @@ function cosineSimilarity(vecA: Map<string, number>, vecB: Map<string, number>):
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+// ========== TF-IDF 索引缓存 ==========
+// 缓存文档集的 IDF 与各文档向量，避免每次检索全量重算（tokenization、IDF、文档向量
+// 仅依赖文档集，与查询无关）。
+// 缓存 key 为文档列表指纹（hash）；文档变更 → 指纹变化 → 自动失效旧条目并重建。
+// 另提供 invalidateRagCache() 供上传 / 删除知识后显式清空，释放内存。
+
+interface RagIndexCache {
+  key: string;
+  idf: Map<string, number>;
+  docVectors: Map<string, number>[];
+}
+
+const RAG_CACHE_MAX = 8;
+const ragCacheMap = new Map<string, RagIndexCache>();
+
+// 文档列表指纹（djb2 变体哈希）：用 id + 文本长度 + 文本前缀组合，兼顾速度与变化检测
+function hashDocuments(docs: KnowledgeChunk[]): string {
+  let hash = 5381;
+  const fingerprint = docs
+    .map((d) => `${d.id}:${d.text.length}:${d.text.slice(0, 64)}`)
+    .join("|");
+  for (let i = 0; i < fingerprint.length; i++) {
+    hash = ((hash << 5) + hash + fingerprint.charCodeAt(i)) | 0;
+  }
+  return `${docs.length}#${(hash >>> 0).toString(16)}`;
+}
+
+// 获取或构建文档集 TF-IDF 索引（命中缓存则直接返回，未命中则构建并缓存）
+function getRagIndex(docs: KnowledgeChunk[]): RagIndexCache | null {
+  if (docs.length === 0) return null;
+  const key = hashDocuments(docs);
+  const cached = ragCacheMap.get(key);
+  if (cached) return cached;
+
+  const docTokensList = docs.map((c) => tokenize(c.text));
+  const idf = computeIdf(docTokensList);
+  const docVectors = docTokensList.map((tokens) =>
+    tfidfVector(termFrequency(tokens), idf)
+  );
+  const entry: RagIndexCache = { key, idf, docVectors };
+
+  // 简单 FIFO 驱逐，限制缓存条目数量
+  if (ragCacheMap.size >= RAG_CACHE_MAX) {
+    const firstKey = ragCacheMap.keys().next().value;
+    if (firstKey !== undefined) ragCacheMap.delete(firstKey);
+  }
+  ragCacheMap.set(key, entry);
+  return entry;
+}
+
+// 清除全部 RAG 索引缓存（文档变更时调用，如上传 / 删除知识后）
+export function invalidateRagCache(): void {
+  ragCacheMap.clear();
+}
+
 // ========== 检索主逻辑 ==========
 
 export function retrieve(query: string, courseId?: string, topK = 3): KnowledgeChunk[] {
@@ -111,19 +166,19 @@ export function retrieve(query: string, courseId?: string, topK = 3): KnowledgeC
   const queryTokens = tokenize(query);
   if (queryTokens.length === 0) return [];
 
-  // 1. 构建文档集 token 列表
-  const docTokensList = knowledgePool.map((c) => tokenize(c.text));
-  const idf = computeIdf(docTokensList);
+  // 1. 获取（或构建并缓存）文档集的 TF-IDF 索引：
+  //    文档 tokenization、IDF、各文档向量仅依赖文档集，缓存后避免每次检索全量重算。
+  const index = getRagIndex(knowledgePool);
+  if (!index) return [];
+  const { idf, docVectors } = index;
 
-  // 2. 计算查询的 TF-IDF 向量
+  // 2. 计算查询的 TF-IDF 向量（依赖查询，每次计算）
   const queryTf = termFrequency(queryTokens);
   const queryVec = tfidfVector(queryTf, idf);
 
-  // 3. 计算每个文档的 TF-IDF 向量并评分
+  // 3. 用缓存的文档向量评分
   const scored = knowledgePool.map((chunk, i) => {
-    const docTf = termFrequency(docTokensList[i]);
-    const docVec = tfidfVector(docTf, idf);
-    const similarity = cosineSimilarity(queryVec, docVec);
+    const similarity = cosineSimilarity(queryVec, docVectors[i]);
     return { chunk, s: similarity };
   });
 

@@ -13,6 +13,7 @@ import { UserProfile } from '../model/DataModels';
 struct ProfilePage {
   @State profile: UserProfile | null = null;
   @State loading: boolean = false;
+  @State pressedSection: number = -1;
 
   aboutToAppear() {
     // 调试模式：先加载演示数据，避免网络等待时空白
@@ -84,6 +85,7 @@ struct ProfilePage {
         .padding(16)
         .backgroundColor(Constants.COLOR_BG_CARD)
         .borderRadius(12)
+        .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
         .margin({ left: 16, right: 16, bottom: 16 })
 
         // 统计卡片
@@ -130,8 +132,20 @@ struct ProfilePage {
         .padding(16)
         .backgroundColor(Constants.COLOR_BG_CARD)
         .borderRadius(12)
+        .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
         .margin({ left: 16, right: 16, bottom: 12 })
         .alignItems(HorizontalAlign.Start)
+        .scale({ x: this.pressedSection === 0 ? 0.98 : 1, y: this.pressedSection === 0 ? 0.98 : 1 })
+        .animation({ duration: 100, curve: Curve.EaseOut })
+        .onTouch((event?: TouchEvent) => {
+          if (event) {
+            if (event.type === TouchType.Down) {
+              this.pressedSection = 0;
+            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+              this.pressedSection = -1;
+            }
+          }
+        })
 
         // 已掌握知识点
         Column() {
@@ -156,8 +170,20 @@ struct ProfilePage {
         .padding(16)
         .backgroundColor(Constants.COLOR_BG_CARD)
         .borderRadius(12)
+        .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
         .margin({ left: 16, right: 16 })
         .alignItems(HorizontalAlign.Start)
+        .scale({ x: this.pressedSection === 1 ? 0.98 : 1, y: this.pressedSection === 1 ? 0.98 : 1 })
+        .animation({ duration: 100, curve: Curve.EaseOut })
+        .onTouch((event?: TouchEvent) => {
+          if (event) {
+            if (event.type === TouchType.Down) {
+              this.pressedSection = 1;
+            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+              this.pressedSection = -1;
+            }
+          }
+        })
       }
     }
     .width('100%')

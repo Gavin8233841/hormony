@@ -3,6 +3,7 @@
 
 import { store } from "@/lib/store/db";
 import { generateId } from "@/lib/utils";
+import { invalidateRagCache } from "@/lib/rag";
 import type { KnowledgeUploadRequest, KnowledgeChunk } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -51,56 +52,63 @@ function chunkText(text: string): string[] {
 }
 
 export async function POST(req: Request) {
-  let body: KnowledgeUploadRequest;
   try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-  }
+    let body: KnowledgeUploadRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
+    }
 
-  const courseId = String(body.courseId ?? "").trim();
-  const source = String(body.source ?? "").trim();
-  const text = String(body.text ?? "").trim();
+    const courseId = String(body.courseId ?? "").trim();
+    const source = String(body.source ?? "").trim();
+    const text = String(body.text ?? "").trim();
 
-  if (!courseId) {
-    return Response.json({ error: "缺少 courseId", code: "MISSING_FIELD" }, { status: 400 });
-  }
-  if (!source) {
-    return Response.json({ error: "缺少 source（资料来源名称）", code: "MISSING_FIELD" }, { status: 400 });
-  }
-  if (!text) {
-    return Response.json({ error: "缺少 text（知识内容）", code: "MISSING_FIELD" }, { status: 400 });
-  }
-  if (text.length > MAX_TEXT_LENGTH) {
-    return Response.json(
-      { error: `文本过长（上限 ${MAX_TEXT_LENGTH} 字符，当前 ${text.length}）`, code: "TEXT_TOO_LONG" },
-      { status: 400 }
-    );
-  }
+    if (!courseId) {
+      return Response.json({ error: "缺少 courseId", code: "MISSING_FIELD" }, { status: 400 });
+    }
+    if (!source) {
+      return Response.json({ error: "缺少 source（资料来源名称）", code: "MISSING_FIELD" }, { status: 400 });
+    }
+    if (!text) {
+      return Response.json({ error: "缺少 text（知识内容）", code: "MISSING_FIELD" }, { status: 400 });
+    }
+    if (text.length > MAX_TEXT_LENGTH) {
+      return Response.json(
+        { error: `文本过长（上限 ${MAX_TEXT_LENGTH} 字符，当前 ${text.length}）`, code: "TEXT_TOO_LONG" },
+        { status: 400 }
+      );
+    }
 
-  // 分块
-  const textChunks = chunkText(text);
-  const chunks: KnowledgeChunk[] = textChunks.map((chunkText) => ({
-    id: generateId("k"),
-    text: chunkText,
-    source,
-    courseId,
-  }));
+    // 分块
+    const textChunks = chunkText(text);
+    const chunks: KnowledgeChunk[] = textChunks.map((chunkText) => ({
+      id: generateId("k"),
+      text: chunkText,
+      source,
+      courseId,
+    }));
 
-  store.addKnowledgeBatch(chunks);
-  store.logActivity({
-    type: "study",
-    description: `上传知识资料：${source}（${chunks.length} 个切片）`,
-    timestamp: new Date().toISOString(),
-  });
+    store.addKnowledgeBatch(chunks);
+    // 文档变更：清除 RAG 索引缓存，下次检索按新文档集重建
+    invalidateRagCache();
+    store.logActivity({
+      type: "study",
+      description: `上传知识资料：${source}（${chunks.length} 个切片）`,
+      timestamp: new Date().toISOString(),
+    });
 
-  return Response.json({
-    success: true,
-    courseId,
-    source,
-    chunkCount: chunks.length,
-    chunkIds: chunks.map((c) => c.id),
-  });
+    return Response.json({
+      success: true,
+      courseId,
+      source,
+      chunkCount: chunks.length,
+      chunkIds: chunks.map((c) => c.id),
+    });
+  } catch (err) {
+    console.error("[knowledge/upload] unhandled error:", err instanceof Error ? err.message : String(err));
+    return Response.json({ error: "服务器内部错误", code: "INTERNAL_ERROR" }, { status: 500 });
+  }
 }
 
 export async function OPTIONS() {
