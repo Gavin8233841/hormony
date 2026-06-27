@@ -78,10 +78,10 @@ export default function CoursesPage() {
               <div className="mt-4">
                 <div className="mb-1 flex justify-between text-xs text-slate-400">
                   <span>学习进度</span>
-                  <span>{(c.progress * 100).toFixed(0)}%</span>
+                  <span>{(Math.min(Math.max(c.progress, 0), 1) * 100).toFixed(0)}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-700/50">
-                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${c.progress * 100}%` }} />
+                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(Math.max(c.progress, 0), 1) * 100}%` }} />
                 </div>
               </div>
 

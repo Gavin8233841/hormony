@@ -2,6 +2,8 @@
 
 import { runQuizAgent } from "@/lib/agents/quiz-agent";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   let body: {
     userId?: string;
@@ -18,10 +20,15 @@ export async function POST(req: Request) {
 
   const userId = body.userId ?? "demo";
   const courseId = body.courseId ?? "cs101";
-  const topic = body.topic ?? "综合";
-  const count = body.count ?? 5;
+  const topic = String(body.topic ?? "综合").trim();
+  const count = Math.min(Math.max(Number(body.count) || 5, 1), 20);
   const difficulty = body.difficulty ?? "medium";
 
-  const quiz = await runQuizAgent(userId, courseId, topic, count, difficulty);
-  return Response.json(quiz);
+  try {
+    const quiz = await runQuizAgent(userId, courseId, topic, count, difficulty);
+    return Response.json(quiz);
+  } catch (err) {
+    console.error("[quiz] error:", err instanceof Error ? err.message : String(err));
+    return Response.json({ error: "生成测验失败，请稍后重试", code: "INTERNAL_ERROR" }, { status: 500 });
+  }
 }

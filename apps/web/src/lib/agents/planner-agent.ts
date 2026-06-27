@@ -3,7 +3,7 @@
 import { callModel, extractJsonPayload } from "./model";
 import { getProfileContext } from "./profile-agent";
 import { generateId } from "@/lib/utils";
-import type { AgentResult, PlanTask, StudyPlan } from "@/lib/types";
+import type { PlanTask, StudyPlan } from "@/lib/types";
 import { store } from "@/lib/store/db";
 
 export async function runPlannerAgent(

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { Send, Loader2 } from "lucide-react";
-import type { AgentName, Citation } from "@/lib/types";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Send, Loader2, Square } from "lucide-react";
+import type { AgentName, Citation, StreamEvent } from "@/lib/types";
 
 interface ChatItem {
   role: "user" | "assistant";
@@ -55,6 +55,11 @@ export default function ChatPage() {
         signal: controller.signal,
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "未知错误" }));
+        throw new Error(errData.error || `请求失败 (HTTP ${res.status})`);
+      }
+
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -70,20 +75,21 @@ export default function ChatPage() {
             const data = line.replace(/^data: /, "").trim();
             if (!data) continue;
             try {
-              const evt = JSON.parse(data);
+              const evt = JSON.parse(data) as StreamEvent;
               setMessages((m) => {
-                const copy = [...m];
-                const last = copy[copy.length - 1];
+                const last = m[m.length - 1];
+                if (!last || last.role !== "assistant") return m;
+                const updated: ChatItem = { ...last };
                 if (evt.type === "thinking") {
-                  last.thinking = [...(last.thinking ?? []), evt.agent];
+                  updated.thinking = [...(last.thinking ?? []), evt.agent];
                 } else if (evt.type === "trace") {
-                  last.trace = [...(last.trace ?? []), { agent: evt.agent, content: evt.content }];
+                  updated.trace = [...(last.trace ?? []), { agent: evt.agent, content: evt.content }];
                 } else if (evt.type === "delta") {
-                  last.content += evt.content;
+                  updated.content = last.content + evt.content;
                 } else if (evt.type === "citation") {
-                  last.citations = [...(last.citations ?? []), evt.source];
+                  updated.citations = [...(last.citations ?? []), evt.source];
                 }
-                return copy;
+                return [...m.slice(0, -1), updated];
               });
             } catch {
               /* ignore parse errors */
@@ -92,17 +98,37 @@ export default function ChatPage() {
         }
       }
     } catch (err) {
-      setMessages((m) => {
-        const copy = [...m];
-        const last = copy[copy.length - 1];
-        last.content = `请求失败：${err instanceof Error ? err.message : String(err)}`;
-        return copy;
-      });
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setMessages((m) => {
+          const last = m[m.length - 1];
+          if (!last || last.role !== "assistant") return m;
+          return [...m.slice(0, -1), { ...last, content: last.content || "（已取消）" }];
+        });
+      } else {
+        setMessages((m) => {
+          const last = m[m.length - 1];
+          if (!last || last.role !== "assistant") return m;
+          return [...m.slice(0, -1), { ...last, content: `请求失败：${err instanceof Error ? err.message : String(err)}` }];
+        });
+      }
     } finally {
       setLoading(false);
       abortRef.current = null;
     }
   }, [input, loading]);
+
+  // 卸载时中止未完成的 SSE 请求
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+  }, []);
 
   const suggestions = [
     "什么是二叉搜索树？",
@@ -116,7 +142,7 @@ export default function ChatPage() {
       <div className="mb-4">
         <h1 className="text-2xl font-bold">AI 对话辅导</h1>
         <p className="mt-1 text-sm text-slate-400">
-          多 Agent 协作 · 流式输出 · 带资料引用与安全审核
+          智能问答 · 流式输出 · 带资料引用
         </p>
       </div>
 
@@ -159,10 +185,10 @@ export default function ChatPage() {
                 {msg.content || (loading && msg.role === "assistant" ? "思考中..." : "")}
               </div>
 
-              {/* Agent 执行轨迹 */}
+              {/* 执行轨迹 */}
               {msg.trace && msg.trace.length > 0 && (
                 <details className="mt-3 rounded-lg bg-slate-900/50 p-3 text-xs">
-                  <summary className="cursor-pointer text-slate-400">Agent 执行轨迹</summary>
+                  <summary className="cursor-pointer text-slate-400">参考资料溯源</summary>
                   <div className="mt-2 space-y-2">
                     {msg.trace.map((t, j) => (
                       <div key={j}>
@@ -209,6 +235,14 @@ export default function ChatPage() {
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           发送
         </button>
+        {loading && (
+          <button
+            onClick={stop}
+            className="flex items-center gap-2 rounded-xl border border-red-500/40 px-4 py-3 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
+          >
+            <Square size={14} /> 停止
+          </button>
+        )}
       </div>
     </div>
   );

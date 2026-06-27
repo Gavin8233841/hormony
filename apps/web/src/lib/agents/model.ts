@@ -101,10 +101,6 @@ export function getModelRuntimeInfo(): ModelRuntimeInfo {
   };
 }
 
-export const isModelConfigured = getModelRuntimeInfo().configured;
-export const modelName = getModelRuntimeInfo().modelName;
-export const modelClient = getModelClient(readModelConfig());
-
 export interface ModelCallOptions {
   temperature?: number;
   maxTokens?: number;

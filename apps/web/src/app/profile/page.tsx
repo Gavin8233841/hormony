@@ -32,7 +32,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">个人画像</h1>
-        <p className="mt-1 text-sm text-slate-400">Profile Agent 维护的学习画像，驱动个性化推荐</p>
+        <p className="mt-1 text-sm text-slate-400">你的学习数据画像，驱动个性化推荐</p>
       </div>
 
       {loading && (
@@ -108,7 +108,7 @@ export default function ProfilePage() {
               ) : (
                 <p className="text-sm text-slate-500">暂无数据</p>
               )}
-              <p className="mt-3 text-xs text-slate-500">Planner Agent 会优先安排这些主题的复习任务</p>
+              <p className="mt-3 text-xs text-slate-500">学习计划会优先安排这些主题的复习任务</p>
             </div>
             <div className="card">
               <div className="mb-3 flex items-center gap-2">
@@ -126,7 +126,7 @@ export default function ProfilePage() {
               ) : (
                 <p className="text-sm text-slate-500">暂无数据</p>
               )}
-              <p className="mt-3 text-xs text-slate-500">Evaluator Agent 根据答题记录持续更新</p>
+              <p className="mt-3 text-xs text-slate-500">根据答题记录持续更新</p>
             </div>
           </div>
         </>

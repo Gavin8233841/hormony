@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CalendarDays, Loader2, CheckCircle2, Clock } from "lucide-react";
-import type { PlanTask } from "@/lib/types";
+import type { PlanTask, StudyPlan } from "@/lib/types";
 
 export default function PlanPage() {
   const [goal, setGoal] = useState("");
@@ -29,7 +29,7 @@ export default function PlanPage() {
         }),
       });
       if (!res.ok) throw new Error("生成失败");
-      const plan = await res.json();
+      const plan = (await res.json()) as StudyPlan;
       setTasks(plan.tasks ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -42,7 +42,7 @@ export default function PlanPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">学习计划</h1>
-        <p className="mt-1 text-sm text-slate-400">Planner Agent 根据目标与画像拆解为可执行任务</p>
+        <p className="mt-1 text-sm text-slate-400">输入学习目标，自动拆解为每日可执行任务</p>
       </div>
 
       {/* 输入表单 */}

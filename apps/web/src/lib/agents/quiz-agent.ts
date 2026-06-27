@@ -3,7 +3,7 @@
 import { callModel, extractJsonPayload } from "./model";
 import { generateId } from "@/lib/utils";
 import { store } from "@/lib/store/db";
-import type { AgentResult, Quiz, QuizQuestion } from "@/lib/types";
+import type { Quiz, QuizQuestion } from "@/lib/types";
 
 export async function runQuizAgent(
   userId: string,

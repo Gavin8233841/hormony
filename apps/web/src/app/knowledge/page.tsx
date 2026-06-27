@@ -9,11 +9,13 @@ export default function KnowledgePage() {
   const [results, setResults] = useState<KnowledgeChunk[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const search = async () => {
     if (!query.trim()) return;
     setLoading(true);
     setError(null);
+    setHasSearched(true);
     try {
       const res = await fetch("/api/knowledge/search", {
         method: "POST",
@@ -36,7 +38,7 @@ export default function KnowledgePage() {
       <div>
         <h1 className="text-2xl font-bold">知识库</h1>
         <p className="mt-1 text-sm text-slate-400">
-          RAG 检索演示 · Retrieval Agent 基于课程资料切片做语义匹配
+          搜索课程资料 · 语义匹配相关知识点
         </p>
       </div>
 
@@ -65,6 +67,14 @@ export default function KnowledgePage() {
       {error && (
         <div className="card border-red-500/30">
           <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
+
+      {hasSearched && !loading && !error && results.length === 0 && (
+        <div className="card flex flex-col items-center gap-2 py-12 text-center">
+          <Search size={32} className="text-slate-600" />
+          <p className="text-slate-400">未检索到相关资料</p>
+          <p className="text-xs text-slate-500">尝试换个关键词，或检查课程资料是否已上传</p>
         </div>
       )}
 

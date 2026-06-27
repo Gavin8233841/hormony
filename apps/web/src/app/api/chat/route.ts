@@ -19,6 +19,11 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "缺少 message 字段", code: "MISSING_FIELD" }, { status: 400 });
   }
 
+  const message = String(body.message).trim();
+  if (message.length > 2000) {
+    return Response.json({ error: "消息过长（上限 2000 字符）", code: "MESSAGE_TOO_LONG" }, { status: 400 });
+  }
+
   const userId = body.userId ?? "demo";
 
   const encoder = new TextEncoder();
@@ -33,9 +38,11 @@ export async function POST(req: NextRequest) {
         emit({
           type: "trace",
           agent: "Safety",
-          content: `编排过程出错：${err instanceof Error ? err.message : String(err)}`,
+          content: "服务处理异常，请稍后重试",
         });
         emit({ type: "done", sessionId: "error" });
+        // 内部错误仅记录日志，不向客户端泄露细节
+        console.error("[chat] orchestrate error:", err instanceof Error ? err.message : String(err));
       } finally {
         controller.close();
       }
