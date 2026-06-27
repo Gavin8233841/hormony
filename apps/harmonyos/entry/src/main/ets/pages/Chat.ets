@@ -3,9 +3,9 @@
  * 浅色主题 · 渐变标题栏 · SSE 流式接收 · 欢迎引导
  */
 
-import router from '@ohos.router';
 import http from '@ohos.net.http';
 import { HttpClient } from '../common/HttpClient';
+import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { Citation, StreamEvent, ChatRequest } from '../model/DataModels';
 
@@ -51,27 +51,7 @@ struct Chat {
 
   build() {
     Column() {
-      // 渐变标题栏
-      Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor('#ffffff')
-          .width(36)
-          .height(36)
-          .textAlign(TextAlign.Center)
-          .onClick(() => {
-            router.back();
-          })
-        Text('AI 辅导')
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff')
-          .layoutWeight(1)
-          .margin({ left: 4 })
-      }
-      .width('100%')
-      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
-      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
+      GradientHeader('AI 辅导', '')
 
       // 消息列表 / 欢迎页
       if (this.messages.length === 0) {
@@ -83,11 +63,11 @@ struct Chat {
             .height(56)
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
             .backgroundColor(Constants.COLOR_BRAND)
             .borderRadius(28)
             .textAlign(TextAlign.Center)
-            .shadow({ radius: 12, color: '#0a59f740', offsetX: 0, offsetY: 4 })
+            .shadow({ radius: 12, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 4 })
 
           Text('你好，我是鸿学伴 AI 助教')
             .fontSize(16)
@@ -170,7 +150,7 @@ struct Chat {
         Button('发送')
           .fontSize(14)
           .backgroundColor(Constants.COLOR_BRAND)
-          .fontColor('#ffffff')
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           .borderRadius(Constants.RADIUS_MD)
           .enabled(!this.loading && this.inputText.length > 0)
           .onClick(() => {
@@ -273,7 +253,7 @@ struct Chat {
           Column() {
             Text(msg.content)
               .fontSize(14)
-              .fontColor('#ffffff')
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
               .padding(12)
               .backgroundColor(Constants.COLOR_BRAND)
               .borderRadius(Constants.RADIUS_MD)
@@ -292,7 +272,7 @@ struct Chat {
             .height(32)
             .fontSize(11)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
             .backgroundColor(Constants.COLOR_BRAND)
             .borderRadius(16)
             .textAlign(TextAlign.Center)

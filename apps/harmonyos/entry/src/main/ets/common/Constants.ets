@@ -55,9 +55,17 @@ export class Constants {
   // 阴影色（带透明度的黑色）
   static readonly SHADOW_CARD: string = '#0a000014';
   static readonly SHADOW_CARD_LG: string = '#1200001a';
+  // 品牌阴影色（用于AI头像等品牌色元素的阴影）
+  static readonly SHADOW_BRAND: string = '#0a59f740';
 
-  // 渐变色组（用于头部背景）
-  static readonly GRADIENT_HEADER_COLORS: [ResourceColor, ResourceColor] = ['#0a59f7', '#3d7fef'];
+  // 渐变色组（用于头部背景）— 单独定义起止色，页面内组合使用
+  static readonly COLOR_GRADIENT_START: string = '#0a59f7';
+  static readonly COLOR_GRADIENT_MID: string = '#3d7fef';
+  static readonly COLOR_GRADIENT_END: string = '#5a9bf0';
+
+  // 渐变背景上的文字色
+  static readonly COLOR_TEXT_ON_GRADIENT: string = '#ffffff';
+  static readonly COLOR_TEXT_ON_GRADIENT_SUB: string = '#ffffffcc';
 
   // 动画时长（毫秒）
   static readonly ANIM_FAST: number = 200;

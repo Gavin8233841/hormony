@@ -3,8 +3,8 @@
  * 浅色主题 · 用户友好文案 · 修复 courseId
  */
 
-import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
+import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { KnowledgeChunk, KnowledgeSearchRequest, KnowledgeSearchResponse } from '../model/DataModels';
 
@@ -26,34 +26,7 @@ struct KnowledgePage {
 
   build() {
     Column() {
-      // 渐变标题栏
-      Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor('#ffffff')
-          .width(36)
-          .height(36)
-          .textAlign(TextAlign.Center)
-          .onClick(() => {
-            router.back();
-          })
-        Column() {
-          Text('搜课程资料')
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          Text('搜索知识点和相关资料')
-            .fontSize(12)
-            .fontColor('#ffffffcc')
-            .margin({ top: 2 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        .margin({ left: 4 })
-      }
-      .width('100%')
-      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
-      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
+      GradientHeader('搜课程资料', '搜索知识点和相关资料')
 
       // 搜索栏
       Row({ space: 12 }) {

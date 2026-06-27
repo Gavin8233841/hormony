@@ -52,7 +52,20 @@
       "acceptance_total": 7,
       "decision": "",
       "message_length": 5
+    },
+    {
+      "loop_count": 0,
+      "timestamp": "2026-06-27 16:41:28",
+      "status": "continuing",
+      "verify_passed": 1,
+      "verify_total": 1,
+      "has_complete_signal": false,
+      "has_block_signal": false,
+      "acceptance_done": 7,
+      "acceptance_total": 7,
+      "decision": "block",
+      "message_length": 895
     }
   ],
-  "updated_at": "2026-06-27 15:45:52"
+  "updated_at": "2026-06-27 16:41:28"
 }

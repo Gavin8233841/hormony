@@ -3,10 +3,9 @@
  * 浅色主题 · 加载状态 · 内联统计卡片
  */
 
-import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { StatCard } from '../common/Builders';
+import { StatCard, GradientHeader } from '../common/Builders';
 import { UserProfile } from '../model/DataModels';
 
 @Entry
@@ -47,34 +46,7 @@ struct ProfilePage {
 
   build() {
     Column() {
-      // 渐变标题栏
-      Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor('#ffffff')
-          .width(36)
-          .height(36)
-          .textAlign(TextAlign.Center)
-          .onClick(() => {
-            router.back();
-          })
-        Column() {
-          Text('学习画像')
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          Text('查看薄弱点和优势')
-            .fontSize(12)
-            .fontColor('#ffffffcc')
-            .margin({ top: 2 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        .margin({ left: 4 })
-      }
-      .width('100%')
-      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
-      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
+      GradientHeader('学习画像', '查看薄弱点和优势')
 
       if (this.loading) {
         Column() {

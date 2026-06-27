@@ -104,12 +104,12 @@ struct Index {
         Text('鸿学伴')
           .fontSize(28)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff')
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           .width('100%')
 
         Text('今天学什么？')
           .fontSize(14)
-          .fontColor('#ffffffcc')
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT_SUB)
           .margin({ top: 4 })
           .width('100%')
       }
@@ -117,7 +117,7 @@ struct Index {
       .padding({ left: 24, right: 24, top: 44, bottom: 28 })
       .linearGradient({
         angle: 135,
-        colors: [['#0a59f7', 0], ['#3d7fef', 0.5], ['#5a9bf0', 1]]
+        colors: [[Constants.COLOR_GRADIENT_START, 0], [Constants.COLOR_GRADIENT_MID, 0.5], [Constants.COLOR_GRADIENT_END, 1]]
       })
 
       // 内容区（带入场动画）

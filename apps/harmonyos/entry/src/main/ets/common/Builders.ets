@@ -71,6 +71,45 @@ export function TitleBar(title: string, subtitle: string) {
 }
 
 /**
+ * 渐变标题栏（带返回按钮 + 蓝色渐变背景）
+ * 用于所有子页面的统一标题栏样式
+ * @param title       主标题
+ * @param subtitle    副标题（可选，传空字符串则不显示）
+ */
+@Builder
+export function GradientHeader(title: string, subtitle: string) {
+  Row() {
+    Text('‹')
+      .fontSize(28)
+      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+      .width(36)
+      .height(36)
+      .textAlign(TextAlign.Center)
+      .onClick(() => {
+        router.back();
+      })
+    Column() {
+      Text(title)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+      if (subtitle.length > 0) {
+        Text(subtitle)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT_SUB)
+          .margin({ top: 2 })
+      }
+    }
+    .alignItems(HorizontalAlign.Start)
+    .layoutWeight(1)
+    .margin({ left: 4 })
+  }
+  .width('100%')
+  .padding({ left: 8, right: 20, top: 16, bottom: 12 })
+  .linearGradient({ angle: 135, colors: [[Constants.COLOR_GRADIENT_START, 0], [Constants.COLOR_GRADIENT_MID, 1]] })
+}
+
+/**
  * 空状态占位
  * @param message  提示文案
  */

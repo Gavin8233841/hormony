@@ -2,8 +2,8 @@
  * 课程页 - 课程列表
  */
 
-import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
+import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { Course, CoursesResponse } from '../model/DataModels';
 
@@ -40,36 +40,7 @@ struct CoursePage {
 
   build() {
     Column() {
-      // 标题栏
-      // 渐变标题栏
-      Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor('#ffffff')
-          .width(40)
-          .height(40)
-          .textAlign(TextAlign.Center)
-          .onClick(() => {
-            router.back();
-          })
-
-        Column() {
-          Text('我的课程')
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          Text('查看课程进度和学习资料')
-            .fontSize(12)
-            .fontColor('#ffffffcc')
-            .margin({ top: 2 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        .margin({ left: 4 })
-      }
-      .width('100%')
-      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
-      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
+      GradientHeader('我的课程', '查看课程进度和学习资料')
 
       if (this.loading) {
         Column() {
@@ -138,7 +109,8 @@ struct CoursePage {
               .width('100%')
               .padding(16)
               .backgroundColor(Constants.COLOR_BG_CARD)
-              .borderRadius(14)
+              .borderRadius(Constants.RADIUS_LG)
+              .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
             }
           })
         }

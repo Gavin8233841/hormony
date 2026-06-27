@@ -3,8 +3,8 @@
  * 浅色主题 · 用户友好文案 · 任务列表
  */
 
-import router from '@ohos.router';
 import { HttpClient } from '../common/HttpClient';
+import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 
@@ -18,34 +18,7 @@ struct PlanPage {
 
   build() {
     Column() {
-      // 渐变标题栏
-      Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor('#ffffff')
-          .width(36)
-          .height(36)
-          .textAlign(TextAlign.Center)
-          .onClick(() => {
-            router.back();
-          })
-        Column() {
-          Text('学习计划')
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          Text('输入目标，自动拆解任务')
-            .fontSize(12)
-            .fontColor('#ffffffcc')
-            .margin({ top: 2 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        .margin({ left: 4 })
-      }
-      .width('100%')
-      .padding({ left: 8, right: 20, top: 16, bottom: 12 })
-      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
+      GradientHeader('学习计划', '输入目标，自动拆解为每日任务')
 
       // 输入区
       Column({ space: 12 }) {
