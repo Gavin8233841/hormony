@@ -63,7 +63,7 @@ struct Chat {
 
   build() {
     Column() {
-      GradientHeader('AI 辅导', '')
+      GradientHeader('AI 辅导', '', () => this.getUIContext().getRouter().back())
 
       // 消息列表 / 欢迎页
       if (this.messages.length === 0) {

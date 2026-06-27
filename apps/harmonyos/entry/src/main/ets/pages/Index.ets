@@ -3,7 +3,6 @@
  * 渐变头部 + 学习概览 + 快捷入口
  */
 
-import router from '@ohos.router';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
@@ -35,7 +34,7 @@ struct Index {
     this.loadProfile();
     // 入场动画
     setTimeout(() => {
-      animateTo({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut }, () => {
+      this.getUIContext().animateTo({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut }, () => {
         this.appearOpacity = 1;
         this.appearOffset = 0;
       });
@@ -164,27 +163,27 @@ struct Index {
         // 功能入口
         Column({ space: 10 }) {
           this.FunctionEntry(0, '问问鸿学伴', '向 AI 助教提问，获取带引用的讲解', Constants.COLOR_BRAND, () => {
-            router.pushUrl({ url: 'pages/Chat' }).catch((err: Error) => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
           this.FunctionEntry(1, '学习计划', '输入目标，自动拆解为每日任务', Constants.COLOR_SUCCESS, () => {
-            router.pushUrl({ url: 'pages/Plan' }).catch((err: Error) => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/Plan' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
           this.FunctionEntry(2, '搜课程资料', '搜索课程知识点和相关资料', Constants.COLOR_WARNING, () => {
-            router.pushUrl({ url: 'pages/Knowledge' }).catch((err: Error) => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
           this.FunctionEntry(3, '我的课程', '查看课程进度和学习资料', Constants.COLOR_ACCENT_PURPLE, () => {
-            router.pushUrl({ url: 'pages/Course' }).catch((err: Error) => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/Course' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })
           this.FunctionEntry(4, '学习画像', '查看薄弱点和优势，针对性提升', Constants.COLOR_ACCENT_CYAN, () => {
-            router.pushUrl({ url: 'pages/Profile' }).catch((err: Error) => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/Profile' }).catch((err: Error) => {
               hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'Index router.pushUrl failed: %{public}s', err.message);
             });
           })

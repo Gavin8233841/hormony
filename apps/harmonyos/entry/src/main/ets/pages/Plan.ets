@@ -22,7 +22,7 @@ struct PlanPage {
 
   build() {
     Column() {
-      GradientHeader('学习计划', '输入目标，自动拆解为每日任务')
+      GradientHeader('学习计划', '输入目标，自动拆解为每日任务', () => this.getUIContext().getRouter().back())
 
       // 输入区
       Column({ space: 12 }) {

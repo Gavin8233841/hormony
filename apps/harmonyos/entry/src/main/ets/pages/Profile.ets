@@ -47,7 +47,7 @@ struct ProfilePage {
 
   build() {
     Column() {
-      GradientHeader('学习画像', '查看薄弱点和优势')
+      GradientHeader('学习画像', '查看薄弱点和优势', () => this.getUIContext().getRouter().back())
 
       if (this.loading) {
         Column() {

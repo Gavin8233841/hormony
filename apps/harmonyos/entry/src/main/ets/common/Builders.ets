@@ -3,7 +3,6 @@
  * 跨页面复用的 UI 片段
  */
 
-import router from '@ohos.router';
 import { Constants } from './Constants';
 
 /**
@@ -38,7 +37,7 @@ export function StatCard(value: string, label: string, color: ResourceColor) {
  * @param subtitle    副标题（可选，传空字符串则不显示）
  */
 @Builder
-export function TitleBar(title: string, subtitle: string) {
+export function TitleBar(title: string, subtitle: string, onBack: () => void) {
   Row() {
     Text('‹')
       .fontSize(28)
@@ -47,7 +46,7 @@ export function TitleBar(title: string, subtitle: string) {
       .height(36)
       .textAlign(TextAlign.Center)
       .onClick(() => {
-        router.back();
+        onBack();
       })
 
     Column() {
@@ -77,7 +76,7 @@ export function TitleBar(title: string, subtitle: string) {
  * @param subtitle    副标题（可选，传空字符串则不显示）
  */
 @Builder
-export function GradientHeader(title: string, subtitle: string) {
+export function GradientHeader(title: string, subtitle: string, onBack: () => void) {
   Row() {
     Text('‹')
       .fontSize(28)
@@ -86,7 +85,7 @@ export function GradientHeader(title: string, subtitle: string) {
       .height(36)
       .textAlign(TextAlign.Center)
       .onClick(() => {
-        router.back();
+        onBack();
       })
     Column() {
       Text(title)

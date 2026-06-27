@@ -41,7 +41,7 @@ struct CoursePage {
 
   build() {
     Column() {
-      GradientHeader('我的课程', '查看课程进度和学习资料')
+      GradientHeader('我的课程', '查看课程进度和学习资料', () => this.getUIContext().getRouter().back())
 
       if (this.loading) {
         Column() {

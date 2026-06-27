@@ -31,7 +31,7 @@ struct KnowledgePage {
 
   build() {
     Column() {
-      GradientHeader('搜课程资料', '搜索知识点和相关资料')
+      GradientHeader('搜课程资料', '搜索知识点和相关资料', () => this.getUIContext().getRouter().back())
 
       // 搜索栏
       Row({ space: 12 }) {
