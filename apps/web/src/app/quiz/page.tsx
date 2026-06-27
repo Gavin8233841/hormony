@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Brain, Loader2, CheckCircle2, XCircle, Target, TrendingDown, RefreshCw } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Brain, Loader2, CheckCircle2, XCircle, Target, TrendingDown, RefreshCw, History } from "lucide-react";
 import type { Quiz, QuizResult, QuizAnswer } from "@/lib/types";
 
 export default function QuizPage() {
@@ -16,6 +16,27 @@ export default function QuizPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<QuizResult | null>(null);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<QuizResult[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch("/api/quiz?userId=demo");
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data.results ?? []);
+      }
+    } catch {
+      // 静默失败
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const generate = async () => {
     setLoading(true);
@@ -66,6 +87,7 @@ export default function QuizPage() {
       if (!res.ok) throw new Error("提交失败");
       const data = (await res.json()) as QuizResult;
       setResult(data);
+      loadHistory(); // 刷新历史
     } catch (e) {
       setError(e instanceof Error ? e.message : "提交测验失败");
     } finally {
@@ -323,6 +345,59 @@ export default function QuizPage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 测验历史 */}
+      {!quiz && !result && (
+        <div className="card">
+          <div className="mb-3 flex items-center gap-2">
+            <History size={18} className="text-slate-400" />
+            <h3 className="font-semibold">测验记录</h3>
+          </div>
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 size={20} className="animate-spin text-slate-500" />
+            </div>
+          ) : history.length > 0 ? (
+            <div className="space-y-2">
+              {history.slice(0, 5).map((h, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 rounded-lg bg-slate-900/40 px-4 py-3"
+                >
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                    h.accuracy >= 0.8 ? "bg-emerald-500/20 text-emerald-400" :
+                    h.accuracy >= 0.6 ? "bg-amber-500/20 text-amber-400" :
+                    "bg-red-500/20 text-red-400"
+                  }`}>
+                    {Math.round(h.accuracy * 100)}%
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">
+                      {h.correctCount}/{h.totalQuestions} 题正确
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {new Date(h.submittedAt).toLocaleString("zh-CN")}
+                    </div>
+                  </div>
+                  {h.weakTopics.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {h.weakTopics.slice(0, 3).map((t) => (
+                        <span key={t} className="rounded bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-6 text-center text-sm text-slate-500">
+              暂无测验记录，完成测验后此处显示历史成绩
+            </p>
+          )}
         </div>
       )}
     </div>

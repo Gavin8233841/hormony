@@ -1,8 +1,24 @@
 // POST /api/quiz — 生成测验题
 
+// GET /api/quiz?userId=... — 获取测验历史
+// POST /api/quiz — 生成测验
+
 import { runQuizAgent } from "@/lib/agents/quiz-agent";
+import { store } from "@/lib/store/db";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId") ?? "demo";
+    const results = store.getQuizResults(userId);
+    return Response.json({ results });
+  } catch (err) {
+    console.error("[quiz/GET] error:", err instanceof Error ? err.message : String(err));
+    return Response.json({ error: "获取测验历史失败", code: "INTERNAL_ERROR" }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   let body: {
