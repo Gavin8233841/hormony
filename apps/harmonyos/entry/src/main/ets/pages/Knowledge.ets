@@ -30,7 +30,7 @@ struct KnowledgePage {
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor('#1a1a1a')
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -41,10 +41,10 @@ struct KnowledgePage {
           Text('搜课程资料')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#1a1a1a')
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
           Text('搜索知识点和相关资料')
             .fontSize(12)
-            .fontColor('#929292')
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
@@ -59,15 +59,15 @@ struct KnowledgePage {
         TextInput({ text: this.query, placeholder: '输入关键词...' })
           .layoutWeight(1)
           .fontSize(14)
-          .backgroundColor('#ffffff')
+          .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(12)
           .onChange((v: string) => { this.query = v; })
           .onSubmit(() => { this.search(); })
 
         Button('检索')
           .fontSize(14)
-          .backgroundColor('#0a59f7')
-          .fontColor('#ffffff')
+          .backgroundColor(Constants.COLOR_BRAND)
+          .fontColor(Constants.COLOR_BG_CARD)
           .borderRadius(12)
           .enabled(!this.loading)
           .onClick(() => { this.search(); })
@@ -78,7 +78,7 @@ struct KnowledgePage {
       if (this.message.length > 0) {
         Text(this.message)
           .fontSize(12)
-          .fontColor('#929292')
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ left: 16, bottom: 8 })
           .width('100%')
       }
@@ -86,16 +86,16 @@ struct KnowledgePage {
       // 加载中
       if (this.loading) {
         Column() {
-          LoadingProgress().width(36).height(36).color('#0a59f7')
+          LoadingProgress().width(36).height(36).color(Constants.COLOR_BRAND)
         }
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else if (this.results.length > 0) {
         // 结果列表
-        Text(`找到 ${this.results.length} 条相关资料`)
+        Text('找到 ' + this.results.length + ' 条相关资料')
           .fontSize(12)
-          .fontColor('#929292')
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ left: 16, bottom: 8 })
 
         List({ space: 12 }) {
@@ -105,12 +105,12 @@ struct KnowledgePage {
                 Row() {
                   Text(item.source)
                     .fontSize(13)
-                    .fontColor('#0a59f7')
+                    .fontColor(Constants.COLOR_BRAND)
                     .layoutWeight(1)
                   if (item.score !== undefined) {
-                    Text(`相关度 ${(item.score * 100).toFixed(0)}%`)
+                    Text('相关度 ' + (item.score * 100).toFixed(0) + '%')
                       .fontSize(11)
-                      .fontColor('#4caf50')
+                      .fontColor(Constants.COLOR_SUCCESS)
                   }
                 }
                 .width('100%')
@@ -118,13 +118,13 @@ struct KnowledgePage {
 
                 Text(item.text)
                   .fontSize(13)
-                  .fontColor('#1a1a1a')
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   .maxLines(3)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
               }
               .width('100%')
               .padding(16)
-              .backgroundColor('#ffffff')
+              .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(12)
               .alignItems(HorizontalAlign.Start)
             }
@@ -138,7 +138,7 @@ struct KnowledgePage {
         Column() {
           Text('输入关键词开始搜索')
             .fontSize(14)
-            .fontColor('#cccccc')
+            .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
         }
         .width('100%')
         .layoutWeight(1)
@@ -147,7 +147,7 @@ struct KnowledgePage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#f5f6f8')
+    .backgroundColor(Constants.COLOR_BG_PAGE)
   }
 
   async search(): Promise<void> {
@@ -166,14 +166,19 @@ struct KnowledgePage {
     };
 
     try {
-      const response = await HttpClient.post<KnowledgeSearchResponse>(Constants.API_KNOWLEDGE_SEARCH, request);
+      const response = await HttpClient.post<KnowledgeSearchResponse>(Constants.API_KNOWLEDGE_SEARCH, JSON.stringify(request));
       this.results = response.chunks;
-      this.message = `检索到 ${this.results.length} 条资料`;
+      this.message = '检索到 ' + this.results.length + ' 条资料';
     } catch (e) {
-      this.results = this.demoChunks.filter(
-        (c: KnowledgeChunk): boolean => c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q)
-      );
-      this.message = '网络不可用，已切换本地检索';
+      if (Constants.__DEBUG__) {
+        // 调试模式：回退本地检索
+        this.results = this.demoChunks.filter(
+          (c: KnowledgeChunk): boolean => c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q)
+        );
+        this.message = '网络不可用，已切换本地检索';
+      } else {
+        this.message = '检索失败，请检查网络';
+      }
     } finally {
       this.loading = false;
     }

@@ -3,6 +3,7 @@
 import { store } from "@/lib/store/db";
 import { runEvaluatorAgent } from "@/lib/agents/evaluator-agent";
 import { retrieve } from "@/lib/rag";
+import { sanitizeUserId } from "@/lib/utils";
 import type { QuizSubmission, QuizResult, QuizResultDetail } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
   }
 
   const quizId = String(body.quizId ?? "").trim();
-  const userId = String(body.userId ?? "demo").trim();
+  const userId = sanitizeUserId(body.userId);
   const answers = Array.isArray(body.answers) ? body.answers : [];
 
   if (!quizId) {
@@ -39,16 +40,17 @@ export async function POST(req: Request) {
   let correctCount = 0;
 
   for (const ans of answers) {
-    const question = quiz.questions.find((q) => q.id === ans.questionId);
+    const question = quiz.questions.find((q) => q.id === String(ans.questionId ?? ""));
     if (!question) continue;
 
-    const isCorrect = ans.userAnswer.trim().toUpperCase() === question.answer.trim().toUpperCase();
+    const userAnswer = String(ans.userAnswer ?? "").trim();
+    const isCorrect = userAnswer.toUpperCase() === question.answer.trim().toUpperCase();
     if (isCorrect) correctCount++;
 
     details.push({
       questionId: question.id,
       stem: question.stem,
-      userAnswer: ans.userAnswer,
+      userAnswer,
       correctAnswer: question.answer,
       isCorrect,
       explanation: question.explanation,

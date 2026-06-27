@@ -2,6 +2,7 @@
 // PATCH /api/plan/save — 更新计划任务状态（打卡）
 
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 import type { StudyPlan } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  const userId = String(body.userId ?? "demo").trim();
+  const userId = sanitizeUserId(body.userId);
   const goal = String(body.goal ?? "").trim();
   const tasks = Array.isArray(body.tasks) ? body.tasks : [];
 
@@ -67,7 +68,7 @@ export async function PATCH(req: Request) {
     return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  const userId = String(body.userId ?? "demo").trim();
+  const userId = sanitizeUserId(body.userId);
   const taskId = String(body.taskId ?? "").trim();
   const done = Boolean(body.done);
 

@@ -1,0 +1,58 @@
+{
+  "created_at": "2026-06-27 15:43:41",
+  "cycles": [
+    {
+      "loop_count": 0,
+      "timestamp": "2026-06-27 15:44:01",
+      "status": "acceptance_incomplete",
+      "verify_passed": 1,
+      "verify_total": 1,
+      "has_complete_signal": false,
+      "has_block_signal": false,
+      "acceptance_done": 2,
+      "acceptance_total": 7,
+      "decision": "block",
+      "message_length": 16
+    },
+    {
+      "loop_count": 0,
+      "timestamp": "2026-06-27 15:45:02",
+      "status": "acceptance_incomplete",
+      "verify_passed": 1,
+      "verify_total": 1,
+      "has_complete_signal": false,
+      "has_block_signal": false,
+      "acceptance_done": 2,
+      "acceptance_total": 7,
+      "decision": "block",
+      "message_length": 16
+    },
+    {
+      "loop_count": 1,
+      "timestamp": "2026-06-27 15:45:30",
+      "status": "blocked_by_keyword",
+      "verify_passed": 1,
+      "verify_total": 1,
+      "has_complete_signal": false,
+      "has_block_signal": true,
+      "acceptance_done": 2,
+      "acceptance_total": 7,
+      "decision": "",
+      "message_length": 16
+    },
+    {
+      "loop_count": 29,
+      "timestamp": "2026-06-27 15:45:52",
+      "status": "max_loops_reached",
+      "verify_passed": 1,
+      "verify_total": 1,
+      "has_complete_signal": false,
+      "has_block_signal": false,
+      "acceptance_done": 2,
+      "acceptance_total": 7,
+      "decision": "",
+      "message_length": 5
+    }
+  ],
+  "updated_at": "2026-06-27 15:45:52"
+}

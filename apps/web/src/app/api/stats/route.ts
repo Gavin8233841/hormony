@@ -1,12 +1,13 @@
 // GET /api/stats?userId=... — 仪表盘统计数据聚合
 
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId") ?? "demo";
+  const userId = sanitizeUserId(searchParams.get("userId"));
 
   try {
     const stats = store.getStats(userId);

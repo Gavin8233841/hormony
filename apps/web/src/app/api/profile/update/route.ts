@@ -1,6 +1,7 @@
 // PUT /api/profile/update — 更新用户学习画像
 
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 import type { UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +14,7 @@ export async function PUT(req: Request) {
     return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  const userId = String(body.userId ?? "demo").trim();
-  if (!userId) {
-    return Response.json({ error: "缺少 userId", code: "MISSING_FIELD" }, { status: 400 });
-  }
+  const userId = sanitizeUserId(body.userId);
 
   // 只提取白名单字段，防止非法字段注入
   const updates: Partial<UserProfile> = {};

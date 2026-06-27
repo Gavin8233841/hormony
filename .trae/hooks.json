@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "Stop": [
+      {
+        "loop_limit": 30,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .trae/loop_gate.py",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
+}

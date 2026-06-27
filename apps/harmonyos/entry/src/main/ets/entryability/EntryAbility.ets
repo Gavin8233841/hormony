@@ -4,6 +4,8 @@
 
 import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import { Constants } from '../common/Constants';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -19,7 +21,7 @@ export default class EntryAbility extends UIAbility {
     // 默认加载首页（仪表盘）
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
-        console.error(`Failed to load content. ${JSON.stringify(err)}`);
+        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'EntryAbility loadContent failed: %{public}s', JSON.stringify(err));
         return;
       }
       console.info('Loaded content successfully.');

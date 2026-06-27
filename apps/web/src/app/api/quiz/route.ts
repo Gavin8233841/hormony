@@ -5,13 +5,14 @@
 
 import { runQuizAgent } from "@/lib/agents/quiz-agent";
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") ?? "demo";
+    const userId = sanitizeUserId(searchParams.get("userId"));
     const results = store.getQuizResults(userId);
     return Response.json({ results });
   } catch (err) {
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  const userId = body.userId ?? "demo";
+  const userId = sanitizeUserId(body.userId);
   const courseId = body.courseId ?? "cs101";
   const topic = String(body.topic ?? "综合").trim();
   const count = Math.min(Math.max(Number(body.count) || 5, 1), 20);

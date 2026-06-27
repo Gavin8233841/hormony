@@ -22,7 +22,7 @@ struct PlanPage {
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor('#1a1a1a')
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -33,10 +33,10 @@ struct PlanPage {
           Text('学习计划')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#1a1a1a')
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
           Text('输入目标，自动拆解任务')
             .fontSize(12)
-            .fontColor('#929292')
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
@@ -50,7 +50,7 @@ struct PlanPage {
       Column({ space: 12 }) {
         TextInput({ text: this.goal, placeholder: '学习目标，如：两周复习数据结构' })
           .fontSize(14)
-          .backgroundColor('#ffffff')
+          .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(12)
           .onChange((v: string) => { this.goal = v; })
 
@@ -58,11 +58,11 @@ struct PlanPage {
           Column() {
             Text('周期（天）')
               .fontSize(12)
-              .fontColor('#929292')
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
               .margin({ bottom: 4 })
             TextInput({ text: this.days.toString() })
               .fontSize(14)
-              .backgroundColor('#ffffff')
+              .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(12)
               .width('100%')
               .onChange((v: string) => { this.days = parseInt(v) || 14; })
@@ -71,8 +71,8 @@ struct PlanPage {
 
           Button('生成计划')
             .fontSize(14)
-            .backgroundColor('#0a59f7')
-            .fontColor('#ffffff')
+            .backgroundColor(Constants.COLOR_BRAND)
+            .fontColor(Constants.COLOR_BG_CARD)
             .borderRadius(12)
             .height(40)
             .enabled(!this.loading && this.goal.length > 0)
@@ -85,36 +85,36 @@ struct PlanPage {
 
       // 任务列表
       if (this.tasks.length > 0) {
-        Text(`计划任务（${this.tasks.length} 项）`)
+        Text('计划任务（' + this.tasks.length + ' 项）')
           .fontSize(14)
-          .fontColor('#929292')
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ left: 16, bottom: 8 })
 
         List({ space: 8 }) {
           ForEach(this.tasks, (t: PlanTask, i: number) => {
             ListItem() {
               Row({ space: 12 }) {
-                Text(`${i + 1}`)
+                Text('' + (i + 1))
                   .fontSize(14)
-                  .fontColor('#929292')
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   .width(24)
 
                 Column() {
                   Text(t.title)
                     .fontSize(14)
-                    .fontColor('#1a1a1a')
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   Row({ space: 12 }) {
                     Text(t.date)
                       .fontSize(11)
-                      .fontColor('#929292')
-                    Text(`${t.estimatedMin} 分钟`)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    Text(t.estimatedMin.toString() + ' 分钟')
                       .fontSize(11)
-                      .fontColor('#929292')
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
                     Text(t.type)
                       .fontSize(11)
-                      .fontColor('#929292')
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
                       .padding({ left: 6, right: 6, top: 1, bottom: 1 })
-                      .backgroundColor('#f0f1f3')
+                      .backgroundColor(Constants.COLOR_BG_TASK_TAG)
                       .borderRadius(6)
                   }
                   .margin({ top: 4 })
@@ -124,7 +124,7 @@ struct PlanPage {
               }
               .width('100%')
               .padding(12)
-              .backgroundColor('#ffffff')
+              .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(12)
             }
           })
@@ -134,7 +134,7 @@ struct PlanPage {
         .padding({ left: 16, right: 16 })
       } else if (this.loading) {
         Column() {
-          LoadingProgress().width(36).height(36).color('#0a59f7')
+          LoadingProgress().width(36).height(36).color(Constants.COLOR_BRAND)
         }
         .width('100%')
         .layoutWeight(1)
@@ -144,7 +144,7 @@ struct PlanPage {
         Column() {
           Text('输入学习目标，生成每日计划')
             .fontSize(14)
-            .fontColor('#cccccc')
+            .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
         }
         .width('100%')
         .layoutWeight(1)
@@ -153,7 +153,7 @@ struct PlanPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#f5f6f8')
+    .backgroundColor(Constants.COLOR_BG_PAGE)
   }
 
   async generate() {
@@ -167,13 +167,15 @@ struct PlanPage {
         durationDays: this.days,
         dailyMinutes: 90,
       };
-      const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, req);
+      const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, JSON.stringify(req));
       this.tasks = plan.tasks;
     } catch (e) {
-      // 回退演示
-      const task1: PlanTask = { id: '1', title: '复习树与二叉树', date: '2026-06-25', estimatedMin: 45, type: '复习' };
-      const task2: PlanTask = { id: '2', title: '练习 BST 习题', date: '2026-06-26', estimatedMin: 30, type: '练习' };
-      this.tasks = [task1, task2];
+      if (Constants.__DEBUG__) {
+        // 调试模式：回退演示任务
+        const task1: PlanTask = { id: '1', title: '复习树与二叉树', date: '2026-06-25', estimatedMin: 45, type: '复习' };
+        const task2: PlanTask = { id: '2', title: '练习 BST 习题', date: '2026-06-26', estimatedMin: 30, type: '练习' };
+        this.tasks = [task1, task2];
+      }
     } finally {
       this.loading = false;
     }

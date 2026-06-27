@@ -190,9 +190,15 @@ export const store = {
   },
   addKnowledge(chunk: KnowledgeChunk) {
     db.knowledge.push(chunk);
+    if (db.knowledge.length > 500) {
+      db.knowledge = db.knowledge.slice(-500);
+    }
   },
   addKnowledgeBatch(chunks: KnowledgeChunk[]) {
     db.knowledge.push(...chunks);
+    if (db.knowledge.length > 500) {
+      db.knowledge = db.knowledge.slice(-500);
+    }
   },
 
   // ========== Plans ==========
@@ -223,6 +229,9 @@ export const store = {
   // ========== Quiz Results ==========
   recordQuizResult(result: QuizResult) {
     db.quizResults.push(result);
+    if (db.quizResults.length > 200) {
+      db.quizResults = db.quizResults.slice(-200);
+    }
     // 同步更新用户画像的答题统计
     const profile = db.profiles.get(result.userId);
     if (profile) {

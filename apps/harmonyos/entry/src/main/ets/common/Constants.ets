@@ -21,6 +21,38 @@ export class Constants {
   // 演示用户
   static readonly DEMO_USER_ID: string = 'demo';
 
+  // 调试开关：true 时网络失败回退演示数据；false 时显示真实错误不回退
+  static readonly __DEBUG__: boolean = true;
+
   // 请求超时（毫秒）
   static readonly REQUEST_TIMEOUT: number = 30000;
+
+  // 颜色常量（统一收口，禁止页面内硬编码颜色）
+  // 文字色
+  static readonly COLOR_TEXT_PRIMARY: string = '#1a1a1a';
+  static readonly COLOR_TEXT_SECONDARY: string = '#929292';
+  static readonly COLOR_TEXT_PLACEHOLDER: string = '#cccccc';
+  static readonly COLOR_TEXT_TERTIARY: string = '#666666';
+  // 品牌与功能色
+  static readonly COLOR_BRAND: string = '#0a59f7';
+  static readonly COLOR_SUCCESS: string = '#4caf50';
+  static readonly COLOR_WARNING: string = '#ff9800';
+  static readonly COLOR_ERROR: string = '#e53935';
+  // 强调色（功能入口左边框）
+  static readonly COLOR_ACCENT_PURPLE: string = '#9c27b0';
+  static readonly COLOR_ACCENT_CYAN: string = '#00bcd4';
+  // 背景色
+  static readonly COLOR_BG_CARD: string = '#ffffff';
+  static readonly COLOR_BG_PAGE: string = '#f5f6f8';
+  static readonly COLOR_BG_PROGRESS_TRACK: string = '#e8e8e8';
+  static readonly COLOR_BG_TAG: string = '#f0f0f2';
+  static readonly COLOR_BG_TASK_TAG: string = '#f0f1f3';
+  // 浅色背景（带透明度，用于标签底色）
+  static readonly COLOR_BRAND_LIGHT: string = '#0a59f720';
+  static readonly COLOR_ERROR_LIGHT: string = '#e5393520';
+  static readonly COLOR_SUCCESS_LIGHT: string = '#4caf5020';
+
+  // hilog 日志
+  static readonly HILOG_DOMAIN: number = 0x0001;
+  static readonly HILOG_TAG: string = 'HongXueBan';
 }

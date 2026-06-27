@@ -2,6 +2,7 @@
 // POST /api/courses — 添加新课程
 
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 import type { Course } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") ?? "demo";
+    const userId = sanitizeUserId(searchParams.get("userId"));
     const courses = store.getCourses(userId);
     return Response.json({ courses });
   } catch (err) {
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  const userId = String(body.userId ?? "demo").trim();
+  const userId = sanitizeUserId(body.userId);
   const id = String(body.id ?? `course_${Date.now().toString(36)}`).trim();
   const title = String(body.title ?? "").trim();
 

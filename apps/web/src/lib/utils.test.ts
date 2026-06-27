@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateId } from "@/lib/utils";
+import { generateId, sanitizeUserId } from "@/lib/utils";
 import { extractJsonPayload } from "@/lib/agents/model";
 
 describe("工具函数", () => {
@@ -57,6 +57,40 @@ describe("工具函数", () => {
     it("无 JSON 内容时应返回原文", () => {
       const input = "这是一段纯文本";
       expect(extractJsonPayload(input)).toBe("这是一段纯文本");
+    });
+  });
+
+  describe("sanitizeUserId()", () => {
+    it("合法 userId 应原样返回", () => {
+      expect(sanitizeUserId("demo")).toBe("demo");
+      expect(sanitizeUserId("user_123")).toBe("user_123");
+      expect(sanitizeUserId("test-user")).toBe("test-user");
+    });
+
+    it("空值应返回 demo", () => {
+      expect(sanitizeUserId(undefined)).toBe("demo");
+      expect(sanitizeUserId(null)).toBe("demo");
+      expect(sanitizeUserId("")).toBe("demo");
+      expect(sanitizeUserId("   ")).toBe("demo");
+    });
+
+    it("超长 userId 应返回 demo", () => {
+      expect(sanitizeUserId("a".repeat(65))).toBe("demo");
+    });
+
+    it("含特殊字符的 userId 应返回 demo", () => {
+      expect(sanitizeUserId("user;drop table")).toBe("demo");
+      expect(sanitizeUserId("user@hack")).toBe("demo");
+      expect(sanitizeUserId("user/../../etc")).toBe("demo");
+      expect(sanitizeUserId("<script>")).toBe("demo");
+    });
+
+    it("非字符串输入应安全转换", () => {
+      // 数字转为字符串后是合法的字母数字格式
+      expect(sanitizeUserId(123)).toBe("123");
+      // 对象和数组转为字符串后包含非法字符
+      expect(sanitizeUserId({})).toBe("demo");
+      expect(sanitizeUserId([1, 2])).toBe("demo");
     });
   });
 });

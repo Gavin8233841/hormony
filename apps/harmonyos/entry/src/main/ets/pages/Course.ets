@@ -11,23 +11,28 @@ import { Course, CoursesResponse } from '../model/DataModels';
 @Component
 struct CoursePage {
   @State courses: Course[] = [];
-  @State loading: boolean = true;
+  @State loading: boolean = false;
 
   aboutToAppear() {
+    // 调试模式：先加载演示数据，避免网络等待时空白
+    if (Constants.__DEBUG__) {
+      const c1: Course = { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 12, topics: ['数组', '链表', '树', '图'] };
+      const c2: Course = { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 8, topics: ['进程', '调度', '内存管理'] };
+      this.courses = [c1, c2];
+    } else {
+      this.loading = true;
+    }
     this.loadCourses();
   }
 
   async loadCourses() {
     try {
       const res = await HttpClient.get<CoursesResponse>(
-        `${Constants.API_COURSES}?userId=${Constants.DEMO_USER_ID}`
+        Constants.API_COURSES + '?userId=' + Constants.DEMO_USER_ID
       );
       this.courses = res.courses;
     } catch (e) {
-      // 回退演示数据
-      const c1: Course = { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 12, topics: ['数组', '链表', '树', '图'] };
-      const c2: Course = { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 8, topics: ['进程', '调度', '内存管理'] };
-      this.courses = [c1, c2];
+      // __DEBUG__ 模式下保留 aboutToAppear 中设置的演示数据
     } finally {
       this.loading = false;
     }
@@ -39,7 +44,7 @@ struct CoursePage {
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor('#1a1a1a')
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
           .width(40)
           .height(40)
           .textAlign(TextAlign.Center)
@@ -51,10 +56,10 @@ struct CoursePage {
           Text('我的课程')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#1a1a1a')
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
           Text('查看课程进度和学习资料')
             .fontSize(12)
-            .fontColor('#929292')
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
@@ -69,7 +74,7 @@ struct CoursePage {
           LoadingProgress()
             .width(36)
             .height(36)
-            .color('#0a59f7')
+            .color(Constants.COLOR_BRAND)
         }
         .width('100%')
         .layoutWeight(1)
@@ -84,10 +89,10 @@ struct CoursePage {
                   Text(c.title)
                     .fontSize(17)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#1a1a1a')
-                  Text(`${c.docCount} 份资料`)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  Text(c.docCount.toString() + ' 份资料')
                     .fontSize(12)
-                    .fontColor('#929292')
+                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
@@ -96,11 +101,11 @@ struct CoursePage {
                 Row() {
                   Text('学习进度')
                     .fontSize(12)
-                    .fontColor('#929292')
-                  Text(`${Math.round(c.progress * 100)}%`)
+                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  Text(Math.round(c.progress * 100).toString() + '%')
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor('#4caf50')
+                    .fontColor(Constants.COLOR_SUCCESS)
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
@@ -109,8 +114,8 @@ struct CoursePage {
                 // 进度条
                 Progress({ value: c.progress * 100, total: 100, type: ProgressType.Linear })
                   .width('100%')
-                  .color('#4caf50')
-                  .backgroundColor('#e8e8e8')
+                  .color(Constants.COLOR_SUCCESS)
+                  .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
                   .borderRadius(4)
 
                 // 知识点标签
@@ -118,9 +123,9 @@ struct CoursePage {
                   ForEach(c.topics, (t: string) => {
                     Text(t)
                       .fontSize(11)
-                      .fontColor('#666666')
+                      .fontColor(Constants.COLOR_TEXT_TERTIARY)
                       .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                      .backgroundColor('#f0f0f2')
+                      .backgroundColor(Constants.COLOR_BG_TAG)
                       .borderRadius(8)
                       .margin({ right: 6, bottom: 6 })
                   })
@@ -130,7 +135,7 @@ struct CoursePage {
               }
               .width('100%')
               .padding(16)
-              .backgroundColor('#ffffff')
+              .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(14)
             }
           })
@@ -143,6 +148,6 @@ struct CoursePage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#f5f6f8')
+    .backgroundColor(Constants.COLOR_BG_PAGE)
   }
 }

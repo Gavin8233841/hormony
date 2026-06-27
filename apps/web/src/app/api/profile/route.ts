@@ -1,13 +1,14 @@
 // GET /api/profile?userId=... — 获取用户学习画像
 
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") ?? "demo";
+    const userId = sanitizeUserId(searchParams.get("userId"));
     const profile = store.getProfile(userId) ?? store.getProfile("demo");
 
     if (!profile) {

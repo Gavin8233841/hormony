@@ -2,6 +2,7 @@
 
 import { NextRequest } from "next/server";
 import { orchestrateStream } from "@/lib/agents/orchestrator";
+import { sanitizeUserId } from "@/lib/utils";
 import type { ChatRequest, StreamEvent } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -24,14 +25,17 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "消息过长（上限 2000 字符）", code: "MESSAGE_TOO_LONG" }, { status: 400 });
   }
 
-  const userId = body.userId ?? "demo";
+  const userId = sanitizeUserId(body.userId);
 
-  // 限制对话历史大小（最多 12 条消息，每条最多 1000 字符）
+  // 限制对话历史大小（最多 12 条消息，每条最多 1000 字符，仅允许 user/assistant 角色）
   if (body.history && Array.isArray(body.history)) {
-    body.history = body.history.slice(-12).map((m) => ({
-      role: m.role,
-      content: String(m.content ?? "").slice(0, 1000),
-    }));
+    body.history = body.history
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-12)
+      .map((m) => ({
+        role: m.role,
+        content: String(m.content ?? "").slice(0, 1000),
+      }));
   }
 
   const encoder = new TextEncoder();

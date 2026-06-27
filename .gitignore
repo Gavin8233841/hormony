@@ -56,3 +56,6 @@ coverage/
 
 # WorkBuddy
 .workbuddy/
+
+# Screenshots (UI verification evidence, kept locally but not tracked)
+screenshots/

@@ -3,13 +3,14 @@
 
 import { runPlannerAgent } from "@/lib/agents/planner-agent";
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") ?? "demo";
+    const userId = sanitizeUserId(searchParams.get("userId"));
     const plan = store.getPlan(userId);
     if (!plan) {
       return Response.json({ error: "未找到学习计划", code: "NOT_FOUND" }, { status: 404 });
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  const userId = body.userId ?? "demo";
+  const userId = sanitizeUserId(body.userId);
   const goal = String(body.goal ?? "制定学习计划").trim();
   const durationDays = Math.min(Math.max(Number(body.durationDays) || 14, 1), 30);
   const dailyMinutes = Math.min(Math.max(Number(body.dailyMinutes) || 90, 15), 480);

@@ -1,12 +1,13 @@
 // GET /api/conversations?userId=...&limit=... — 获取用户会话历史
 
 import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId") ?? "demo";
+  const userId = sanitizeUserId(searchParams.get("userId"));
   const limit = Math.min(Math.max(Number(searchParams.get("limit")) || 20, 1), 100);
 
   try {
