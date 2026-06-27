@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { LayoutDashboard, MessageSquare, BookOpen, CalendarDays, Database, User } from "lucide-react";
+import { LayoutDashboard, MessageSquare, BookOpen, CalendarDays, Database, User, Brain } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "鸿蒙 AI 学习助理 Agent",
-  description: "C4-AI 鸿蒙高校创新赛 · Agent 创新方向",
+  title: "鸿学伴 · 智能学习助理",
+  description: "C4-AI 鸿蒙高校创新赛 · 智能辅导方向",
 };
 
 const navItems = [
   { href: "/", label: "仪表盘", icon: LayoutDashboard },
-  { href: "/chat", label: "对话", icon: MessageSquare },
+  { href: "/chat", label: "对话辅导", icon: MessageSquare },
+  { href: "/quiz", label: "智能测验", icon: Brain },
   { href: "/courses", label: "课程", icon: BookOpen },
   { href: "/plan", label: "学习计划", icon: CalendarDays },
   { href: "/knowledge", label: "知识库", icon: Database },
@@ -29,8 +30,8 @@ export default function RootLayout({
           {/* 侧边栏 */}
           <aside className="fixed left-0 top-0 z-20 flex h-screen w-56 flex-col border-r border-slate-700/60 bg-slate-900/80">
             <div className="px-5 py-5">
-              <h1 className="text-lg font-bold text-brand-100">学习助理 Agent</h1>
-              <p className="mt-0.5 text-xs text-slate-400">C4-AI · 鸿蒙赛道</p>
+              <h1 className="text-lg font-bold text-brand-100">鸿学伴</h1>
+              <p className="mt-0.5 text-xs text-slate-400">智能学习助理</p>
             </div>
             <nav className="flex-1 space-y-1 px-3">
               {navItems.map((item) => {
@@ -48,7 +49,7 @@ export default function RootLayout({
               })}
             </nav>
             <div className="border-t border-slate-700/60 px-5 py-3">
-              <p className="text-xs text-slate-500">多 Agent 协作 · RAG · 安全审核</p>
+              <p className="text-xs text-slate-500">智能辅导 · 知识检索 · 安全审核</p>
             </div>
           </aside>
 
