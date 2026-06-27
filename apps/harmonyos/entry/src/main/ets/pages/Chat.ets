@@ -1,7 +1,6 @@
 /**
  * AI 辅导页
- * 浅色主题 · 用户友好文案 · SSE 流式接收
- * 修复：SSE 取消机制、闭包引用 this、ArkTS 违规
+ * 浅色主题 · 渐变标题栏 · SSE 流式接收 · 欢迎引导
  */
 
 import router from '@ohos.router';
@@ -26,13 +25,18 @@ struct Chat {
   @State inputText: string = '';
   @State loading: boolean = false;
   private scroller: Scroller = new Scroller();
-  // SSE 请求引用，用于页面销毁时取消
   private currentRequest: http.HttpRequest | null = null;
-  // 取消标志，回调中检查避免销毁后更新状态
   private isCancelled: boolean = false;
 
+  // 推荐问题
+  private suggestions: string[] = [
+    '什么是二叉搜索树？',
+    'TCP 三次握手的过程',
+    '动态规划的基本思想',
+    '进程和线程的区别',
+  ];
+
   aboutToDisappear() {
-    // 页面销毁时取消 SSE，防止内存泄漏与闭包引用已销毁组件
     this.isCancelled = true;
     if (this.currentRequest) {
       try {
@@ -47,11 +51,11 @@ struct Chat {
 
   build() {
     Column() {
-      // 标题栏
+      // 渐变标题栏
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .fontColor('#ffffff')
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -61,24 +65,81 @@ struct Chat {
         Text('AI 辅导')
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .fontColor('#ffffff')
           .layoutWeight(1)
           .margin({ left: 4 })
       }
       .width('100%')
       .padding({ left: 8, right: 20, top: 16, bottom: 12 })
+      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
 
-      // 消息列表
-      List({ scroller: this.scroller }) {
-        ForEach(this.messages, (msg: DisplayMessage) => {
-          ListItem() {
-            this.MessageBubble(msg)
+      // 消息列表 / 欢迎页
+      if (this.messages.length === 0) {
+        // 欢迎引导
+        Column() {
+          // AI 头像
+          Text('AI')
+            .width(56)
+            .height(56)
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#ffffff')
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(28)
+            .textAlign(TextAlign.Center)
+            .shadow({ radius: 12, color: '#0a59f740', offsetX: 0, offsetY: 4 })
+
+          Text('你好，我是鸿学伴 AI 助教')
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .margin({ top: 16 })
+
+          Text('可以问我任何学习相关的问题，我会从课程资料中检索并给出带引用的回答')
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .margin({ top: 8, left: 32, right: 32 })
+            .textAlign(TextAlign.Center)
+
+          // 推荐问题
+          Text('试试问')
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
+            .margin({ top: 28, bottom: 10 })
+
+          Column({ space: 8 }) {
+            ForEach(this.suggestions, (s: string) => {
+              Text(s)
+                .fontSize(13)
+                .fontColor(Constants.COLOR_BRAND)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(Constants.RADIUS_LG)
+                .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+                .onClick(() => {
+                  this.inputText = s;
+                  this.sendMessage();
+                })
+            })
           }
-        })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .padding({ left: 24, right: 24, bottom: 100 })
+      } else {
+        // 消息列表
+        List({ scroller: this.scroller }) {
+          ForEach(this.messages, (msg: DisplayMessage) => {
+            ListItem() {
+              this.MessageBubble(msg)
+            }
+          })
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .padding({ left: 16, right: 16 })
       }
-      .layoutWeight(1)
-      .width('100%')
-      .padding({ left: 16, right: 16 })
 
       // 思考状态
       if (this.loading) {
@@ -98,7 +159,7 @@ struct Chat {
           .layoutWeight(1)
           .fontSize(14)
           .backgroundColor(Constants.COLOR_BG_CARD)
-          .borderRadius(12)
+          .borderRadius(Constants.RADIUS_MD)
           .onChange((value: string) => {
             this.inputText = value;
           })
@@ -109,8 +170,8 @@ struct Chat {
         Button('发送')
           .fontSize(14)
           .backgroundColor(Constants.COLOR_BRAND)
-          .fontColor(Constants.COLOR_BG_CARD)
-          .borderRadius(12)
+          .fontColor('#ffffff')
+          .borderRadius(Constants.RADIUS_MD)
           .enabled(!this.loading && this.inputText.length > 0)
           .onClick(() => {
             this.sendMessage();
@@ -152,7 +213,6 @@ struct Chat {
     const message = this.inputText.trim();
     this.inputText = '';
     this.loading = true;
-    // 重置取消标志（新一轮请求）
     this.isCancelled = false;
 
     const req: ChatRequest = {
@@ -163,7 +223,6 @@ struct Chat {
       Constants.API_CHAT,
       JSON.stringify(req),
       (evt: StreamEvent) => {
-        // 页面已销毁则丢弃事件
         if (this.isCancelled) {
           return;
         }
@@ -180,7 +239,6 @@ struct Chat {
           last.citations.push(evt.source);
         }
 
-        // 触发刷新
         this.messages = this.messages.slice();
       },
       () => {
@@ -201,7 +259,6 @@ struct Chat {
         this.messages = this.messages.slice();
       },
       (reqInstance: http.HttpRequest) => {
-        // 保存请求引用用于取消
         this.currentRequest = reqInstance;
       }
     );
@@ -216,10 +273,10 @@ struct Chat {
           Column() {
             Text(msg.content)
               .fontSize(14)
-              .fontColor(Constants.COLOR_BG_CARD)
+              .fontColor('#ffffff')
               .padding(12)
               .backgroundColor(Constants.COLOR_BRAND)
-              .borderRadius(12)
+              .borderRadius(Constants.RADIUS_MD)
           }
           .alignItems(HorizontalAlign.End)
           .constraintSize({ maxWidth: '80%' })
@@ -227,51 +284,67 @@ struct Chat {
         .width('100%')
         .justifyContent(FlexAlign.End)
       } else {
-        // AI 消息
-        Column() {
-          Text(msg.content.length > 0 ? msg.content : '思考中...')
-            .fontSize(14)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            .padding(12)
-            .backgroundColor(Constants.COLOR_BG_CARD)
-            .borderRadius(12)
-            .width('100%')
+        // AI 消息（带头像）
+        Row({ space: 8 }) {
+          // AI 头像
+          Text('AI')
+            .width(32)
+            .height(32)
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#ffffff')
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(16)
+            .textAlign(TextAlign.Center)
 
-          // 引用（折叠式）
-          if (msg.citations.length > 0) {
-            Row() {
-              Text('参考资料 (' + msg.citations.length + ')')
-                .fontSize(12)
-                .fontColor(Constants.COLOR_BRAND)
-                .padding({ left: 4, right: 4, top: 4, bottom: 4 })
-              Text(msg.citationExpanded ? '收起' : '展开')
-                .fontSize(12)
-                .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                .margin({ left: 4 })
-            }
-            .width('100%')
-            .margin({ top: 4 })
-            .onClick(() => {
-              msg.citationExpanded = !msg.citationExpanded;
-              this.messages = this.messages.slice();
-            })
+          Column() {
+            Text(msg.content.length > 0 ? msg.content : '思考中...')
+              .fontSize(14)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              .padding(12)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .borderRadius(Constants.RADIUS_MD)
+              .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+              .width('100%')
 
-            if (msg.citationExpanded) {
-              Column() {
-                ForEach(msg.citations, (c: Citation, i: number) => {
-                  Text('[' + (i + 1) + '] ' + c.doc + (c.snippet ? ' — ' + c.snippet : ''))
-                    .fontSize(11)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                    .margin({ bottom: 2 })
-                })
+            // 引用（折叠式）
+            if (msg.citations.length > 0) {
+              Row() {
+                Text('参考资料 (' + msg.citations.length + ')')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_BRAND)
+                  .padding({ left: 4, right: 4, top: 4, bottom: 4 })
+                Text(msg.citationExpanded ? '收起' : '展开')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  .margin({ left: 4 })
               }
               .width('100%')
-              .padding({ left: 4, top: 4 })
+              .margin({ top: 4 })
+              .onClick(() => {
+                msg.citationExpanded = !msg.citationExpanded;
+                this.messages = this.messages.slice();
+              })
+
+              if (msg.citationExpanded) {
+                Column() {
+                  ForEach(msg.citations, (c: Citation, i: number) => {
+                    Text('[' + (i + 1) + '] ' + c.doc + (c.snippet ? ' — ' + c.snippet : ''))
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .margin({ bottom: 2 })
+                  })
+                }
+                .width('100%')
+                .padding({ left: 4, top: 4 })
+              }
             }
           }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
-        .alignItems(HorizontalAlign.Start)
+        .alignItems(VerticalAlign.Top)
       }
     }
     .width('100%')

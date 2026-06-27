@@ -47,11 +47,11 @@ struct ProfilePage {
 
   build() {
     Column() {
-      // 标题栏
+      // 渐变标题栏
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .fontColor('#ffffff')
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -62,7 +62,11 @@ struct ProfilePage {
           Text('学习画像')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .fontColor('#ffffff')
+          Text('查看薄弱点和优势')
+            .fontSize(12)
+            .fontColor('#ffffffcc')
+            .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
@@ -70,6 +74,7 @@ struct ProfilePage {
       }
       .width('100%')
       .padding({ left: 8, right: 20, top: 16, bottom: 12 })
+      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
 
       if (this.loading) {
         Column() {

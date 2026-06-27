@@ -41,10 +41,11 @@ struct CoursePage {
   build() {
     Column() {
       // 标题栏
+      // 渐变标题栏
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .fontColor('#ffffff')
           .width(40)
           .height(40)
           .textAlign(TextAlign.Center)
@@ -56,10 +57,10 @@ struct CoursePage {
           Text('我的课程')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .fontColor('#ffffff')
           Text('查看课程进度和学习资料')
             .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor('#ffffffcc')
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
@@ -68,6 +69,7 @@ struct CoursePage {
       }
       .width('100%')
       .padding({ left: 8, right: 20, top: 16, bottom: 12 })
+      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
 
       if (this.loading) {
         Column() {

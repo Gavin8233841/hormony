@@ -52,6 +52,24 @@ export class Constants {
   static readonly COLOR_ERROR_LIGHT: string = '#e5393520';
   static readonly COLOR_SUCCESS_LIGHT: string = '#4caf5020';
 
+  // 阴影色（带透明度的黑色）
+  static readonly SHADOW_CARD: string = '#0a000014';
+  static readonly SHADOW_CARD_LG: string = '#1200001a';
+
+  // 渐变色组（用于头部背景）
+  static readonly GRADIENT_HEADER_COLORS: [ResourceColor, ResourceColor] = ['#0a59f7', '#3d7fef'];
+
+  // 动画时长（毫秒）
+  static readonly ANIM_FAST: number = 200;
+  static readonly ANIM_NORMAL: number = 350;
+  static readonly ANIM_SLOW: number = 500;
+
+  // 圆角
+  static readonly RADIUS_SM: number = 8;
+  static readonly RADIUS_MD: number = 12;
+  static readonly RADIUS_LG: number = 16;
+  static readonly RADIUS_XL: number = 20;
+
   // hilog 日志
   static readonly HILOG_DOMAIN: number = 0x0001;
   static readonly HILOG_TAG: string = 'HongXueBan';

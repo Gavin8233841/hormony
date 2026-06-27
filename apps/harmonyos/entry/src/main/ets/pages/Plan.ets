@@ -18,11 +18,11 @@ struct PlanPage {
 
   build() {
     Column() {
-      // 标题栏
+      // 渐变标题栏
       Row() {
         Text('‹')
           .fontSize(28)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .fontColor('#ffffff')
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -33,10 +33,10 @@ struct PlanPage {
           Text('学习计划')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .fontColor('#ffffff')
           Text('输入目标，自动拆解任务')
             .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor('#ffffffcc')
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
@@ -45,6 +45,7 @@ struct PlanPage {
       }
       .width('100%')
       .padding({ left: 8, right: 20, top: 16, bottom: 12 })
+      .linearGradient({ angle: 135, colors: [['#0a59f7', 0], ['#3d7fef', 1]] })
 
       // 输入区
       Column({ space: 12 }) {
@@ -125,7 +126,8 @@ struct PlanPage {
               .width('100%')
               .padding(12)
               .backgroundColor(Constants.COLOR_BG_CARD)
-              .borderRadius(12)
+              .borderRadius(Constants.RADIUS_MD)
+              .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
             }
           })
         }
