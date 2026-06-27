@@ -13,16 +13,11 @@
     "typecheck:full": "next build && tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/openai": "0.0.66",
-    "ai": "3.4.33",
-    "clsx": "2.1.1",
     "lucide-react": "0.460.0",
     "next": "14.2.18",
     "openai": "4.73.1",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "tailwind-merge": "2.5.4",
-    "zod": "3.23.8"
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
     "@types/node": "22.9.0",

@@ -188,12 +188,6 @@ export const store = {
   getKnowledge(courseId?: string): KnowledgeChunk[] {
     return courseId ? db.knowledge.filter((c) => c.courseId === courseId) : db.knowledge;
   },
-  addKnowledge(chunk: KnowledgeChunk) {
-    db.knowledge.push(chunk);
-    if (db.knowledge.length > 500) {
-      db.knowledge = db.knowledge.slice(-500);
-    }
-  },
   addKnowledgeBatch(chunks: KnowledgeChunk[]) {
     db.knowledge.push(...chunks);
     if (db.knowledge.length > 500) {
