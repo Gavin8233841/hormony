@@ -134,7 +134,7 @@ export default function ChatPage() {
       setLoading(false);
       abortRef.current = null;
     }
-  }, [input, loading]);
+  }, [input, loading, messages]);
 
   // 卸载时中止未完成的 SSE 请求
   useEffect(() => {

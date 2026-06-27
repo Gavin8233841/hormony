@@ -92,15 +92,16 @@ export class HttpClient {
 
     const url = Constants.BASE_URL + path;
     let doneCalled: boolean = false;
+    let eventBuffer: string = '';
+    const decoder = util.TextDecoder.create('utf-8');
 
-    // 注册数据接收回调（流式）
-    // 使用 HttpClient.decodeArrayBuffer 而非 this.decodeArrayBuffer，
-    // 因为 dataReceive 回调中 this 绑定不保证指向 HttpClient 类
-    httpRequest.on('dataReceive', (data: ArrayBuffer) => {
-      const text = HttpClient.decodeArrayBuffer(data);
-      const lines = text.split('\n\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
+    const consumeText = (text: string): void => {
+      eventBuffer += text;
+      const frames = eventBuffer.split('\n\n');
+      eventBuffer = frames.pop() ?? '';
+
+      for (const frame of frames) {
+        const trimmed = frame.trim();
         if (!trimmed.startsWith('data:')) {
           continue;
         }
@@ -113,9 +114,15 @@ export class HttpClient {
             onDone();
           }
         } catch (e) {
-          // 忽略不完整的 JSON 分片
+          // 完整 SSE 帧无法解析时跳过，避免单条异常数据中断整个对话。
         }
       }
+    };
+
+    // 注册数据接收回调（流式）
+    httpRequest.on('dataReceive', (data: ArrayBuffer) => {
+      const text = decoder.decodeToString(new Uint8Array(data), { stream: true });
+      consumeText(text);
     });
 
     // 流式请求完成
@@ -139,14 +146,5 @@ export class HttpClient {
       onError(e);
       httpRequest.destroy();
     });
-  }
-
-  /**
-   * ArrayBuffer 转字符串（UTF-8）
-   * 使用 @kit.ArkTS 的 util.TextDecoder 替代已废弃的 escape()/decodeURIComponent()
-   */
-  private static decodeArrayBuffer(buf: ArrayBuffer): string {
-    const decoder = util.TextDecoder.create('utf-8');
-    return decoder.decodeToString(new Uint8Array(buf));
   }
 }

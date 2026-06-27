@@ -117,11 +117,11 @@ interface RagIndexCache {
 const RAG_CACHE_MAX = 8;
 const ragCacheMap = new Map<string, RagIndexCache>();
 
-// 文档列表指纹（djb2 变体哈希）：用 id + 文本长度 + 文本前缀组合，兼顾速度与变化检测
+// 文档列表指纹（djb2 变体哈希）：覆盖参与检索的完整内容，确保原位编辑也会使缓存失效。
 function hashDocuments(docs: KnowledgeChunk[]): string {
   let hash = 5381;
   const fingerprint = docs
-    .map((d) => `${d.id}:${d.text.length}:${d.text.slice(0, 64)}`)
+    .map((d) => `${d.id}:${d.courseId}:${d.source}:${d.text}`)
     .join("|");
   for (let i = 0; i < fingerprint.length; i++) {
     hash = ((hash << 5) + hash + fingerprint.charCodeAt(i)) | 0;

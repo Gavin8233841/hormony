@@ -2942,3 +2942,52 @@ Loop第23-25轮: 后端P2清理 + deprecated API迁移 + HttpClient修复 + 全�
 #### 涉及文件
 - HANDOVER-FOR-CODEX.md (新建, 682行)
 
+---
+
+## [2026-06-28T01:46:19+08:00] 模型: Codex
+
+### 决策调整
+
+- 按用户要求停止 `loop-engineering` 固定循环，恢复按风险和收益推进的常规工程策略。
+- 纠正“7/7 验收完成、仅差提交材料”的判断：当前是可运行原型，不是可提交成品。
+- 核心架构、模型边界、端侧主流程与最终验收由 Codex 负责；Trae 只执行边界明确的低风险工作。
+
+### 官方约束复核
+
+- 核对华为官方 2026 C4-AI 鸿蒙高校创新赛页面（https://developer.huawei.com/consumer/cn/activity/incentive/C4）：项目属于开放式命题的 Agent 创新方向，允许使用市场可用模型 API；官方明确强调 AI、视觉设计、实用功能和多设备能力的结合。
+- 官方附件仍需登录茶思屋下载；截止时间、视频时长和提交字段继续标为未核实，不得从旧资料推断。
+- 核对 HarmonyOS 官方设计入口（https://developer.huawei.com/consumer/cn/design/）、设计资源（https://developer.huawei.com/consumer/cn/design/resource/）和最佳实践（https://developer.huawei.com/consumer/cn/best-practices/）：ArkUI、官方组件资源、完整体验设计和系统能力应作为端侧重构依据。
+
+### DevEco Code CLI 验证
+
+- 本机命令：`deveco` 0.1.0。
+- 已核实 `deveco run`、`deveco debug skill` 等命令可执行。
+- 使用 `deveco run --dir C:\\Users\\guo82\\Desktop\\Hormony` 对 `HttpClient.ets` 的 SSE 分片处理做只读复核，准确识别跨 `dataReceive` 分片丢帧问题，未修改文件。
+- 结论：适合明确文件、明确输出、禁止修改的局部审查；不用于自主架构决策。技能列表混有无关全局技能，调用时必须限定范围。
+
+### 核心修复
+
+1. `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`
+   - `postSSE` 增加跨回调 `eventBuffer`，只消费以 `\n\n` 结束的完整服务端帧。
+   - 改用同一个 `util.TextDecoder` 且设置 `stream: true`，避免 UTF-8 中文字符跨网络分片时被独立解码破坏。
+2. `apps/web/src/app/chat/page.tsx`
+   - 补齐 `messages` 依赖，消除 React Hook 警告并确保请求历史来自最新状态。
+3. `apps/web/src/lib/agents/model.ts`
+   - 将演示回答中的字面 `\\n` 修正为真实换行。
+4. `apps/web/src/lib/rag/index.ts`
+   - 缓存指纹覆盖完整 `id/courseId/source/text`，避免同 ID、同长度、同前缀的文档原位修改后继续复用旧向量。
+
+### 验收证据
+
+- Web：`pnpm lint` 0 warning；`pnpm typecheck` 通过；`pnpm test` 4 文件 68/68 通过；`pnpm build` 通过。
+- DevEco MCP：`project_sync` 通过；`HttpClient.ets` 静态检查 `no diagnostics`；`entry@default` debug 构建 `BUILD SUCCESSFUL`。
+- HAP：模拟器安装并启动成功。首次启动遇到模拟器瞬时锁屏，解锁后重试成功，属于环境状态而非代码错误。
+- 运行态：启动本地后端，从鸿蒙首页进入对话并点击“什么是二叉搜索树？”，端侧收到完整中文回答和“依据”段落，换行正确，后端无错误日志。
+- 证据：`screenshots/codex-stream-test-passed-20260628.png` 及对应 UI 树目录，仅本地保留且被 `.gitignore` 忽略。
+- HAP 当前无签名配置，仍为 unsigned；正式签名和提交包尚未完成。
+
+### Trae 边界更新
+
+- 已更新 `docs/TRAE-DEVELOPMENT-BOUNDARIES.md`。
+- Trae 下一批只读梳理端侧 UX 信息架构和官方组件依据，不修改业务代码；待 Codex 复核后再下发端侧重构任务。
+
