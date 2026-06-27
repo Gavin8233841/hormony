@@ -1,6 +1,6 @@
 # Hormony API 参考文档
 
-> 版本：1.0.0  
+> 版本：1.1.0  
 > 最后更新：2026-06-27  
 > 适用项目：Hormony 智能学习助手（Next.js App Router）
 
@@ -97,22 +97,25 @@ http://localhost:3000
 
 | # | 方法 | 路径 | 功能 | 鉴权 |
 |---|------|------|------|------|
-| 1 | POST | `/api/chat` | SSE 流式多 Agent 对话 | userId |
+| 1 | POST | `/api/chat` | SSE 流式多 Agent 对话（支持多轮上下文） | userId |
 | 2 | GET | `/api/courses` | 获取用户课程列表 | userId (query) |
-| 3 | POST | `/api/knowledge/search` | RAG 知识检索 | 无 |
-| 4 | POST | `/api/knowledge/upload` | 上传知识文本到 RAG 知识库 | 无 |
-| 5 | GET | `/api/model/status` | 查询模型服务配置状态 | 无 |
-| 6 | POST | `/api/plan` | 生成学习计划 | userId |
-| 7 | POST | `/api/plan/save` | 保存学习计划 | userId |
-| 8 | PATCH | `/api/plan/save` | 更新计划任务打卡状态 | userId |
-| 9 | GET | `/api/profile` | 获取用户学习画像 | userId (query) |
-| 10 | PUT | `/api/profile/update` | 更新用户学习画像 | userId |
-| 11 | POST | `/api/quiz` | 生成测验题 | userId |
-| 12 | POST | `/api/quiz/submit` | 提交测验答案并评分 | userId |
-| 13 | POST | `/api/safety-review` | 内容安全审核 | 无 |
-| 14 | GET | `/api/stats` | 仪表盘统计数据聚合 | userId (query) |
-| 15 | GET | `/api/conversations` | 获取用户会话历史 | userId (query) |
-| 16 | GET | `/api/health` | 服务健康检查 | 无 |
+| 3 | POST | `/api/courses` | 添加新课程 | userId |
+| 4 | POST | `/api/knowledge/search` | RAG 知识检索 | 无 |
+| 5 | POST | `/api/knowledge/upload` | 上传知识文本到 RAG 知识库 | 无 |
+| 6 | GET | `/api/model/status` | 查询模型服务配置状态 | 无 |
+| 7 | GET | `/api/plan` | 获取已存学习计划 | userId (query) |
+| 8 | POST | `/api/plan` | 生成学习计划 | userId |
+| 9 | POST | `/api/plan/save` | 保存学习计划 | userId |
+| 10 | PATCH | `/api/plan/save` | 更新计划任务打卡状态 | userId |
+| 11 | GET | `/api/profile` | 获取用户学习画像 | userId (query) |
+| 12 | PUT | `/api/profile/update` | 更新用户学习画像 | userId |
+| 13 | GET | `/api/quiz` | 获取测验历史记录 | userId (query) |
+| 14 | POST | `/api/quiz` | 生成测验题 | userId |
+| 15 | POST | `/api/quiz/submit` | 提交测验答案并评分 | userId |
+| 16 | POST | `/api/safety-review` | 内容安全审核 | 无 |
+| 17 | GET | `/api/stats` | 仪表盘统计数据聚合 | userId (query) |
+| 18 | GET | `/api/conversations` | 获取用户会话历史 | userId (query) |
+| 19 | GET | `/api/health` | 服务健康检查 | 无 |
 
 ---
 
