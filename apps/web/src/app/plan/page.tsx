@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Loader2, CheckCircle2, Clock } from "lucide-react";
+import { CalendarDays, Loader2, CheckCircle2, Clock, Circle } from "lucide-react";
 import type { PlanTask, StudyPlan } from "@/lib/types";
 
 export default function PlanPage() {
@@ -11,6 +11,7 @@ export default function PlanPage() {
   const [tasks, setTasks] = useState<PlanTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const generate = async () => {
     if (!goal.trim()) return;
@@ -37,6 +38,31 @@ export default function PlanPage() {
       setLoading(false);
     }
   };
+
+  const toggleTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    setTogglingId(taskId);
+    // 乐观更新
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, done: !t.done } : t));
+
+    try {
+      const res = await fetch("/api/plan/save", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: "demo", taskId, done: !task.done }),
+      });
+      if (!res.ok) throw new Error("打卡失败");
+    } catch {
+      // 回滚
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, done: task.done } : t));
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const completedCount = tasks.filter((t) => t.done).length;
 
   return (
     <div className="space-y-6">
@@ -95,13 +121,43 @@ export default function PlanPage() {
       {/* 任务列表 */}
       {tasks.length > 0 && (
         <div className="card">
-          <h3 className="mb-3 font-semibold">计划任务（{tasks.length} 项）</h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-semibold">计划任务（{tasks.length} 项）</h3>
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-700/50">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${(completedCount / tasks.length) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs text-slate-400">{completedCount}/{tasks.length}</span>
+            </div>
+          </div>
           <div className="space-y-2">
             {tasks.map((t, i) => (
-              <div key={t.id} className="flex items-center gap-3 rounded-lg bg-slate-900/40 px-4 py-3">
-                <CheckCircle2 size={18} className="text-slate-600" />
+              <div
+                key={t.id}
+                className={`flex items-center gap-3 rounded-lg px-4 py-3 transition ${
+                  t.done ? "bg-emerald-500/10" : "bg-slate-900/40"
+                }`}
+              >
+                <button
+                  onClick={() => toggleTask(t.id)}
+                  disabled={togglingId === t.id}
+                  className="shrink-0 transition hover:scale-110 disabled:opacity-50"
+                >
+                  {togglingId === t.id ? (
+                    <Loader2 size={18} className="animate-spin text-slate-500" />
+                  ) : t.done ? (
+                    <CheckCircle2 size={18} className="text-emerald-400" />
+                  ) : (
+                    <Circle size={18} className="text-slate-600" />
+                  )}
+                </button>
                 <div className="flex-1">
-                  <div className="text-sm font-medium">{t.title}</div>
+                  <div className={`text-sm font-medium ${t.done ? "text-slate-500 line-through" : ""}`}>
+                    {t.title}
+                  </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     <span>{t.date}</span>
                     <span className="flex items-center gap-1">

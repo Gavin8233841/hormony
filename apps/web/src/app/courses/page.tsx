@@ -32,7 +32,7 @@ export default function CoursesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">我的课程</h1>
-        <p className="mt-1 text-sm text-slate-400">课程资料已纳入 RAG 知识库，可被 Retrieval Agent 检索</p>
+        <p className="mt-1 text-sm text-slate-400">课程资料已纳入知识库，支持智能检索与问答</p>
       </div>
 
       {loading && (
