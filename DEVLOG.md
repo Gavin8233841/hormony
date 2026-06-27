@@ -2807,3 +2807,57 @@ P0 安全问题修复（apps/web 后端）— CORS 通配符 / userId 校验加�
 - apps/web/src/app/api/chat/route.ts
 - apps/web/.env.example
 
+---
+
+## [2026-06-28T00:00:40Z] [2026-06-28 08:00:40 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+Loop第21-22轮: 子Agent CLI并行工作流正式运行 + 全页面按压反馈 + 后端P1修复
+
+#### 1. 子Agent CLI并行工作流正式运行
+- 主线程: 代码编辑 + MCP ETS检查 + 模拟器UI操作(截图/点击/导航)
+- 子Agent(Build): 通过hdc/hvigorw CLI完成构建+安装+启动+截图全流程
+- 子Agent(Backend): 后端代码审计(31文件21项发现) + P0安全修复 + P1性能修复
+- 子Agent(Research): HarmonyOS API研究(List警告/stateStyles/scrollToIndex/骨架屏)
+- 并行效率: 主线程编辑代码时, 子Agent同时跑后端测试和API研究; 主线程MCP检查时, 子Agent构建部署
+
+#### 2. Course/Knowledge/Profile卡片按压反馈
+- Course.ets: 添加 pressedIndex + ForEach index参数 + onTouch + scale(0.98) + animation(100ms)
+- Knowledge.ets: 同上, 搜索结果卡片支持按压反馈
+- Profile.ets: 添加 pressedSection + 薄弱/已掌握知识点卡片支持按压反馈 + 用户信息卡片添加阴影一致性
+
+#### 3. 后端P0安全修复 (子Agent完成)
+- CORS: `*` 通配符改为白名单(localhost:3000 + 10.0.2.2:3000) + Vary: Origin
+- userId: 正则收紧为 `^[a-zA-Z0-9_]+$`, 长度1-50, 新增边界测试用例
+- SSE: chat路由首事件前抛错返回500而非200, 流建立后通过SSE错误事件通知
+
+#### 4. 后端P1性能修复 (子Agent完成)
+- orchestrator: 提取5个公共辅助函数(prepareContext/runPreAgents/routeMainAgent/runSafetyCheck/persistConversation), 消除~90行重复代码
+- RAG缓存: 新增RagIndexCache(FIFO 8条上限, djb2指纹), 文档变更双重失效(指纹+显式invalidateRagCache)
+- API错误处理: quiz/submit和knowledge/upload顶层try-catch, 未捕获异常返回500
+
+#### 验证结果
+- ETS检查: Course/Knowledge/Profile 3个文件 0 diagnostics
+- CLI构建: BUILD SUCCESSFUL (退出码0, HAP产物327KB)
+- CLI安装: install bundle successfully
+- CLI启动: start ability successfully
+- 后端测试: 68/68 passed
+- 后端类型: tsc 0错误
+- 模拟器截图: 首页+Course+Knowledge+Profile 4页面全部渲染正确
+
+#### 涉及文件
+- apps/harmonyos/entry/src/main/ets/pages/Course.ets (按压反馈)
+- apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets (按压反馈)
+- apps/harmonyos/entry/src/main/ets/pages/Profile.ets (按压反馈+阴影一致性)
+- apps/web/src/middleware.ts (CORS白名单)
+- apps/web/src/lib/utils.ts (userId验证加固)
+- apps/web/src/lib/utils.test.ts (边界测试用例)
+- apps/web/src/app/api/chat/route.ts (SSE错误状态码)
+- apps/web/src/lib/agents/orchestrator.ts (重复代码消除)
+- apps/web/src/lib/rag/index.ts (RAG缓存)
+- apps/web/src/app/api/quiz/submit/route.ts (try-catch)
+- apps/web/src/app/api/knowledge/upload/route.ts (try-catch+缓存失效)
+- apps/web/.env.example (ORIGIN_ALLOWLIST文档)
+- apps/web/BACKEND_P1_FIX_DEVLOG.md (后端修复开发文档)
+
