@@ -26,6 +26,14 @@ export async function POST(req: NextRequest) {
 
   const userId = body.userId ?? "demo";
 
+  // 限制对话历史大小（最多 12 条消息，每条最多 1000 字符）
+  if (body.history && Array.isArray(body.history)) {
+    body.history = body.history.slice(-12).map((m) => ({
+      role: m.role,
+      content: String(m.content ?? "").slice(0, 1000),
+    }));
+  }
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
