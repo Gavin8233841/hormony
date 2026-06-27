@@ -61,10 +61,10 @@ describe("工具函数", () => {
   });
 
   describe("sanitizeUserId()", () => {
-    it("合法 userId 应原样返回", () => {
+    it("合法 userId 应原样返回（仅字母数字下划线）", () => {
       expect(sanitizeUserId("demo")).toBe("demo");
       expect(sanitizeUserId("user_123")).toBe("user_123");
-      expect(sanitizeUserId("test-user")).toBe("test-user");
+      expect(sanitizeUserId("User_456")).toBe("User_456");
     });
 
     it("空值应返回 demo", () => {
@@ -74,7 +74,10 @@ describe("工具函数", () => {
       expect(sanitizeUserId("   ")).toBe("demo");
     });
 
-    it("超长 userId 应返回 demo", () => {
+    it("长度边界：1-50 字符合法，超出返回 demo", () => {
+      expect(sanitizeUserId("a")).toBe("a");
+      expect(sanitizeUserId("a".repeat(50))).toBe("a".repeat(50));
+      expect(sanitizeUserId("a".repeat(51))).toBe("demo");
       expect(sanitizeUserId("a".repeat(65))).toBe("demo");
     });
 
@@ -83,6 +86,8 @@ describe("工具函数", () => {
       expect(sanitizeUserId("user@hack")).toBe("demo");
       expect(sanitizeUserId("user/../../etc")).toBe("demo");
       expect(sanitizeUserId("<script>")).toBe("demo");
+      // 连字符不再允许
+      expect(sanitizeUserId("test-user")).toBe("demo");
     });
 
     it("非字符串输入应安全转换", () => {

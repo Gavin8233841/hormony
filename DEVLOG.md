@@ -2766,3 +2766,44 @@ Loop第20轮: List组件警告修复 + 按钮禁用态优化 + Chat滚动功能 
 - apps/harmonyos/entry/src/main/ets/pages/Plan.ets (List修复 + 按钮禁用态 + canGenerate getter)
 - apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets (List修复 + 按钮禁用态 + canSearch getter)
 
+---
+
+## [2026-06-27T15:42:00Z] [2026-06-27 23:42:00 CST] 模型: Claude (TRAE Work) — 后端修复子Agent
+
+### 操作
+
+P0 安全问题修复（apps/web 后端）— CORS 通配符 / userId 校验加固 / chat SSE 错误状态码
+
+#### P0-1: CORS 通配符修复
+- 文件: apps/web/src/middleware.ts
+- 将 `Access-Control-Allow-Origin: *` 替换为基于 Origin 白名单的回显（仅当请求来源命中白名单时设置具体来源，不再使用通配符）
+- 新增 ORIGIN_ALLOWLIST 环境变量配置，默认允许 http://localhost:3000 与 http://10.0.2.2:3000；解析为空时回退默认白名单
+- 新增 Vary: Origin 头，避免缓存错配
+- 新增辅助函数: getOriginAllowlist / resolveAllowedOrigin / applyCorsHeaders（OPTIONS 预检与正常 API 响应统一复用）
+- 文件: apps/web/.env.example（补充 ORIGIN_ALLOWLIST 文档与示例）
+
+#### P0-2: userId 输入验证加固
+- 文件: apps/web/src/lib/utils.ts
+- sanitizeUserId 正则从 `^[a-zA-Z0-9_-]+$` 收紧为 `^[a-zA-Z0-9_]+$`（移除连字符，仅允许字母数字与下划线）
+- 长度上限从 64 收紧为 1-50 字符；空值仍返回 'demo'
+- 文件: apps/web/src/lib/utils.test.ts（同步更新用例：连字符→demo、新增 50/51 边界测试）
+- 该函数已在全部消费 userId 的 API 路由中使用（profile/plan/quiz/courses/conversations/stats/chat 等），无需新增调用点
+
+#### P0-3: chat SSE 流错误返回 HTTP 500
+- 文件: apps/web/src/app/api/chat/route.ts
+- 重构为"先探测首事件再提交响应"模式：orchestrateStream 在产出首个事件前若抛错 → 直接返回 HTTP 500（不再始终 200）
+- 首个事件就绪后建立 200 SSE 流，回放缓冲事件并实时推送后续事件（保持事件顺序）
+- 流建立后的错误仍通过 SSE 错误事件（trace + done）通知客户端（HTTP 状态已固化，符合 HTTP 流式语义）
+- 新增 cancel 处理与写入 try-catch 容错，避免客户端断连时在已取消的流上抛错
+
+#### 验证
+- `npx tsc --noEmit --project tsconfig.typecheck.json` → exit 0，无类型错误
+- `npx vitest run` → 4 文件 68 测试全部通过（utils.test.ts 17 用例含新边界用例）
+
+#### 涉及文件
+- apps/web/src/middleware.ts
+- apps/web/src/lib/utils.ts
+- apps/web/src/lib/utils.test.ts
+- apps/web/src/app/api/chat/route.ts
+- apps/web/.env.example
+

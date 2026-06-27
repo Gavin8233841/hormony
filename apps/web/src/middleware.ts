@@ -21,18 +21,53 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: http:; frame-ancestors 'none'",
 };
 
+// CORS 允许来源白名单
+// 默认允许：本地开发环境 + 鸿蒙模拟器访问宿主机
+// 可通过环境变量 ORIGIN_ALLOWLIST 覆盖（逗号分隔，例如 "https://a.com,https://b.com"）
+const DEFAULT_ORIGIN_ALLOWLIST = [
+  "http://localhost:3000", // 开发环境
+  "http://10.0.2.2:3000",  // 鸿蒙模拟器访问宿主机
+];
+
+function getOriginAllowlist(): string[] {
+  const raw = process.env.ORIGIN_ALLOWLIST;
+  if (!raw) return DEFAULT_ORIGIN_ALLOWLIST;
+  const list = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  // 解析为空时回退到默认白名单，避免误配置导致全部来源被拒
+  return list.length > 0 ? list : DEFAULT_ORIGIN_ALLOWLIST;
+}
+
+// 根据请求 Origin 头返回允许的来源；无 Origin 或不在白名单时返回 null
+function resolveAllowedOrigin(req: NextRequest): string | null {
+  const origin = req.headers.get("origin");
+  if (!origin) return null;
+  return getOriginAllowlist().includes(origin) ? origin : null;
+}
+
+// 为响应注入 CORS 头：仅当请求来源命中白名单时回显具体 Origin（不再使用通配符 *）
+function applyCorsHeaders(res: NextResponse, req: NextRequest) {
+  const origin = resolveAllowedOrigin(req);
+  if (origin) {
+    res.headers.set("Access-Control-Allow-Origin", origin);
+    res.headers.append("Vary", "Origin");
+  }
+  res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 仅对 API 路由执行速率限制
   if (pathname.startsWith("/api/")) {
-    // CORS 预检直接放行
+    // CORS 预检直接放行（仅允许白名单来源）
     if (req.method === "OPTIONS") {
       const res = new NextResponse(null, { status: 204 });
       addSecurityHeaders(res);
-      res.headers.set("Access-Control-Allow-Origin", "*");
-      res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      applyCorsHeaders(res, req);
       return res;
     }
 
@@ -69,11 +104,9 @@ export function middleware(req: NextRequest) {
   const res = NextResponse.next();
   addSecurityHeaders(res);
 
-  // API 路由添加 CORS 头
+  // API 路由添加 CORS 头（仅允许白名单来源）
   if (pathname.startsWith("/api/")) {
-    res.headers.set("Access-Control-Allow-Origin", "*");
-    res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    applyCorsHeaders(res, req);
   }
 
   return res;

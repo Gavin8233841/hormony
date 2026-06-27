@@ -15,6 +15,7 @@ struct KnowledgePage {
   @State results: KnowledgeChunk[] = [];
   @State loading: boolean = false;
   @State message: string = '';
+  @State pressedIndex: number = -1;
 
   private demoChunks: KnowledgeChunk[] = [
     { text: '二叉搜索树（BST）是一种节点值满足左子树均小于根、右子树均大于根的二叉树。中序遍历 BST 可得到升序序列。', source: '数据结构.pdf', courseId: 'cs101' },
@@ -77,7 +78,7 @@ struct KnowledgePage {
           .margin({ left: 16, bottom: 8 })
 
         List({ space: 12 }) {
-          ForEach(this.results, (item: KnowledgeChunk) => {
+          ForEach(this.results, (item: KnowledgeChunk, i: number) => {
             ListItem() {
               Column() {
                 Row() {
@@ -106,6 +107,17 @@ struct KnowledgePage {
               .borderRadius(Constants.RADIUS_MD)
               .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
               .alignItems(HorizontalAlign.Start)
+              .scale({ x: this.pressedIndex === i ? 0.98 : 1, y: this.pressedIndex === i ? 0.98 : 1 })
+              .animation({ duration: 100, curve: Curve.EaseOut })
+              .onTouch((event?: TouchEvent) => {
+                if (event) {
+                  if (event.type === TouchType.Down) {
+                    this.pressedIndex = i;
+                  } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                    this.pressedIndex = -1;
+                  }
+                }
+              })
             }
           })
         }

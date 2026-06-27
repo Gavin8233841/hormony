@@ -12,6 +12,7 @@ import { Course, CoursesResponse } from '../model/DataModels';
 struct CoursePage {
   @State courses: Course[] = [];
   @State loading: boolean = false;
+  @State pressedIndex: number = -1;
 
   aboutToAppear() {
     // 调试模式：先加载演示数据，避免网络等待时空白
@@ -54,7 +55,7 @@ struct CoursePage {
         .justifyContent(FlexAlign.Center)
       } else {
         List({ space: 10 }) {
-          ForEach(this.courses, (c: Course) => {
+          ForEach(this.courses, (c: Course, i: number) => {
             ListItem() {
               Column() {
                 // 课程标题行
@@ -111,6 +112,17 @@ struct CoursePage {
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_LG)
               .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+              .scale({ x: this.pressedIndex === i ? 0.98 : 1, y: this.pressedIndex === i ? 0.98 : 1 })
+              .animation({ duration: 100, curve: Curve.EaseOut })
+              .onTouch((event?: TouchEvent) => {
+                if (event) {
+                  if (event.type === TouchType.Down) {
+                    this.pressedIndex = i;
+                  } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                    this.pressedIndex = -1;
+                  }
+                }
+              })
             }
           })
         }
