@@ -2991,3 +2991,42 @@ Loop第23-25轮: 后端P2清理 + deprecated API迁移 + HttpClient修复 + 全�
 - 已更新 `docs/TRAE-DEVELOPMENT-BOUNDARIES.md`。
 - Trae 下一批只读梳理端侧 UX 信息架构和官方组件依据，不修改业务代码；待 Codex 复核后再下发端侧重构任务。
 
+---
+
+## [2026-06-28T02:12:00+08:00] 模型: Codex
+
+### 端侧前端重构决策
+
+- 用户决定由 Codex 主导端侧前端初稿和基础框架，Trae 后续只做明确范围内的补齐与回归。
+- 现有六页面保留已验证的数据合同和网络能力，视觉结构、主导航、页面层级、设计令牌与核心组件允许重做。
+- 当前阶段先完成三套可实现的手机端视觉方向，再按选定方向实现 ArkUI；不直接把静态生成图当作成品。
+
+### 官方资源核对
+
+- 华为设计资源页提供手机/折叠屏/平板组件、HarmonyOS Sans、应用图标与 HarmonyOS Symbol。
+- HarmonyOS Symbol 官方目录当前展示 433 个系统图标，覆盖首页、消息、文档、搜索、人物、设置等本项目需要的语义。
+- 多设备最佳实践明确提供断点、分栏和自适应布局能力；重构底层将避免继续使用只适配当前模拟器尺寸的固定版面。
+- 官方设计入口强调沉浸光感、材质层次和统一组件，但本项目只在导航及关键交互面使用轻量材质，不做全屏玻璃化。
+
+### GitHub 资源审查
+
+- 使用 GitHub 插件核对四个用户指定仓库的真实路径、用途和许可证。
+- `pbakaus/impeccable`：Apache-2.0，支持 Codex/Trae，设计规则可用；自动检测主要面向 HTML/CSS。
+- `Leonxlnx/taste-skill`：MIT；默认技能明确不面向多步骤产品界面，仅采用 `imagegen-frontend-mobile` 作为视觉探索规则。
+- `nextlevelbuilder/ui-ux-pro-max-skill`：MIT，支持多种 Web 和移动框架，但未列出 ArkUI，不接入鸿蒙运行依赖。
+- `VoltAgent/awesome-design-md`：MIT 的设计规范资料集合，不作为执行工具，不复制具体第三方品牌视觉。
+
+### 项目内技能配置
+
+- 新增 `.agents/skills/impeccable` 与 `.agents/skills/imagegen-frontend-mobile`，合计 100 个文件，约 2.17 MB。
+- 补齐两个上游许可证文件；新增 `.agents/README.md` 说明来源、用途和执行边界。
+- 未创建 `.codex/hooks.json`，未安装 npm 包，未修改 HarmonyOS 或 Web 构建配置。
+- 供应链检查发现 `impeccable` 脚本具备联网、本地服务和子进程能力，因此默认禁用脚本，只读取设计规则；后续如需执行必须单独审查准确脚本。
+
+### 插件分工
+
+- Product Design：负责设计 brief、三套视觉方向和选定方向的实现对照。
+- Creative Production：只在需要扩展情绪板或品牌资产时使用，不直接生成 ArkUI。
+- Canva：保留给后续竞赛展示材料和演示文档，不用于决定原生客户端结构。
+- GitHub：用于核对上游来源、文件路径、维护状态和许可证。
+
