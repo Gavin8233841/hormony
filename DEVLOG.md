@@ -2710,3 +2710,59 @@ Loop第19轮: 页面转场动画 + 按压反馈 + DevEco CLI并行工作流实�
 - apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets (pageTransition)
 - apps/harmonyos/entry/src/main/ets/pages/Profile.ets (pageTransition)
 
+---
+
+## [2026-06-27T21:21:24Z] [2026-06-27 21:21:24 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+Loop第20轮: List组件警告修复 + 按钮禁用态优化 + Chat滚动功能 + MCP+CLI真正并行工作流
+
+#### 1. List组件 invalidInitOfList 警告全部修复 (4个文件)
+- Chat.ets: List添加 .height('100%') + .cachedCount(5) + .scrollBar(BarState.Off)
+- Course.ets: 同上
+- Plan.ets: 同上
+- Knowledge.ets: 同上
+- MCP check_ets_files 验证: 5个文件全部 0 diagnostics (警告完全消除)
+
+#### 2. 按钮禁用态自定义颜色 (3个页面)
+- 新增 Constants: COLOR_BUTTON_DISABLED_BG (#d3d7de) + COLOR_BUTTON_DISABLED_TEXT (#929292)
+- Chat.ets: 发送按钮添加 canSend getter + 三元条件背景色/文字色
+- Plan.ets: 生成计划按钮添加 canGenerate getter + 三元条件背景色/文字色
+- Knowledge.ets: 检索按钮添加 canSearch getter + 三元条件背景色/文字色
+- 效果: 禁用态从默认半透明蒙版改为明确的灰色，视觉反馈更清晰
+
+#### 3. Chat 滚动到底部功能
+- 新增 scrollToBottom() 私有方法: setTimeout 50ms + scroller.scrollToIndex(ScrollAlign.END)
+- sendMessage() 推送消息后调用 scrollToBottom()
+- SSE delta 回调中追加内容后也调用 scrollToBottom()
+- 实现聊天消息自动滚动跟随，用户体验更流畅
+
+#### 4. MCP + CLI 真正并行工作流
+- 主线程: 代码编辑 + MCP工具(check_ets, build, start_app, screenshot, click, UI树)
+- 子Agent 1 (Explore): HarmonyOS API研究 (List警告原因, stateStyles, scrollToIndex, 骨架屏)
+- 子Agent 2 (general): 后端验证 (vitest 68/68通过, tsc 0错误)
+- 子Agent 3 (general): 日志监控 (hilog + faultlog, 无崩溃)
+- 并行模式: 主线程编辑代码时, 子Agent同时跑后端测试和API研究; 主线程MCP构建时, 子Agent监控日志
+
+#### 5. 模拟器可视化验证
+- 首页截图: 渐变头部 + 统计卡片 + 5个功能入口全部正常
+- Chat页面截图: 发送按钮禁用态显示灰色 (正确)
+- Plan页面截图: 生成计划按钮禁用态显示灰色 (正确)
+- MCP inputText 不触发 ArkUI onChange (UI自动化已知限制, 真实用户输入正常)
+
+#### 验证结果
+- ETS检查: 5个文件 0 diagnostics (invalidInitOfList 警告全部消除)
+- 构建: BUILD SUCCESSFUL in 9.7s
+- 模拟器: Pura 90 Pro Max 安装启动成功
+- 后端: 68/68测试通过, tsc类型检查0错误
+- 日志: com.c4ai.hormony 无崩溃, 无Error/Fatal
+- 截图: 3张截图验证首页+Chat+Plan页面全部渲染正确
+
+#### 涉及文件
+- apps/harmonyos/entry/src/main/ets/common/Constants.ets (新增禁用态颜色常量)
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets (List修复 + 按钮禁用态 + scrollToBottom + canSend getter)
+- apps/harmonyos/entry/src/main/ets/pages/Course.ets (List修复)
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets (List修复 + 按钮禁用态 + canGenerate getter)
+- apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets (List修复 + 按钮禁用态 + canSearch getter)
+

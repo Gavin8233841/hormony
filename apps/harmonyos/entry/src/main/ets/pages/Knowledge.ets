@@ -24,6 +24,10 @@ struct KnowledgePage {
     { text: '图的遍历分为 DFS 和 BFS，DFS 使用栈/递归，BFS 使用队列。', source: '数据结构.pdf', courseId: 'cs101' },
   ];
 
+  get canSearch(): boolean {
+    return !this.loading && this.query.trim().length > 0;
+  }
+
   build() {
     Column() {
       GradientHeader('搜课程资料', '搜索知识点和相关资料')
@@ -40,10 +44,10 @@ struct KnowledgePage {
 
         Button('检索')
           .fontSize(14)
-          .backgroundColor(Constants.COLOR_BRAND)
-          .fontColor(Constants.COLOR_BG_CARD)
+          .backgroundColor(this.canSearch ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+          .fontColor(this.canSearch ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
           .borderRadius(12)
-          .enabled(!this.loading)
+          .enabled(this.canSearch)
           .onClick(() => { this.search(); })
       }
       .width('100%')
@@ -106,7 +110,10 @@ struct KnowledgePage {
           })
         }
         .width('100%')
+        .height('100%')
         .layoutWeight(1)
+        .cachedCount(5)
+        .scrollBar(BarState.Off)
         .padding({ left: 16, right: 16 })
       } else {
         // 空状态

@@ -67,6 +67,10 @@ export class Constants {
   static readonly COLOR_TEXT_ON_GRADIENT: string = '#ffffff';
   static readonly COLOR_TEXT_ON_GRADIENT_SUB: string = '#ffffffcc';
 
+  // 禁用态按钮颜色（避免默认半透明蒙版，提供明确视觉反馈）
+  static readonly COLOR_BUTTON_DISABLED_BG: string = '#d3d7de';
+  static readonly COLOR_BUTTON_DISABLED_TEXT: string = '#929292';
+
   // 动画时长（毫秒）
   static readonly ANIM_FAST: number = 200;
   static readonly ANIM_NORMAL: number = 350;

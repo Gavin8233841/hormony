@@ -16,6 +16,10 @@ struct PlanPage {
   @State tasks: PlanTask[] = [];
   @State loading: boolean = false;
 
+  get canGenerate(): boolean {
+    return !this.loading && this.goal.trim().length > 0;
+  }
+
   build() {
     Column() {
       GradientHeader('学习计划', '输入目标，自动拆解为每日任务')
@@ -45,11 +49,11 @@ struct PlanPage {
 
           Button('生成计划')
             .fontSize(14)
-            .backgroundColor(Constants.COLOR_BRAND)
-            .fontColor(Constants.COLOR_BG_CARD)
+            .backgroundColor(this.canGenerate ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+            .fontColor(this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
             .borderRadius(12)
             .height(40)
-            .enabled(!this.loading && this.goal.length > 0)
+            .enabled(this.canGenerate)
             .onClick(() => { this.generate(); })
         }
         .width('100%')
@@ -105,7 +109,10 @@ struct PlanPage {
           })
         }
         .width('100%')
+        .height('100%')
         .layoutWeight(1)
+        .cachedCount(5)
+        .scrollBar(BarState.Off)
         .padding({ left: 16, right: 16 })
       } else if (this.loading) {
         Column() {

@@ -49,6 +49,18 @@ struct Chat {
     }
   }
 
+  get canSend(): boolean {
+    return !this.loading && this.inputText.trim().length > 0;
+  }
+
+  private scrollToBottom(): void {
+    setTimeout(() => {
+      if (this.messages.length > 0) {
+        this.scroller.scrollToIndex(this.messages.length - 1, true, ScrollAlign.END);
+      }
+    }, 50);
+  }
+
   build() {
     Column() {
       GradientHeader('AI 辅导', '')
@@ -116,8 +128,11 @@ struct Chat {
             }
           })
         }
-        .layoutWeight(1)
         .width('100%')
+        .height('100%')
+        .layoutWeight(1)
+        .cachedCount(5)
+        .scrollBar(BarState.Off)
         .padding({ left: 16, right: 16 })
       }
 
@@ -149,10 +164,10 @@ struct Chat {
 
         Button('发送')
           .fontSize(14)
-          .backgroundColor(Constants.COLOR_BRAND)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+          .fontColor(this.canSend ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
           .borderRadius(Constants.RADIUS_MD)
-          .enabled(!this.loading && this.inputText.length > 0)
+          .enabled(this.canSend)
           .onClick(() => {
             this.sendMessage();
           })
@@ -194,6 +209,7 @@ struct Chat {
     this.inputText = '';
     this.loading = true;
     this.isCancelled = false;
+    this.scrollToBottom();
 
     const req: ChatRequest = {
       userId: Constants.DEMO_USER_ID,
@@ -220,6 +236,7 @@ struct Chat {
         }
 
         this.messages = this.messages.slice();
+        this.scrollToBottom();
       },
       () => {
         if (this.isCancelled) {
