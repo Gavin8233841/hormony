@@ -97,7 +97,63 @@ function seedDemoData() {
     { type: "quiz", description: "完成测验：4/5 题正确", timestamp: new Date(Date.now() - 7200000).toISOString() },
     { type: "plan", description: "完成任务：练习栈与队列题目", timestamp: new Date(Date.now() - 10800000).toISOString() },
     { type: "study", description: "检索知识库：动态规划", timestamp: new Date(Date.now() - 86400000).toISOString() },
+    { type: "chat", description: "提问：TCP 三次握手过程", timestamp: new Date(Date.now() - 172800000).toISOString() },
+    { type: "quiz", description: "完成测验：3/5 题正确", timestamp: new Date(Date.now() - 259200000).toISOString() },
+    { type: "plan", description: "保存学习计划：两周复习数据结构", timestamp: new Date(Date.now() - 345600000).toISOString() },
+    { type: "study", description: "上传知识：操作系统.pdf", timestamp: new Date(Date.now() - 432000000).toISOString() },
   ];
+
+  // 演示会话历史
+  const demoConversations: ConversationRecord[] = [
+    {
+      sessionId: "session_demo_001",
+      userId: "demo",
+      message: "什么是二叉搜索树？",
+      response: "二叉搜索树（BST）是一种节点值满足左子树均小于根、右子树均大于根的二叉树。中序遍历 BST 可得到升序序列。查找、插入、删除平均时间复杂度为 O(log n)，最坏退化为 O(n)。",
+      intent: "tutor",
+      citations: [{ doc: "数据结构.pdf", snippet: "二叉搜索树（BST）..." }],
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+    },
+    {
+      sessionId: "session_demo_002",
+      userId: "demo",
+      message: "TCP 三次握手为什么不是两次？",
+      response: "三次握手确保双方都能收发数据。如果只有两次，服务端发送 SYN+ACK 后认为连接已建立，但客户端可能未收到，导致服务端浪费资源。第三次 ACK 确认客户端也收到了服务端的响应，防止历史连接失效。",
+      intent: "tutor",
+      citations: [{ doc: "计算机网络.pdf", snippet: "TCP 三次握手..." }],
+      createdAt: new Date(Date.now() - 172800000).toISOString(),
+    },
+    {
+      sessionId: "session_demo_003",
+      userId: "demo",
+      message: "动态规划和贪心算法有什么区别？",
+      response: "动态规划通过存储子问题解来避免重复计算，会回溯所有可能；贪心算法每步选当前最优，不回溯。动态规划适用于最优子结构+重叠子问题，贪心适用于贪心选择性质+最优子结构。典型例子：DP-背包问题，贪心-最小生成树。",
+      intent: "tutor",
+      citations: [{ doc: "算法设计.pdf", snippet: "贪心算法在每一步..." }],
+      createdAt: new Date(Date.now() - 259200000).toISOString(),
+    },
+  ];
+  db.conversations.push(...demoConversations);
+
+  // 演示测验结果
+  const demoQuizResult: QuizResult = {
+    quizId: "quiz_demo_001",
+    userId: "demo",
+    totalQuestions: 5,
+    correctCount: 4,
+    accuracy: 0.8,
+    details: [
+      { questionId: "q1", stem: "二叉搜索树的中序遍历得到什么序列？", userAnswer: "升序序列", correctAnswer: "升序序列", isCorrect: true, explanation: "BST 中序遍历得到升序序列" },
+      { questionId: "q2", stem: "哈希表的平均查找时间复杂度？", userAnswer: "O(1)", correctAnswer: "O(1)", isCorrect: true, explanation: "哈希表平均 O(1)，最坏 O(n)" },
+      { questionId: "q3", stem: "快速排序的最坏时间复杂度？", userAnswer: "O(n log n)", correctAnswer: "O(n²)", isCorrect: false, explanation: "最坏情况下退化为 O(n²)" },
+      { questionId: "q4", stem: "死锁的四个必要条件之一是？", userAnswer: "互斥", correctAnswer: "互斥", isCorrect: true, explanation: "互斥、占有并等待、不可抢占、循环等待" },
+      { questionId: "q5", stem: "HTTP 默认端口号？", userAnswer: "80", correctAnswer: "80", isCorrect: true, explanation: "HTTP 默认 80，HTTPS 默认 443" },
+    ],
+    evaluation: "正确率 80%（4/5）。总体表现良好。错题集中在快速排序最坏时间复杂度，建议复习排序算法的时间复杂度分析，特别是最坏情况和平均情况的区别。",
+    weakTopics: ["快速排序", "排序算法"],
+    submittedAt: new Date(Date.now() - 7200000).toISOString(),
+  };
+  db.quizResults.push(demoQuizResult);
 }
 
 // 仅在首次创建时初始化演示数据
