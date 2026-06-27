@@ -1,6 +1,8 @@
 // GET /api/courses?userId=... — 获取用户课程列表
+// POST /api/courses — 添加新课程
 
 import { store } from "@/lib/store/db";
+import type { Course } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +13,51 @@ export async function GET(req: Request) {
     const courses = store.getCourses(userId);
     return Response.json({ courses });
   } catch (err) {
-    console.error("[courses] error:", err instanceof Error ? err.message : String(err));
+    console.error("[courses/GET] error:", err instanceof Error ? err.message : String(err));
     return Response.json({ error: "课程数据获取失败", code: "INTERNAL_ERROR" }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  let body: Partial<Course> & { userId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
+  }
+
+  const userId = String(body.userId ?? "demo").trim();
+  const id = String(body.id ?? `course_${Date.now().toString(36)}`).trim();
+  const title = String(body.title ?? "").trim();
+
+  if (!title) {
+    return Response.json({ error: "缺少课程名称", code: "MISSING_FIELD" }, { status: 400 });
+  }
+  if (title.length > 100) {
+    return Response.json({ error: "课程名称过长（上限 100 字符）", code: "TITLE_TOO_LONG" }, { status: 400 });
+  }
+
+  const course: Course = {
+    id,
+    title,
+    progress: Math.min(Math.max(Number(body.progress) || 0, 0), 1),
+    docCount: Math.max(Number(body.docCount) || 0, 0),
+    topics: Array.isArray(body.topics)
+      ? body.topics.filter((t) => typeof t === "string").slice(0, 20)
+      : [],
+  };
+
+  try {
+    store.addCourse(userId, course);
+    store.logActivity({
+      type: "study",
+      description: `添加课程：${title}`,
+      timestamp: new Date().toISOString(),
+    });
+    return Response.json(course, { status: 201 });
+  } catch (err) {
+    console.error("[courses/POST] error:", err instanceof Error ? err.message : String(err));
+    return Response.json({ error: "添加课程失败", code: "INTERNAL_ERROR" }, { status: 500 });
   }
 }
 

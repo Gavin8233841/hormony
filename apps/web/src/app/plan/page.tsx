@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CalendarDays, Loader2, CheckCircle2, Clock, Circle } from "lucide-react";
 import type { PlanTask, StudyPlan } from "@/lib/types";
 
@@ -12,6 +12,28 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // 加载已有计划
+  const loadPlan = useCallback(async () => {
+    setInitialLoading(true);
+    try {
+      const res = await fetch("/api/plan?userId=demo");
+      if (res.ok) {
+        const plan = (await res.json()) as StudyPlan;
+        setTasks(plan.tasks ?? []);
+        if (plan.goal) setGoal(plan.goal);
+      }
+    } catch {
+      // 静默失败，用户可手动生成
+    } finally {
+      setInitialLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPlan();
+  }, [loadPlan]);
 
   const generate = async () => {
     if (!goal.trim()) return;
@@ -117,6 +139,14 @@ export default function PlanPage() {
       </div>
 
       {error && <div className="card border-red-500/40 text-sm text-red-400">{error}</div>}
+
+      {/* 初始加载 */}
+      {initialLoading && (
+        <div className="card flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-brand-500" />
+          <span className="ml-3 text-sm text-slate-400">加载学习计划...</span>
+        </div>
+      )}
 
       {/* 任务列表 */}
       {tasks.length > 0 && (
