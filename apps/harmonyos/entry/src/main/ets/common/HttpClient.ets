@@ -33,6 +33,8 @@ export class HttpClient {
         return parsed;
       }
       throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+    } catch (e) {
+      throw e instanceof Error ? e : new Error('Network request failed');
     } finally {
       httpRequest.destroy();
     }
@@ -63,6 +65,8 @@ export class HttpClient {
         return parsed;
       }
       throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+    } catch (e) {
+      throw e instanceof Error ? e : new Error('Network request failed');
     } finally {
       httpRequest.destroy();
     }
