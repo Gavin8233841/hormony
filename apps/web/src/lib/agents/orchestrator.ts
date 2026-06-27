@@ -9,7 +9,7 @@ import { runPlannerAgent } from "./planner-agent";
 import { runQuizAgent } from "./quiz-agent";
 import { runEvaluatorAgent } from "./evaluator-agent";
 import { runSafetyAgent } from "./safety-agent";
-import type { AgentResult, Citation, StreamEvent, ChatRequest } from "@/lib/types";
+import type { AgentResult, Citation, StreamEvent, ChatRequest, ChatMessage } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { store } from "@/lib/store/db";
 
@@ -54,8 +54,17 @@ export interface OrchestrationResult {
 // 非流式编排：用于一次性返回（如 plan/quiz 接口）
 export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult> {
   const intent = detectIntent(req.message);
-  const sessionId = generateId("session");
+  const sessionId = req.context?.sessionId ?? generateId("session");
   const agentResults: AgentResult[] = [];
+
+  // 0. 加载对话历史（多轮上下文）
+  const history: ChatMessage[] = req.history ?? [];
+  if (!req.history) {
+    for (const c of store.getConversations(req.userId, 5)) {
+      history.push({ role: "user", content: c.message });
+      history.push({ role: "assistant", content: c.response });
+    }
+  }
 
   // 1. 始终加载用户画像（失败不阻断）
   const profileResult = await safeAgentCall("Profile", () => runProfileAgent(req.userId));
@@ -107,7 +116,8 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
           req.userId,
           req.message,
           retrievalResult.content,
-          retrievalResult.citations ?? []
+          retrievalResult.citations ?? [],
+          history
         )
       );
       break;
@@ -164,7 +174,16 @@ export async function orchestrateStream(
   emit: (event: StreamEvent) => void
 ): Promise<void> {
   const intent = detectIntent(req.message);
-  const sessionId = generateId("session");
+  const sessionId = req.context?.sessionId ?? generateId("session");
+
+  // 0. 加载对话历史（多轮上下文）
+  const history: ChatMessage[] = req.history ?? [];
+  if (!req.history) {
+    for (const c of store.getConversations(req.userId, 5)) {
+      history.push({ role: "user", content: c.message });
+      history.push({ role: "assistant", content: c.response });
+    }
+  }
 
   // 1. Profile Agent（失败不阻断）
   emit({ type: "thinking", agent: "Profile" });
@@ -218,6 +237,12 @@ export async function orchestrateStream(
         };
       });
       break;
+    case "evaluate":
+      emit({ type: "thinking", agent: "Evaluator" });
+      mainResult = await safeAgentCall("Evaluator", () =>
+        runEvaluatorAgent(req.userId, [])
+      );
+      break;
     case "tutor":
     case "general":
     default:
@@ -227,7 +252,8 @@ export async function orchestrateStream(
           req.userId,
           req.message,
           retrievalResult.content,
-          retrievalResult.citations ?? []
+          retrievalResult.citations ?? [],
+          history
         )
       );
       break;

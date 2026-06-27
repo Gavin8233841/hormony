@@ -27,13 +27,21 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const send = useCallback(async () => {
     if (!input.trim() || loading) return;
     const userMsg: ChatItem = { role: "user", content: input.trim() };
+    const currentInput = input.trim();
     setMessages((m) => [...m, userMsg]);
     setInput("");
     setLoading(true);
+
+    // 构建对话历史（最近 6 轮）
+    const history = messages.slice(-12).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
     const assistantMsg: ChatItem = {
       role: "assistant",
@@ -51,7 +59,14 @@ export default function ChatPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: "demo", message: userMsg.content }),
+        body: JSON.stringify({
+          userId: "demo",
+          message: currentInput,
+          history: history.length > 0 ? history : undefined,
+          context: sessionIdRef.current
+            ? { sessionId: sessionIdRef.current }
+            : undefined,
+        }),
         signal: controller.signal,
       });
 
@@ -76,6 +91,10 @@ export default function ChatPage() {
             if (!data) continue;
             try {
               const evt = JSON.parse(data) as StreamEvent;
+              if (evt.type === "done") {
+                sessionIdRef.current = evt.sessionId;
+                continue;
+              }
               setMessages((m) => {
                 const last = m[m.length - 1];
                 if (!last || last.role !== "assistant") return m;

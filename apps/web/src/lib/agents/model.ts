@@ -141,6 +141,49 @@ export async function callModel(
   }
 }
 
+// 带对话历史的调用入口：支持多轮上下文
+export async function callModelWithHistory(
+  systemPrompt: string,
+  userPrompt: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  opts?: ModelCallOptions
+): Promise<string> {
+  const config = readModelConfig();
+  const client = getModelClient(config);
+
+  if (!client) {
+    return demoResponse(userPrompt);
+  }
+
+  try {
+    const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPrompt },
+    ];
+    // 最多保留最近 6 轮（12 条消息），避免 token 溢出
+    const recentHistory = history.slice(-12);
+    for (const msg of recentHistory) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+    messages.push({ role: "user", content: userPrompt });
+
+    const res = await client.chat.completions.create({
+      model: config.modelName,
+      messages,
+      temperature: opts?.temperature ?? 0.3,
+      max_tokens: opts?.maxTokens ?? 1024,
+    });
+
+    const content = res.choices[0]?.message?.content;
+    if (typeof content === "string" && content.trim().length > 0) {
+      return content.trim();
+    }
+
+    return demoResponse(userPrompt, "模型返回为空，已切换演示模式。");
+  } catch {
+    return demoResponse(userPrompt, "模型服务暂不可用，已切换演示模式。");
+  }
+}
+
 // 从模型文本中提取 JSON，兼容纯 JSON、Markdown 代码块和前后带说明文字的输出。
 export function extractJsonPayload(raw: string): string {
   const text = raw.trim();

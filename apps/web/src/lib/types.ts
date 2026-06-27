@@ -102,6 +102,7 @@ export interface AgentResult {
 export interface ChatRequest {
   userId: string;
   message: string;
+  history?: ChatMessage[];
   context?: {
     courseId?: string;
     sessionId?: string;
