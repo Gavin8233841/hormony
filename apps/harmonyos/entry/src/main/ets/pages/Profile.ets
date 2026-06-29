@@ -8,9 +8,9 @@ import { Constants } from '../common/Constants';
 import { StatCard, GradientHeader } from '../common/Builders';
 import { UserProfile } from '../model/DataModels';
 
-@Entry
 @Component
-struct ProfilePage {
+export struct ProfileContent {
+  @Prop embedded: boolean = false;
   @State profile: UserProfile | null = null;
   @State loading: boolean = false;
   @State pressedSection: number = -1;
@@ -47,7 +47,23 @@ struct ProfilePage {
 
   build() {
     Column() {
-      GradientHeader('学习画像', '查看薄弱点和优势', () => this.getUIContext().getRouter().back())
+      if (this.embedded) {
+        Column() {
+          Text('我的')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('你的学习节奏与成长记录')
+            .fontSize(14)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .margin({ top: 6 })
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 22, right: 22, top: 24, bottom: 18 })
+      } else {
+        GradientHeader('学习画像', '查看薄弱点和优势', () => this.getUIContext().getRouter().back())
+      }
 
       if (this.loading) {
         Column() {
@@ -196,5 +212,15 @@ struct ProfilePage {
       .slide(SlideEffect.Left)
     PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
       .slide(SlideEffect.Right)
+  }
+}
+
+@Entry
+@Component
+struct ProfilePage {
+  build() {
+    Column() {
+      ProfileContent()
+    }
   }
 }

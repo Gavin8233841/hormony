@@ -39,19 +39,18 @@ export function StatCard(value: string, label: string, color: ResourceColor) {
 @Builder
 export function TitleBar(title: string, subtitle: string, onBack: () => void) {
   Row() {
-    Text('‹')
-      .fontSize(28)
-      .fontColor(Constants.COLOR_TEXT_PRIMARY)
-      .width(36)
-      .height(36)
-      .textAlign(TextAlign.Center)
+    SymbolGlyph($r('sys.symbol.chevron_left'))
+      .fontSize(22)
+      .fontColor([Constants.COLOR_TEXT_PRIMARY])
+      .width(40)
+      .height(40)
       .onClick(() => {
         onBack();
       })
 
     Column() {
       Text(title)
-        .fontSize(18)
+        .fontSize(22)
         .fontWeight(FontWeight.Bold)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
       if (subtitle.length > 0) {
@@ -66,7 +65,7 @@ export function TitleBar(title: string, subtitle: string, onBack: () => void) {
     .margin({ left: 4 })
   }
   .width('100%')
-  .padding({ left: 8, right: 20, top: 16, bottom: 12 })
+  .padding({ left: 8, right: 20, top: 16, bottom: 14 })
 }
 
 /**
@@ -78,24 +77,23 @@ export function TitleBar(title: string, subtitle: string, onBack: () => void) {
 @Builder
 export function GradientHeader(title: string, subtitle: string, onBack: () => void) {
   Row() {
-    Text('‹')
-      .fontSize(28)
-      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-      .width(36)
-      .height(36)
-      .textAlign(TextAlign.Center)
+    SymbolGlyph($r('sys.symbol.chevron_left'))
+      .fontSize(22)
+      .fontColor([Constants.COLOR_TEXT_PRIMARY])
+      .width(40)
+      .height(40)
       .onClick(() => {
         onBack();
       })
     Column() {
       Text(title)
-        .fontSize(18)
+        .fontSize(22)
         .fontWeight(FontWeight.Bold)
-        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
       if (subtitle.length > 0) {
         Text(subtitle)
           .fontSize(12)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT_SUB)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ top: 2 })
       }
     }
@@ -104,8 +102,8 @@ export function GradientHeader(title: string, subtitle: string, onBack: () => vo
     .margin({ left: 4 })
   }
   .width('100%')
-  .padding({ left: 8, right: 20, top: 16, bottom: 12 })
-  .linearGradient({ angle: 135, colors: [[Constants.COLOR_GRADIENT_START, 0], [Constants.COLOR_GRADIENT_MID, 1]] })
+  .padding({ left: 8, right: 20, top: 16, bottom: 14 })
+  .backgroundColor(Constants.COLOR_BG_PAGE)
 }
 
 /**

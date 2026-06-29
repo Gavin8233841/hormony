@@ -29,47 +29,51 @@ export class Constants {
 
   // 颜色常量（统一收口，禁止页面内硬编码颜色）
   // 文字色
-  static readonly COLOR_TEXT_PRIMARY: string = '#1a1a1a';
-  static readonly COLOR_TEXT_SECONDARY: string = '#929292';
-  static readonly COLOR_TEXT_PLACEHOLDER: string = '#cccccc';
-  static readonly COLOR_TEXT_TERTIARY: string = '#666666';
+  static readonly COLOR_TEXT_PRIMARY: string = '#111827';
+  static readonly COLOR_TEXT_SECONDARY: string = '#6f7a8f';
+  static readonly COLOR_TEXT_PLACEHOLDER: string = '#a7b0c2';
+  static readonly COLOR_TEXT_TERTIARY: string = '#526078';
   // 品牌与功能色
-  static readonly COLOR_BRAND: string = '#0a59f7';
-  static readonly COLOR_SUCCESS: string = '#4caf50';
-  static readonly COLOR_WARNING: string = '#ff9800';
-  static readonly COLOR_ERROR: string = '#e53935';
+  static readonly COLOR_BRAND: string = '#176bff';
+  static readonly COLOR_SUCCESS: string = '#2fb86b';
+  static readonly COLOR_WARNING: string = '#f59e0b';
+  static readonly COLOR_ERROR: string = '#e5484d';
   // 强调色（功能入口左边框）
-  static readonly COLOR_ACCENT_PURPLE: string = '#9c27b0';
-  static readonly COLOR_ACCENT_CYAN: string = '#00bcd4';
+  static readonly COLOR_ACCENT_PURPLE: string = '#7c5cff';
+  static readonly COLOR_ACCENT_CYAN: string = '#16a6b6';
   // 背景色
   static readonly COLOR_BG_CARD: string = '#ffffff';
-  static readonly COLOR_BG_PAGE: string = '#f5f6f8';
-  static readonly COLOR_BG_PROGRESS_TRACK: string = '#e8e8e8';
-  static readonly COLOR_BG_TAG: string = '#f0f0f2';
-  static readonly COLOR_BG_TASK_TAG: string = '#f0f1f3';
+  static readonly COLOR_BG_PAGE: string = '#f4f7fc';
+  static readonly COLOR_BG_PROGRESS_TRACK: string = '#dce4f0';
+  static readonly COLOR_BG_TAG: string = '#eef3fa';
+  static readonly COLOR_BG_TASK_TAG: string = '#eef3fa';
+  static readonly COLOR_BORDER: string = '#e5ebf4';
+  static readonly COLOR_SURFACE_TINT: string = '#f8fbff';
+  static readonly COLOR_NAV_INACTIVE: string = '#778197';
   // 浅色背景（带透明度，用于标签底色）
-  static readonly COLOR_BRAND_LIGHT: string = '#0a59f720';
-  static readonly COLOR_ERROR_LIGHT: string = '#e5393520';
-  static readonly COLOR_SUCCESS_LIGHT: string = '#4caf5020';
+  static readonly COLOR_BRAND_LIGHT: string = '#eaf2ff';
+  static readonly COLOR_ERROR_LIGHT: string = '#fff0f1';
+  static readonly COLOR_SUCCESS_LIGHT: string = '#eaf8ef';
+  static readonly COLOR_WARNING_LIGHT: string = '#fff7e7';
 
   // 阴影色（带透明度的黑色）
-  static readonly SHADOW_CARD: string = '#0a000014';
-  static readonly SHADOW_CARD_LG: string = '#1200001a';
+  static readonly SHADOW_CARD: string = '#120f2748';
+  static readonly SHADOW_CARD_LG: string = '#1a0f2748';
   // 品牌阴影色（用于AI头像等品牌色元素的阴影）
-  static readonly SHADOW_BRAND: string = '#0a59f740';
+  static readonly SHADOW_BRAND: string = '#35176bff';
 
   // 渐变色组（用于头部背景）— 单独定义起止色，页面内组合使用
-  static readonly COLOR_GRADIENT_START: string = '#0a59f7';
-  static readonly COLOR_GRADIENT_MID: string = '#3d7fef';
-  static readonly COLOR_GRADIENT_END: string = '#5a9bf0';
+  static readonly COLOR_GRADIENT_START: string = '#176bff';
+  static readonly COLOR_GRADIENT_MID: string = '#4b91ff';
+  static readonly COLOR_GRADIENT_END: string = '#86b8ff';
 
   // 渐变背景上的文字色
   static readonly COLOR_TEXT_ON_GRADIENT: string = '#ffffff';
   static readonly COLOR_TEXT_ON_GRADIENT_SUB: string = '#ffffffcc';
 
   // 禁用态按钮颜色（避免默认半透明蒙版，提供明确视觉反馈）
-  static readonly COLOR_BUTTON_DISABLED_BG: string = '#d3d7de';
-  static readonly COLOR_BUTTON_DISABLED_TEXT: string = '#929292';
+  static readonly COLOR_BUTTON_DISABLED_BG: string = '#e8edf5';
+  static readonly COLOR_BUTTON_DISABLED_TEXT: string = '#98a3b5';
 
   // 动画时长（毫秒）
   static readonly ANIM_FAST: number = 200;

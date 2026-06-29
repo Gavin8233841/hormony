@@ -6,10 +6,11 @@ import { HttpClient } from '../common/HttpClient';
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { Course, CoursesResponse } from '../model/DataModels';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
-@Entry
 @Component
-struct CoursePage {
+export struct CourseContent {
+  @Prop embedded: boolean = false;
   @State courses: Course[] = [];
   @State loading: boolean = false;
   @State pressedIndex: number = -1;
@@ -41,7 +42,23 @@ struct CoursePage {
 
   build() {
     Column() {
-      GradientHeader('我的课程', '查看课程进度和学习资料', () => this.getUIContext().getRouter().back())
+      if (this.embedded) {
+        Column() {
+          Text('我的课程')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('沿着清晰进度，继续今天的学习')
+            .fontSize(14)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .margin({ top: 6 })
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 22, right: 22, top: 24, bottom: 18 })
+      } else {
+        GradientHeader('我的课程', '查看课程进度和学习资料', () => this.getUIContext().getRouter().back())
+      }
 
       if (this.loading) {
         Column() {
@@ -60,10 +77,22 @@ struct CoursePage {
               Column() {
                 // 课程标题行
                 Row() {
-                  Text(c.title)
-                    .fontSize(17)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  Row({ space: 10 }) {
+                    Stack({ alignContent: Alignment.Center }) {
+                      Column()
+                        .width(42)
+                        .height(42)
+                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                        .borderRadius(13)
+                      SymbolGlyph($r('sys.symbol.book_open_fill'))
+                        .fontSize(22)
+                        .fontColor([Constants.COLOR_BRAND])
+                    }
+                    Text(c.title)
+                      .fontSize(18)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  }
                   Text(c.docCount.toString() + ' 份资料')
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -123,6 +152,12 @@ struct CoursePage {
                   }
                 }
               })
+              .onClick(() => {
+                this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
+                  hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+                    'CourseContent router.pushUrl failed: %{public}s', err.message);
+                });
+              })
             }
           })
         }
@@ -144,5 +179,15 @@ struct CoursePage {
       .slide(SlideEffect.Left)
     PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
       .slide(SlideEffect.Right)
+  }
+}
+
+@Entry
+@Component
+struct CoursePage {
+  build() {
+    Column() {
+      CourseContent()
+    }
   }
 }

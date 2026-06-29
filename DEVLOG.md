@@ -3030,3 +3030,40 @@ Loop第23-25轮: 后端P2清理 + deprecated API迁移 + HttpClient修复 + 全�
 - Canva：保留给后续竞赛展示材料和演示文档，不用于决定原生客户端结构。
 - GitHub：用于核对上游来源、文件路径、维护状态和许可证。
 
+---
+
+## [2026-06-30T02:27:30+08:00] 模型: Codex
+
+### 原生端侧前端框架落地
+
+- 按用户选定的高品质浅色方向重构 HarmonyOS 首页，不再沿用 Web 仪表盘式首页。
+- 新增 `HomeContent.ets`，实现品牌头部、通知、当前课程、今日计划、快速提问与 API 数据回退。
+- `Index.ets` 改为“今日 / 课程 / 学伴 / 我的”四入口原生壳层；底栏使用 HarmonyOS Symbol、选中态动画和有限的材质模糊。
+- `Chat.ets`、`Course.ets`、`Profile.ets` 提供可嵌入主壳层的内容组件，同时保留原有独立路由入口。
+- 修复底栏覆盖层拦截页面点击的问题：导航覆盖容器使用 `HitTestMode.Transparent`，底栏条目自身仍可交互。
+- 课程卡进入知识库的路由失败改为写入 `hilog`，避免空处理掩盖故障。
+- 新增 `PRODUCT.md` 与 `DESIGN.md`，固定产品定位、端侧信息架构、颜色、间距、圆角、图标、交互和协作边界。
+
+### 参考图原则落实
+
+- 采用克制用色：品牌蓝仅用于当前状态和主操作，完成态使用语义绿，其余标签与未选导航统一为中性灰。
+- 将松散功能列表收敛为课程、计划、提问三个任务组；卡片只承载一个明确目标。
+- 内容卡圆角收敛到 16 vp，悬浮底栏为 20 vp；取消“可见描边 + 重阴影”，阴影半径降至 8 vp。
+- 章节信息由侧色条改为紧凑浅蓝信息组；玻璃材质仅保留在底部导航。
+- 继续使用已核实的 HarmonyOS Symbol，不引入第三方 UI 运行依赖，不用表情或文本符号冒充图标。
+
+### DevEco 与运行态验收
+
+- 设备：Pura 90 Pro Max HVD；显示 1256 x 2760 px、虚拟尺寸 358 x 788 vp、density 3.5，分辨率恢复正常。
+- `project_sync` 通过；`entry@default` debug 构建 `BUILD SUCCESSFUL`，`CompileArkTS` 与 `PackageHap` 完成。
+- `check_ets_files` 独立通道持续返回 `Failed to flush stdin: 管道正在被关闭 (os error 232)`；完整 ArkTS 编译成功，记录为工具通道问题，不伪报静态检查通过。
+- 通过 UI 树逐项确认：通知展开、头像进入“我的”、继续学习进入课程、计划页往返、四入口切换、课程进入知识库并返回、快速提问预填保留。
+- 启动 Web 服务后，模拟器真实调用 `POST /api/chat` 返回 200；端侧完整显示二叉搜索树回答、资料依据与 3 条参考资料。
+- 主要证据：`screenshots/codex-home-final-pass2-20260630.png`、`screenshots/codex-chat-sse-passed-20260630.png` 及对应 UI 树目录。
+
+### 设计 QA
+
+- 生成同屏对照 `screenshots/codex-home-reference-comparison-20260630.png`。
+- `design-qa.md` 最终结果为 `passed`：无 P0/P1/P2；专属 3D 课程插画记为后续 P3 增强，不阻断端侧框架。
+- DevEco Code CLI 继续限定为明确文件、只读审查工具；本轮核心实现、构建和运行验收由 Codex 与 DevEco MCP/HDC 完成。
+

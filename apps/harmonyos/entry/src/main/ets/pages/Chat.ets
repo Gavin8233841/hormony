@@ -18,9 +18,10 @@ interface DisplayMessage {
   citationExpanded: boolean;
 }
 
-@Entry
 @Component
-struct Chat {
+export struct ChatContent {
+  @Prop embedded: boolean = false;
+  @Prop quickQuestion: string = '';
   @State messages: DisplayMessage[] = [];
   @State inputText: string = '';
   @State loading: boolean = false;
@@ -35,6 +36,12 @@ struct Chat {
     '动态规划的基本思想',
     '进程和线程的区别',
   ];
+
+  aboutToAppear(): void {
+    if (this.quickQuestion.trim().length > 0) {
+      this.inputText = this.quickQuestion.trim();
+    }
+  }
 
   aboutToDisappear() {
     this.isCancelled = true;
@@ -63,22 +70,36 @@ struct Chat {
 
   build() {
     Column() {
-      GradientHeader('AI 辅导', '', () => this.getUIContext().getRouter().back())
+      if (this.embedded) {
+        Column() {
+          Text('学伴')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('基于课程资料，为每个问题给出依据')
+            .fontSize(14)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .margin({ top: 6 })
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 22, right: 22, top: 24, bottom: 12 })
+      } else {
+        GradientHeader('AI 辅导', '', () => this.getUIContext().getRouter().back())
+      }
 
       // 消息列表 / 欢迎页
       if (this.messages.length === 0) {
         // 欢迎引导
         Column() {
           // AI 头像
-          Text('AI')
+          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
             .width(56)
             .height(56)
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .backgroundColor(Constants.COLOR_BRAND)
+            .fontSize(26)
+            .fontColor([Constants.COLOR_BRAND])
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
             .borderRadius(28)
-            .textAlign(TextAlign.Center)
             .shadow({ radius: 12, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 4 })
 
           Text('你好，我是鸿学伴 AI 助教')
@@ -162,11 +183,15 @@ struct Chat {
             this.sendMessage();
           })
 
-        Button('发送')
-          .fontSize(14)
+        Button() {
+          SymbolGlyph($r('sys.symbol.paperplane_right_fill'))
+            .fontSize(20)
+            .fontColor([this.canSend ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT])
+        }
+          .width(44)
+          .height(44)
           .backgroundColor(this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
-          .fontColor(this.canSend ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-          .borderRadius(Constants.RADIUS_MD)
+          .borderRadius(22)
           .enabled(this.canSend)
           .onClick(() => {
             this.sendMessage();
@@ -284,15 +309,13 @@ struct Chat {
         // AI 消息（带头像）
         Row({ space: 8 }) {
           // AI 头像
-          Text('AI')
+          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
             .width(32)
             .height(32)
-            .fontSize(11)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .backgroundColor(Constants.COLOR_BRAND)
+            .fontSize(16)
+            .fontColor([Constants.COLOR_BRAND])
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
             .borderRadius(16)
-            .textAlign(TextAlign.Center)
 
           Column() {
             Text(msg.content.length > 0 ? msg.content : '思考中...')
@@ -353,5 +376,15 @@ struct Chat {
       .slide(SlideEffect.Left)
     PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
       .slide(SlideEffect.Right)
+  }
+}
+
+@Entry
+@Component
+struct Chat {
+  build() {
+    Column() {
+      ChatContent()
+    }
   }
 }
