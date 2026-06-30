@@ -27,12 +27,12 @@ chcp 65001 > $null
 | 项目 | 值 |
 |------|------|
 | 团队 | `gwyy8233841` |
-| 目标项目名 | `hongxueban-agent-api` |
+| 项目名 | `hormony` |
 | 部署目录 | `apps/web` |
 | 框架 | Next.js（自动检测） |
-| Vercel 插件项目列表 | 0 个项目（2026-07-01 01:25 CST 实测） |
-| 历史 URL | 两个历史地址的 `/api/health` 均返回 404，不能作为可用部署 |
-| Production URL | 待真实生产部署成功后记录 |
+| 项目 ID 复核 | `prj_pEkBHRQqLMyNulhHyrKX01YRrLzh` |
+| Production URL | `https://hormony-ruddy.vercel.app` |
+| 生产健康检查 | `ready` / `model` / `stateless` |
 
 ## Token 认证方式
 

@@ -24,7 +24,7 @@ export async function runPlannerAgent(
 每日可用时间：${dailyMinutes} 分钟
 请生成 ${Math.min(durationDays, 10)} 个关键任务。`;
 
-  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.4 });
+  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.4, maxTokens: 1200 });
 
   const tasks = parseTasks(raw);
   if (tasks.length === 0) {

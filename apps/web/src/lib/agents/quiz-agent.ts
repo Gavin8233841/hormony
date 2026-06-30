@@ -21,7 +21,7 @@ export async function runQuizAgent(
 难度：${difficulty}
 数量：${count}`;
 
-  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5, maxTokens: 1800 });
+  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5, maxTokens: 1500 });
   const questions = parseQuestions(raw, count);
   if (questions.length !== count) {
     throw new Error("MODEL_INVALID_RESPONSE: 题目数量或结构不符合要求");

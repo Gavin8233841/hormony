@@ -2,7 +2,7 @@
 
 > **2026-07-01 Codex 纠正**：本文创建时将另一项目的 Render 配置误认为鸿学伴已部署。本项目当时没有公网 API 地址，当前批准方案为 Vercel Hobby 无状态真实 Agent 网关 + HarmonyOS ArkData 本地状态。下文“云端服务器已配置”及持久卷相关判断不再作为当前事实。
 
-> **2026-07-01 01:25 Codex 实测**：Vercel 插件在团队 `GWYY` 下返回 0 个项目；`apps/web/.vercel/project.json` 仅是本地链接文件，不能证明项目已在云端创建。首次部署、公网 URL 和生产环境变量仍未完成。Vercel CLI 设备登录受 Windows 中文主机名 ByteString 问题阻塞，必须使用用户在交互终端隐藏提供的 Vercel Token。下文“Token 认证完成”“项目创建”均为 Trae 未经平台复核的旧记录。
+> **2026-07-01 05:10 Codex 实测**：通过项目 ID 复核确认 Vercel 项目 `hormony` 已存在，生产域名为 `https://hormony-ruddy.vercel.app`。提交 `745921d` 已生产部署，`/api/health` 返回 `ready/model/stateless`，聊天 SSE 真实豆包调用成功；计划与出题首次联调因 SDK 默认重试叠加深度推理超过 60 秒，正在以“关闭深度思考 + 禁用自动重试”修复。旧 Token 曾被 Trae 写入未跟踪文档，已脱敏并要求轮换。
 
 > 创建时间：2026-07-01 00:00 CST
 > 创建者：Trae（Claude in TRAE Work）
@@ -20,7 +20,7 @@
 | **云平台** | Vercel（Hobby 免费层） |
 | **认证方式** | Token（`vcp_` 前缀，已通过 `npx vercel --token` 完成认证） |
 | **团队** | GWYY |
-| **项目名** | `harmony`（必须全小写，首次用 `Harmony` 报错 400） |
+| **项目名** | `hormony`（项目 ID `prj_pEkBHRQqLMyNulhHyrKX01YRrLzh`） |
 | **框架检测** | Next.js（Vercel 自动识别，默认 Build Command = `next build`） |
 | **部署目录** | `apps/web` |
 | **Docker** | 仅保留本地复现，不再作为生产前提 |
@@ -28,14 +28,14 @@
 ### 部署状态
 
 - [x] Vercel 账户已具备
-- [ ] Token 认证在当前 Codex 进程可用
-- [ ] 项目创建并经 Vercel 项目列表复核
+- [x] 使用轮换后的 Token 完成生产部署（Token 不落盘）
+- [x] 项目经项目 ID 复核
 - [x] 框架自动检测（Next.js）
-- [ ] 首次部署成功（因项目名大写报错 400，已修正为小写后重试中）
-- [ ] 获得公网 HTTPS URL
-- [ ] 环境变量配置（`MODEL_API_KEY`、`MODEL_BASE_URL`、`MODEL_NAME`）
-- [ ] `Constants.ets` 的 `BASE_URL` 替换为 Vercel URL
-- [ ] CORS 白名单添加 Vercel 域名
+- [x] 提交 `745921d` 生产部署成功
+- [x] 公网 HTTPS URL：`https://hormony-ruddy.vercel.app`
+- [x] 生产模型与无状态环境变量已配置
+- [x] `Constants.ets` 的 `BASE_URL` 已替换为 Vercel URL
+- [x] 原生 App 请求无浏览器 Origin，不需要为 HAP 添加 CORS 域名
 
 ### Vercel 部署已知问题
 

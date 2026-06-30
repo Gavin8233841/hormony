@@ -1,6 +1,7 @@
 // 模型客户端：OpenAI 兼容接口。生产路径不提供伪造模型回退。
 
 import OpenAI from "openai";
+import type { ChatCompletionCreateParamsNonStreaming } from "openai/resources/chat/completions";
 
 const DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const DEFAULT_MODEL_NAME = "doubao-seed-2-1-pro-260628";
@@ -39,6 +40,12 @@ export class ModelInvalidResponseError extends Error {
 
 interface ModelConfig extends ModelRuntimeInfo {
   apiKey: string;
+}
+
+interface ArkChatCompletionRequest extends ChatCompletionCreateParamsNonStreaming {
+  thinking: {
+    type: "disabled";
+  };
 }
 
 let cachedClient: OpenAI | null = null;
@@ -105,6 +112,7 @@ function getModelClient(config: ModelConfig): OpenAI | null {
       apiKey: config.apiKey,
       baseURL: config.baseURL,
       timeout: config.timeoutMs,
+      maxRetries: 0,
     });
     cachedClientKey = cacheKey;
   }
@@ -147,7 +155,7 @@ export async function callModel(
   }
 
   try {
-    const res = await client.chat.completions.create({
+    const request: ArkChatCompletionRequest = {
       model: config.modelName,
       messages: [
         { role: "system", content: systemPrompt },
@@ -155,7 +163,9 @@ export async function callModel(
       ],
       temperature: opts?.temperature ?? 0.3,
       max_tokens: Math.min(Math.max(opts?.maxTokens ?? 1024, 128), 2048),
-    });
+      thinking: { type: "disabled" },
+    };
+    const res = await client.chat.completions.create(request);
 
     const content = res.choices[0]?.message?.content;
     if (typeof content === "string" && content.trim().length > 0) {
@@ -199,12 +209,14 @@ export async function callModelWithHistory(
     }
     messages.push({ role: "user", content: userPrompt });
 
-    const res = await client.chat.completions.create({
+    const request: ArkChatCompletionRequest = {
       model: config.modelName,
       messages,
       temperature: opts?.temperature ?? 0.3,
       max_tokens: Math.min(Math.max(opts?.maxTokens ?? 1024, 128), 2048),
-    });
+      thinking: { type: "disabled" },
+    };
+    const res = await client.chat.completions.create(request);
 
     const content = res.choices[0]?.message?.content;
     if (typeof content === "string" && content.trim().length > 0) {

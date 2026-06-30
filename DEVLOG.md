@@ -3601,3 +3601,23 @@ Vercel 部署配置与信息同步 — 确定云平台为 Vercel，完成认证�
 - 在 Vercel 隐藏录入 Token 与 `MODEL_API_KEY`，创建并部署项目，写入非敏感生产变量。
 - 真实豆包联调五个公网接口后，将 HTTPS URL 写入 `Constants.ets`，重建并完成断网/重启/服务卡片端到端验收。
 
+---
+
+## [2026-06-30T21:10:00Z] [2026-07-01 05:10:00 CST] 模型: Codex
+
+### Vercel 生产联调
+
+- 通过 Vercel 项目 ID 确认现有项目名为 `hormony`，生产域名为 `https://hormony-ruddy.vercel.app`。
+- 用户在安全交互窗口轮换并隐藏输入 Vercel Token 与豆包 Key；凭据未写入文件或命令日志。
+- 提交 `745921d` 生产部署 READY；健康检查返回 `200 ready/model/stateless`，聊天 SSE 返回真实 `delta` 与 `done`，有状态画像接口返回 `404`。
+- 首次计划与出题请求被 Vercel 60 秒终止。运行日志确认 SDK 默认重试与模型深度推理造成总时长越界。
+- 依据火山方舟官方 Chat API 能力，在模型请求中设置 `thinking.type=disabled`，并将 OpenAI SDK `maxRetries` 设为 0；计划与出题输出预算分别收口至 1200/1500 Token，仍保持真实模型生成。
+
+### App 主线与分工
+
+- `Constants.ets` 已指向 Vercel 生产 HTTPS 地址，HAP 重新构建成功。
+- 新增 `APP-LEARNING-LOOP-ROADMAP.md`：定义课程、练习、反馈、错题、间隔复习、掌握度和成就的真实学习闭环。
+- 明确所有进度、连续学习和成就必须由 ArkData 学习事件推导，禁止写死展示值。
+- 新增 `TRAE-NEXT-WORK-PACKAGE.md` 并已在 Trae Work 创建独立任务：先执行页面差距矩阵、竞品证据、端侧课程/题库/资源资产转换和页面规格。
+- 更新 Trae 边界：CLI 可完成时优先 CLI，必要时再用 DevEco MCP；Web 仅作为无状态网关，开发重心为 HarmonyOS App。
+

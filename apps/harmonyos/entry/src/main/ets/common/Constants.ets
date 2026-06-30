@@ -7,7 +7,7 @@ export class Constants {
   // Web 后端地址
   // 模拟器访问宿主机：http://10.0.2.2:3000
   // 真机调试：http://<电脑局域网IP>:3000
-  static readonly BASE_URL: string = 'http://10.0.2.2:3000';
+  static readonly BASE_URL: string = 'https://hormony-ruddy.vercel.app';
 
   // API 路径
   static readonly API_CHAT: string = '/api/chat';
