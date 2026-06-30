@@ -189,12 +189,24 @@ describe("Store 数据存储", () => {
   describe("Activity 操作", () => {
     it("logActivity 应记录活动", () => {
       store.logActivity({
+        userId: "demo",
         type: "study",
         description: "测试活动记录",
         timestamp: new Date().toISOString(),
       });
       const stats = store.getStats("demo");
       expect(stats.recentActivity.some((a) => a.description === "测试活动记录")).toBe(true);
+    });
+
+    it("getStats 不应返回其他用户的活动", () => {
+      store.logActivity({
+        userId: "other_user",
+        type: "study",
+        description: "其他用户活动",
+        timestamp: new Date().toISOString(),
+      });
+      const stats = store.getStats("demo");
+      expect(stats.recentActivity.some((a) => a.description === "其他用户活动")).toBe(false);
     });
   });
 });

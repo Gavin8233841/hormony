@@ -2,7 +2,7 @@
 // 支持单条文本上传，自动分块存储
 
 import { store } from "@/lib/store/db";
-import { generateId } from "@/lib/utils";
+import { generateId, sanitizeUserId } from "@/lib/utils";
 import { invalidateRagCache } from "@/lib/rag";
 import type { KnowledgeUploadRequest, KnowledgeChunk } from "@/lib/types";
 
@@ -61,6 +61,7 @@ export async function POST(req: Request) {
     }
 
     const courseId = String(body.courseId ?? "").trim();
+    const userId = sanitizeUserId(body.userId);
     const source = String(body.source ?? "").trim();
     const text = String(body.text ?? "").trim();
 
@@ -93,6 +94,7 @@ export async function POST(req: Request) {
     // 文档变更：清除 RAG 索引缓存，下次检索按新文档集重建
     invalidateRagCache();
     store.logActivity({
+      userId,
       type: "study",
       description: `上传知识资料：${source}（${chunks.length} 个切片）`,
       timestamp: new Date().toISOString(),

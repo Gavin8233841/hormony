@@ -188,6 +188,7 @@ export interface DashboardStats {
 }
 
 export interface RecentActivity {
+  userId: string;
   type: "chat" | "quiz" | "plan" | "study";
   description: string;
   timestamp: string;
@@ -208,6 +209,7 @@ export interface ConversationRecord {
 // ========== 知识上传 ==========
 
 export interface KnowledgeUploadRequest {
+  userId?: string;
   courseId: string;
   source: string;
   text: string;

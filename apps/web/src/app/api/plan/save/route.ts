@@ -51,6 +51,7 @@ export async function POST(req: Request) {
 
   store.savePlan(plan);
   store.logActivity({
+    userId,
     type: "plan",
     description: `保存学习计划：${goal.slice(0, 40)}`,
     timestamp: new Date().toISOString(),
@@ -85,6 +86,7 @@ export async function PATCH(req: Request) {
     const task = plan.tasks.find((item) => item.id === taskId);
     if (task) {
       store.logActivity({
+        userId,
         type: "plan",
         description: `完成任务：${task.title.slice(0, 40)}`,
         timestamp: new Date().toISOString(),

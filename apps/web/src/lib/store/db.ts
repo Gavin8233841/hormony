@@ -3,6 +3,7 @@
 
 import type { UserProfile, Course, StudyPlan, Quiz, KnowledgeChunk, QuizResult, ConversationRecord, DashboardStats, RecentActivity, ExternalResource } from "@/lib/types";
 import { allKnowledgeChunks, allQuizzes, externalResources } from "@/lib/data";
+import { loadPersistedState, savePersistedState } from "@/lib/store/persistence";
 
 interface DB {
   curriculumDataVersion?: string;
@@ -37,6 +38,24 @@ const db: DB = globalThis.__APP_DB__ ?? {
 
 if (!Array.isArray(db.externalResources)) {
   db.externalResources = [];
+}
+
+if (!globalThis.__APP_DB__) {
+  const persisted = loadPersistedState();
+  if (persisted) {
+    db.profiles = new Map(persisted.profiles.map((profile) => [profile.userId, profile]));
+    db.courses = new Map(
+      persisted.courseGroups.map((group) => [group.userId, group.courses])
+    );
+    db.plans = new Map(persisted.plans.map((plan) => [plan.userId, plan]));
+    db.quizzes = new Map(
+      persisted.generatedQuizzes.map((quiz) => [quiz.quizId, quiz])
+    );
+    db.knowledge = [...persisted.uploadedKnowledge];
+    db.quizResults = [...persisted.quizResults];
+    db.conversations = [...persisted.conversations];
+    db.activityLog = [...persisted.activityLog];
+  }
 }
 
 if (!globalThis.__APP_DB__) {
@@ -100,14 +119,14 @@ function seedDemoData() {
 
   // 演示活动记录
   db.activityLog = [
-    { type: "chat", description: "提问：什么是二叉搜索树", timestamp: new Date(Date.now() - 3600000).toISOString() },
-    { type: "quiz", description: "完成测验：4/5 题正确", timestamp: new Date(Date.now() - 7200000).toISOString() },
-    { type: "plan", description: "完成任务：练习栈与队列题目", timestamp: new Date(Date.now() - 10800000).toISOString() },
-    { type: "study", description: "检索知识库：动态规划", timestamp: new Date(Date.now() - 86400000).toISOString() },
-    { type: "chat", description: "提问：TCP 三次握手过程", timestamp: new Date(Date.now() - 172800000).toISOString() },
-    { type: "quiz", description: "完成测验：3/5 题正确", timestamp: new Date(Date.now() - 259200000).toISOString() },
-    { type: "plan", description: "保存学习计划：两周复习数据结构", timestamp: new Date(Date.now() - 345600000).toISOString() },
-    { type: "study", description: "上传知识：操作系统.pdf", timestamp: new Date(Date.now() - 432000000).toISOString() },
+    { userId: "demo", type: "chat", description: "提问：什么是二叉搜索树", timestamp: new Date(Date.now() - 3600000).toISOString() },
+    { userId: "demo", type: "quiz", description: "完成测验：4/5 题正确", timestamp: new Date(Date.now() - 7200000).toISOString() },
+    { userId: "demo", type: "plan", description: "完成任务：练习栈与队列题目", timestamp: new Date(Date.now() - 10800000).toISOString() },
+    { userId: "demo", type: "study", description: "检索知识库：动态规划", timestamp: new Date(Date.now() - 86400000).toISOString() },
+    { userId: "demo", type: "chat", description: "提问：TCP 三次握手过程", timestamp: new Date(Date.now() - 172800000).toISOString() },
+    { userId: "demo", type: "quiz", description: "完成测验：3/5 题正确", timestamp: new Date(Date.now() - 259200000).toISOString() },
+    { userId: "demo", type: "plan", description: "保存学习计划：两周复习数据结构", timestamp: new Date(Date.now() - 345600000).toISOString() },
+    { userId: "demo", type: "study", description: "上传知识：操作系统.pdf", timestamp: new Date(Date.now() - 432000000).toISOString() },
   ];
 
   // 演示会话历史
@@ -164,11 +183,12 @@ function seedDemoData() {
 }
 
 const CURRICULUM_DATA_VERSION = "2026-06-30-1";
+const seedChunkIds = new Set(allKnowledgeChunks.map((chunk) => chunk.id));
+const seedQuizIds = new Set(allQuizzes.map((quiz) => quiz.quizId));
 
 function syncCurriculumData(): void {
   if (db.curriculumDataVersion === CURRICULUM_DATA_VERSION) return;
 
-  const seedChunkIds = new Set(allKnowledgeChunks.map((chunk) => chunk.id));
   const uploadedChunks = db.knowledge.filter((chunk) => !seedChunkIds.has(chunk.id));
   db.knowledge = [...allKnowledgeChunks, ...uploadedChunks];
 
@@ -178,6 +198,24 @@ function syncCurriculumData(): void {
 
   db.externalResources = [...externalResources];
   db.curriculumDataVersion = CURRICULUM_DATA_VERSION;
+}
+
+function persistState(): void {
+  savePersistedState({
+    profiles: Array.from(db.profiles.values()),
+    courseGroups: Array.from(db.courses.entries()).map(([userId, courses]) => ({
+      userId,
+      courses,
+    })),
+    plans: Array.from(db.plans.values()),
+    generatedQuizzes: Array.from(db.quizzes.values()).filter(
+      (quiz) => !seedQuizIds.has(quiz.quizId)
+    ),
+    uploadedKnowledge: db.knowledge.filter((chunk) => !seedChunkIds.has(chunk.id)),
+    quizResults: db.quizResults,
+    conversations: db.conversations,
+    activityLog: db.activityLog,
+  });
 }
 
 // 仅在首次创建时初始化演示数据
@@ -196,6 +234,7 @@ export const store = {
     if (!existing) return undefined;
     const updated = { ...existing, ...updates };
     db.profiles.set(userId, updated);
+    persistState();
     return updated;
   },
 
@@ -207,6 +246,7 @@ export const store = {
     const courses = db.courses.get(userId) ?? [];
     courses.push(course);
     db.courses.set(userId, courses);
+    persistState();
   },
 
   // ========== Knowledge ==========
@@ -218,11 +258,13 @@ export const store = {
     if (db.knowledge.length > 500) {
       db.knowledge = db.knowledge.slice(-500);
     }
+    persistState();
   },
 
   // ========== Plans ==========
   savePlan(plan: StudyPlan) {
     db.plans.set(plan.userId, plan);
+    persistState();
   },
   getPlan(userId: string): StudyPlan | undefined {
     return db.plans.get(userId);
@@ -233,12 +275,14 @@ export const store = {
     const task = plan.tasks.find((t) => t.id === taskId);
     if (!task) return undefined;
     task.done = done;
+    persistState();
     return plan;
   },
 
   // ========== Quiz ==========
   saveQuiz(quiz: Quiz) {
     db.quizzes.set(quiz.quizId, quiz);
+    persistState();
   },
   getQuiz(quizId: string): Quiz | undefined {
     return db.quizzes.get(quizId);
@@ -269,10 +313,12 @@ export const store = {
     }
     // 记录活动
     db.activityLog.unshift({
+      userId: result.userId,
       type: "quiz",
       description: `完成测验：${result.correctCount}/${result.totalQuestions} 题正确`,
       timestamp: result.submittedAt,
     });
+    persistState();
   },
   getQuizResults(userId: string): QuizResult[] {
     return db.quizResults.filter((r) => r.userId === userId);
@@ -285,10 +331,12 @@ export const store = {
       db.conversations = db.conversations.slice(0, 100);
     }
     db.activityLog.unshift({
+      userId: record.userId,
       type: "chat",
       description: record.message.slice(0, 50),
       timestamp: record.createdAt,
     });
+    persistState();
   },
   getConversations(userId: string, limit = 20): ConversationRecord[] {
     return db.conversations.filter((c) => c.userId === userId).slice(0, limit);
@@ -312,7 +360,9 @@ export const store = {
       totalTasks,
       completedTasks,
       totalQuizSubmissions: quizResults.length,
-      recentActivity: db.activityLog.slice(0, 10),
+      recentActivity: db.activityLog
+        .filter((activity) => activity.userId === userId)
+        .slice(0, 10),
     };
   },
 
@@ -322,6 +372,7 @@ export const store = {
     if (db.activityLog.length > 50) {
       db.activityLog = db.activityLog.slice(0, 50);
     }
+    persistState();
   },
 
   // ========== External Resources ==========

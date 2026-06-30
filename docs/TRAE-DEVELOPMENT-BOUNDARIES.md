@@ -189,10 +189,14 @@ chore: <短任务描述>
 
 ### 下一批低风险任务
 
-1. 读取 `apps/web/src/lib/data/quizzes.ts` 和 `data-integrity.test.ts`，统计三门课程各自选择题数量。
-2. 将每门课程的选择题补到至少 20 道；ID、题干必须全局唯一，答案必须对应 `A/B/C/D` 选项，解析不少于两句。
-3. 题目只能写入 `quizzes.ts`，不得修改类型、Agent、API、Store 或 ArkTS。
-4. 运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`，追加 `DEVLOG.md`，不提交 Git，交由 Codex 复核。
+题库扩量任务已于提交 `32cdec0` 完成。下一批执行外部学习资源审计：
+
+1. 逐条检查 `external-resources.ts` 的 36 个 URL，确认可访问、域名属于官方机构或出版方、标题与落地页一致。
+2. 具体教材或课程不得只链接平台首页；能找到官方详情页时改为详情页。
+3. 新建 `docs/RESOURCE-AUDIT-20260630.md`，记录资源 ID、最终 URL、HTTP 结果、官方归属和处理结论。
+4. 只允许修改 `external-resources.ts`、`data-integrity.test.ts`、新审计文档和追加 `DEVLOG.md`。
+5. 增加资源 ID、标题、URL 全局唯一测试；不得修改类型、Agent、API、Store、ArkTS、依赖和导航。
+6. 运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`git diff --check`；不提交 Git，交由 Codex 复核。
 
 ---
 

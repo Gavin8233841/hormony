@@ -49,6 +49,7 @@ export async function PUT(req: Request) {
 
   // 记录活动
   store.logActivity({
+    userId,
     type: "study",
     description: `更新学习画像：${Object.keys(updates).join("、")}`,
     timestamp: new Date().toISOString(),

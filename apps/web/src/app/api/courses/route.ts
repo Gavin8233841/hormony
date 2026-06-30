@@ -51,6 +51,7 @@ export async function POST(req: Request) {
   try {
     store.addCourse(userId, course);
     store.logActivity({
+      userId,
       type: "study",
       description: `添加课程：${title}`,
       timestamp: new Date().toISOString(),

@@ -27,7 +27,7 @@
 │           ├── lib/
 │           │   ├── agents/     # 7 个智能体
 │           │   ├── rag/        # TF-IDF 检索引擎
-│           │   ├── store/      # 内存数据存储
+│           │   ├── store/      # 内存索引 + JSON 用户状态快照
 │           │   └── types.ts    # TypeScript 类型定义
 │           └── middleware.ts   # 安全中间件
 │

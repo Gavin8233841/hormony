@@ -3264,6 +3264,25 @@ HEAD `0235baf`（feat: 打通知识题库与原生测验闭环）后，程序化
 - 5 个相关 ArkTS 文件经 DevEco MCP 检查无诊断，`entry@default` debug 构建成功。
 - 计划生命周期测试 2/2 通过，Web TypeScript 检查通过。
 - 按新协作边界仅进行代码级与构建级验收，视觉总验收留到下一大阶段统一执行。
+
+---
+
+## [2026-06-30T18:47:34+08:00] 模型: Codex
+
+### 用户状态持久化底层
+
+- 新增 `store/persistence.ts`，以版本化 JSON 快照保存用户画像、课程、计划、动态测验、答题结果、对话、活动和上传知识。
+- 内置知识切片、预置题库和资源索引保持只读，不重复写入运行时文件；Store 对外方法保持不变。
+- 快照默认写入 `apps/web/.runtime/hongxueban-state.json`，测试环境默认关闭，可通过 `APP_STATE_FILE` 和 `APP_STATE_PERSISTENCE` 配置。
+- 所有 Store 写操作接入快照；服务启动时先恢复用户状态，再同步当前版本静态课程资产。
+- 活动记录新增 `userId`，统计接口只返回当前用户活动，修复跨用户活动串线。
+- CORS 方法补齐 PATCH 与 PUT，支持计划打卡和画像更新。
+
+### 验证与分工
+
+- Web lint、typecheck、81/81 测试和生产构建通过。
+- 生产服务完成两次计划状态写入，并在进程重启后恢复原状态，`STATE_FILE_EXISTS=True`、`RESTART_RESTORED=True`。
+- Trae 下一批只执行 36 条外部资源直达链接与官方归属审计，不修改核心状态、Agent 或端侧架构。
 | Git diff | `git diff --check` | exit code 0（仅 CRLF 警告，无空白错误） |
 | Git status | `git status --short` | 仅 quizzes.ts、data-integrity.test.ts、DEVLOG.md 三个文件变更 |
 
