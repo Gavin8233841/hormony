@@ -87,10 +87,20 @@ describe("课程数据资产完整性", () => {
 
   it("外部资源应使用受支持类型、HTTPS 地址和有效课程关联", () => {
     const ids = new Set<string>();
+    const titles = new Set<string>();
+    const urls = new Set<string>();
 
     for (const resource of externalResources) {
       expect(ids.has(resource.id)).toBe(false);
       ids.add(resource.id);
+      // 标题全局唯一
+      const titleKey = resource.title.trim();
+      expect(titles.has(titleKey)).toBe(false);
+      titles.add(titleKey);
+      // URL 全局唯一
+      const urlKey = resource.url.trim();
+      expect(urls.has(urlKey)).toBe(false);
+      urls.add(urlKey);
       expect(EXTERNAL_RESOURCE_TYPES).toContain(resource.type);
       expect(new URL(resource.url).protocol).toBe("https:");
       expect(resource.description.trim().length).toBeGreaterThanOrEqual(30);

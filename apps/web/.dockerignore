@@ -1,0 +1,8 @@
+.git
+.next
+.runtime
+node_modules
+.env*
+*.log
+*.tsbuildinfo
+BACKEND_*_DEVLOG.md

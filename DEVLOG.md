@@ -3238,6 +3238,68 @@ HEAD `0235baf`（feat: 打通知识题库与原生测验闭环）后，程序化
 
 ---
 
+## [2026-06-30T11:09:00Z] [2026-06-30 19:09:00 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+36 条外部资源全量审计 — 逐条核验 URL 可访问性、官方归属、详情页一致性和标题准确性
+
+#### 审计方法
+
+启动 3 个并行研究子代理（每组 12 条），通过 WebFetch 逐条访问 URL + WebSearch 核验官方归属与详情页。对 4 条平台首页资源搜索并验证正确的详情页 URL。
+
+#### 审计结果
+
+| 指标 | 结果 |
+|------|------|
+| 资源总数 | 36 |
+| URL 可访问 | 36/36 |
+| 官方归属正确 | 36/36 |
+| 标题与落地页一致 | 36/36 |
+| 平台首页（已修复） | 4 条（res_04, res_10, res_25, res_26） |
+| 标题/描述微调 | 2 条（res_21 课程号更新, res_24 标题对齐 URL） |
+| URL 后缀统一 | 1 条（res_16 补 .html） |
+| 保留不变 | 28 条 |
+
+#### 修改清单（7 条资源）
+
+| 资源 ID | 修改类型 | 修改内容 |
+|---------|---------|---------|
+| res_04 | URL 替换 | 清华大学出版社首页 → ISBN 9787302023685 书籍详情页 |
+| res_10 | URL 替换 | 电子工业出版社首页 → bookid=70139 书籍详情页（第9版） |
+| res_16 | URL 后缀统一 | `/rfc/rfc768` → `/rfc/rfc768.html` |
+| res_21 | 标题更新 | `MIT 6.828` → `MIT 6.1810（原 6.828）`（MIT 已重新编号） |
+| res_24 | 标题+描述更新 | `Part I & II` → `Part I`（URL 仅覆盖 Part I，描述注明 Part II 需单独选课） |
+| res_25 | URL 替换 | 中国大学MOOC 平台首页 → 浙江大学陈越《数据结构》课程详情页（cid=93001） |
+| res_26 | URL 替换 | 极客时间平台首页 → 王争《数据结构与算法之美》专栏详情页（intro/100017301） |
+
+#### 新增测试覆盖
+
+在 `data-integrity.test.ts` 外部资源测试中新增：
+- 资源标题（`title`）全局唯一断言
+- 资源 URL 全局唯一断言
+
+#### 修改文件
+
+| 文件 | 修改类型 | 内容 |
+|------|---------|------|
+| `apps/web/src/lib/data/external-resources.ts` | 修改 | 7 条资源的 URL/标题/描述更新 |
+| `apps/web/src/lib/data/data-integrity.test.ts` | 修改 | 新增标题和 URL 全局唯一断言 |
+| `docs/RESOURCE-AUDIT-20260630.md` | 新增 | 36 条逐条审计报告 |
+| `DEVLOG.md` | 追加 | 本轮工作记录 |
+
+#### 验证结果
+
+| 验证项 | 命令 | 结果 |
+|--------|------|------|
+| ESLint | `npx next lint` | ✔ No ESLint warnings or errors |
+| 类型检查 | `npx tsc --noEmit --project tsconfig.typecheck.json` | 0 errors |
+| 单元测试 | `npx vitest run` | 81/81 passed (8 test files) |
+| Git diff | `git diff --check` | exit code 0（仅 CRLF 警告） |
+| Git status | `git status --short` | 仅 external-resources.ts、data-integrity.test.ts、RESOURCE-AUDIT-20260630.md 三个文件变更 |
+
+---
+
 ## [2026-06-30T18:29:58+08:00] 模型: Codex
 
 ### Trae 题库扩量复核
@@ -3365,4 +3427,31 @@ HEAD `0235baf`（feat: 打通知识题库与原生测验闭环）后，程序化
 | 验证项 | 命令 | 结果 |
 |--------|------|------|
 | 单元测试 | `npx vitest run` | 78/78 passed (7 test files) |
+
+---
+
+## [2026-06-30T23:35:00+08:00] 模型: Codex
+
+### 竞赛规则复核与得分优先边界
+
+- 交叉核对仓库内 2026 鸿蒙高校创新赛竞赛规程、报名手册和官方当前赛事页，新增 `docs/COMPETITION-SCORE-FIRST-PLAN.md`。
+- 明确 Agent 创新方向评分：基础创新 50、完整度 20、前景 20、规范性 10，实际应用价值另有 20 分加分；后续优先可演示的鸿蒙系统能力、端云可靠性和正式材料。
+- 现有文件未发现“应用必须完全离线运行”的条款；远程评审仍不能访问 `10.0.2.2`，确定公网 HTTPS 主服务与本地降级双保险。
+- 记录规程与报名手册对初赛演示材料的口径差异，按 PDF、MP4、Demo ZIP 的严格口径准备，并保留门户登录后人工复核门槛。
+- 更新 Trae 边界：停止继续扩充题库、知识切片和外链，下一批仅做提交源码与第三方资源清单。
+
+### 后端生产部署基础
+
+- 新增 `apps/web/Dockerfile` 和 `.dockerignore`，使用 Node 22、Next.js standalone、非 root 用户、持久卷 `/data` 和 `/api/health` 容器健康检查。
+- standalone 仅在 Linux 容器构建阶段启用；Windows 本地生产构建保持普通输出，规避 pnpm 依赖追踪的符号链接权限问题。
+- 移除 `next.config.mjs` 中与白名单中间件冲突的通配符 CORS 响应头，API 来源控制统一由 `middleware.ts` 负责。
+- `.env.example` 补充持久化变量；部署文档废弃不适配文件持久化的 Vercel 路径，改为公网 HTTPS、长驻单实例和持久卷要求。
+
+### 验证
+
+- `pnpm lint`：无警告或错误。
+- `pnpm typecheck`：通过。
+- `pnpm test`：8 个测试文件、81/81 通过。
+- `pnpm build`：生产构建通过，10/10 静态页面生成完成，17 个 API 路由可构建。
+- 本机未安装 Docker，未执行镜像构建与容器重启持久化测试；该项保留为实际部署环境验收门槛。
 

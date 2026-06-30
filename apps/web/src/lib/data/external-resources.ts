@@ -43,7 +43,7 @@ export const externalResources: ExternalResource[] = [
     id: "res_04",
     title: "数据结构（严蔚敏·C语言版）",
     type: "textbook",
-    url: "https://www.tup.com.cn/",
+    url: "https://www.tup.com.cn/wap/tsxqy.aspx?id=00236807",
     description:
       "清华大学出版社出版的国内数据结构课程标杆教材，由严蔚敏与吴伟民合著。以 C 语言描述各类数据结构与算法实现，体系完整、逻辑严密，是国内高校考研与教学使用最广泛的数据结构教材之一。",
     courseId: "cs101",
@@ -107,7 +107,7 @@ export const externalResources: ExternalResource[] = [
     id: "res_10",
     title: "计算机网络（谢希仁）",
     type: "textbook",
-    url: "https://www.phei.com.cn/",
+    url: "https://www.phei.com.cn/module/goods/wssd_content.jsp?bookid=70139",
     description:
       "电子工业出版社出版的国内计算机网络课程主流教材，由谢希仁编著。体系完整地覆盖物理层到应用层的网络体系结构，结合中国网络发展实际情况进行讲解，是国内高校计算机网络课程与考研复习使用最广泛的教材。",
     courseId: "cs103",
@@ -166,7 +166,7 @@ export const externalResources: ExternalResource[] = [
     id: "res_16",
     title: "RFC 768 — UDP",
     type: "documentation",
-    url: "https://www.rfc-editor.org/rfc/rfc768",
+    url: "https://www.rfc-editor.org/rfc/rfc768.html",
     description:
       "用户数据报协议（UDP）的规范文档（RFC 768），定义了无连接、不可靠但高效的传输层协议机制。UDP 是 DNS 查询、实时音视频与物联网通信的基础协议，文档简洁明了，是理解轻量级网络传输的入门必读。",
     courseId: "cs103",
@@ -214,7 +214,7 @@ export const externalResources: ExternalResource[] = [
   },
   {
     id: "res_21",
-    title: "MIT 6.828 — Operating Systems",
+    title: "MIT 6.1810（原 6.828）— Operating Systems",
     type: "course",
     url: "https://pdos.csail.mit.edu/6.828/",
     description:
@@ -243,11 +243,11 @@ export const externalResources: ExternalResource[] = [
   },
   {
     id: "res_24",
-    title: "Coursera — Algorithms Part I & II（Princeton）",
+    title: "Coursera — Algorithms Part I（Princeton）",
     type: "course",
     url: "https://www.coursera.org/learn/algorithms-part1",
     description:
-      "Princeton 大学 Sedgewick 教授在 Coursera 开设的算法系列课程（Part I 与 Part II），配合《Algorithms》第四版教材使用。涵盖并查集、排序、查找、图论与字符串算法，提供自动评测编程作业。",
+      "Princeton 大学 Sedgewick 教授在 Coursera 开设的算法课程 Part I，配合《Algorithms》第四版教材使用。涵盖并查集、排序与查找基础算法，提供自动评测编程作业。Part II 需在 Coursera 平台单独搜索选课。",
     courseId: "cs101",
     tags: ["算法", "Coursera", "Princeton", "在线课程", "Sedgewick"],
   },
@@ -255,7 +255,7 @@ export const externalResources: ExternalResource[] = [
     id: "res_25",
     title: "中国大学MOOC — 数据结构",
     type: "course",
-    url: "https://www.icourse163.org/",
+    url: "https://www.icourse163.org/course/detail.htm?cid=93001",
     description:
       "中国大学 MOOC 平台汇集国内多所高校（如浙江大学、武汉大学等）的数据结构在线课程。以中文授课为主，配合 PPT 课件与在线评测系统，适合国内学生进行系统化的数据结构学习与考研复习。",
     courseId: "cs101",
@@ -265,7 +265,7 @@ export const externalResources: ExternalResource[] = [
     id: "res_26",
     title: "极客时间 — 数据结构与算法之美",
     type: "course",
-    url: "https://time.geekbang.org/",
+    url: "https://time.geekbang.org/column/intro/100017301",
     description:
       "极客时间平台王争主讲的付费专栏课程，以实战视角讲解数据结构与算法在工程中的应用。涵盖数组、链表、栈、队列、散列表、二叉树、图等核心数据结构与排序、查找等经典算法，配有 LeetCode 刷题指导。",
     courseId: "cs101",
