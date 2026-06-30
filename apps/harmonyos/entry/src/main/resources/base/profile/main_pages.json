@@ -1,10 +1,7 @@
 {
   "src": [
     "pages/Index",
-    "pages/Chat",
-    "pages/Course",
     "pages/Plan",
-    "pages/Knowledge",
-    "pages/Profile"
+    "pages/Knowledge"
   ]
 }

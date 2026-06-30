@@ -1,6 +1,6 @@
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Course, CoursesResponse, UserProfile } from '../model/DataModels';
+import { Course, CoursesResponse } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 interface HomeTask {
@@ -14,7 +14,6 @@ export struct HomeContent {
   @Link selectedTab: number;
   @Link quickQuestion: string;
 
-  @State profile: UserProfile | null = null;
   @State currentCourse: Course = {
     id: 'cs101',
     title: '数据结构',
@@ -33,30 +32,10 @@ export struct HomeContent {
   ];
 
   aboutToAppear(): void {
-    if (Constants.__DEBUG__) {
-      this.profile = {
-        userId: 'demo',
-        name: '演示同学',
-        stage: '本科二年级',
-        weakTopics: ['树与图', '动态规划', '操作系统调度'],
-        strongTopics: ['数组', '链表', '基础语法'],
-        learningStyle: '视觉型',
-        stats: { totalQuestions: 128, accuracy: 0.76, studyDays: 23 },
-      };
-    }
     this.loadOverview();
   }
 
   private async loadOverview(): Promise<void> {
-    try {
-      const profile = await HttpClient.get<UserProfile>(
-        Constants.API_PROFILE + '?userId=' + Constants.DEMO_USER_ID
-      );
-      this.profile = profile;
-    } catch (e) {
-      // 调试模式保留本地概览，正式模式由各详情页展示错误状态。
-    }
-
     try {
       const response = await HttpClient.get<CoursesResponse>(
         Constants.API_COURSES + '?userId=' + Constants.DEMO_USER_ID
@@ -292,9 +271,6 @@ export struct HomeContent {
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_XL)
     .shadow({ radius: 8, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
-    .onClick(() => {
-      this.selectedTab = 1;
-    })
   }
 
   @Builder

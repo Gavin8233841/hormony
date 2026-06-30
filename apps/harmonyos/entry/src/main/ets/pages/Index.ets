@@ -14,9 +14,20 @@ import { ProfileContent } from './Profile';
 struct Index {
   @State currentIndex: number = 0;
   @State quickQuestion: string = '';
+  @State contentOpacity: number = 1;
+  @State contentOffset: number = 0;
 
   private selectTab(index: number): void {
+    if (this.currentIndex === index) {
+      return;
+    }
     this.currentIndex = index;
+    this.contentOpacity = 0.86;
+    this.contentOffset = 6;
+    this.getUIContext().animateTo({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut }, (): void => {
+      this.contentOpacity = 1;
+      this.contentOffset = 0;
+    });
   }
 
   @Builder
@@ -25,7 +36,8 @@ struct Index {
       SymbolGlyph(this.currentIndex === index ? selectedIcon : icon)
         .fontSize(23)
         .fontColor([this.currentIndex === index ? Constants.COLOR_BRAND : Constants.COLOR_NAV_INACTIVE])
-        .symbolEffect(new BounceSymbolEffect(EffectScope.WHOLE, EffectDirection.UP), this.currentIndex === index)
+        .scale({ x: this.currentIndex === index ? 1.06 : 1, y: this.currentIndex === index ? 1.06 : 1 })
+        .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
       Text(title)
         .fontSize(11)
         .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Regular)
@@ -49,7 +61,7 @@ struct Index {
     }
     .width('90%')
     .height(72)
-    .backgroundColor('#f2ffffff')
+    .backgroundColor(Constants.COLOR_NAV_SURFACE)
     .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
     .borderRadius(Constants.RADIUS_XL)
     .shadow({ radius: 8, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
@@ -58,33 +70,39 @@ struct Index {
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      if (this.currentIndex === 0) {
-        HomeContent({
-          selectedTab: $currentIndex,
-          quickQuestion: $quickQuestion,
-        })
-      } else if (this.currentIndex === 1) {
-        Column() {
-          CourseContent({ embedded: true })
+      Column() {
+        if (this.currentIndex === 0) {
+          HomeContent({
+            selectedTab: $currentIndex,
+            quickQuestion: $quickQuestion,
+          })
+        } else if (this.currentIndex === 1) {
+          Column() {
+            CourseContent()
+          }
+          .width('100%')
+          .height('100%')
+          .padding({ bottom: 88 })
+        } else if (this.currentIndex === 2) {
+          Column() {
+            ChatContent({ quickQuestion: this.quickQuestion })
+          }
+          .width('100%')
+          .height('100%')
+          .padding({ bottom: 88 })
+        } else {
+          Column() {
+            ProfileContent()
+          }
+          .width('100%')
+          .height('100%')
+          .padding({ bottom: 88 })
         }
-        .width('100%')
-        .height('100%')
-        .padding({ bottom: 88 })
-      } else if (this.currentIndex === 2) {
-        Column() {
-          ChatContent({ embedded: true, quickQuestion: this.quickQuestion })
-        }
-        .width('100%')
-        .height('100%')
-        .padding({ bottom: 88 })
-      } else {
-        Column() {
-          ProfileContent({ embedded: true })
-        }
-        .width('100%')
-        .height('100%')
-        .padding({ bottom: 88 })
       }
+      .width('100%')
+      .height('100%')
+      .opacity(this.contentOpacity)
+      .translate({ y: this.contentOffset })
 
       Column() {
         Blank()

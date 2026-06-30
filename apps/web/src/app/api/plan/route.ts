@@ -31,9 +31,13 @@ export async function POST(req: Request) {
   }
 
   const userId = sanitizeUserId(body.userId);
-  const goal = String(body.goal ?? "制定学习计划").trim();
+  const goal = String(body.goal ?? "").trim();
   const durationDays = Math.min(Math.max(Number(body.durationDays) || 14, 1), 30);
   const dailyMinutes = Math.min(Math.max(Number(body.dailyMinutes) || 90, 15), 480);
+
+  if (goal.length === 0) {
+    return Response.json({ error: "缺少 goal 字段", code: "MISSING_FIELD" }, { status: 400 });
+  }
 
   if (goal.length > 500) {
     return Response.json({ error: "目标描述过长（上限 500 字符）", code: "GOAL_TOO_LONG" }, { status: 400 });

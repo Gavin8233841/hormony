@@ -6,32 +6,6 @@
 import { Constants } from './Constants';
 
 /**
- * 统计卡片
- * @param value  数值文本（调用方预先计算并转为 string）
- * @param label  标签文本
- * @param color  数值颜色
- */
-@Builder
-export function StatCard(value: string, label: string, color: ResourceColor) {
-  Column() {
-    Text(value)
-      .fontSize(24)
-      .fontWeight(FontWeight.Bold)
-      .fontColor(color)
-    Text(label)
-      .fontSize(12)
-      .fontColor(Constants.COLOR_TEXT_SECONDARY)
-      .margin({ top: 4 })
-  }
-  .layoutWeight(1)
-  .padding(14)
-  .backgroundColor(Constants.COLOR_BG_CARD)
-  .borderRadius(Constants.RADIUS_MD)
-  .shadow({ radius: 12, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
-  .alignItems(HorizontalAlign.Center)
-}
-
-/**
  * 统一标题栏（带返回按钮）
  * @param title       主标题
  * @param subtitle    副标题（可选，传空字符串则不显示）

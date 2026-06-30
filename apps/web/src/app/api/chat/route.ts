@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
   }
 
   const message = String(body.message).trim();
+  if (message.length === 0) {
+    return Response.json({ error: "message 不能为空", code: "MISSING_FIELD" }, { status: 400 });
+  }
   if (message.length > 2000) {
     return Response.json({ error: "消息过长（上限 2000 字符）", code: "MESSAGE_TOO_LONG" }, { status: 400 });
   }

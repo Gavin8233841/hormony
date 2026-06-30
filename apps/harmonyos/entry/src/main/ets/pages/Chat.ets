@@ -5,7 +5,6 @@
 
 import http from '@ohos.net.http';
 import { HttpClient } from '../common/HttpClient';
-import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { Citation, StreamEvent, ChatRequest } from '../model/DataModels';
 
@@ -16,11 +15,12 @@ interface DisplayMessage {
   agentTrace: string[];
   thinking: string[];
   citationExpanded: boolean;
+  failed: boolean;
+  retryQuestion: string;
 }
 
 @Component
 export struct ChatContent {
-  @Prop embedded: boolean = false;
   @Prop quickQuestion: string = '';
   @State messages: DisplayMessage[] = [];
   @State inputText: string = '';
@@ -28,6 +28,7 @@ export struct ChatContent {
   private scroller: Scroller = new Scroller();
   private currentRequest: http.HttpRequest | null = null;
   private isCancelled: boolean = false;
+  private scrollScheduled: boolean = false;
 
   // 推荐问题
   private suggestions: string[] = [
@@ -38,6 +39,7 @@ export struct ChatContent {
   ];
 
   aboutToAppear(): void {
+    this.isCancelled = false;
     if (this.quickQuestion.trim().length > 0) {
       this.inputText = this.quickQuestion.trim();
     }
@@ -61,7 +63,12 @@ export struct ChatContent {
   }
 
   private scrollToBottom(): void {
+    if (this.scrollScheduled) {
+      return;
+    }
+    this.scrollScheduled = true;
     setTimeout(() => {
+      this.scrollScheduled = false;
       if (this.messages.length > 0) {
         this.scroller.scrollToIndex(this.messages.length - 1, true, ScrollAlign.END);
       }
@@ -70,23 +77,19 @@ export struct ChatContent {
 
   build() {
     Column() {
-      if (this.embedded) {
-        Column() {
-          Text('学伴')
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text('基于课程资料，为每个问题给出依据')
-            .fontSize(14)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .margin({ top: 6 })
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-        .padding({ left: 22, right: 22, top: 24, bottom: 12 })
-      } else {
-        GradientHeader('AI 辅导', '', () => this.getUIContext().getRouter().back())
+      Column() {
+        Text('学伴')
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text('基于课程资料，为每个问题给出依据')
+          .fontSize(14)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .margin({ top: 6 })
       }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      .padding({ left: 22, right: 22, top: 24, bottom: 12 })
 
       // 消息列表 / 欢迎页
       if (this.messages.length === 0) {
@@ -122,12 +125,13 @@ export struct ChatContent {
 
           Column({ space: 8 }) {
             ForEach(this.suggestions, (s: string) => {
-              Text(s)
+              Button(s)
                 .fontSize(13)
                 .fontColor(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_LG)
-                .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+                .height(44)
+                .padding({ left: 16, right: 16 })
                 .onClick(() => {
                   this.inputText = s;
                   this.sendMessage();
@@ -157,22 +161,11 @@ export struct ChatContent {
         .padding({ left: 16, right: 16 })
       }
 
-      // 思考状态
-      if (this.loading) {
-        Row({ space: 8 }) {
-          LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
-          Text('正在思考...')
-            .fontSize(13)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        }
-        .width('100%')
-        .padding({ left: 20, bottom: 8 })
-      }
-
       // 输入栏
       Row({ space: 12 }) {
         TextInput({ text: this.inputText, placeholder: '输入你的问题...' })
           .layoutWeight(1)
+          .height(44)
           .fontSize(14)
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(Constants.RADIUS_MD)
@@ -205,18 +198,21 @@ export struct ChatContent {
     .backgroundColor(Constants.COLOR_BG_PAGE)
   }
 
-  sendMessage() {
-    if (this.inputText.trim().length === 0 || this.loading) {
+  sendMessage(question?: string): void {
+    const content = question !== undefined ? question.trim() : this.inputText.trim();
+    if (content.length === 0 || this.loading) {
       return;
     }
 
     const userMsg: DisplayMessage = {
       role: 'user',
-      content: this.inputText.trim(),
+      content: content,
       citations: [],
       agentTrace: [],
       thinking: [],
       citationExpanded: false,
+      failed: false,
+      retryQuestion: '',
     };
     this.messages.push(userMsg);
 
@@ -227,10 +223,12 @@ export struct ChatContent {
       agentTrace: [],
       thinking: [],
       citationExpanded: false,
+      failed: false,
+      retryQuestion: content,
     };
     this.messages.push(assistantMsg);
 
-    const message = this.inputText.trim();
+    const message = content;
     this.inputText = '';
     this.loading = true;
     this.isCancelled = false;
@@ -270,12 +268,13 @@ export struct ChatContent {
         this.loading = false;
         this.currentRequest = null;
       },
-      (err: Error) => {
+      (_err: Error) => {
         if (this.isCancelled) {
           return;
         }
         const last = this.messages[this.messages.length - 1];
-        last.content = '请求失败: ' + err.message;
+        last.content = '暂时无法连接学习服务，请稍后重试。';
+        last.failed = true;
         this.loading = false;
         this.currentRequest = null;
         this.messages = this.messages.slice();
@@ -318,14 +317,42 @@ export struct ChatContent {
             .borderRadius(16)
 
           Column() {
-            Text(msg.content.length > 0 ? msg.content : '思考中...')
-              .fontSize(14)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            if (msg.content.length > 0) {
+              Text(msg.content)
+                .fontSize(14)
+                .fontColor(msg.failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+                .padding(12)
+                .backgroundColor(msg.failed ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_CARD)
+                .borderRadius(Constants.RADIUS_MD)
+                .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+                .width('100%')
+            } else {
+              Row({ space: 8 }) {
+                LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
+                Text('正在检索课程资料')
+                  .fontSize(13)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              }
+              .width('100%')
               .padding(12)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_MD)
-              .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
-              .width('100%')
+            }
+
+            if (msg.failed) {
+              Button('重试')
+                .fontSize(12)
+                .fontColor(Constants.COLOR_BRAND)
+                .height(36)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(18)
+                .margin({ top: 6 })
+                .onClick(() => {
+                  msg.failed = false;
+                  this.messages = this.messages.slice(0, this.messages.length - 1);
+                  this.sendMessage(msg.retryQuestion);
+                })
+            }
 
             // 引用（折叠式）
             if (msg.citations.length > 0) {
@@ -338,8 +365,20 @@ export struct ChatContent {
                   .fontSize(12)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   .margin({ left: 4 })
+                if (msg.citationExpanded) {
+                  SymbolGlyph($r('sys.symbol.chevron_up'))
+                    .fontSize(12)
+                    .fontColor([Constants.COLOR_TEXT_SECONDARY])
+                    .margin({ left: 4 })
+                } else {
+                  SymbolGlyph($r('sys.symbol.chevron_down'))
+                    .fontSize(12)
+                    .fontColor([Constants.COLOR_TEXT_SECONDARY])
+                    .margin({ left: 4 })
+                }
               }
               .width('100%')
+              .height(40)
               .margin({ top: 4 })
               .onClick(() => {
                 msg.citationExpanded = !msg.citationExpanded;
@@ -371,17 +410,11 @@ export struct ChatContent {
     .padding({ top: 8, bottom: 8 })
   }
 
-  pageTransition() {
-    PageTransitionEnter({ duration: 300, curve: Curve.EaseOut })
-      .slide(SlideEffect.Left)
-    PageTransitionExit({ duration: 300, curve: Curve.EaseOut })
-      .slide(SlideEffect.Right)
-  }
 }
 
 @Entry
 @Component
-struct Chat {
+struct ChatPage {
   build() {
     Column() {
       ChatContent()
