@@ -3621,3 +3621,241 @@ Vercel 部署配置与信息同步 — 确定云平台为 Vercel，完成认证�
 - 新增 `TRAE-NEXT-WORK-PACKAGE.md` 并已在 Trae Work 创建独立任务：先执行页面差距矩阵、竞品证据、端侧课程/题库/资源资产转换和页面规格。
 - 更新 Trae 边界：CLI 可完成时优先 CLI，必要时再用 DevEco MCP；Web 仅作为无状态网关，开发重心为 HarmonyOS App。
 
+---
+
+## [2026-06-30T21:15:00Z] [2026-07-01 05:15:21 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+集成 Vercel Analytics — 在 Next.js 根 layout 中添加 `<Analytics />` 组件
+
+#### 修改内容
+
+| 文件 | 变更 |
+|------|------|
+| `apps/web/src/app/layout.tsx` | 新增 `import { Analytics } from "@vercel/analytics/next"` 和 `<Analytics />` 组件 |
+| `apps/web/package.json` | 新增 `@vercel/analytics@2.0.1` 依赖 |
+| `apps/web/pnpm-lock.yaml` | 锁文件更新 |
+
+#### 验证结果
+
+| 验证项 | 结果 |
+|--------|------|
+| 类型检查 | 0 errors |
+| 单元测试 | 85/85 passed (9 test files) |
+| Git 提交 | `44b7f31` feat: 集成 Vercel Analytics 监控 |
+
+#### 说明
+
+用户在 Vercel Dashboard 完成第一步（安装包），Trae 完成第二步（添加 React 组件）。部署后 Vercel 将自动收集页面访问数据。
+
+---
+
+## [2026-07-01T05:16:14+08:00] 模型: Claude (TRAE Work)
+
+### 批次 A：现状清单与竞品证据 + 批次 B：端侧只读学习资产
+
+执行 `docs/TRAE-NEXT-WORK-PACKAGE.md` 任务包的批次 A 和批次 B（并行执行）。
+
+#### 批次 A：现状清单与竞品证据
+
+**操作**：遍历所有 `.ets` 页面和 ArkData/API 调用，输出页面-数据源矩阵；研究 6 个竞品学习流程；产出差距矩阵文档。
+
+**页面遍历结果**（8 个页面 + 1 个 Widget 卡片）：
+
+| 页面 | 数据源类型 | 真实/写死 | 缺失状态 |
+|------|-----------|----------|---------|
+| Index.ets | 硬编码 | 写死（Tab 框架） | — |
+| HomeContent.ets | 混合（ArkData+硬编码） | 混合 | 无 loading/empty/error/offline |
+| Course.ets | ArkData | 种子数据 | 无 offline |
+| Chat.ets | 混合（API SSE+ArkData+硬编码） | 真实 | 有全部状态 |
+| Knowledge.ets | 混合（API+硬编码 fallback） | 真实 | 有全部状态+离线降级 |
+| Plan.ets | 混合（API+ArkData） | 真实 | 无 offline |
+| Profile.ets | ArkData | 种子数据 | 无 offline |
+| Quiz.ets | 混合（API+ArkData） | 真实 | 无 empty/offline |
+| LearningPlanCard.ets | 硬编码 | 写死 | — |
+
+**关键发现**：
+- 首页 65%/42%/30% 来自 `ensureDefaults()` 种子数据，非真实计算
+- 5 个 API 端点定义但未使用（API_PROFILE/API_COURSES/API_PLAN_SAVE/API_QUIZ_SUBMIT/API_SAFETY）
+- Quiz 评分在本地完成，不调用 API_QUIZ_SUBMIT
+- HomeContent 首屏无加载态，docCount 12→52 闪烁
+- Widget 卡片 LocalStorageProp 默认值写死，未发现动态更新逻辑
+
+**竞品研究**（6 个产品，均来自官方文档）：
+- Khan Academy：Mastery System 技能 3 级+掌握分，答错降级，Course Challenge 综合重评
+- Quizlet：8 种学习模式，Learn 自适应+Progress 分组 3 档+星标复习
+- Anki：SM-2/FSRS 间隔重复，卡片状态 4 态，Leeches 自动暂停，完全离线优先
+- Duolingo：线性学习路径，Streak+XP+Gems+Achievements+排行榜
+- 中国大学MOOC：章节/周结构，视频+单元测验+作业+期末，AI 助教"小慕"
+- 粉笔：智能出题+模考，自动错题本+标签二刷，直播课离线下载
+
+**产出文件**：`docs/APP-FEATURE-GAP-MATRIX.md`（237 行），含 P0（8 项）/P1（8 项）/P2（6 项）差距清单
+
+**数据来源**：
+- 端侧源码：逐页读取 8 个 `.ets` 文件 + Constants.ets + HttpClient.ets + LocalLearningRepository.ets + DataModels.ets + EntryAbility.ets + LearningReminder.ets
+- 竞品数据：support.khanacademy.org、help.quizlet.com、docs.ankiweb.net、support.duolingo.com、icourse163.org、fenbi.com 官方页面
+
+#### 批次 B：端侧只读学习资产
+
+**操作**：从现有 TypeScript 数据文件精确转换 147 条知识切片、60 道选择题和 36 条外部资源为端侧 JSON 资产。
+
+**源文件**：
+- `apps/web/src/lib/data/cs101-knowledge.ts`（52 条）
+- `apps/web/src/lib/data/cs102-knowledge.ts`（48 条）
+- `apps/web/src/lib/data/cs103-knowledge.ts`（47 条）
+- `apps/web/src/lib/data/quizzes.ts`（81 题，其中 60 选择+21 简答，仅转换选择题）
+- `apps/web/src/lib/data/external-resources.ts`（36 条）
+- `apps/web/src/lib/types.ts`（类型定义参考）
+
+**产出文件**：
+
+| 文件 | 路径 | 条目数 |
+|------|------|--------|
+| knowledge-chunks.json | `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json` | 147 |
+| quizzes.json | `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json` | 60 |
+| external-resources.json | `apps/harmonyos/entry/src/main/resources/rawfile/learning/external-resources.json` | 36 |
+
+**完整性检查脚本**：`c:\Users\guo82\.trae-cn\work\6a443090b00f7fb9d5ea5d97\check-learning-assets.js`
+
+**检查命令与结果**：
+
+```
+node "c:\Users\guo82\.trae-cn\work\6a443090b00f7fb9d5ea5d97\check-learning-assets.js"
+```
+
+退出码：**0**（全部通过）
+
+| 检查项 | 结果 |
+|--------|------|
+| JSON 可解析 | PASS（3 文件全部解析成功） |
+| 知识切片数量=147 | PASS（实际 147） |
+| 选择题数量=60 | PASS（实际 60） |
+| 外部资源数量=36 | PASS（实际 36） |
+| 知识切片 ID 唯一 | PASS（147 个唯一） |
+| 题目 ID 唯一 | PASS（60 个唯一） |
+| 资源 ID 唯一 | PASS（36 个唯一） |
+| 每题 4 选项 | PASS（60 道均为 4 选项） |
+| answer 匹配选项 | PASS（60 道全部匹配） |
+| 题目 courseId 有效 | PASS |
+| 资源 courseId 有效 | PASS |
+| 知识切片 courseId 覆盖 | PASS（cs101, cs102, cs103） |
+| 资源 URL 非空+http(s):// | PASS |
+| 资源标题非空 | PASS |
+| 知识切片必填字段 | PASS |
+| 题目必填字段 | PASS |
+| 资源必填字段 | PASS |
+
+汇总：**17 项通过，0 项失败**
+
+**转换说明**：
+- 选择题筛选：通过 `type === "choice"` 判断，排除 21 道简答题
+- quiz 展平：嵌套 Quiz 结构展平，每题携带 courseId 和 topic
+- 键名格式：camelCase
+- 编码：UTF-8
+- 未修改任何 TS 源文件、DataModels.ets、LocalLearningRepository.ets 或其他受保护文件
+
+#### 验证
+
+| 验证项 | 命令 | 退出码 | 结果 |
+|--------|------|--------|------|
+| 完整性检查 | `node check-learning-assets.js` | 0 | 17/17 PASS |
+| Git diff 检查 | `git diff --check` | 0 | 通过（仅 LF/CRLF 警告） |
+
+#### 修改文件清单
+
+| 文件 | 类型 | 说明 |
+|------|------|------|
+| `docs/APP-FEATURE-GAP-MATRIX.md` | 新增 | 批次 A 差距矩阵文档（237 行） |
+| `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json` | 新增 | 147 条知识切片端侧资产 |
+| `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json` | 新增 | 60 道选择题端侧资产 |
+| `apps/harmonyos/entry/src/main/resources/rawfile/learning/external-resources.json` | 新增 | 36 条外部资源端侧资产 |
+| `DEVLOG.md` | 追加 | 本轮记录 |
+
+#### 未修改文件（受保护）
+
+- `DataModels.ets` — 未修改
+- `LocalLearningRepository.ets` — 未修改
+- 模型 Agent（model.ts、orchestrator.ts）— 未修改
+- API 契约 — 未修改
+- 主导航（Index.ets Tab 结构）— 未修改
+- 数据库迁移 — 未修改
+- 任何 TS 源文件 — 未修改
+
+#### 未完成项与阻塞
+
+- 批次 C（页面与交互设计准备）待执行
+- 批次 D 等待 Codex 提供领域接口，不越界
+
+#### Git 状态
+
+未提交 Git，等待 Codex 审阅。`git status` 显示新增文件在 `apps/harmonyos/entry/src/main/resources/rawfile/` 目录下。
+
+---
+
+## [2026-07-01T05:19:38+08:00] 模型: Claude (TRAE Work)
+
+### 批次 C：页面与交互设计准备
+
+**操作**：基于 `APP-LEARNING-LOOP-ROADMAP.md` 为 9 个页面输出页面规格文档。
+
+**产出文件**：`docs/PAGE-SPEC-DESIGN.md`，覆盖以下 9 个页面：
+
+| # | 页面 | 唯一主操作 | 导航来源 | 返回目标 |
+|---|------|-----------|---------|---------|
+| 1 | CourseDetail | 点击知识点→进入 Lesson | Course Tab 课程卡片 | Course Tab |
+| 2 | Lesson | "学完了，去练习"→进入 Practice | CourseDetail 知识点条目 | CourseDetail |
+| 3 | Practice | "提交评分"→进入 QuizResult | Lesson / CourseDetail | 来源页 |
+| 4 | QuizResult | "错题重做"→进入 Review | Practice 提交后 | CourseDetail |
+| 5 | Review | "完成复习"→更新错题状态 | QuizResult / MistakeBook | 来源页 |
+| 6 | Resources | 点击资源→打开系统浏览器 | CourseDetail "扩展资源" | CourseDetail |
+| 7 | ActivityRecords | 点击记录→跳转对应内容 | Profile "学习记录" | Profile |
+| 8 | MistakeBook | 点击错题→进入 Review | Profile "错题本" | Profile |
+| 9 | Achievements | 纯展示页，无主操作 | Profile "成就" | Profile |
+
+**每个页面规格包含**：
+- 信息层级（逐层拆分）
+- 唯一主操作（每页只有一个主按钮）
+- 五态设计（loading/empty/error/offline/complete）
+- 导航来源与返回目标
+- 设计令牌引用（全部来自 `Constants.ets`）
+- 鸿蒙系统 Symbol 引用（`sys.symbol.*`）
+- 端侧 JSON 资产使用映射
+- 静态预览 ASCII 示意图
+
+**设计约束遵守**：
+- 复用现有设计令牌（`Constants.ets`），不硬编码新颜色/圆角/字体
+- 仅使用 `sys.symbol.*` 系统图标，不引入第三方 UI 库
+- 不修改 Index、路由、仓库 schema
+- 不设计进度算法、成就规则、间隔复习算法或数据库迁移
+- 同一功能在顶层只出现一个入口
+
+**数据来源**：
+- `docs/APP-LEARNING-LOOP-ROADMAP.md` — 页面流程与状态模型
+- `DESIGN.md` — 设计系统规范
+- `Constants.ets` — 颜色/圆角/动画令牌
+- `Builders.ets` — 已有 Builder（TitleBar/GradientHeader/EmptyState/LoadingState）
+- `DataModels.ets` — 数据模型接口
+
+**验证**：
+
+| 验证项 | 命令 | 退出码 | 结果 |
+|--------|------|--------|------|
+| Git diff 检查 | `git diff --check` | 0 | 通过（仅 LF/CRLF 警告） |
+
+**修改文件清单**：
+
+| 文件 | 类型 | 说明 |
+|------|------|------|
+| `docs/PAGE-SPEC-DESIGN.md` | 新增 | 9 个页面规格文档，含设计令牌引用、信息层级、五态设计、静态预览 |
+| `DEVLOG.md` | 追加 | 本轮记录 |
+
+**未修改文件（受保护）**：
+- `Index.ets` — 未修改
+- 路由配置 — 未修改
+- 仓库 schema（`DataModels.ets`、`LocalLearningRepository.ets`）— 未修改
+- 任何 `.ets` 页面文件 — 未修改
+
+**未完成项与阻塞**：
+- 批次 D 等待 Codex 提供领域接口（LessonProgress、QuizAttempt、TopicMastery、StudyEvent、ReviewItem、Achievement 的 ArkData 接口定义），不越界实现
+
