@@ -147,6 +147,7 @@ export interface ChatRequest {
 }
 
 export interface KnowledgeSearchRequest {
+  userId: string;
   query: string;
   courseId?: string;
   topK: number;

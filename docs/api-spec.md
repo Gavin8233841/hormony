@@ -273,11 +273,14 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 **请求**
 ```json
 {
+  "userId": "demo",
   "query": "二叉搜索树",
   "courseId": "cs101",
   "topK": 5
 }
 ```
+
+检索成功后会记录当前用户的学习活动，用于后续学习轨迹与推荐。
 
 **响应**
 ```json

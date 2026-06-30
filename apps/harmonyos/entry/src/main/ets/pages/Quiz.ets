@@ -5,6 +5,7 @@
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   QuizAnswer,
   QuizQuestionView,
@@ -47,6 +48,11 @@ struct QuizPage {
     } else {
       this.suggestions = ['二叉树与BST', '图的遍历', '动态规划'];
     }
+    const selectedTopic = AppStorage.get<string>('selectedQuizTopic') ?? '';
+    if (selectedTopic.trim().length > 0) {
+      this.topic = selectedTopic.trim();
+      AppStorage.setOrCreate<string>('selectedQuizTopic', '');
+    }
   }
 
   private get currentAnswer(): string {
@@ -69,6 +75,16 @@ struct QuizPage {
     this.resultDetails = [];
     this.evaluation = '';
     this.weakTopics = [];
+  }
+
+  private reviewTopic(topic: string): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('knowledgePrefillQuery', topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'QuizPage knowledge router.pushUrl failed: %{public}s', err.message);
+    });
   }
 
   async generateQuiz(): Promise<void> {
@@ -333,13 +349,15 @@ struct QuizPage {
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.weakTopics, (topic: string): void => {
-              Text(topic)
+              Button(topic)
+                .height(38)
                 .fontSize(12)
                 .fontColor(Constants.COLOR_WARNING)
-                .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+                .padding({ left: 12, right: 12 })
                 .backgroundColor(Constants.COLOR_BG_CARD)
                 .borderRadius(Constants.RADIUS_SM)
                 .margin({ right: 8, bottom: 8 })
+                .onClick(() => { this.reviewTopic(topic); })
             })
           }
           .width('100%')

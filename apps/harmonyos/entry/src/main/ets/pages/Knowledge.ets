@@ -7,6 +7,7 @@ import { HttpClient } from '../common/HttpClient';
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { KnowledgeChunk, KnowledgeSearchRequest, KnowledgeSearchResponse } from '../model/DataModels';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Entry
 @Component
@@ -34,6 +35,17 @@ struct KnowledgePage {
     return !this.loading && this.query.trim().length > 0;
   }
 
+  private startTopicQuiz(): void {
+    const topic = this.query.trim().length > 0 ? this.query.trim() : '综合';
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'KnowledgePage quiz router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
@@ -43,6 +55,12 @@ struct KnowledgePage {
       this.suggestions = ['TCP 三次握手', 'HTTP', '路由'];
     } else {
       this.suggestions = ['二叉搜索树', '图的遍历', '动态规划'];
+    }
+    const prefill = AppStorage.get<string>('knowledgePrefillQuery') ?? '';
+    if (prefill.trim().length > 0) {
+      this.query = prefill.trim();
+      AppStorage.setOrCreate<string>('knowledgePrefillQuery', '');
+      this.search();
     }
   }
 
@@ -125,6 +143,15 @@ struct KnowledgePage {
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ left: 16, bottom: 8 })
+
+        Button('复习后，针对“' + this.query + '”开始测验')
+          .height(42)
+          .fontSize(13)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .margin({ left: 16, right: 16, bottom: 10 })
+          .onClick(() => { this.startTopicQuiz(); })
 
         List({ space: 12 }) {
           ForEach(this.results, (item: KnowledgeChunk, i: number) => {
@@ -253,6 +280,7 @@ struct KnowledgePage {
     this.hasError = false;
     this.results = [];
     const request: KnowledgeSearchRequest = {
+      userId: Constants.DEMO_USER_ID,
       query: q,
       courseId: this.courseId,
       topK: 5,

@@ -28,7 +28,7 @@ export default function KnowledgePage() {
       const res = await fetch("/api/knowledge/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim(), topK: 5 }),
+        body: JSON.stringify({ userId: "demo", query: query.trim(), topK: 5 }),
       });
       if (!res.ok) throw new Error(`检索失败 (HTTP ${res.status})`);
       const data = (await res.json()) as { chunks?: KnowledgeChunk[] };
@@ -50,6 +50,7 @@ export default function KnowledgePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: "demo",
           courseId: uploadCourseId,
           source: uploadSource.trim(),
           text: uploadText.trim(),

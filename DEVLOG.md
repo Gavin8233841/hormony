@@ -3283,6 +3283,22 @@ HEAD `0235baf`（feat: 打通知识题库与原生测验闭环）后，程序化
 - Web lint、typecheck、81/81 测试和生产构建通过。
 - 生产服务完成两次计划状态写入，并在进程重启后恢复原状态，`STATE_FILE_EXISTS=True`、`RESTART_RESTORED=True`。
 - Trae 下一批只执行 36 条外部资源直达链接与官方归属审计，不修改核心状态、Agent 或端侧架构。
+
+---
+
+## [2026-06-30T18:55:13+08:00] 模型: Codex
+
+### 错题复习再测反馈链
+
+- 测验结果中的薄弱主题改为可点击动作，进入同一课程知识库并自动检索对应主题。
+- 知识库检索结果增加“复习后开始测验”，将当前检索主题带回原生测验页，形成“测验 → 薄弱点 → 资料 → 再测”循环。
+- 课程直接进入知识库或测验时会清理旧预填主题，避免跨课程残留状态。
+- 知识检索请求补充 `userId`，服务端将检索行为写入当前用户活动；Web 与 HarmonyOS 请求契约同步。
+
+### 验证
+
+- 4 个相关 ArkTS 文件经 DevEco MCP 检查无诊断，Web TypeScript 检查通过。
+- 本轮属于上一学习闭环阶段的小范围连接，不单独执行截图与完整构建。
 | Git diff | `git diff --check` | exit code 0（仅 CRLF 警告，无空白错误） |
 | Git status | `git status --short` | 仅 quizzes.ts、data-integrity.test.ts、DEVLOG.md 三个文件变更 |
 

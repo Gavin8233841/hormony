@@ -1,10 +1,13 @@
 // POST /api/knowledge/search - RAG knowledge retrieval
 
 import { retrieve } from "@/lib/rag";
+import { store } from "@/lib/store/db";
+import { sanitizeUserId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 interface KnowledgeSearchRequest {
+  userId?: string;
   query?: string;
   courseId?: string;
   topK?: number;
@@ -31,6 +34,13 @@ export async function POST(req: Request) {
 
   try {
     const chunks = retrieve(query, body.courseId, topK);
+    const userId = sanitizeUserId(body.userId);
+    store.logActivity({
+      userId,
+      type: "study",
+      description: `检索知识：${query.slice(0, 40)}`,
+      timestamp: new Date().toISOString(),
+    });
     return Response.json({ chunks });
   } catch (err) {
     console.error("[knowledge/search] error:", err instanceof Error ? err.message : String(err));

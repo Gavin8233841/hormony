@@ -44,6 +44,7 @@ export struct CourseContent {
   private openKnowledge(course: Course): void {
     AppStorage.setOrCreate<string>('selectedCourseId', course.id);
     AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
+    AppStorage.setOrCreate<string>('knowledgePrefillQuery', '');
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'CourseContent router.pushUrl failed: %{public}s', err.message);
@@ -53,6 +54,7 @@ export struct CourseContent {
   private openQuiz(course: Course): void {
     AppStorage.setOrCreate<string>('selectedCourseId', course.id);
     AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', '综合');
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'CourseContent quiz router.pushUrl failed: %{public}s', err.message);
