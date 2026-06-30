@@ -2,6 +2,7 @@
   "src": [
     "pages/Index",
     "pages/Plan",
-    "pages/Knowledge"
+    "pages/Knowledge",
+    "pages/Quiz"
   ]
 }

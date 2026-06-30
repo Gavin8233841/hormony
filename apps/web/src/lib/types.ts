@@ -54,11 +54,33 @@ export interface Quiz {
   questions: QuizQuestion[];
 }
 
+export interface QuizQuestionView {
+  id: string;
+  type: "choice" | "short";
+  stem: string;
+  options?: string[];
+}
+
+export interface QuizView {
+  quizId: string;
+  courseId: string;
+  topic: string;
+  questions: QuizQuestionView[];
+}
+
+export interface QuizCatalogItem {
+  quizId: string;
+  courseId: string;
+  topic: string;
+  questionCount: number;
+}
+
 export interface KnowledgeChunk {
   id: string;
   text: string;
   source: string;
   courseId: string;
+  topic?: string;
   score?: number;
 }
 
@@ -189,6 +211,18 @@ export interface KnowledgeUploadRequest {
   courseId: string;
   source: string;
   text: string;
+}
+
+// ========== 外部资源索引 ==========
+
+export interface ExternalResource {
+  id: string;
+  title: string;
+  type: "textbook" | "documentation" | "course" | "standard" | "tool";
+  url: string;
+  description: string;
+  courseId?: string;
+  tags: string[];
 }
 
 // ========== 计划任务打卡 ==========

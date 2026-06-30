@@ -137,16 +137,82 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 ```json
 {
   "quizId": "string",
+  "courseId": "cs101",
+  "topic": "树",
   "questions": [
     {
       "id": "q1",
       "type": "choice",
       "stem": "二叉搜索树中序遍历的结果是？",
-      "options": ["A. 升序", "B. 降序", "C. 随机", "D. 不确定"],
-      "answer": "A",
-      "explanation": "二叉搜索树中序遍历得到有序序列。"
+      "options": ["A. 升序", "B. 降序", "C. 随机", "D. 不确定"]
     }
   ]
+}
+```
+
+生成接口不返回答案和解析。完整题目只保存在服务端，提交后才返回评分与解析。
+
+---
+
+## GET /api/quiz?courseId=...
+
+返回指定课程的题库目录，不返回题目正文、答案或解析。
+
+```json
+{
+  "quizzes": [
+    {
+      "quizId": "quiz_cs101_tree",
+      "courseId": "cs101",
+      "topic": "二叉树与BST",
+      "questionCount": 3
+    }
+  ]
+}
+```
+
+---
+
+## POST /api/quiz/submit
+
+提交答案并返回整份测验的评分、逐题解析和薄弱知识点。缺失答案按未作答计入总题数。
+
+**请求**
+```json
+{
+  "quizId": "string",
+  "userId": "demo",
+  "answers": [
+    { "questionId": "q1", "userAnswer": "A. 升序" }
+  ]
+}
+```
+
+**响应**
+```json
+{
+  "quizId": "string",
+  "userId": "demo",
+  "totalQuestions": 5,
+  "correctCount": 1,
+  "accuracy": 0.2,
+  "details": [],
+  "evaluation": "string",
+  "weakTopics": ["二叉树与BST"],
+  "submittedAt": "ISO-8601"
+}
+```
+
+---
+
+## GET /api/resources
+
+获取学习资源索引。可使用 `courseId` 和 `type` 筛选；`type` 仅支持 `textbook`、`documentation`、`course`、`standard`、`tool`。
+
+```json
+{
+  "resources": [],
+  "total": 0
 }
 ```
 

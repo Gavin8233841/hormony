@@ -59,7 +59,62 @@ export interface KnowledgeChunk {
   text: string;
   source: string;
   courseId?: string;
+  topic?: string;
   score?: number;
+}
+
+export interface QuizQuestionView {
+  id: string;
+  type: string;
+  stem: string;
+  options?: string[];
+}
+
+export interface QuizView {
+  quizId: string;
+  courseId: string;
+  topic: string;
+  questions: QuizQuestionView[];
+}
+
+export interface QuizRequest {
+  userId: string;
+  courseId: string;
+  topic: string;
+  count: number;
+  difficulty: string;
+}
+
+export interface QuizAnswer {
+  questionId: string;
+  userAnswer: string;
+}
+
+export interface QuizSubmission {
+  quizId: string;
+  userId: string;
+  answers: QuizAnswer[];
+}
+
+export interface QuizResultDetail {
+  questionId: string;
+  stem: string;
+  userAnswer: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+  explanation: string;
+}
+
+export interface QuizResult {
+  quizId: string;
+  userId: string;
+  totalQuestions: number;
+  correctCount: number;
+  accuracy: number;
+  details: QuizResultDetail[];
+  evaluation: string;
+  weakTopics: string[];
+  submittedAt: string;
 }
 
 // SSE 流式事件

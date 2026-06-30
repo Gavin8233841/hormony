@@ -11,15 +11,14 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 export struct CourseContent {
   @State courses: Course[] = [];
   @State loading: boolean = false;
-  @State pressedIndex: number = -1;
   @State message: string = '';
 
   aboutToAppear() {
     // 调试模式：先加载演示数据，避免网络等待时空白
     if (Constants.__DEBUG__) {
-      const c1: Course = { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 12, topics: ['数组', '链表', '树', '图'] };
-      const c2: Course = { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 8, topics: ['进程', '调度', '内存管理'] };
-      const c3: Course = { id: 'cs103', title: '计算机网络', progress: 0.30, docCount: 6, topics: ['TCP/IP', 'HTTP', '路由'] };
+      const c1: Course = { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 52, topics: ['二叉树', '图的遍历', '动态规划'] };
+      const c2: Course = { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 48, topics: ['进程调度', '内存管理', '文件系统'] };
+      const c3: Course = { id: 'cs103', title: '计算机网络', progress: 0.30, docCount: 47, topics: ['TCP/IP', 'HTTP', '路由协议'] };
       this.courses = [c1, c2, c3];
     } else {
       this.loading = true;
@@ -48,6 +47,15 @@ export struct CourseContent {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'CourseContent router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
+  private openQuiz(course: Course): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', course.id);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'CourseContent quiz router.pushUrl failed: %{public}s', err.message);
     });
   }
 
@@ -104,7 +112,7 @@ export struct CourseContent {
         .padding({ left: 16, right: 16 })
       } else if (this.courses.length > 0) {
         List({ space: 10 }) {
-          ForEach(this.courses, (c: Course, i: number) => {
+          ForEach(this.courses, (c: Course) => {
             ListItem() {
               Column() {
                 // 课程标题行
@@ -128,10 +136,6 @@ export struct CourseContent {
                   Text(c.docCount.toString() + ' 份资料')
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                  SymbolGlyph($r('sys.symbol.chevron_right'))
-                    .fontSize(14)
-                    .fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
-                    .margin({ left: 8 })
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
@@ -171,26 +175,37 @@ export struct CourseContent {
                 }
                 .width('100%')
                 .margin({ top: 12 })
+
+                Row({ space: 10 }) {
+                  Button('课程资料')
+                    .layoutWeight(1)
+                    .height(42)
+                    .fontSize(13)
+                    .fontColor(Constants.COLOR_BRAND)
+                    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                    .borderRadius(Constants.RADIUS_MD)
+                    .onClick(() => {
+                      this.openKnowledge(c);
+                    })
+                  Button('开始测验')
+                    .layoutWeight(1)
+                    .height(42)
+                    .fontSize(13)
+                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                    .backgroundColor(Constants.COLOR_BRAND)
+                    .borderRadius(Constants.RADIUS_MD)
+                    .onClick(() => {
+                      this.openQuiz(c);
+                    })
+                }
+                .width('100%')
+                .margin({ top: 6 })
               }
               .width('100%')
               .padding(16)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_LG)
               .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
-              .scale({ x: this.pressedIndex === i ? 0.98 : 1, y: this.pressedIndex === i ? 0.98 : 1 })
-              .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
-              .onTouch((event?: TouchEvent) => {
-                if (event) {
-                  if (event.type === TouchType.Down) {
-                    this.pressedIndex = i;
-                  } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                    this.pressedIndex = -1;
-                  }
-                }
-              })
-              .onClick(() => {
-                this.openKnowledge(c);
-              })
             }
           })
         }

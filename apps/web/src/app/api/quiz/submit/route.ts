@@ -36,16 +36,16 @@ export async function POST(req: Request) {
       return Response.json({ error: "测验不存在或已过期", code: "QUIZ_NOT_FOUND" }, { status: 404 });
     }
 
-    // 评分
+    // 评分：始终覆盖整份测验，缺失答案按未作答处理。
     const details: QuizResultDetail[] = [];
     let correctCount = 0;
+    const answerMap = new Map(
+      answers.map((answer) => [String(answer.questionId ?? ""), String(answer.userAnswer ?? "")])
+    );
 
-    for (const ans of answers) {
-      const question = quiz.questions.find((q) => q.id === String(ans.questionId ?? ""));
-      if (!question) continue;
-
-      const userAnswer = String(ans.userAnswer ?? "").trim();
-      const isCorrect = userAnswer.toUpperCase() === question.answer.trim().toUpperCase();
+    for (const question of quiz.questions) {
+      const userAnswer = (answerMap.get(question.id) ?? "").trim();
+      const isCorrect = answersMatch(question, userAnswer);
       if (isCorrect) correctCount++;
 
       details.push({
@@ -73,20 +73,22 @@ export async function POST(req: Request) {
     try {
       const evalResult = await runEvaluatorAgent(userId, evaluatorInput);
       evaluation = evalResult.content;
-
-      // 从错题中提取薄弱主题（基于检索匹配）
-      const wrongQuestions = details.filter((d) => !d.isCorrect);
-      if (wrongQuestions.length > 0) {
-        const wrongTexts = wrongQuestions.map((d) => d.stem).join(" ");
-        const relatedChunks = retrieve(wrongTexts, quiz.courseId, 3);
-        weakTopics = relatedChunks
-          .map((c) => c.source.replace(/\.pdf$|\.docx?$|\.txt$/i, ""))
-          .filter((v, i, arr) => arr.indexOf(v) === i)
-          .slice(0, 5);
-      }
     } catch (err) {
       console.error("[quiz/submit] evaluator error:", err instanceof Error ? err.message : String(err));
       evaluation = `正确率：${(accuracy * 100).toFixed(0)}%（${correctCount}/${totalQuestions}）。评估服务暂不可用。`;
+    }
+
+    // 薄弱主题来自本地知识库，不依赖模型评估服务是否可用。
+    const wrongQuestions = details.filter((detail) => !detail.isCorrect);
+    if (wrongQuestions.length > 0) {
+      const wrongTexts = wrongQuestions.map((detail) => detail.stem).join(" ");
+      const relatedChunks = retrieve(wrongTexts, quiz.courseId, 3);
+      weakTopics = relatedChunks
+        .map((chunk) =>
+          chunk.topic ?? chunk.source.replace(/\.pdf$|\.docx?$|\.txt$/i, "")
+        )
+        .filter((value, index, values) => values.indexOf(value) === index)
+        .slice(0, 5);
     }
 
     const result: QuizResult = {
@@ -109,4 +111,23 @@ export async function POST(req: Request) {
     console.error("[quiz/submit] unhandled error:", err instanceof Error ? err.message : String(err));
     return Response.json({ error: "服务器内部错误", code: "INTERNAL_ERROR" }, { status: 500 });
   }
+}
+
+function answersMatch(
+  question: { type: "choice" | "short"; options?: string[]; answer: string },
+  userAnswer: string
+): boolean {
+  const expected = question.answer.trim();
+  if (question.type === "choice" && question.options) {
+    const selectedIndex = question.options.indexOf(userAnswer);
+    const selectedKey = selectedIndex >= 0
+      ? String.fromCharCode("A".charCodeAt(0) + selectedIndex)
+      : userAnswer;
+    const expectedIndex = question.options.indexOf(expected);
+    const expectedKey = expectedIndex >= 0
+      ? String.fromCharCode("A".charCodeAt(0) + expectedIndex)
+      : expected;
+    return selectedKey.toUpperCase() === expectedKey.toUpperCase();
+  }
+  return userAnswer.toLocaleLowerCase() === expected.toLocaleLowerCase();
 }

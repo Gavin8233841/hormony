@@ -3107,3 +3107,88 @@ Loop第23-25轮: 后端P2清理 + deprecated API迁移 + HttpClient修复 + 全�
 - 模拟器确认：操作系统课程上下文正确、课程检索返回操作系统资料、结果可展开、建议目标可填入、计划真实生成 5 项任务、AI 回答与 3 条引用可展开。
 - 应用 hilog 未出现业务错误；仅有模拟器系统组件缺失与图形参数监听警告。
 
+## [2026-06-30T07:06:00Z] [2026-06-30 15:06:00 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+构建生产级学习内容数据资产 — 将伪演示内容升级为可用落地级别
+
+#### 背景
+
+Codex 完成 4 次提交（HEAD: 60d17b4）后，前端框架已就绪但后端数据层仅含 15 条知识切片、0 条预置题库、0 条外部资源索引。本轮将数据层彻底充实，使"伪演示内容"升级为"可用落地级别"。
+
+#### 数据资产产出
+
+| 资产类别 | 之前 | 之后 | 增量 |
+|----------|------|------|------|
+| 知识切片总数 | 15 | 147 | +132 |
+| CS101 数据结构切片 | 8 | 52 | +44 |
+| CS102 操作系统切片 | 4 | 48 | +44 |
+| CS103 计算机网络切片 | 3 | 47 | +44 |
+| 不足100字切片 | - | 0 | - |
+| 题库题目总数 | 3(回退) | 70 | +67 |
+| CS101 题目 | 3(回退) | 24 | +21 |
+| CS102 题目 | 0 | 23 | +23 |
+| CS103 题目 | 0 | 23 | +23 |
+| 外部资源索引 | 0 | 36 | +36 |
+| 课程主题数（每门） | 3-6 | 10-12 | ≥8 达标 |
+
+#### 涉及文件
+
+**新增数据文件**:
+- `apps/web/src/lib/data/cs101-knowledge.ts` — 数据结构52条知识切片（12主题）
+- `apps/web/src/lib/data/cs102-knowledge.ts` — 操作系统48条知识切片（10主题）
+- `apps/web/src/lib/data/cs103-knowledge.ts` — 计算机网络47条知识切片（11主题）
+- `apps/web/src/lib/data/quizzes.ts` — 70道题库（25个Quiz对象，选择题70%+简答题30%）
+- `apps/web/src/lib/data/external-resources.ts` — 36条外部资源（教材10/文档8/课程8/标准5/工具5）
+- `apps/web/src/lib/data/index.ts` — 桶导出 + getQuizzesByCourse 辅助函数
+
+**修改文件**:
+- `apps/web/src/lib/types.ts` — KnowledgeChunk 新增 topic 字段；新增 ExternalResource 接口
+- `apps/web/src/lib/store/db.ts` — 替换 seedDemoData()：导入全部数据文件，种子化147条切片+25个Quiz+36条资源；新增 getQuizzesByCourse/getExternalResources/getExternalResourcesByType 方法；DB 接口新增 externalResources 字段
+- `apps/web/src/lib/agents/quiz-agent.ts` — LLM 失败时回退到静态题库（按 courseId+topic 匹配），替换原3题硬编码回退
+- `apps/web/src/app/api/quiz/route.ts` — GET 端点支持 ?courseId= 参数返回课程题库
+- `apps/web/src/app/api/resources/route.ts` — 新增外部资源 API（GET ?courseId=&type=）
+- `apps/web/src/lib/rag/index.test.ts` — 修复 BST 检索断言（知识库扩大后 TF-IDF 排序变化）
+
+#### 正反馈闭环设计
+
+- 知识切片与题库通过 `courseId + topic` 字段关联
+- Quiz Agent 回退逻辑按 courseId 筛选 → 按 topic 模糊匹配 → 取题
+- 外部资源通过 `courseId` 与课程关联，支持按类型筛选
+- 用户画像 weakTopics 与知识切片 topic 对齐，可驱动推荐
+
+#### 验证结果
+
+| 验证项 | 命令 | 结果 |
+|--------|------|------|
+| 类型检查 | `npx tsc --noEmit --project tsconfig.typecheck.json` | 0 errors |
+| 单元测试 | `npx vitest run` | 70/70 passed |
+| 数据量验证 | tsx 脚本 | 切片147/题库70/资源36，全部达标 |
+| 短切片检查 | tsx 脚本 | 0条不足100字 |
+
+---
+
+## [2026-06-30T17:58:30+08:00] 模型: Codex
+
+### 课程数据与测验闭环审查
+
+- 复核 Trae 新增的 147 条知识切片、70 道题和 36 条资源索引，补充数据唯一性、长度、课程关联、选项答案与资源类型测试。
+- 修复选择题客户端提交完整选项但服务端只比较字母导致的误判；服务端现在覆盖整份测验评分，未作答题目不会从总题数中消失。
+- 生成接口改为只返回题干与选项，答案和解析保留在服务端；题库 GET 改为只返回主题目录。
+- 静态题回退按主题优先并从课程题池补齐，不再循环复制少量题目；模型返回结构不完整时直接丢弃并回退可靠题库。
+- 薄弱知识点优先使用知识切片 `topic`，真实回写到用户画像；内存 Store 增加课程数据版本同步，兼容开发热重载。
+- 更新过时的 HTTP/TCP/HarmonyOS 官方资源链接和描述，新增资源类型运行时校验。
+
+### HarmonyOS 原生测验入口
+
+- 课程卡由整卡单入口改为“课程资料 / 开始测验”两个明确动作，避免重复或含糊跳转。
+- 新增原生 `Quiz.ets`，实现主题选择、5 题逐题作答、提交评分、正确率、薄弱点和逐题解析。
+- 增加公开测验数据模型、提交模型、评分结果模型及 `/api/quiz/submit` 常量，路由表新增 `pages/Quiz`。
+
+### 验证与协作边界
+
+- Web lint、typecheck、77 项测试与生产构建通过；HarmonyOS 4 个相关文件静态检查无诊断，`entry@default` debug 构建成功。
+- 生产服务改为 `0.0.0.0:3000` 稳定启动；单接口冒烟确认返回 5 道题且不包含答案字段。
+- `docs/TRAE-DEVELOPMENT-BOUNDARIES.md` 已更新分工：Codex 负责核心架构与大阶段验收，Trae 负责内容扩量、链接复核、机械检查和证据整理。
+

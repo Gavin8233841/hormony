@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Brain, Loader2, CheckCircle2, XCircle, Target, TrendingDown, RefreshCw, History } from "lucide-react";
-import type { Quiz, QuizResult, QuizAnswer } from "@/lib/types";
+import type { QuizView, QuizResult, QuizAnswer } from "@/lib/types";
 
 export default function QuizPage() {
   const [courseId, setCourseId] = useState("cs101");
@@ -10,7 +10,7 @@ export default function QuizPage() {
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [quiz, setQuiz] = useState<QuizView | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,7 +57,7 @@ export default function QuizPage() {
         }),
       });
       if (!res.ok) throw new Error("生成失败");
-      const data = (await res.json()) as Quiz;
+      const data = (await res.json()) as QuizView;
       setQuiz(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "生成测验失败");

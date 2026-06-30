@@ -1,8 +1,10 @@
 // Quiz Agent：测验题生成
+// 优先使用 LLM 动态生成；LLM 不可用时回退到静态题库（70道题目，覆盖3门课程）
 
 import { callModel, extractJsonPayload } from "./model";
 import { generateId } from "@/lib/utils";
 import { store } from "@/lib/store/db";
+import { getQuizzesByCourse as getSeedQuizzesByCourse } from "@/lib/data";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 
 export async function runQuizAgent(
@@ -21,9 +23,23 @@ export async function runQuizAgent(
 难度：${difficulty}
 数量：${count}`;
 
-  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5 });
+  let questions: QuizQuestion[] = [];
 
-  const questions = parseQuestions(raw, count, topic);
+  try {
+    const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5 });
+    questions = parseQuestions(raw, count, topic);
+  } catch {
+    // LLM 不可用时，从静态题库取题
+  }
+
+  // LLM 题量不足时，用静态题库补齐，并避免重复题干。
+  if (questions.length < count) {
+    const existingStems = new Set(questions.map((question) => question.stem));
+    const fallback = staticQuizBank(courseId, topic, count).filter(
+      (question) => !existingStems.has(question.stem)
+    );
+    questions = [...questions, ...fallback].slice(0, count);
+  }
 
   const quiz: Quiz = {
     quizId: generateId("quiz"),
@@ -39,47 +55,58 @@ function parseQuestions(raw: string, count: number, topic: string): QuizQuestion
   try {
     const arr = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
-      return arr.slice(0, count).map((q: Record<string, unknown>, i: number) => ({
-        id: generateId("q"),
-        type: "choice" as const,
-        stem: String(q.stem ?? `${topic} 第 ${i + 1} 题`),
-        options: Array.isArray(q.options) ? q.options.map(String) : ["A. 选项一", "B. 选项二", "C. 选项三", "D. 选项四"],
-        answer: String(q.answer ?? "A"),
-        explanation: String(q.explanation ?? "暂无解析"),
-      }));
+      const parsed: QuizQuestion[] = [];
+      for (const item of arr.slice(0, count)) {
+        if (!item || typeof item !== "object") continue;
+        const q = item as Record<string, unknown>;
+        const stem = typeof q.stem === "string" ? q.stem.trim() : "";
+        const options = Array.isArray(q.options)
+          ? q.options.map(String).map((option) => option.trim()).filter(Boolean)
+          : [];
+        const answer = typeof q.answer === "string" ? q.answer.trim() : "";
+        const explanation =
+          typeof q.explanation === "string" ? q.explanation.trim() : "";
+        if (!stem || options.length < 2 || !answer || !explanation) continue;
+        parsed.push({
+          id: generateId("q"),
+          type: "choice",
+          stem,
+          options,
+          answer,
+          explanation,
+        });
+      }
+      return parsed;
     }
   } catch {
-    // 回退演示题
+    // JSON 解析失败，返回空数组触发静态题库回退
   }
-  return demoQuestions(count, topic);
+  return [];
 }
 
-function demoQuestions(count: number, topic: string): QuizQuestion[] {
-  const bank: QuizQuestion[] = [
-    {
-      id: generateId("q"),
-      type: "choice",
-      stem: `关于${topic}，下列说法正确的是？`,
-      options: ["A. 中序遍历得到升序序列", "B. 只能存储整数", "C. 不支持插入操作", "D. 查找复杂度恒为 O(1)"],
-      answer: "A",
-      explanation: "二叉搜索树中序遍历得到升序序列，这是其核心特性。",
-    },
-    {
-      id: generateId("q"),
-      type: "choice",
-      stem: `${topic}的最坏时间复杂度是？`,
-      options: ["A. O(1)", "B. O(log n)", "C. O(n)", "D. O(n²)"],
-      answer: "C",
-      explanation: "当树退化为链表时，查找复杂度为 O(n)。",
-    },
-    {
-      id: generateId("q"),
-      type: "choice",
-      stem: `学习${topic}时，最有效的实践方式是？`,
-      options: ["A. 只看课本", "B. 结合代码实现与习题练习", "C. 死记硬背", "D. 跳过练习"],
-      answer: "B",
-      explanation: "结合代码实现与习题练习能加深对数据结构的理解。",
-    },
-  ];
-  return bank.slice(0, count);
+// 从静态题库中按课程和主题取题
+function staticQuizBank(courseId: string, topic: string, count: number): QuizQuestion[] {
+  const quizzes = getSeedQuizzesByCourse(courseId);
+  const normalizedTopic = topic.trim();
+  const topicMatches = normalizedTopic && normalizedTopic !== "综合"
+    ? quizzes.filter(
+        (quiz) =>
+          quiz.topic.includes(normalizedTopic) || normalizedTopic.includes(quiz.topic)
+      )
+    : [];
+  const remaining = quizzes.filter((quiz) => !topicMatches.includes(quiz));
+  const seenQuestionIds = new Set<string>();
+  const pool = [...topicMatches, ...remaining]
+    .flatMap((quiz) => quiz.questions)
+    .filter((question) => question.type === "choice")
+    .filter((question) => {
+      if (seenQuestionIds.has(question.id)) return false;
+      seenQuestionIds.add(question.id);
+      return true;
+    });
+
+  return pool.slice(0, count).map((question) => ({
+    ...question,
+    id: generateId("q"),
+  }));
 }
