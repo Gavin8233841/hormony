@@ -233,4 +233,13 @@ Trae 下一批只执行以下任务，不修改业务代码：
 4. 只允许新增该清单并追加 `DEVLOG.md`，不修改业务代码、依赖、构建配置和现有竞赛文档。
 5. 运行 `git diff --check`，不提交 Git，交由 Codex 复核。
 
-服务端容器、持久化、模型密钥、公网配置、HarmonyOS `BASE_URL` 和系统级能力仍由 Codex 处理。
+### 真实 Agent 强制边界（2026-07-01）
+
+1. Vercel 仅承载无状态 Agent 网关；画像、计划、答题、进度和会话保存在 HarmonyOS ArkData。
+2. 所有 AI 文案、AI 计划和 AI 出题必须来自已配置的豆包模型。模型不可用时返回明确错误，禁止规则文本、模板任务或静态题库冒充 AI。
+3. 精选题库、本机课程资料和确定性评分属于普通产品能力，UI 必须与 AI 生成内容区分。
+4. `MODEL_API_KEY` 仅允许进入 Vercel 环境变量，不得进入源码、日志、HAP、GitHub 或截图。
+5. Docker 只做本地复现；Trae 不再研究持久卷、服务器运维或数据库部署。
+6. Trae 只能在 Codex 已定义的 ArkData 接口下迁移重复页面和补测试，不得修改模型调用、Safety、无状态 API 契约和状态仓库核心。
+
+无状态 API、模型密钥、Vercel 配置、HarmonyOS `BASE_URL`、ArkData 仓库和系统级能力由 Codex 处理。

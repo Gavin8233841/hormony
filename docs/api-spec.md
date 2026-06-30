@@ -1,30 +1,31 @@
 # 接口规范
 
 > 所有接口由 `apps/web` 的 Next.js API Routes 提供，鸿蒙端通过 HTTP/SSE 调用。
-> Base URL: `http://<host>:3000/api`
+> 生产 Base URL: `https://<project>.vercel.app/api`。Vercel 只提供无状态 Agent 网关，用户学习状态保存在 HarmonyOS ArkData。
 
 ## 通用约定
 
 - 请求/响应均为 JSON（流式接口除外）
-- 认证：`Authorization: Bearer <token>`（初期可省略）
+- 生产调用频率由 Vercel Firewall 与豆包额度上限共同约束
 - 错误格式：`{ "error": string, "code": string }`
 - 模型密钥只由 Web 服务端进程环境变量读取，不出现在任何接口响应中
+- `MODEL_API_KEY` 缺失或模型不可用时，AI 接口返回 `503 MODEL_UNAVAILABLE`，不存在演示回答
 
 ---
 
 ## GET /api/model/status
 
-获取模型服务端配置状态，用于联调确认当前处于真实模型模式还是演示模式。
+获取模型服务端配置状态，用于联调确认真实模型是否就绪。
 
 **响应**
 ```json
 {
   "configured": false,
-  "mode": "demo",
+  "mode": "unavailable",
   "provider": "openai-compatible",
   "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
   "modelName": "doubao-seed-2-1-pro-260628",
-  "timeoutMs": 60000
+  "timeoutMs": 45000
 }
 ```
 
@@ -44,7 +45,18 @@
   "context": {
     "courseId": "string?",
     "sessionId": "string?"
-  }
+  },
+  "profile": {
+    "stage": "本科二年级",
+    "weakTopics": ["树与图"],
+    "strongTopics": ["数组"],
+    "learningStyle": "视觉型",
+    "stats": { "totalQuestions": 128, "accuracy": 0.76, "studyDays": 23 }
+  },
+  "history": [
+    { "role": "user", "content": "上一轮问题" },
+    { "role": "assistant", "content": "上一轮真实模型回答" }
+  ]
 }
 ```
 
@@ -60,7 +72,7 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 
 ## GET /api/profile?userId=...
 
-获取用户学习画像。
+无状态部署中禁用，返回 `404 ENDPOINT_DISABLED`。用户画像由 HarmonyOS ArkData 读取。
 
 **响应**
 ```json
@@ -116,13 +128,13 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 }
 ```
 
-生成成功后计划会保存到当前用户，首页与计划页可通过 GET 读取同一份任务状态。
+生成结果不在服务端保存。HarmonyOS 收到结果后写入 ArkData，首页与计划页读取同一份本地状态。
 
 ---
 
 ## GET /api/plan?userId=...
 
-获取用户当前学习计划；不存在时返回 `404 NOT_FOUND`。
+无状态部署中禁用，返回 `404 ENDPOINT_DISABLED`。
 
 ---
 
@@ -138,7 +150,7 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 }
 ```
 
-返回更新后的完整 `StudyPlan`；计划或任务不存在时返回 `404 NOT_FOUND`。
+无状态部署中禁用。任务完成状态由 HarmonyOS 本地更新。
 
 ---
 
@@ -174,7 +186,7 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 }
 ```
 
-生成接口不返回答案和解析。完整题目只保存在服务端，提交后才返回评分与解析。
+生成接口同时返回 `grading` 数组，HarmonyOS 状态层单独保存该数组，答题界面提交前不展示答案。评分、画像与课程进度更新均在本地执行，服务端不保存。
 
 ---
 
@@ -199,7 +211,7 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 
 ## POST /api/quiz/submit
 
-提交答案并返回整份测验的评分、逐题解析和薄弱知识点。缺失答案按未作答计入总题数。
+无状态部署中禁用。HarmonyOS 使用本次 `QuizPackage.grading` 在本地评分并保存结果。
 
 **请求**
 ```json

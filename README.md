@@ -75,7 +75,8 @@
 
 - **鸿蒙端**: ArkTS / ArkUI / Stage 模型 / Navigation 路由
 - **Web 端**: Next.js 14 / React 18 / TypeScript / Tailwind CSS
-- **AI 模型**: OpenAI 兼容接口（火山引擎豆包 / 可配置）
+- **AI 模型**: Vercel 无状态网关调用火山引擎豆包，生产环境禁止伪造 AI 降级
+- **端侧状态**: HarmonyOS ArkData 保存画像、计划、进度、答题结果与最近对话
 - **检索引擎**: TF-IDF + 中文双字分词 + 余弦相似度（零依赖）
 - **安全**: 速率限制 + 安全头 + CORS + 5 层内容审核
 

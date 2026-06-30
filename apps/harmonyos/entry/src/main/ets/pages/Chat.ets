@@ -6,7 +6,8 @@
 import http from '@ohos.net.http';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Citation, StreamEvent, ChatRequest } from '../model/DataModels';
+import { Citation, StreamEvent, ChatRequest, ChatMessage, HealthResponse } from '../model/DataModels';
+import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 interface DisplayMessage {
   role: string;
@@ -25,6 +26,8 @@ export struct ChatContent {
   @State messages: DisplayMessage[] = [];
   @State inputText: string = '';
   @State loading: boolean = false;
+  @StorageLink('cloudAgentReady') cloudAgentReady: boolean = false;
+  @State serviceMessage: string = '正在连接云端学伴';
   private scroller: Scroller = new Scroller();
   private currentRequest: http.HttpRequest | null = null;
   private isCancelled: boolean = false;
@@ -40,6 +43,8 @@ export struct ChatContent {
 
   aboutToAppear(): void {
     this.isCancelled = false;
+    this.loadLocalHistory();
+    this.probeCloudAgent();
     if (this.quickQuestion.trim().length > 0) {
       this.inputText = this.quickQuestion.trim();
     }
@@ -59,7 +64,42 @@ export struct ChatContent {
   }
 
   get canSend(): boolean {
-    return !this.loading && this.inputText.trim().length > 0;
+    return this.cloudAgentReady && !this.loading && this.inputText.trim().length > 0;
+  }
+
+  private async loadLocalHistory(): Promise<void> {
+    try {
+      const history = await LocalLearningRepository.getChatHistory();
+      const restored: DisplayMessage[] = [];
+      for (const item of history) {
+        const message: DisplayMessage = {
+          role: item.role,
+          content: item.content,
+          citations: item.citations ?? [],
+          agentTrace: [],
+          thinking: [],
+          citationExpanded: false,
+          failed: false,
+          retryQuestion: ''
+        };
+        restored.push(message);
+      }
+      this.messages = restored;
+    } catch (error) {
+      this.serviceMessage = '本地会话记录加载失败';
+    }
+  }
+
+  private async probeCloudAgent(): Promise<void> {
+    this.serviceMessage = '正在连接云端学伴';
+    try {
+      const health = await HttpClient.get<HealthResponse>(Constants.API_HEALTH);
+      this.cloudAgentReady = health.status === 'ready';
+      this.serviceMessage = this.cloudAgentReady ? '' : '云端学伴尚未就绪';
+    } catch (error) {
+      this.cloudAgentReady = false;
+      this.serviceMessage = '云端学伴暂不可用';
+    }
   }
 
   private scrollToBottom(): void {
@@ -162,6 +202,22 @@ export struct ChatContent {
       }
 
       // 输入栏
+      if (!this.cloudAgentReady) {
+        Row() {
+          Text(this.serviceMessage)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .layoutWeight(1)
+          Button('重试')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_BRAND)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .height(32)
+            .onClick((): void => { this.probeCloudAgent(); })
+        }
+        .width('100%')
+        .padding({ left: 18, right: 18, top: 8 })
+      }
       Row({ space: 12 }) {
         TextInput({ text: this.inputText, placeholder: '输入你的问题...' })
           .layoutWeight(1)
@@ -200,7 +256,7 @@ export struct ChatContent {
 
   sendMessage(question?: string): void {
     const content = question !== undefined ? question.trim() : this.inputText.trim();
-    if (content.length === 0 || this.loading) {
+    if (content.length === 0 || this.loading || !this.cloudAgentReady) {
       return;
     }
 
@@ -234,13 +290,34 @@ export struct ChatContent {
     this.isCancelled = false;
     this.scrollToBottom();
 
+    const requestHistory: ChatMessage[] = [];
+    for (const item of this.messages.slice(0, this.messages.length - 2).slice(-24)) {
+      if (item.content.length === 0) continue;
+      const historyItem: ChatMessage = {
+        role: item.role,
+        content: item.content,
+        citations: item.citations
+      };
+      requestHistory.push(historyItem);
+    }
     const req: ChatRequest = {
       userId: Constants.DEMO_USER_ID,
       message: message,
+      history: requestHistory,
+      context: {
+        courseId: AppStorage.get<string>('selectedCourseId') ?? 'cs101'
+      }
     };
-    HttpClient.postSSE(
-      Constants.API_CHAT,
-      JSON.stringify(req),
+    LocalLearningRepository.getProfile().then((profile): void => {
+      if (profile !== null) req.profile = profile;
+      this.startSseRequest(req);
+    }).catch((): void => {
+      this.startSseRequest(req);
+    });
+  }
+
+  private startSseRequest(req: ChatRequest): void {
+    HttpClient.postSSE(Constants.API_CHAT, JSON.stringify(req),
       (evt: StreamEvent) => {
         if (this.isCancelled) {
           return;
@@ -256,6 +333,9 @@ export struct ChatContent {
           last.content += evt.content;
         } else if (evt.type === 'citation' && evt.source) {
           last.citations.push(evt.source);
+        } else if (evt.type === 'error') {
+          last.failed = true;
+          this.serviceMessage = evt.message ?? '云端学伴暂不可用';
         }
 
         this.messages = this.messages.slice();
@@ -267,14 +347,20 @@ export struct ChatContent {
         }
         this.loading = false;
         this.currentRequest = null;
+        const last = this.messages[this.messages.length - 1];
+        if (last.failed || last.content.length === 0) {
+          this.messages = this.messages.slice(0, this.messages.length - 1);
+        } else {
+          this.saveLocalHistory();
+        }
       },
       (_err: Error) => {
         if (this.isCancelled) {
           return;
         }
-        const last = this.messages[this.messages.length - 1];
-        last.content = '暂时无法连接学习服务，请稍后重试。';
-        last.failed = true;
+        this.messages = this.messages.slice(0, this.messages.length - 1);
+        this.serviceMessage = '云端学伴暂不可用，请稍后重试';
+        this.cloudAgentReady = false;
         this.loading = false;
         this.currentRequest = null;
         this.messages = this.messages.slice();
@@ -283,6 +369,20 @@ export struct ChatContent {
         this.currentRequest = reqInstance;
       }
     );
+  }
+
+  private async saveLocalHistory(): Promise<void> {
+    const history: ChatMessage[] = [];
+    for (const item of this.messages.slice(-24)) {
+      if (item.content.length === 0 || item.failed) continue;
+      const message: ChatMessage = {
+        role: item.role,
+        content: item.content,
+        citations: item.citations
+      };
+      history.push(message);
+    }
+    await LocalLearningRepository.saveChatHistory(history);
   }
 
   @Builder

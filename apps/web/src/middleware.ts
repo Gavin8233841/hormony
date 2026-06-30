@@ -8,6 +8,15 @@ import type { NextRequest } from "next/server";
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 分钟窗口
 const RATE_LIMIT_MAX_REQUESTS = 30;  // 每窗口最大请求数
 
+const STATEFUL_API_PREFIXES = [
+  "/api/conversations",
+  "/api/knowledge/upload",
+  "/api/plan/save",
+  "/api/profile",
+  "/api/quiz/submit",
+  "/api/stats",
+];
+
 // 内存存储（单实例够用，多实例需换 Redis）
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
@@ -60,6 +69,18 @@ function applyCorsHeaders(res: NextResponse, req: NextRequest) {
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (
+    process.env.DEPLOYMENT_MODE === "stateless" &&
+    STATEFUL_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  ) {
+    const res = NextResponse.json(
+      { error: "该接口在无状态部署中不可用", code: "ENDPOINT_DISABLED" },
+      { status: 404 }
+    );
+    addSecurityHeaders(res);
+    return res;
+  }
 
   // 仅对 API 路由执行速率限制
   if (pathname.startsWith("/api/")) {

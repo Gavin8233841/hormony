@@ -166,7 +166,12 @@ export class HttpClient {
       extraData: body,
       connectTimeout: Constants.REQUEST_TIMEOUT,
       readTimeout: Constants.REQUEST_TIMEOUT,
-    }).then(() => {
+    }).then((responseCode: number) => {
+      if (responseCode !== 200) {
+        onError(new Error('HTTP ' + responseCode));
+        httpRequest.destroy();
+        return;
+      }
       // 流结束但未收到 done 事件时，确保 onDone 被调用
       if (!doneCalled) {
         doneCalled = true;

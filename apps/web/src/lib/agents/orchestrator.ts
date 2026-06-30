@@ -13,7 +13,6 @@ import { runEvaluatorAgent } from "./evaluator-agent";
 import { runSafetyAgent } from "./safety-agent";
 import type { AgentResult, Citation, StreamEvent, ChatRequest, ChatMessage, SafetyResult } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-import { store } from "@/lib/store/db";
 
 // 简易意图识别（关键词路由）
 type Intent = "tutor" | "plan" | "quiz" | "evaluate" | "general";
@@ -64,12 +63,6 @@ function prepareContext(req: ChatRequest): {
   const intent = detectIntent(req.message);
   const sessionId = req.context?.sessionId ?? generateId("session");
   const history: ChatMessage[] = req.history ?? [];
-  if (!req.history) {
-    for (const c of store.getConversations(req.userId, 5)) {
-      history.push({ role: "user", content: c.message });
-      history.push({ role: "assistant", content: c.response });
-    }
-  }
   return { intent, sessionId, history };
 }
 
@@ -81,7 +74,7 @@ async function runPreAgents(
 ): Promise<{ profileResult: AgentResult; retrievalResult: AgentResult }> {
   // Profile Agent
   emit?.({ type: "thinking", agent: "Profile" });
-  const profileResult = await safeAgentCall("Profile", () => runProfileAgent(req.userId));
+  const profileResult = await safeAgentCall("Profile", () => runProfileAgent(req.profile));
   emit?.({ type: "trace", agent: "Profile", content: profileResult.content });
 
   // Retrieval Agent
@@ -113,8 +106,8 @@ async function routeMainAgent(
   switch (intent) {
     case "plan":
       emit?.({ type: "thinking", agent: "Planner" });
-      mainResult = await safeAgentCall("Planner", async () => {
-        const plan = await runPlannerAgent(req.userId, req.message, 14, 90);
+      mainResult = await (async () => {
+        const plan = await runPlannerAgent(req.userId, req.message, 14, 90, req.profile);
         return {
           agent: "Planner",
           content: isStream
@@ -123,11 +116,11 @@ async function routeMainAgent(
                 .join("\n")}`
             : JSON.stringify(plan, null, 2),
         };
-      });
+      })();
       break;
     case "quiz":
       emit?.({ type: "thinking", agent: "Quiz" });
-      mainResult = await safeAgentCall("Quiz", async () => {
+      mainResult = await (async () => {
         const quiz = await runQuizAgent(
           req.userId,
           req.context?.courseId ?? "cs101",
@@ -146,33 +139,30 @@ async function routeMainAgent(
                 .join("\n\n")}`
             : JSON.stringify(quiz, null, 2),
         };
-      });
+      })();
       break;
     case "evaluate":
       emit?.({ type: "thinking", agent: "Evaluator" });
-      mainResult = await safeAgentCall("Evaluator", () =>
-        runEvaluatorAgent(req.userId, [])
-      );
+      mainResult = await runEvaluatorAgent(req.userId, [], req.profile);
       break;
     case "tutor":
     case "general":
     default:
       emit?.({ type: "thinking", agent: "Tutor" });
-      mainResult = await safeAgentCall("Tutor", () =>
-        runTutorAgent(
+      mainResult = await runTutorAgent(
           req.userId,
           req.message,
           retrievalResult.content,
           retrievalResult.citations ?? [],
-          history
-        )
-      );
+          history,
+          req.profile
+        );
       break;
   }
   return mainResult;
 }
 
-// 安全审核（失败不阻断）。
+// 安全审核（失败时阻断正文输出）。
 // 传入 emit 时推送 thinking + trace 事件；返回 safety 结果与对应的 AgentResult。
 async function runSafetyCheck(
   content: string,
@@ -186,10 +176,10 @@ async function runSafetyCheck(
       err instanceof Error ? err.message : String(err)
     );
     return {
-      passed: true,
-      flags: [],
-      hallucinationRisk: "low" as const,
-      suggestion: emit ? "安全审核服务暂不可用。" : "安全审核服务暂不可用，已跳过。",
+      passed: false,
+      flags: ["安全审核服务不可用"],
+      hallucinationRisk: "high" as const,
+      suggestion: "安全审核失败，已阻断本次回答。",
     };
   });
   const safetyAgentResult: AgentResult = {
@@ -207,24 +197,6 @@ async function runSafetyCheck(
       : `安全检查：${safety.flags.join("；")}，幻觉风险：${safety.hallucinationRisk}。${safety.suggestion ?? ""}`,
   });
   return { safety, safetyAgentResult };
-}
-
-// 持久化会话历史
-function persistConversation(
-  sessionId: string,
-  req: ChatRequest,
-  mainResult: AgentResult,
-  intent: Intent
-): void {
-  store.addConversation({
-    sessionId,
-    userId: req.userId,
-    message: req.message,
-    response: mainResult.content,
-    intent,
-    citations: mainResult.citations ?? [],
-    createdAt: new Date().toISOString(),
-  });
 }
 
 // ========== 入口函数 ==========
@@ -249,14 +221,15 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
   );
   agentResults.push(safetyAgentResult);
 
-  // 4. 记录会话历史
-  persistConversation(sessionId, req, mainResult, intent);
+  const finalContent = safety.passed
+    ? mainResult.content
+    : "本次回答未通过安全检查，请调整问题后重试。";
 
   return {
     sessionId,
     intent,
     agentResults,
-    finalContent: mainResult.content,
+    finalContent,
     citations: mainResult.citations ?? [],
     safetyPassed: safety.passed,
     safetySuggestion: safety.suggestion,
@@ -276,20 +249,28 @@ export async function orchestrateStream(
   // 2. 按意图路由到主 Agent（失败不阻断）
   const mainResult = await routeMainAgent(intent, req, retrievalResult, history, emit);
 
-  // 3. 流式输出正文（逐段）
-  emit({ type: "delta", content: mainResult.content });
+  // 3. 安全审核必须先于任何正文输出。
+  const { safety } = await runSafetyCheck(
+    mainResult.content,
+    mainResult.citations ?? [],
+    emit
+  );
+  if (!safety.passed) {
+    emit({
+      type: "error",
+      code: "SAFETY_BLOCKED",
+      message: "本次回答未通过安全检查，请调整问题后重试。",
+    });
+    emit({ type: "done", sessionId });
+    return;
+  }
 
-  // 4. 推送引用
+  // 4. 审核通过后才输出正文与引用。
+  emit({ type: "delta", content: mainResult.content });
   for (const c of mainResult.citations ?? []) {
     emit({ type: "citation", source: c });
   }
 
-  // 5. 安全审核（失败不阻断）
-  await runSafetyCheck(mainResult.content, mainResult.citations ?? [], emit);
-
-  // 6. 记录会话历史
-  persistConversation(sessionId, req, mainResult, intent);
-
-  // 7. 完成
+  // 5. 完成。会话由 HarmonyOS 本地仓库持久化。
   emit({ type: "done", sessionId });
 }

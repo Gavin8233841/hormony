@@ -3,6 +3,10 @@
     { "name": "module_desc", "value": "鸿蒙 AI 学习助理 Agent" },
     { "name": "EntryAbility_desc", "value": "学习助理主入口" },
     { "name": "EntryAbility_label", "value": "学习助理" },
-    { "name": "reason_internet", "value": "用于连接 AI 后端服务进行对话与检索" }
+    { "name": "reason_internet", "value": "用于连接 AI 后端服务进行对话与检索" },
+    { "name": "EntryFormAbility_label", "value": "今日学习" },
+    { "name": "EntryFormAbility_desc", "value": "在桌面查看下一项学习任务" },
+    { "name": "widget_display_name", "value": "鸿学伴今日学习" },
+    { "name": "widget_desc", "value": "显示本地学习计划中的下一项任务" }
   ]
 }

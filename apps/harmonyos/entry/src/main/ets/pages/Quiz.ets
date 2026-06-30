@@ -1,5 +1,5 @@
 /**
- * 课程测验页 - 原生答题、服务端评分与错题解析
+ * 课程测验页 - 真实 AI 出题、本地评分与学习记录
  */
 
 import { GradientHeader } from '../common/Builders';
@@ -7,14 +7,15 @@ import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
-  QuizAnswer,
+  Course,
+  QuizGradingItem,
+  QuizPackage,
   QuizQuestionView,
   QuizRequest,
   QuizResult,
   QuizResultDetail,
-  QuizSubmission,
-  QuizView,
 } from '../model/DataModels';
+import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 @Entry
 @Component
@@ -36,6 +37,7 @@ struct QuizPage {
   @State resultDetails: QuizResultDetail[] = [];
   @State evaluation: string = '';
   @State weakTopics: string[] = [];
+  private grading: QuizGradingItem[] = [];
   private suggestions: string[] = ['二叉树与BST', '图的遍历', '动态规划'];
 
   aboutToAppear(): void {
@@ -75,6 +77,7 @@ struct QuizPage {
     this.resultDetails = [];
     this.evaluation = '';
     this.weakTopics = [];
+    this.grading = [];
   }
 
   private reviewTopic(topic: string): void {
@@ -99,18 +102,19 @@ struct QuizPage {
       difficulty: 'medium',
     };
     try {
-      const response = await HttpClient.post<QuizView>(
+      const response = await HttpClient.post<QuizPackage>(
         Constants.API_QUIZ,
         JSON.stringify(request)
       );
       this.quizId = response.quizId;
       this.questions = response.questions;
+      this.grading = response.grading;
       this.answers = new Array<string>(response.questions.length).fill('');
       if (this.questions.length === 0) {
         this.message = '当前主题暂时没有可用题目';
       }
     } catch (e) {
-      this.message = '题目加载失败，请确认学习服务已启动';
+      this.message = '云端学伴暂不可用，未生成任何题目';
     } finally {
       this.loading = false;
     }
@@ -120,36 +124,105 @@ struct QuizPage {
     if (this.submitting || this.quizId.length === 0) return;
     this.submitting = true;
     this.message = '';
-    const answerList: QuizAnswer[] = [];
+    const details: QuizResultDetail[] = [];
+    let correctCount = 0;
     for (let i = 0; i < this.questions.length; i++) {
-      const answer: QuizAnswer = {
-        questionId: this.questions[i].id,
-        userAnswer: this.answers[i] ?? '',
+      const question = this.questions[i];
+      const grading = this.findGrading(question.id);
+      const userAnswer = this.answers[i] ?? '';
+      const isCorrect = this.answerLetter(userAnswer) === grading.answer.trim().toUpperCase();
+      if (isCorrect) correctCount += 1;
+      const detail: QuizResultDetail = {
+        questionId: question.id,
+        stem: question.stem,
+        userAnswer: userAnswer,
+        correctAnswer: this.correctOption(question, grading.answer),
+        isCorrect: isCorrect,
+        explanation: grading.explanation
       };
-      answerList.push(answer);
+      details.push(detail);
     }
-    const request: QuizSubmission = {
+
+    const weakTopics: string[] = correctCount < this.questions.length ? [this.topic] : [];
+    const result: QuizResult = {
       quizId: this.quizId,
       userId: Constants.DEMO_USER_ID,
-      answers: answerList,
+      totalQuestions: this.questions.length,
+      correctCount: correctCount,
+      accuracy: this.questions.length > 0 ? correctCount / this.questions.length : 0,
+      details: details,
+      evaluation: correctCount === this.questions.length ? '本组题目全部答对，继续保持。' :
+        '已记录本次答题结果，可从薄弱知识点进入课程资料复习。',
+      weakTopics: weakTopics,
+      submittedAt: new Date().toISOString()
     };
     try {
-      const response = await HttpClient.post<QuizResult>(
-        Constants.API_QUIZ_SUBMIT,
-        JSON.stringify(request)
-      );
-      this.resultAccuracy = response.accuracy;
-      this.resultCorrectCount = response.correctCount;
-      this.resultTotalQuestions = response.totalQuestions;
-      this.resultDetails = response.details;
-      this.evaluation = response.evaluation;
-      this.weakTopics = response.weakTopics;
+      await LocalLearningRepository.appendQuizResult(result);
+      await this.updateLocalProfile(result);
+      await this.updateCourseProgress();
+      this.resultAccuracy = result.accuracy;
+      this.resultCorrectCount = result.correctCount;
+      this.resultTotalQuestions = result.totalQuestions;
+      this.resultDetails = result.details;
+      this.evaluation = result.evaluation;
+      this.weakTopics = result.weakTopics;
       this.resultReady = true;
     } catch (e) {
-      this.message = '提交失败，请稍后重试';
+      this.message = '答题结果保存失败，请稍后重试';
     } finally {
       this.submitting = false;
     }
+  }
+
+  private findGrading(questionId: string): QuizGradingItem {
+    for (const item of this.grading) {
+      if (item.questionId === questionId) return item;
+    }
+    return { questionId: questionId, answer: '', explanation: '暂无解析' };
+  }
+
+  private answerLetter(answer: string): string {
+    const trimmed = answer.trim().toUpperCase();
+    if (trimmed.length === 0) return '';
+    return trimmed.substring(0, 1);
+  }
+
+  private correctOption(question: QuizQuestionView, answer: string): string {
+    const options = question.options ?? [];
+    const index = answer.trim().toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+    if (index >= 0 && index < options.length) return options[index];
+    return answer;
+  }
+
+  private async updateLocalProfile(result: QuizResult): Promise<void> {
+    const profile = await LocalLearningRepository.getProfile();
+    if (profile === null) return;
+    const previousTotal = profile.stats.totalQuestions;
+    const previousCorrect = Math.round(previousTotal * profile.stats.accuracy);
+    const nextTotal = previousTotal + result.totalQuestions;
+    profile.stats.totalQuestions = nextTotal;
+    profile.stats.accuracy = nextTotal > 0 ?
+      (previousCorrect + result.correctCount) / nextTotal : 0;
+    for (const topic of result.weakTopics) {
+      if (!profile.weakTopics.includes(topic)) profile.weakTopics.push(topic);
+    }
+    await LocalLearningRepository.saveProfile(profile);
+  }
+
+  private async updateCourseProgress(): Promise<void> {
+    const courses = await LocalLearningRepository.getCourses();
+    if (courses === null) return;
+    const nextCourses: Course[] = courses.map((course: Course): Course => {
+      if (course.id !== this.courseId) return course;
+      return {
+        id: course.id,
+        title: course.title,
+        progress: Math.min(course.progress + 0.03, 1),
+        docCount: course.docCount,
+        topics: course.topics
+      };
+    });
+    await LocalLearningRepository.saveCourses(nextCourses);
   }
 
   @Builder

@@ -19,12 +19,10 @@ export class Constants {
   static readonly API_QUIZ_SUBMIT: string = '/api/quiz/submit';
   static readonly API_SAFETY: string = '/api/safety-review';
   static readonly API_KNOWLEDGE_SEARCH: string = '/api/knowledge/search';
+  static readonly API_HEALTH: string = '/api/health';
 
   // 演示用户
   static readonly DEMO_USER_ID: string = 'demo';
-
-  // 调试开关：true 时网络失败回退演示数据；false 时显示真实错误不回退
-  static readonly __DEBUG__: boolean = true;
 
   // 请求超时（毫秒）
   static readonly REQUEST_TIMEOUT: number = 30000;

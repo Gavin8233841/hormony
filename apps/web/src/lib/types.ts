@@ -14,6 +14,18 @@ export interface UserProfile {
   };
 }
 
+export interface LearningProfileSnapshot {
+  stage: string;
+  weakTopics: string[];
+  strongTopics: string[];
+  learningStyle: string;
+  stats: {
+    totalQuestions: number;
+    accuracy: number;
+    studyDays: number;
+  };
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -66,6 +78,16 @@ export interface QuizView {
   courseId: string;
   topic: string;
   questions: QuizQuestionView[];
+}
+
+export interface QuizGradingItem {
+  questionId: string;
+  answer: string;
+  explanation: string;
+}
+
+export interface QuizPackage extends QuizView {
+  grading: QuizGradingItem[];
 }
 
 export interface QuizCatalogItem {
@@ -125,6 +147,7 @@ export interface ChatRequest {
   userId: string;
   message: string;
   history?: ChatMessage[];
+  profile?: LearningProfileSnapshot;
   context?: {
     courseId?: string;
     sessionId?: string;
@@ -137,6 +160,7 @@ export type StreamEvent =
   | { type: "delta"; content: string }
   | { type: "citation"; source: Citation }
   | { type: "trace"; agent: AgentName; content: string }
+  | { type: "error"; code: string; message: string }
   | { type: "done"; sessionId: string };
 
 // ========== 测验提交与评分 ==========

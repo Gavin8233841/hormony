@@ -6,7 +6,8 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
-import { StudyPlan, PlanTask, PlanRequest, PlanTaskUpdate } from '../model/DataModels';
+import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
+import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 @Entry
 @Component
@@ -42,11 +43,11 @@ struct PlanPage {
 
   private async loadPlan(): Promise<void> {
     try {
-      const plan = await HttpClient.get<StudyPlan>(
-        Constants.API_PLAN + '?userId=' + Constants.DEMO_USER_ID
-      );
-      this.goal = plan.goal;
-      this.tasks = plan.tasks;
+      const plan = await LocalLearningRepository.getPlan();
+      if (plan !== null) {
+        this.goal = plan.goal;
+        this.tasks = plan.tasks;
+      }
     } catch (e) {
       // 没有已保存计划时保留创建状态。
     }
@@ -54,21 +55,32 @@ struct PlanPage {
 
   private async toggleTask(task: PlanTask): Promise<void> {
     const nextDone = !Boolean(task.done);
-    const request: PlanTaskUpdate = {
-      userId: Constants.DEMO_USER_ID,
-      taskId: task.id,
-      done: nextDone,
-    };
     try {
-      const plan = await HttpClient.patch<StudyPlan>(
-        Constants.API_PLAN_SAVE,
-        JSON.stringify(request)
-      );
-      this.tasks = plan.tasks;
-      this.message = nextDone ? '任务已完成，学习进度已同步' : '任务已恢复为待完成';
+      const nextTasks: PlanTask[] = [];
+      for (const item of this.tasks) {
+        if (item.id === task.id) {
+          const updated: PlanTask = {
+            id: item.id,
+            title: item.title,
+            date: item.date,
+            estimatedMin: item.estimatedMin,
+            type: item.type,
+            done: nextDone
+          };
+          nextTasks.push(updated);
+        } else {
+          nextTasks.push(item);
+        }
+      }
+      const current = await LocalLearningRepository.getPlan();
+      if (current === null) throw new Error('本地计划不存在');
+      current.tasks = nextTasks;
+      await LocalLearningRepository.savePlan(current);
+      this.tasks = nextTasks;
+      this.message = nextDone ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成';
       this.hasError = false;
     } catch (e) {
-      this.message = '任务状态同步失败，请稍后重试';
+      this.message = '任务状态保存失败，请稍后重试';
       this.hasError = true;
     }
   }
@@ -335,21 +347,15 @@ struct PlanPage {
         goal: this.goal.trim(),
         durationDays: this.days,
         dailyMinutes: 90,
+        profile: (await LocalLearningRepository.getProfile()) ?? undefined
       };
       const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, JSON.stringify(req));
+      await LocalLearningRepository.savePlan(plan);
       this.tasks = plan.tasks;
       this.message = '计划已生成并同步到首页';
     } catch (e) {
-      if (Constants.__DEBUG__) {
-        const task1: PlanTask = { id: '1', title: '梳理核心概念', date: '第 1 天', estimatedMin: 45, type: '复习' };
-        const task2: PlanTask = { id: '2', title: '完成章节练习', date: '第 2 天', estimatedMin: 30, type: '练习' };
-        const task3: PlanTask = { id: '3', title: '复盘错题与薄弱点', date: '第 3 天', estimatedMin: 40, type: '复盘' };
-        this.tasks = [task1, task2, task3];
-        this.message = '网络不可用，已生成演示计划';
-      } else {
-        this.message = '计划生成失败，请稍后重试';
-        this.hasError = true;
-      }
+      this.message = '云端学伴暂不可用，未生成任何计划';
+      this.hasError = true;
     } finally {
       this.loading = false;
     }

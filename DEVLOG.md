@@ -3455,3 +3455,149 @@ HEAD `0235baf`（feat: 打通知识题库与原生测验闭环）后，程序化
 - `pnpm build`：生产构建通过，10/10 静态页面生成完成，17 个 API 路由可构建。
 - 本机未安装 Docker，未执行镜像构建与容器重启持久化测试；该项保留为实际部署环境验收门槛。
 
+---
+
+## [2026-06-30T16:00:00Z] [2026-07-01 00:00:00 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+创建 Codex 信息同步文档 — 消除 Trae 与 Codex 之间的严重信息差
+
+#### 背景
+
+用户发现 Codex 不知道已配置免费云端服务器的事实，仍在研究 Docker 服务器搭建方案。经排查发现工作区中存在多处信息差：
+1. Codex 在 `a24219b` 提交中创建了 Dockerfile 和 Docker 部署指南，但用户不计划搭建 Docker 服务器
+2. Codex 在边界文档第十一节声明"服务端容器、持久化...仍由 Codex 处理"，但用户已有云端方案
+3. Codex 在竞赛得分计划中列出"容器化后端"为立即完成项，可能已被用户云端配置覆盖
+4. Trae 已完成的 8 项工程工作（数据资产、类型扩展、后端改造、API 路由、学术核验等）未同步给 Codex
+
+#### 产出
+
+新建 `docs/CODEX-SYNC-20260701.md`（363行），涵盖：
+1. 云端服务器已配置的最高优先级声明 + 6 项需用户补充的信息
+2. Trae 已完成的 8 项工作详情（数据资产、类型扩展、后端改造、Agent 回退、API 路由、学术核验、URL 审计、测试增强）
+3. 当前测试与验证状态（81/81 passed）
+4. 工具链状态（DevEco MCP 11 工具、CLI 路径、模拟器、模型配置）
+5. 当前架构概览（四入口底栏 + 后端 + 正反馈闭环）
+6. 竞赛关键信息（截止日期、评分标准、得分优先顺序）
+7. 用户硬约束（10 条）
+8. Git 提交历史和 Trae 未提交工作清单
+9. Trae 与 Codex 分工边界和 Trae 禁止范围
+10. 5 项待解决问题（云端信息缺失为最高优先级）
+11. 完整文件索引
+
+#### 待用户补充
+
+云端服务器的 6 项信息无法从工作区文件获取，需用户直接提供：
+1. 云平台名称
+2. 公网 HTTPS URL
+3. 环境变量配置方式
+4. 持久化方案
+5. 部署方式
+6. 冷启动行为
+
+#### 修改文件
+
+| 文件 | 类型 | 内容 |
+|------|------|------|
+| `docs/CODEX-SYNC-20260701.md` | 新增 | 363行信息同步文档 |
+| `DEVLOG.md` | 追加 | 本轮记录 |
+
+---
+
+## [2026-06-30T17:17:00Z] [2026-07-01 01:17:08 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+Vercel 部署配置与信息同步 — 确定云平台为 Vercel，完成认证和项目创建
+
+#### 背景
+
+用户确认云平台为 Vercel，Codex 表明"Docker 仅保留本地复现，不再作为生产前提"。用户在终端执行 Vercel 部署时遇到两个问题需 Trae 协助解决，随后将全部情况同步到本地工作区。
+
+#### 解决的问题
+
+1. **ByteString 报错**
+   - 现象：`vercel login` 报 `TypeError: Cannot convert argument to a ByteString because the character at index 0 has a value of 37101`
+   - 根因：Windows 计算机名 `郭泳延的笔记本`（含中文），Vercel CLI 读取 `COMPUTERNAME` 环境变量构建 HTTP 头时崩溃
+   - 修复：覆盖 `$env:COMPUTERNAME = "DESKTOP-GUO82"` 等环境变量为 ASCII 值
+
+2. **项目名大写报错 400**
+   - 现象：Vercel 项目名 `Harmony`（大写 H）被拒绝
+   - 修复：改为全小写 `harmony`
+
+#### 部署进展
+
+| 步骤 | 状态 |
+|------|------|
+| Vercel 账户 | 已具备 |
+| Token 认证 | 完成（`npx vercel --token`） |
+| 团队选择 | GWYY |
+| 项目创建 | `harmony`（小写） |
+| 框架检测 | Next.js 自动识别 |
+| 首次部署 | 因项目名大写失败，修正后重试中 |
+| 公网 URL | 待获取 |
+| 环境变量 | 待配置 |
+
+#### 信息同步
+
+更新 `docs/CODEX-SYNC-20260701.md` 的"最高优先级"章节：
+- 替换原"云端服务器已配置"（信息不准确）为"Vercel 部署进展"
+- 记录已确定事项（平台/认证/团队/项目名/框架/Docker 定位）
+- 记录部署状态清单（含已完成和待完成项）
+- 记录已知问题（ByteString 报错/项目名大写/CLI 未全局安装）
+- 记录 Vercel Hobby 免费层限制（带宽/函数超时/无持久卷）
+- 记录部署后 Codex 需执行的 5 项任务
+
+#### 持续同步约定
+
+从本轮起，每次项目内发生变化或进展，Trae 都将更新到 `DEVLOG.md` 和 `docs/CODEX-SYNC-20260701.md`，确保 Codex 可随时读取最新状态。
+
+#### 修改文件
+
+| 文件 | 类型 | 内容 |
+|------|------|------|
+| `docs/CODEX-SYNC-20260701.md` | 修改 | "最高优先级"章节替换为 Vercel 部署进展 |
+| `DEVLOG.md` | 追加 | 本轮记录 |
+
+---
+
+## [2026-06-30T17:25:00Z] [2026-07-01 01:25:00 CST] 模型: Codex
+
+### 目标
+
+落实“Vercel 无状态真实 Agent 网关 + HarmonyOS ArkData 本地学习状态”方案，删除生产假 AI 边界，并加入鸿蒙系统级展示能力。
+
+### 核心后端
+
+- 模型客户端移除生产演示回答与规则回退；`MODEL_API_KEY` 缺失时统一返回 `503 MODEL_UNAVAILABLE`，测试替身仅允许 `NODE_ENV=test`。
+- `/api/chat` 扩展画像、课程、会话和最多 12 条历史；Safety 在首个正文事件前完成，Safety 异常按阻断处理。
+- `/api/plan` 与 `/api/quiz` 仅返回真实模型结果，不在服务端保存；无状态部署禁用计划读取、任务保存、画像、答题提交、会话和上传等写接口。
+- 增加输入长度、课程、难度、历史、画像、输出 Token 和 45 秒模型超时约束；生产运行模式固定 `DEPLOYMENT_MODE=stateless`、`APP_STATE_PERSISTENCE=off`。
+- 新增无状态与模型不可用契约测试，Web 验证为 9 个测试文件、85/85 通过。
+
+### HarmonyOS 端侧底层
+
+- 新增 `LocalLearningRepository`，以 ArkData `relationalStore` 单表版本化保存画像、课程进度、计划、答题结果和最近 24 条消息。
+- Profile、Course、Home、Plan、Quiz、Chat 改为读取/写入本地仓库；答题在本地评分并更新画像与课程进度。
+- App 启动探测 `/api/health`；云端未就绪时禁用 AI 输入，AI 失败不创建助手气泡或伪造计划/题目。
+- 新增 `EntryFormAbility` 与 2x2 学习服务卡片，读取本地下一项计划；新增用户触发的系统学习提醒通知。
+
+### 部署与安全
+
+- Vercel 插件已连接团队 `GWYY`，但平台项目列表实测为空；本地 `.vercel/project.json` 不能作为云端创建成功证据。
+- CLI 设备登录受 Windows 中文主机名 ByteString 兼容问题阻塞；需由用户在交互终端隐藏提供 Vercel Token 与模型 Key 后完成部署。
+- 工作区扫描未发现 `vcp_` Token；模型密钥未写入源码、日志、`.env.local` 或 HAP 配置。
+- Docker 保留为本地复现工具，不是竞赛运行前提。
+
+### 验证
+
+- Web：`pnpm lint`、`pnpm typecheck`、`pnpm test`（85/85）、`pnpm build` 全部通过。
+- HarmonyOS：`CompileArkTS`、`PackageHap`、`assembleHap` 成功，HAP 655567 字节；仅剩未配置正式签名的预期警告。
+- 模拟器 `127.0.0.1:5555`：HAP 覆盖安装成功，`EntryAbility` 启动成功。
+
+### 待完成
+
+- 在 Vercel 隐藏录入 Token 与 `MODEL_API_KEY`，创建并部署项目，写入非敏感生产变量。
+- 真实豆包联调五个公网接口后，将 HTTPS URL 写入 `Constants.ets`，重建并完成断网/重启/服务卡片端到端验收。
+

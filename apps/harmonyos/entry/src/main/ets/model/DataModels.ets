@@ -78,6 +78,16 @@ export interface QuizView {
   questions: QuizQuestionView[];
 }
 
+export interface QuizGradingItem {
+  questionId: string;
+  answer: string;
+  explanation: string;
+}
+
+export interface QuizPackage extends QuizView {
+  grading: QuizGradingItem[];
+}
+
 export interface QuizRequest {
   userId: string;
   courseId: string;
@@ -125,6 +135,8 @@ export interface StreamEvent {
   content?: string;
   source?: Citation;
   sessionId?: string;
+  code?: string;
+  message?: string;
 }
 
 // API 请求体接口
@@ -133,6 +145,7 @@ export interface PlanRequest {
   goal: string;
   durationDays: number;
   dailyMinutes: number;
+  profile?: UserProfile;
 }
 
 export interface PlanTaskUpdate {
@@ -144,6 +157,19 @@ export interface PlanTaskUpdate {
 export interface ChatRequest {
   userId: string;
   message: string;
+  history?: ChatMessage[];
+  profile?: UserProfile;
+  context?: ChatContext;
+}
+
+export interface ChatContext {
+  courseId?: string;
+  sessionId?: string;
+}
+
+export interface HealthResponse {
+  status: string;
+  deploymentMode: string;
 }
 
 export interface KnowledgeSearchRequest {

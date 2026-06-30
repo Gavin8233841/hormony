@@ -28,6 +28,21 @@ const PII_PATTERNS = [
   { pattern: /[\w.+-]+@[\w-]+\.[\w.-]+/g, label: "邮箱地址" },
 ];
 
+export function validateUserInput(content: string): string[] {
+  const flags: string[] = [];
+  for (const pattern of INJECTION_PATTERNS) {
+    if (pattern.test(content)) {
+      flags.push("疑似 Prompt 注入攻击");
+      break;
+    }
+  }
+  for (const { pattern, label } of PII_PATTERNS) {
+    pattern.lastIndex = 0;
+    if (pattern.test(content)) flags.push(`输入包含敏感信息：${label}`);
+  }
+  return flags;
+}
+
 export async function runSafetyAgent(
   content: string,
   citations: Citation[]

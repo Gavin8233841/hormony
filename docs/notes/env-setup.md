@@ -27,8 +27,8 @@
 |------|------|------|
 | PATH 环境变量 | ohpm / hvigor / hdc 不在系统 PATH | 可通过 DevEco Studio 或 MCP 使用，建议手动添加 |
 | JAVA_HOME | 未设置 | 建议指向 JDK 17 安装目录 |
-| HOS_SDK_HOME | 未设置 | 建议指向 `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony` |
-| 模型 API Key | 不写入仓库、日志或 `.env.local`，启动服务前通过当前进程环境变量注入 | 待注入 |
+| DEVECO_SDK_HOME | 命令行构建时按进程设置 | `C:\Program Files\Huawei\DevEco Studio\sdk` |
+| 模型 API Key | 只写入 Vercel Environment Variables，不写入仓库、日志、HAP 或 `.env.local` | 待 Vercel 隐藏录入 |
 | 官方第三附件 | 作品说明文档 | 需登录茶思屋下载 |
 | DevEco MCP | 已写入 `~/.workbuddy/mcp.json` | 需在连接器管理页面 Trust 启用 |
 
@@ -54,9 +54,11 @@ DevEco Studio 安装完成后，将以下路径加入系统 PATH（路径以实�
 
 - `MODEL_BASE_URL`: `https://ark.cn-beijing.volces.com/api/v3`
 - `MODEL_NAME`: `doubao-seed-2-1-pro-260628`
-- `MODEL_TIMEOUT_MS`: `60000`
+- `MODEL_TIMEOUT_MS`: `45000`
+- `DEPLOYMENT_MODE`: `stateless`
+- `APP_STATE_PERSISTENCE`: `off`
 
-`MODEL_API_KEY` 不写入仓库、日志或 `.env.local`。启动 Web 服务前只通过当前进程环境变量注入。
+`MODEL_API_KEY` 不写入仓库、日志或 `.env.local`。生产环境只在 Vercel 项目设置中隐藏录入。
 
 ```powershell
 $env:MODEL_API_KEY="<在本机手动填入>"
@@ -64,12 +66,12 @@ cd apps/web
 pnpm dev
 ```
 
-未设置 `MODEL_API_KEY` 时，Web 后端自动使用演示模式。
+未设置 `MODEL_API_KEY` 时，健康检查和所有 AI 接口返回明确 `503 MODEL_UNAVAILABLE`，禁止演示回复或规则回复冒充 AI。
 
-## 用户状态快照
+## 本地开发状态快照
 
 - 默认文件：`apps/web/.runtime/hongxueban-state.json`，已被 Git 忽略。
-- 保存内容：用户画像、课程、学习计划、动态测验、答题结果、对话、活动和上传知识。
+- 该快照只用于 Web 本地开发和旧页面调试，不是竞赛生产状态源。
 - 不重复保存：内置知识切片、预置题库和外部资源索引。
-- `APP_STATE_PERSISTENCE=off` 可关闭快照；测试环境默认关闭。
+- Vercel 强制 `APP_STATE_PERSISTENCE=off`；用户画像、计划、答题结果和对话由 HarmonyOS ArkData 保存。
 - `APP_STATE_FILE` 可指定其他绝对路径，未配置时使用上述默认位置。

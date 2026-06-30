@@ -3,8 +3,8 @@
  * 浅色主题 · 加载状态 · 内联统计卡片
  */
 
-import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
+import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { UserProfile } from '../model/DataModels';
 
 @Component
@@ -14,32 +14,15 @@ export struct ProfileContent {
   @State message: string = '';
 
   aboutToAppear() {
-    // 调试模式：先加载演示数据，避免网络等待时空白
-    if (Constants.__DEBUG__) {
-      this.profile = {
-        userId: 'demo',
-        name: '演示同学',
-        stage: '本科二年级',
-        weakTopics: ['树与图', '动态规划', '操作系统调度'],
-        strongTopics: ['数组', '链表', '基础语法'],
-        learningStyle: '视觉型',
-        stats: { totalQuestions: 128, accuracy: 0.76, studyDays: 23 },
-      };
-    } else {
-      this.loading = true;
-    }
+    this.loading = true;
     this.loadProfile();
   }
 
   async loadProfile() {
     try {
-      this.profile = await HttpClient.get<UserProfile>(
-        Constants.API_PROFILE + '?userId=' + Constants.DEMO_USER_ID
-      );
+      this.profile = await LocalLearningRepository.getProfile();
     } catch (e) {
-      if (!Constants.__DEBUG__) {
-        this.message = '学习画像加载失败，请检查网络后重试';
-      }
+      this.message = '本地学习画像加载失败，请重新打开应用';
     } finally {
       this.loading = false;
     }

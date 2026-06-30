@@ -1,16 +1,15 @@
 // GET /api/health — 服务健康检查
 
 import { getModelRuntimeInfo } from "@/lib/agents/model";
-import { store } from "@/lib/store/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const modelInfo = getModelRuntimeInfo();
-  const stats = store.getStats("demo");
+  const status = modelInfo.configured ? "ready" : "degraded";
 
   return Response.json({
-    status: "ok",
+    status,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     model: {
@@ -18,13 +17,9 @@ export async function GET() {
       mode: modelInfo.mode,
       provider: modelInfo.provider,
     },
-    data: {
-      profiles: stats.totalQuestions >= 0 ? "loaded" : "empty",
-      courses: stats.activeCourses,
-      quizSubmissions: stats.totalQuizSubmissions,
-    },
+    deploymentMode: process.env.DEPLOYMENT_MODE?.trim() || "development",
     version: "1.0.0",
-  });
+  }, { status: modelInfo.configured ? 200 : 503 });
 }
 
 export async function OPTIONS() {

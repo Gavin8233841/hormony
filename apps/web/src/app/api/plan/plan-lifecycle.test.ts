@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as getPlan, POST as generatePlan } from "./route";
-import { PATCH as updateTask } from "./save/route";
 import type { StudyPlan } from "@/lib/types";
 
 const originalModelKey = process.env.MODEL_API_KEY;
+const originalDeploymentMode = process.env.DEPLOYMENT_MODE;
 
 describe("学习计划生命周期", () => {
   beforeEach(() => {
     delete process.env.MODEL_API_KEY;
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([
+      { title: "复习二叉树", date: "2026-07-02", estimatedMin: 45, type: "review" },
+      { title: "完成章节练习", date: "2026-07-03", estimatedMin: 30, type: "practice" },
+    ]);
   });
 
   afterEach(() => {
@@ -16,9 +20,12 @@ describe("学习计划生命周期", () => {
     } else {
       process.env.MODEL_API_KEY = originalModelKey;
     }
+    delete process.env.TEST_MODEL_RESPONSE;
+    if (originalDeploymentMode === undefined) delete process.env.DEPLOYMENT_MODE;
+    else process.env.DEPLOYMENT_MODE = originalDeploymentMode;
   });
 
-  it("生成计划后应可读取并打卡任务", async () => {
+  it("应生成无状态计划并由客户端负责保存", async () => {
     const userId = "plan_lifecycle_user";
     const generateResponse = await generatePlan(
       new Request("http://localhost/api/plan", {
@@ -35,42 +42,25 @@ describe("学习计划生命周期", () => {
     const generated = (await generateResponse.json()) as StudyPlan;
 
     expect(generateResponse.status).toBe(200);
-    expect(generated.tasks.length).toBeGreaterThan(0);
-
-    const getResponse = await getPlan(
-      new Request(`http://localhost/api/plan?userId=${userId}`)
-    );
-    const fetched = (await getResponse.json()) as StudyPlan;
-    expect(fetched.planId).toBe(generated.planId);
-
-    const taskId = fetched.tasks[0].id;
-    const patchResponse = await updateTask(
-      new Request("http://localhost/api/plan/save", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, taskId, done: true }),
-      })
-    );
-    const updated = (await patchResponse.json()) as StudyPlan;
-
-    expect(patchResponse.status).toBe(200);
-    expect(updated.tasks.find((task) => task.id === taskId)?.done).toBe(true);
+    expect(generated.tasks).toHaveLength(2);
+    expect(generated.goal).toBe("两周复习数据结构");
   });
 
-  it("不存在的任务不应返回成功", async () => {
-    const response = await updateTask(
-      new Request("http://localhost/api/plan/save", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: "demo",
-          taskId: "missing_task_id",
-          done: true,
-        }),
-      })
-    );
+  it("模型未配置时应返回明确 503", async () => {
+    delete process.env.TEST_MODEL_RESPONSE;
+    const response = await generatePlan(new Request("http://localhost/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal: "复习数据结构" }),
+    }));
+    await expect(response.json()).resolves.toMatchObject({ code: "MODEL_UNAVAILABLE" });
+    expect(response.status).toBe(503);
+  });
 
-    await expect(response.json()).resolves.toMatchObject({ code: "NOT_FOUND" });
+  it("无状态部署不得从服务端读取计划", async () => {
+    process.env.DEPLOYMENT_MODE = "stateless";
+    const response = await getPlan(new Request("http://localhost/api/plan?userId=demo"));
     expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "ENDPOINT_DISABLED" });
   });
 });

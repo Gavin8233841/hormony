@@ -3,16 +3,17 @@
 
 import { callModel, callModelWithHistory } from "./model";
 import { getProfileContext } from "./profile-agent";
-import type { AgentResult, Citation, ChatMessage } from "@/lib/types";
+import type { AgentResult, Citation, ChatMessage, LearningProfileSnapshot } from "@/lib/types";
 
 export async function runTutorAgent(
   userId: string,
   question: string,
   ragContext: string,
   citations: Citation[],
-  history?: ChatMessage[]
+  history?: ChatMessage[],
+  profileSnapshot?: LearningProfileSnapshot
 ): Promise<AgentResult> {
-  const profile = getProfileContext(userId);
+  const profile = getProfileContext(profileSnapshot);
 
   const systemPrompt = `你是一位耐心的大学课程辅导老师。根据学生画像和检索到的课程资料回答问题。
 要求：

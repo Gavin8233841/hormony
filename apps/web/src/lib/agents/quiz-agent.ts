@@ -1,10 +1,8 @@
 // Quiz Agent：测验题生成
-// 优先使用 LLM 动态生成；LLM 不可用时回退到静态题库（70道题目，覆盖3门课程）
+// 仅使用真实模型动态生成。精选题库通过独立 GET 接口提供，不冒充 AI。
 
 import { callModel, extractJsonPayload } from "./model";
 import { generateId } from "@/lib/utils";
-import { store } from "@/lib/store/db";
-import { getQuizzesByCourse as getSeedQuizzesByCourse } from "@/lib/data";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 
 export async function runQuizAgent(
@@ -23,22 +21,10 @@ export async function runQuizAgent(
 难度：${difficulty}
 数量：${count}`;
 
-  let questions: QuizQuestion[] = [];
-
-  try {
-    const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5 });
-    questions = parseQuestions(raw, count, topic);
-  } catch {
-    // LLM 不可用时，从静态题库取题
-  }
-
-  // LLM 题量不足时，用静态题库补齐，并避免重复题干。
-  if (questions.length < count) {
-    const existingStems = new Set(questions.map((question) => question.stem));
-    const fallback = staticQuizBank(courseId, topic, count).filter(
-      (question) => !existingStems.has(question.stem)
-    );
-    questions = [...questions, ...fallback].slice(0, count);
+  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5, maxTokens: 1800 });
+  const questions = parseQuestions(raw, count);
+  if (questions.length !== count) {
+    throw new Error("MODEL_INVALID_RESPONSE: 题目数量或结构不符合要求");
   }
 
   const quiz: Quiz = {
@@ -47,11 +33,10 @@ export async function runQuizAgent(
     topic,
     questions,
   };
-  store.saveQuiz(quiz);
   return quiz;
 }
 
-function parseQuestions(raw: string, count: number, topic: string): QuizQuestion[] {
+function parseQuestions(raw: string, count: number): QuizQuestion[] {
   try {
     const arr = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
@@ -79,34 +64,7 @@ function parseQuestions(raw: string, count: number, topic: string): QuizQuestion
       return parsed;
     }
   } catch {
-    // JSON 解析失败，返回空数组触发静态题库回退
+    return [];
   }
   return [];
-}
-
-// 从静态题库中按课程和主题取题
-function staticQuizBank(courseId: string, topic: string, count: number): QuizQuestion[] {
-  const quizzes = getSeedQuizzesByCourse(courseId);
-  const normalizedTopic = topic.trim();
-  const topicMatches = normalizedTopic && normalizedTopic !== "综合"
-    ? quizzes.filter(
-        (quiz) =>
-          quiz.topic.includes(normalizedTopic) || normalizedTopic.includes(quiz.topic)
-      )
-    : [];
-  const remaining = quizzes.filter((quiz) => !topicMatches.includes(quiz));
-  const seenQuestionIds = new Set<string>();
-  const pool = [...topicMatches, ...remaining]
-    .flatMap((quiz) => quiz.questions)
-    .filter((question) => question.type === "choice")
-    .filter((question) => {
-      if (seenQuestionIds.has(question.id)) return false;
-      seenQuestionIds.add(question.id);
-      return true;
-    });
-
-  return pool.slice(0, count).map((question) => ({
-    ...question,
-    id: generateId("q"),
-  }));
 }

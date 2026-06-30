@@ -1,5 +1,7 @@
 # Hormony API 参考文档
 
+> **历史文档警告（2026-07-01）**：本文记录旧的有状态 Web 原型，含 `demo` 模式与服务端用户状态接口，不适用于 Vercel 生产部署。当前契约以 `docs/api-spec.md`、`docs/DEPLOYMENT-GUIDE.md` 和路由测试为准；生产环境禁止假 AI，学习状态由 HarmonyOS ArkData 保存。
+
 > 版本：1.1.0  
 > 最后更新：2026-06-27  
 > 适用项目：Hormony 智能学习助手（Next.js App Router）

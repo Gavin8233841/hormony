@@ -101,17 +101,25 @@ describe("工具函数", () => {
 });
 
 describe("Profile Agent", () => {
-  it("runProfileAgent 应返回演示用户画像", async () => {
+  const profile = {
+    stage: "本科二年级",
+    weakTopics: ["二叉树"],
+    strongTopics: ["数组"],
+    learningStyle: "结构化学习",
+    stats: { totalQuestions: 20, accuracy: 0.75, studyDays: 5 },
+  };
+
+  it("runProfileAgent 应使用客户端画像快照", async () => {
     const { runProfileAgent } = await import("@/lib/agents/profile-agent");
-    const result = await runProfileAgent("demo");
+    const result = await runProfileAgent(profile);
     expect(result.agent).toBe("Profile");
-    expect(result.content).toContain("演示同学");
+    expect(result.content).toContain("二叉树");
     expect(result.metadata).toBeDefined();
   });
 
   it("getProfileContext 应返回部分画像字段", async () => {
     const { getProfileContext } = await import("@/lib/agents/profile-agent");
-    const ctx = getProfileContext("demo");
+    const ctx = getProfileContext(profile);
     expect(ctx.stage).toBeDefined();
     expect(ctx.weakTopics).toBeDefined();
     expect(ctx.learningStyle).toBeDefined();

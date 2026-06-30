@@ -1,22 +1,28 @@
 // Profile Agent：加载与维护用户学习画像
 
-import { store } from "@/lib/store/db";
-import type { UserProfile, AgentResult } from "@/lib/types";
+import type { LearningProfileSnapshot, AgentResult } from "@/lib/types";
 
-export async function runProfileAgent(userId: string): Promise<AgentResult> {
-  const profile = store.getProfile(userId) ?? store.getProfile("demo")!;
+const DEFAULT_PROFILE: LearningProfileSnapshot = {
+  stage: "本科二年级",
+  weakTopics: [],
+  strongTopics: [],
+  learningStyle: "结构化学习",
+  stats: { totalQuestions: 0, accuracy: 0, studyDays: 1 },
+};
+
+export async function runProfileAgent(
+  profile?: LearningProfileSnapshot
+): Promise<AgentResult> {
+  const resolved = profile ?? DEFAULT_PROFILE;
   return {
     agent: "Profile",
-    content: `用户：${profile.name}（${profile.stage}），学习风格：${profile.learningStyle}。薄弱知识点：${profile.weakTopics.join("、")}。已答题 ${profile.stats.totalQuestions} 道，正确率 ${(profile.stats.accuracy * 100).toFixed(0)}%。`,
-    metadata: { profile },
+    content: `学习阶段：${resolved.stage}，学习风格：${resolved.learningStyle}。薄弱知识点：${resolved.weakTopics.join("、") || "暂无"}。已答题 ${resolved.stats.totalQuestions} 道，正确率 ${(resolved.stats.accuracy * 100).toFixed(0)}%。`,
+    metadata: { profile: resolved },
   };
 }
 
-export function getProfileContext(userId: string): Partial<UserProfile> {
-  const p = store.getProfile(userId) ?? store.getProfile("demo")!;
-  return {
-    stage: p.stage,
-    weakTopics: p.weakTopics,
-    learningStyle: p.learningStyle,
-  };
+export function getProfileContext(
+  profile?: LearningProfileSnapshot
+): LearningProfileSnapshot {
+  return profile ?? DEFAULT_PROFILE;
 }

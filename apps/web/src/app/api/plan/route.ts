@@ -4,10 +4,21 @@
 import { runPlannerAgent } from "@/lib/agents/planner-agent";
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
+import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
+import { modelErrorResponse } from "@/lib/api-errors";
+import type { LearningProfileSnapshot } from "@/lib/types";
+import { validateUserInput } from "@/lib/agents/safety-agent";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(req: Request) {
+  if (process.env.DEPLOYMENT_MODE === "stateless") {
+    return Response.json(
+      { error: "学习计划仅保存在 HarmonyOS 设备", code: "ENDPOINT_DISABLED" },
+      { status: 404 }
+    );
+  }
   try {
     const { searchParams } = new URL(req.url);
     const userId = sanitizeUserId(searchParams.get("userId"));
@@ -23,7 +34,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  let body: { userId?: string; goal?: string; durationDays?: number; dailyMinutes?: number };
+  let body: { userId?: string; goal?: string; durationDays?: number; dailyMinutes?: number; profile?: LearningProfileSnapshot };
   try {
     body = await req.json();
   } catch {
@@ -43,12 +54,23 @@ export async function POST(req: Request) {
     return Response.json({ error: "目标描述过长（上限 500 字符）", code: "GOAL_TOO_LONG" }, { status: 400 });
   }
 
+  if (validateUserInput(goal).length > 0) {
+    return Response.json(
+      { error: "目标内容不符合安全要求", code: "INPUT_REJECTED" },
+      { status: 400 }
+    );
+  }
+
+  if (!getModelRuntimeInfo().configured) {
+    return modelErrorResponse(new ModelUnavailableError());
+  }
+
   try {
-    const plan = await runPlannerAgent(userId, goal, durationDays, dailyMinutes);
+    const plan = await runPlannerAgent(userId, goal, durationDays, dailyMinutes, body.profile);
     return Response.json(plan);
   } catch (err) {
     console.error("[plan/POST] error:", err instanceof Error ? err.message : String(err));
-    return Response.json({ error: "生成计划失败，请稍后重试", code: "INTERNAL_ERROR" }, { status: 500 });
+    return modelErrorResponse(err);
   }
 }
 

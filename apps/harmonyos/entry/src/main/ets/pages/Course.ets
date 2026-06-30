@@ -2,9 +2,9 @@
  * 课程页 - 课程列表
  */
 
-import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Course, CoursesResponse } from '../model/DataModels';
+import { Course } from '../model/DataModels';
+import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
@@ -14,28 +14,15 @@ export struct CourseContent {
   @State message: string = '';
 
   aboutToAppear() {
-    // 调试模式：先加载演示数据，避免网络等待时空白
-    if (Constants.__DEBUG__) {
-      const c1: Course = { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 52, topics: ['二叉树', '图的遍历', '动态规划'] };
-      const c2: Course = { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 48, topics: ['进程调度', '内存管理', '文件系统'] };
-      const c3: Course = { id: 'cs103', title: '计算机网络', progress: 0.30, docCount: 47, topics: ['TCP/IP', 'HTTP', '路由协议'] };
-      this.courses = [c1, c2, c3];
-    } else {
-      this.loading = true;
-    }
+    this.loading = true;
     this.loadCourses();
   }
 
   async loadCourses() {
     try {
-      const res = await HttpClient.get<CoursesResponse>(
-        Constants.API_COURSES + '?userId=' + Constants.DEMO_USER_ID
-      );
-      this.courses = res.courses;
+      this.courses = (await LocalLearningRepository.getCourses()) ?? [];
     } catch (e) {
-      if (!Constants.__DEBUG__) {
-        this.message = '课程加载失败，请检查网络后重试';
-      }
+      this.message = '本地课程加载失败，请重新打开应用';
     } finally {
       this.loading = false;
     }

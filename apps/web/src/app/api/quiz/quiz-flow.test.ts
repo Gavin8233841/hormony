@@ -1,15 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as getQuizData, POST as generateQuiz } from "./route";
-import { POST as submitQuiz } from "./submit/route";
 import { GET as getResources } from "../resources/route";
-import { store } from "@/lib/store/db";
-import type { QuizResult, QuizView } from "@/lib/types";
+import type { QuizPackage } from "@/lib/types";
 
 const originalModelKey = process.env.MODEL_API_KEY;
+const originalDeploymentMode = process.env.DEPLOYMENT_MODE;
 
 describe("题库与资源 API 闭环", () => {
   beforeEach(() => {
     delete process.env.MODEL_API_KEY;
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify(Array.from({ length: 5 }, (_, index) => ({
+      type: "choice",
+      stem: `测试题 ${index + 1}`,
+      options: ["A. 选项一", "B. 选项二", "C. 选项三", "D. 选项四"],
+      answer: "A",
+      explanation: "这是测试环境中的固定解析。",
+    })));
   });
 
   afterEach(() => {
@@ -18,9 +24,12 @@ describe("题库与资源 API 闭环", () => {
     } else {
       process.env.MODEL_API_KEY = originalModelKey;
     }
+    delete process.env.TEST_MODEL_RESPONSE;
+    if (originalDeploymentMode === undefined) delete process.env.DEPLOYMENT_MODE;
+    else process.env.DEPLOYMENT_MODE = originalDeploymentMode;
   });
 
-  it("生成接口不应向客户端泄露答案或解析", async () => {
+  it("生成接口应分离展示题目与本地评分数据", async () => {
     const response = await generateQuiz(
       new Request("http://localhost/api/quiz", {
         method: "POST",
@@ -34,58 +43,30 @@ describe("题库与资源 API 闭环", () => {
         }),
       })
     );
-    const quiz = (await response.json()) as QuizView;
+    const quiz = (await response.json()) as QuizPackage;
 
     expect(response.status).toBe(200);
     expect(quiz.questions).toHaveLength(5);
     expect(quiz.questions.every((question) => !("answer" in question))).toBe(true);
     expect(quiz.questions.every((question) => !("explanation" in question))).toBe(true);
+    expect(quiz.grading).toHaveLength(5);
+    expect(quiz.grading[0]).toMatchObject({ answer: "A" });
   });
 
-  it("完整选项文本应正确评分，未提交题目应计入总题数", async () => {
-    const generatedResponse = await generateQuiz(
+  it("模型未配置时应返回明确 503", async () => {
+    delete process.env.TEST_MODEL_RESPONSE;
+    const response = await generateQuiz(
       new Request("http://localhost/api/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: "api_test_user",
           courseId: "cs101",
-          topic: "二叉树与BST",
-          count: 5,
-          difficulty: "medium",
+          topic: "二叉树",
         }),
       })
     );
-    const quiz = (await generatedResponse.json()) as QuizView;
-    const storedQuiz = store.getQuiz(quiz.quizId);
-    expect(storedQuiz).toBeDefined();
-
-    const firstQuestion = storedQuiz!.questions[0];
-    const answerIndex = firstQuestion.answer.charCodeAt(0) - "A".charCodeAt(0);
-    const correctOption = firstQuestion.options?.[answerIndex];
-    expect(correctOption).toBeDefined();
-
-    const submitResponse = await submitQuiz(
-      new Request("http://localhost/api/quiz/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quizId: quiz.quizId,
-          userId: "api_test_user",
-          answers: [
-            { questionId: firstQuestion.id, userAnswer: correctOption },
-          ],
-        }),
-      })
-    );
-    const result = (await submitResponse.json()) as QuizResult;
-
-    expect(submitResponse.status).toBe(200);
-    expect(result.totalQuestions).toBe(5);
-    expect(result.correctCount).toBe(1);
-    expect(result.details).toHaveLength(5);
-    expect(result.details[0].isCorrect).toBe(true);
-    expect(result.weakTopics.every((topic) => !topic.endsWith(".pdf"))).toBe(true);
+    await expect(response.json()).resolves.toMatchObject({ code: "MODEL_UNAVAILABLE" });
+    expect(response.status).toBe(503);
   });
 
   it("课程题库目录不应返回题目答案", async () => {
@@ -99,6 +80,13 @@ describe("题库与资源 API 闭环", () => {
     expect(data.quizzes[0]).toMatchObject({ courseId: "cs102" });
     expect(data.quizzes[0]).toHaveProperty("questionCount");
     expect(data.quizzes[0]).not.toHaveProperty("questions");
+  });
+
+  it("无状态部署不得从服务端读取答题历史", async () => {
+    process.env.DEPLOYMENT_MODE = "stateless";
+    const response = await getQuizData(new Request("http://localhost/api/quiz?userId=demo"));
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "ENDPOINT_DISABLED" });
   });
 
   it("资源接口应拒绝未知类型", async () => {

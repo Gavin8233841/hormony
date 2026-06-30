@@ -10,9 +10,14 @@ import { NextRequest } from "next/server";
 import { orchestrateStream } from "@/lib/agents/orchestrator";
 import { sanitizeUserId } from "@/lib/utils";
 import type { ChatRequest, StreamEvent } from "@/lib/types";
+import { getModelRuntimeInfo } from "@/lib/agents/model";
+import { validateUserInput } from "@/lib/agents/safety-agent";
+import type { LearningProfileSnapshot } from "@/lib/types";
+import { modelErrorResponse } from "@/lib/api-errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   let body: ChatRequest;
@@ -34,7 +39,30 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "消息过长（上限 2000 字符）", code: "MESSAGE_TOO_LONG" }, { status: 400 });
   }
 
+  const inputFlags = validateUserInput(message);
+  if (inputFlags.length > 0) {
+    return Response.json(
+      { error: "输入内容不符合安全要求", code: "INPUT_REJECTED" },
+      { status: 400 }
+    );
+  }
+
   const userId = sanitizeUserId(body.userId);
+  body.profile = sanitizeProfile(body.profile);
+  if (body.context) {
+    const courseId = String(body.context.courseId ?? "");
+    body.context.courseId = ["cs101", "cs102", "cs103"].includes(courseId)
+      ? courseId
+      : undefined;
+    body.context.sessionId = String(body.context.sessionId ?? "").slice(0, 100) || undefined;
+  }
+
+  if (!getModelRuntimeInfo().configured) {
+    return Response.json(
+      { error: "云端学伴暂不可用，请稍后重试", code: "MODEL_UNAVAILABLE" },
+      { status: 503 }
+    );
+  }
 
   // 限制对话历史大小（最多 12 条消息，每条最多 1000 字符，仅允许 user/assistant 角色）
   if (body.history && Array.isArray(body.history)) {
@@ -105,10 +133,7 @@ export async function POST(req: NextRequest) {
       "[chat] orchestrate error (pre-stream):",
       orchestrateError instanceof Error ? orchestrateError.message : String(orchestrateError)
     );
-    return Response.json(
-      { error: "服务处理异常，请稍后重试", code: "INTERNAL_ERROR" },
-      { status: 500 }
-    );
+    return modelErrorResponse(orchestrateError);
   }
 
   // 首个事件已就绪，建立 SSE 流（HTTP 200）
@@ -130,7 +155,7 @@ export async function POST(req: NextRequest) {
         if (orchestrateError) {
           // 流中错误：HTTP 状态已固化为 200，通过 SSE 事件通知客户端
           controller.enqueue(
-            sse({ type: "trace", agent: "Safety", content: "服务处理异常，请稍后重试" })
+            sse({ type: "error", code: "INTERNAL_ERROR", message: "服务处理异常，请稍后重试" })
           );
           controller.enqueue(sse({ type: "done", sessionId: "error" }));
           console.error(
@@ -163,6 +188,25 @@ export async function POST(req: NextRequest) {
       Connection: "keep-alive",
     },
   });
+}
+
+function sanitizeProfile(profile?: LearningProfileSnapshot): LearningProfileSnapshot | undefined {
+  if (!profile) return undefined;
+  return {
+    stage: String(profile.stage ?? "").slice(0, 40),
+    weakTopics: Array.isArray(profile.weakTopics)
+      ? profile.weakTopics.slice(0, 10).map((item) => String(item).slice(0, 40))
+      : [],
+    strongTopics: Array.isArray(profile.strongTopics)
+      ? profile.strongTopics.slice(0, 10).map((item) => String(item).slice(0, 40))
+      : [],
+    learningStyle: String(profile.learningStyle ?? "").slice(0, 40),
+    stats: {
+      totalQuestions: Math.max(0, Number(profile.stats?.totalQuestions) || 0),
+      accuracy: Math.min(Math.max(Number(profile.stats?.accuracy) || 0, 0), 1),
+      studyDays: Math.max(0, Number(profile.stats?.studyDays) || 0),
+    },
+  };
 }
 
 export async function OPTIONS() {

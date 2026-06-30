@@ -23,7 +23,7 @@ struct KnowledgePage {
   @State hasError: boolean = false;
   private suggestions: string[] = ['二叉搜索树', '图的遍历', '动态规划'];
 
-  private demoChunks: KnowledgeChunk[] = [
+  private localCourseChunks: KnowledgeChunk[] = [
     { text: '二叉搜索树（BST）是一种节点值满足左子树均小于根、右子树均大于根的二叉树。中序遍历 BST 可得到升序序列。', source: '数据结构.pdf', courseId: 'cs101' },
     { text: '动态规划通过将复杂问题分解为重叠子问题并存储子问题解来避免重复计算。', source: '数据结构.pdf', courseId: 'cs101' },
     { text: '进程调度算法包括 FCFS、SJF、时间片轮转、多级反馈队列等。', source: '操作系统.pdf', courseId: 'cs102' },
@@ -293,17 +293,12 @@ struct KnowledgePage {
         this.message = '未找到相关资料，试试更具体的关键词';
       }
     } catch (e) {
-      if (Constants.__DEBUG__) {
-        // 调试模式：回退本地检索
-        this.results = this.demoChunks.filter(
-          (c: KnowledgeChunk): boolean => c.courseId === this.courseId &&
-            (c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q))
-        );
-        this.message = this.results.length > 0 ? '网络不可用，已切换本地检索' : '本地资料中未找到相关内容';
-      } else {
-        this.message = '检索失败，请检查网络';
-        this.hasError = true;
-      }
+      this.results = this.localCourseChunks.filter(
+        (c: KnowledgeChunk): boolean => c.courseId === this.courseId &&
+          (c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q))
+      );
+      this.message = this.results.length > 0 ? '云端检索不可用，正在显示本机课程内容' : '本机课程内容中未找到相关结果';
+      this.hasError = this.results.length === 0;
     } finally {
       this.loading = false;
     }

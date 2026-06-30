@@ -1,7 +1,9 @@
-import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Course, CoursesResponse, PlanTask, PlanTaskUpdate, StudyPlan } from '../model/DataModels';
+import { Course, PlanTask, StudyPlan } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { LearningReminder } from '../common/LearningReminder';
+import { common } from '@kit.AbilityKit';
 
 @Component
 export struct HomeContent {
@@ -18,6 +20,7 @@ export struct HomeContent {
   @State quickAsk: string = '';
   @State notificationOpen: boolean = false;
   @State pressedTask: number = -1;
+  @State notificationMessage: string = '学习计划已同步，完成任务会自动更新进度';
   @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [
     { id: 't1', title: '复习数组与链表基础', date: '2026-06-27', estimatedMin: 60, type: 'review', done: true },
     { id: 't2', title: '练习栈与队列题目', date: '2026-06-28', estimatedMin: 90, type: 'practice', done: true },
@@ -31,25 +34,21 @@ export struct HomeContent {
 
   private async loadCourses(): Promise<void> {
     try {
-      const response = await HttpClient.get<CoursesResponse>(
-        Constants.API_COURSES + '?userId=' + Constants.DEMO_USER_ID
-      );
-      if (response.courses.length > 0) {
-        this.currentCourse = response.courses[0];
+      const courses = await LocalLearningRepository.getCourses();
+      if (courses !== null && courses.length > 0) {
+        this.currentCourse = courses[0];
       }
     } catch (e) {
-      // 调试模式保留默认课程，避免首页因后端未启动而失去主任务。
+      // 保留首屏默认课程，等待下次本地读取。
     }
   }
 
   private async loadPlan(): Promise<void> {
     try {
-      const plan = await HttpClient.get<StudyPlan>(
-        Constants.API_PLAN + '?userId=' + Constants.DEMO_USER_ID
-      );
-      this.planTasks = plan.tasks;
+      const plan = await LocalLearningRepository.getPlan();
+      if (plan !== null) this.planTasks = plan.tasks;
     } catch (e) {
-      // 调试模式保留默认任务，确保首页仍可展示主要行动。
+      // 保留首屏默认任务，等待下次本地读取。
     }
   }
 
@@ -62,19 +61,42 @@ export struct HomeContent {
   }
 
   private async toggleTask(task: PlanTask): Promise<void> {
-    const request: PlanTaskUpdate = {
-      userId: Constants.DEMO_USER_ID,
-      taskId: task.id,
-      done: !Boolean(task.done),
-    };
     try {
-      const plan = await HttpClient.patch<StudyPlan>(
-        Constants.API_PLAN_SAVE,
-        JSON.stringify(request)
-      );
-      this.planTasks = plan.tasks;
+      const nextTasks: PlanTask[] = this.planTasks.map((item: PlanTask): PlanTask => {
+        if (item.id !== task.id) return item;
+        return {
+          id: item.id,
+          title: item.title,
+          date: item.date,
+          estimatedMin: item.estimatedMin,
+          type: item.type,
+          done: !Boolean(item.done)
+        };
+      });
+      const currentPlan = await LocalLearningRepository.getPlan();
+      const plan: StudyPlan = currentPlan ?? {
+        planId: 'local-plan',
+        userId: Constants.DEMO_USER_ID,
+        goal: '完成今日学习任务',
+        tasks: nextTasks
+      };
+      plan.tasks = nextTasks;
+      await LocalLearningRepository.savePlan(plan);
+      this.planTasks = nextTasks;
     } catch (e) {
-      // 网络失败时保持服务端状态，不做虚假本地打卡。
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'HomeContent local task update failed');
+    }
+  }
+
+  private async publishReminder(): Promise<void> {
+    this.notificationOpen = true;
+    try {
+      const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const taskTitle = await LearningReminder.publishNextTask(hostContext);
+      this.notificationMessage = '系统提醒已创建：' + taskTitle;
+    } catch (e) {
+      this.notificationMessage = '未能创建系统提醒，请检查通知权限';
     }
   }
 
@@ -144,7 +166,7 @@ export struct HomeContent {
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(22)
           .onClick(() => {
-            this.notificationOpen = !this.notificationOpen;
+            this.publishReminder();
           })
 
           Column()
@@ -163,7 +185,7 @@ export struct HomeContent {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(18)
             .fontColor([Constants.COLOR_SUCCESS])
-          Text('学习计划已同步，完成任务会自动更新进度')
+          Text(this.notificationMessage)
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }

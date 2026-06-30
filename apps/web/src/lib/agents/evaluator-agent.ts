@@ -2,9 +2,8 @@
 // 支持两种模式：基于答题记录分析 / 基于用户画像分析
 
 import { callModel } from "./model";
-import { store } from "@/lib/store/db";
 import { retrieve } from "@/lib/rag";
-import type { AgentResult } from "@/lib/types";
+import type { AgentResult, LearningProfileSnapshot } from "@/lib/types";
 
 interface AnswerRecord {
   question: string;
@@ -14,7 +13,8 @@ interface AnswerRecord {
 
 export async function runEvaluatorAgent(
   userId: string,
-  answers: AnswerRecord[]
+  answers: AnswerRecord[],
+  profile?: LearningProfileSnapshot
 ): Promise<AgentResult> {
   // 模式 1：有答题记录 → 详细错题分析
   if (answers.length > 0) {
@@ -22,7 +22,7 @@ export async function runEvaluatorAgent(
   }
 
   // 模式 2：无答题记录 → 基于画像的薄弱点分析
-  return analyzeProfile(userId);
+  return analyzeProfile(profile);
 }
 
 // 基于答题记录的详细分析
@@ -88,9 +88,7 @@ ${relatedKnowledge ? `相关参考资料：\n${relatedKnowledge}` : ""}`;
 }
 
 // 基于用户画像的薄弱点分析（无答题记录时）
-async function analyzeProfile(userId: string): Promise<AgentResult> {
-  const profile = store.getProfile(userId);
-
+async function analyzeProfile(profile?: LearningProfileSnapshot): Promise<AgentResult> {
   if (!profile) {
     return {
       agent: "Evaluator",
@@ -118,7 +116,6 @@ async function analyzeProfile(userId: string): Promise<AgentResult> {
 推荐适合的练习类型和难度。`;
 
   const userPrompt = `用户画像：
-- 姓名：${profile.name}
 - 阶段：${profile.stage}
 - 学习风格：${profile.learningStyle}
 - 累计答题：${profile.stats.totalQuestions} 题
