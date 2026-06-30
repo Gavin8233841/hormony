@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { LayoutDashboard, MessageSquare, BookOpen, CalendarDays, Database, User, Brain } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -56,6 +57,7 @@ export default function RootLayout({
           {/* 主内容 */}
           <main className="ml-56 flex-1 p-8">{children}</main>
         </div>
+        <Analytics />
       </body>
     </html>
   );
