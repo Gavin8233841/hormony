@@ -1,12 +1,12 @@
 {
   "functions": {
-    "app/api/chat/route.ts": {
+    "src/app/api/chat/route.ts": {
       "maxDuration": 120
     },
-    "app/api/quiz/route.ts": {
+    "src/app/api/quiz/route.ts": {
       "maxDuration": 120
     },
-    "app/api/plan/route.ts": {
+    "src/app/api/plan/route.ts": {
       "maxDuration": 120
     }
   }
