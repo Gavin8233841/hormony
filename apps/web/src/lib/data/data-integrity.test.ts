@@ -8,9 +8,9 @@ import {
 } from "@/lib/data";
 
 const MINIMUM_COUNTS = {
-  cs101: { chunks: 40, questions: 20 },
-  cs102: { chunks: 40, questions: 20 },
-  cs103: { chunks: 40, questions: 20 },
+  cs101: { chunks: 40, questions: 20, choices: 20 },
+  cs102: { chunks: 40, questions: 20, choices: 20 },
+  cs103: { chunks: 40, questions: 20, choices: 20 },
 };
 
 describe("课程数据资产完整性", () => {
@@ -37,6 +37,7 @@ describe("课程数据资产完整性", () => {
   it("题库应满足课程题量、题目唯一性和答案约束", () => {
     const quizIds = new Set<string>();
     const questionIds = new Set<string>();
+    const stems = new Set<string>();
 
     for (const quiz of allQuizzes) {
       expect(quizIds.has(quiz.quizId)).toBe(false);
@@ -48,6 +49,10 @@ describe("课程数据资产完整性", () => {
         expect(questionIds.has(question.id)).toBe(false);
         questionIds.add(question.id);
         expect(question.stem.trim().length).toBeGreaterThan(0);
+        // 题干全局唯一
+        const stemKey = question.stem.trim();
+        expect(stems.has(stemKey)).toBe(false);
+        stems.add(stemKey);
         expect(question.answer.trim().length).toBeGreaterThan(0);
         expect(question.explanation.trim().length).toBeGreaterThan(0);
 
@@ -67,6 +72,16 @@ describe("课程数据资产完整性", () => {
         .filter((quiz) => quiz.courseId === courseId)
         .reduce((sum, quiz) => sum + quiz.questions.length, 0);
       expect(count).toBeGreaterThanOrEqual(MINIMUM_COUNTS[courseId].questions);
+    }
+  });
+
+  it("每门课程选择题数量应不少于 20 道", () => {
+    for (const courseId of COURSE_IDS) {
+      const choiceCount = allQuizzes
+        .filter((quiz) => quiz.courseId === courseId)
+        .flatMap((quiz) => quiz.questions)
+        .filter((question) => question.type === "choice").length;
+      expect(choiceCount).toBeGreaterThanOrEqual(MINIMUM_COUNTS[courseId].choices);
     }
   });
 
