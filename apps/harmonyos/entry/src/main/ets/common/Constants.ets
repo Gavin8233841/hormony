@@ -14,6 +14,7 @@ export class Constants {
   static readonly API_PROFILE: string = '/api/profile';
   static readonly API_COURSES: string = '/api/courses';
   static readonly API_PLAN: string = '/api/plan';
+  static readonly API_PLAN_SAVE: string = '/api/plan/save';
   static readonly API_QUIZ: string = '/api/quiz';
   static readonly API_QUIZ_SUBMIT: string = '/api/quiz/submit';
   static readonly API_SAFETY: string = '/api/safety-review';

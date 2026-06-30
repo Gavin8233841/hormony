@@ -116,6 +116,30 @@ data: {"type":"done","sessionId":"xxx"}\n\n
 }
 ```
 
+生成成功后计划会保存到当前用户，首页与计划页可通过 GET 读取同一份任务状态。
+
+---
+
+## GET /api/plan?userId=...
+
+获取用户当前学习计划；不存在时返回 `404 NOT_FOUND`。
+
+---
+
+## PATCH /api/plan/save
+
+更新单个计划任务的完成状态。
+
+```json
+{
+  "userId": "demo",
+  "taskId": "task_id",
+  "done": true
+}
+```
+
+返回更新后的完整 `StudyPlan`；计划或任务不存在时返回 `404 NOT_FOUND`。
+
 ---
 
 ## POST /api/quiz

@@ -6,19 +6,23 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
-import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
+import { StudyPlan, PlanTask, PlanRequest, PlanTaskUpdate } from '../model/DataModels';
 
 @Entry
 @Component
 struct PlanPage {
   @State goal: string = '';
   @State days: number = 14;
-  @State tasks: PlanTask[] = [];
+  @StorageLink('currentPlanTasks') tasks: PlanTask[] = [];
   @State loading: boolean = false;
   @State message: string = '';
   @State hasError: boolean = false;
   private durationOptions: number[] = [7, 14, 21];
   private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
+
+  aboutToAppear(): void {
+    this.loadPlan();
+  }
 
   get canGenerate(): boolean {
     return !this.loading && this.goal.trim().length > 0;
@@ -30,6 +34,43 @@ struct PlanPage {
     if (type === 'reading') return '阅读';
     if (type === 'quiz') return '测验';
     return type;
+  }
+
+  private taskStatus(task: PlanTask): string {
+    return task.done ? '已完成' : '待完成';
+  }
+
+  private async loadPlan(): Promise<void> {
+    try {
+      const plan = await HttpClient.get<StudyPlan>(
+        Constants.API_PLAN + '?userId=' + Constants.DEMO_USER_ID
+      );
+      this.goal = plan.goal;
+      this.tasks = plan.tasks;
+    } catch (e) {
+      // 没有已保存计划时保留创建状态。
+    }
+  }
+
+  private async toggleTask(task: PlanTask): Promise<void> {
+    const nextDone = !Boolean(task.done);
+    const request: PlanTaskUpdate = {
+      userId: Constants.DEMO_USER_ID,
+      taskId: task.id,
+      done: nextDone,
+    };
+    try {
+      const plan = await HttpClient.patch<StudyPlan>(
+        Constants.API_PLAN_SAVE,
+        JSON.stringify(request)
+      );
+      this.tasks = plan.tasks;
+      this.message = nextDone ? '任务已完成，学习进度已同步' : '任务已恢复为待完成';
+      this.hasError = false;
+    } catch (e) {
+      this.message = '任务状态同步失败，请稍后重试';
+      this.hasError = true;
+    }
   }
 
   @Builder
@@ -178,21 +219,29 @@ struct PlanPage {
           ForEach(this.tasks, (t: PlanTask, i: number) => {
             ListItem() {
               Row({ space: 12 }) {
-                Text((i + 1).toString())
-                  .fontSize(13)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(Constants.COLOR_BRAND)
-                  .width(34)
-                  .height(34)
-                  .textAlign(TextAlign.Center)
-                  .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                  .borderRadius(17)
+                Stack({ alignContent: Alignment.Center }) {
+                  Column()
+                    .width(34)
+                    .height(34)
+                    .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BRAND_LIGHT)
+                    .borderRadius(17)
+                  if (t.done) {
+                    SymbolGlyph($r('sys.symbol.checkmark'))
+                      .fontSize(16)
+                      .fontColor([Constants.COLOR_SUCCESS])
+                  } else {
+                    Text((i + 1).toString())
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_BRAND)
+                  }
+                }
 
                 Column() {
                   Text(t.title)
                     .fontSize(14)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                    .fontColor(t.done ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_PRIMARY)
                   Row({ space: 8 }) {
                     Text(t.date)
                       .fontSize(11)
@@ -211,11 +260,19 @@ struct PlanPage {
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
+
+                Text(this.taskStatus(t))
+                  .fontSize(11)
+                  .fontColor(t.done ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+                  .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+                  .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BRAND_LIGHT)
+                  .borderRadius(11)
               }
               .width('100%')
               .padding(14)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_MD)
+              .onClick(() => { this.toggleTask(t); })
             }
           })
         }
@@ -281,6 +338,7 @@ struct PlanPage {
       };
       const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, JSON.stringify(req));
       this.tasks = plan.tasks;
+      this.message = '计划已生成并同步到首页';
     } catch (e) {
       if (Constants.__DEBUG__) {
         const task1: PlanTask = { id: '1', title: '梳理核心概念', date: '第 1 天', estimatedMin: 45, type: '复习' };

@@ -1,13 +1,7 @@
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Course, CoursesResponse } from '../model/DataModels';
+import { Course, CoursesResponse, PlanTask, PlanTaskUpdate, StudyPlan } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-
-interface HomeTask {
-  title: string;
-  subtitle: string;
-  status: string;
-}
 
 @Component
 export struct HomeContent {
@@ -24,18 +18,18 @@ export struct HomeContent {
   @State quickAsk: string = '';
   @State notificationOpen: boolean = false;
   @State pressedTask: number = -1;
-
-  private tasks: HomeTask[] = [
-    { title: '数组与链表基础', subtitle: '《数据结构》第 2 章', status: '已完成' },
-    { title: '树与二叉树', subtitle: '《数据结构》第 4 章', status: '进行中' },
-    { title: '图的遍历', subtitle: '《数据结构》第 5 章', status: '待开始' },
+  @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [
+    { id: 't1', title: '复习数组与链表基础', date: '2026-06-27', estimatedMin: 60, type: 'review', done: true },
+    { id: 't2', title: '练习栈与队列题目', date: '2026-06-28', estimatedMin: 90, type: 'practice', done: true },
+    { id: 't3', title: '学习二叉树遍历', date: '2026-06-29', estimatedMin: 75, type: 'reading', done: false },
   ];
 
   aboutToAppear(): void {
-    this.loadOverview();
+    this.loadCourses();
+    this.loadPlan();
   }
 
-  private async loadOverview(): Promise<void> {
+  private async loadCourses(): Promise<void> {
     try {
       const response = await HttpClient.get<CoursesResponse>(
         Constants.API_COURSES + '?userId=' + Constants.DEMO_USER_ID
@@ -46,6 +40,49 @@ export struct HomeContent {
     } catch (e) {
       // 调试模式保留默认课程，避免首页因后端未启动而失去主任务。
     }
+  }
+
+  private async loadPlan(): Promise<void> {
+    try {
+      const plan = await HttpClient.get<StudyPlan>(
+        Constants.API_PLAN + '?userId=' + Constants.DEMO_USER_ID
+      );
+      this.planTasks = plan.tasks;
+    } catch (e) {
+      // 调试模式保留默认任务，确保首页仍可展示主要行动。
+    }
+  }
+
+  private taskStatus(task: PlanTask, index: number): string {
+    if (task.done) return '已完成';
+    for (let i = 0; i < index; i++) {
+      if (!this.planTasks[i].done) return '待开始';
+    }
+    return '进行中';
+  }
+
+  private async toggleTask(task: PlanTask): Promise<void> {
+    const request: PlanTaskUpdate = {
+      userId: Constants.DEMO_USER_ID,
+      taskId: task.id,
+      done: !Boolean(task.done),
+    };
+    try {
+      const plan = await HttpClient.patch<StudyPlan>(
+        Constants.API_PLAN_SAVE,
+        JSON.stringify(request)
+      );
+      this.planTasks = plan.tasks;
+    } catch (e) {
+      // 网络失败时保持服务端状态，不做虚假本地打卡。
+    }
+  }
+
+  private currentTaskTitle(): string {
+    for (const task of this.planTasks) {
+      if (!task.done) return task.title;
+    }
+    return '今日任务已完成';
   }
 
   private submitQuickAsk(): void {
@@ -126,7 +163,7 @@ export struct HomeContent {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(18)
             .fontColor([Constants.COLOR_SUCCESS])
-          Text('今日学习任务已同步，暂无其他新通知')
+          Text('学习计划已同步，完成任务会自动更新进度')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
@@ -182,7 +219,7 @@ export struct HomeContent {
               Text('当前章节')
                 .fontSize(12)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
-              Text('树与二叉树')
+              Text(this.currentTaskTitle())
                 .fontSize(18)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -274,25 +311,25 @@ export struct HomeContent {
   }
 
   @Builder
-  TaskRow(task: HomeTask, index: number) {
+  TaskRow(task: PlanTask, index: number) {
     Row({ space: 12 }) {
       Stack({ alignContent: Alignment.Center }) {
         Column()
           .width(34)
           .height(34)
-          .backgroundColor(task.status === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
-            task.status === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
+          .backgroundColor(this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
+            this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
           .border({
             width: 1,
-            color: task.status === '已完成' ? Constants.COLOR_SUCCESS :
-              task.status === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER,
+            color: this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS :
+              this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER,
           })
           .borderRadius(17)
-        if (task.status === '已完成') {
+        if (this.taskStatus(task, index) === '已完成') {
           SymbolGlyph($r('sys.symbol.checkmark'))
             .fontSize(16)
             .fontColor([Constants.COLOR_SUCCESS])
-        } else if (task.status === '进行中') {
+        } else if (this.taskStatus(task, index) === '进行中') {
           SymbolGlyph($r('sys.symbol.arrow_right'))
             .fontSize(16)
             .fontColor([Constants.COLOR_BRAND])
@@ -304,7 +341,7 @@ export struct HomeContent {
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text(task.subtitle)
+        Text(task.date + ' · ' + task.estimatedMin.toString() + ' 分钟')
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ top: 3 })
@@ -312,13 +349,13 @@ export struct HomeContent {
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
 
-      Text(task.status)
+      Text(this.taskStatus(task, index))
         .fontSize(11)
-        .fontColor(task.status === '已完成' ? Constants.COLOR_SUCCESS :
-          task.status === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY)
+        .fontColor(this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS :
+          this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY)
         .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-        .backgroundColor(task.status === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
-          task.status === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
+        .backgroundColor(this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
+          this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
         .borderRadius(12)
     }
     .width('100%')
@@ -335,7 +372,7 @@ export struct HomeContent {
       }
     })
     .onClick(() => {
-      this.selectedTab = 1;
+      this.toggleTask(task);
     })
   }
 
@@ -362,9 +399,9 @@ export struct HomeContent {
       .margin({ bottom: 10 })
 
       Column() {
-        ForEach(this.tasks, (task: HomeTask, index: number) => {
+        ForEach(this.planTasks.slice(0, 3), (task: PlanTask, index: number) => {
           this.TaskRow(task, index)
-          if (index < this.tasks.length - 1) {
+          if (index < Math.min(this.planTasks.length, 3) - 1) {
             Divider()
               .color(Constants.COLOR_BORDER)
               .margin({ left: 46 })

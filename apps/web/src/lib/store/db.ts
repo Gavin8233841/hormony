@@ -231,9 +231,8 @@ export const store = {
     const plan = db.plans.get(userId);
     if (!plan) return undefined;
     const task = plan.tasks.find((t) => t.id === taskId);
-    if (task) {
-      task.done = done;
-    }
+    if (!task) return undefined;
+    task.done = done;
     return plan;
   },
 

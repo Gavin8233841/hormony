@@ -73,6 +73,37 @@ export class HttpClient {
   }
 
   /**
+   * 发送 PATCH 请求
+   */
+  static async patch<T>(path: string, body: string): Promise<T> {
+    const httpRequest = http.createHttp();
+    try {
+      const url = Constants.BASE_URL + path;
+      const response = await httpRequest.request(url, {
+        method: http.RequestMethod.PATCH,
+        header: { 'Content-Type': 'application/json' },
+        extraData: body,
+        connectTimeout: Constants.REQUEST_TIMEOUT,
+        readTimeout: Constants.REQUEST_TIMEOUT,
+        expectDataType: http.HttpDataType.STRING,
+      });
+      if (response.responseCode === 200) {
+        const result = response.result;
+        if (typeof result !== 'string') {
+          throw new Error('Response is not a string');
+        }
+        const parsed: T = JSON.parse(result);
+        return parsed;
+      }
+      throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+    } catch (e) {
+      throw e instanceof Error ? e : new Error('Network request failed');
+    } finally {
+      httpRequest.destroy();
+    }
+  }
+
+  /**
    * 发送 SSE 流式 POST 请求（对话）
    * onEvent 回调在收到每条 SSE 事件时触发
    * onCreated 回调在 httpRequest 创建后触发，调用方可保存引用用于取消

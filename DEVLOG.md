@@ -3246,6 +3246,24 @@ HEAD `0235baf`（feat: 打通知识题库与原生测验闭环）后，程序化
 - 修正 UDP 伪首部题干，明确伪首部只参与校验和计算而不属于实际 UDP 首部。
 - 修正 HTTPS 非对称密码解析，区分现代 TLS 中证书签名认证与 `(EC)DHE` 密钥交换，避免沿用过时的 RSA 密钥交换通则。
 - 未修改题目答案和数据接口；本轮继续采用代码级检查，不执行重复视觉回归。
+
+---
+
+## [2026-06-30T18:38:46+08:00] 模型: Codex
+
+### 学习计划真实状态闭环
+
+- 确认 Planner Agent 已在生成成功后保存计划，补齐此前缺失的端侧读取与任务打卡能力。
+- HarmonyOS `HttpClient` 新增 PATCH；计划页启动时读取当前计划，任务可切换完成状态并同步服务端。
+- 首页移除硬编码任务，读取同一份 `StudyPlan`，通过 `@StorageLink('currentPlanTasks')` 与计划页实时共享任务状态。
+- 首页当前章节改为首个未完成任务，任务日期、预计时长和完成状态均来自服务端；点击任务执行真实打卡，不再错误跳转课程页。
+- 服务端任务 ID 不存在时返回 404，完成打卡后写入活动记录；新增生命周期测试覆盖生成、读取、打卡和不存在任务。
+
+### 验证
+
+- 5 个相关 ArkTS 文件经 DevEco MCP 检查无诊断，`entry@default` debug 构建成功。
+- 计划生命周期测试 2/2 通过，Web TypeScript 检查通过。
+- 按新协作边界仅进行代码级与构建级验收，视觉总验收留到下一大阶段统一执行。
 | Git diff | `git diff --check` | exit code 0（仅 CRLF 警告，无空白错误） |
 | Git status | `git status --short` | 仅 quizzes.ts、data-integrity.test.ts、DEVLOG.md 三个文件变更 |
 

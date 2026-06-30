@@ -32,6 +32,7 @@ export interface PlanTask {
   date: string;
   estimatedMin: number;
   type: string;
+  done?: boolean;
 }
 
 export interface StudyPlan {
@@ -132,6 +133,12 @@ export interface PlanRequest {
   goal: string;
   durationDays: number;
   dailyMinutes: number;
+}
+
+export interface PlanTaskUpdate {
+  userId: string;
+  taskId: string;
+  done: boolean;
 }
 
 export interface ChatRequest {

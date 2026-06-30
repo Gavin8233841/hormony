@@ -78,7 +78,18 @@ export async function PATCH(req: Request) {
 
   const plan = store.updatePlanTask(userId, taskId, done);
   if (!plan) {
-    return Response.json({ error: "计划不存在", code: "NOT_FOUND" }, { status: 404 });
+    return Response.json({ error: "计划或任务不存在", code: "NOT_FOUND" }, { status: 404 });
+  }
+
+  if (done) {
+    const task = plan.tasks.find((item) => item.id === taskId);
+    if (task) {
+      store.logActivity({
+        type: "plan",
+        description: `完成任务：${task.title.slice(0, 40)}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   return Response.json(plan);
