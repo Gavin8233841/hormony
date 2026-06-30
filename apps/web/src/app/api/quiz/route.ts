@@ -13,7 +13,7 @@ import type { QuizPackage } from "@/lib/types";
 import { validateUserInput } from "@/lib/agents/safety-agent";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(req: Request) {
   try {

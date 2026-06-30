@@ -67,21 +67,21 @@ function prepareContext(req: ChatRequest): {
 }
 
 // 执行前置 Agent：Profile + Retrieval（失败不阻断）。
+// 两个 Agent 完全独立，并行执行以减少总延迟。
 // 传入 emit 时按流式协议推送 thinking / trace 事件。
 async function runPreAgents(
   req: ChatRequest,
   emit?: (event: StreamEvent) => void
 ): Promise<{ profileResult: AgentResult; retrievalResult: AgentResult }> {
-  // Profile Agent
   emit?.({ type: "thinking", agent: "Profile" });
-  const profileResult = await safeAgentCall("Profile", () => runProfileAgent(req.profile));
-  emit?.({ type: "trace", agent: "Profile", content: profileResult.content });
-
-  // Retrieval Agent
   emit?.({ type: "thinking", agent: "Retrieval" });
-  const retrievalResult = await safeAgentCall("Retrieval", () =>
-    runRetrievalAgent(req.message, req.context?.courseId)
-  );
+
+  const [profileResult, retrievalResult] = await Promise.all([
+    safeAgentCall("Profile", () => runProfileAgent(req.profile)),
+    safeAgentCall("Retrieval", () => runRetrievalAgent(req.message, req.context?.courseId)),
+  ]);
+
+  emit?.({ type: "trace", agent: "Profile", content: profileResult.content });
   emit?.({
     type: "trace",
     agent: "Retrieval",
