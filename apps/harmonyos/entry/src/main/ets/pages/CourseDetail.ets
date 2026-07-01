@@ -46,10 +46,9 @@ struct CourseDetailPage {
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
     AppStorage.setOrCreate<string>('selectedContentTopic', topic);
-    AppStorage.setOrCreate<string>('knowledgePrefillQuery', topic);
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Lesson' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'CourseDetailPage Knowledge navigation failed: %{public}s', err.message);
+        'CourseDetailPage Lesson navigation failed: %{public}s', err.message);
     });
   }
 

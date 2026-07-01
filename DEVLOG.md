@@ -4011,3 +4011,15 @@ Loop Engineering — Agent 模块端到端打通：离线降级移除 + 代理�
 - Safety 异常不再被包装成看似正常的 Agent 结果，保持失败即报错、正文输出前阻断的边界。
 - 验证：`pnpm lint`、`pnpm typecheck`、`pnpm test` 全部通过，9 个测试文件、85 项测试通过。
 
+---
+
+## [2026-07-01 13:35 CST] Codex：学习星图与课程正文视觉核心
+
+- 重构个人页成长入口，新增 `LearningMap.ets`：课程中心、主题节点、真实掌握度颜色、练习次数驱动节点尺寸、节点点击详情和练习入口。
+- 星图只表达课程归属与真实答题状态；未将视觉连线冒充尚未核验的先修关系。后续接入 Trae 产出的 `topic-relations.json`。
+- 新增 `Lesson.ets`：读取 HAP 内精选知识切片，逐节展示来源、进度与完成状态；每次确认写入 `LessonProgress`，主题完成后进入精选练习。
+- `CourseDetail.ets` 的“学习内容”改为进入端侧课程正文，不再误用云端知识搜索。
+- 星图专用色收口到 `Constants.ets`；使用原生 ArkUI `Line`、`Stack`、`SymbolGlyph`，无第三方渲染依赖。
+- CLI 模拟器验证：个人页 → 学习星图 → 节点详情；课程 → 课程详情 → 学习内容 → 1/4 → 完成本节 → 2/4。
+- 证据：`screenshots/codex-learning-map-20260701/`、`screenshots/codex-lesson-20260701/`。
+

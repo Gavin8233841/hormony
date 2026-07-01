@@ -5,6 +5,8 @@
     "pages/Knowledge",
     "pages/Quiz",
     "pages/CourseDetail",
-    "pages/Practice"
+    "pages/Practice",
+    "pages/LearningMap",
+    "pages/Lesson"
   ]
 }

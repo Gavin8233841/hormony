@@ -6,6 +6,7 @@
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { UserProfile } from '../model/DataModels';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct ProfileContent {
@@ -26,6 +27,13 @@ export struct ProfileContent {
     } finally {
       this.loading = false;
     }
+  }
+
+  private openLearningMap(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/LearningMap' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ProfileContent LearningMap navigation failed: %{public}s', error.message);
+    });
   }
 
   @Builder
@@ -110,6 +118,66 @@ export struct ProfileContent {
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
             .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+
+            Stack({ alignContent: Alignment.Center }) {
+              Column()
+                .width('100%')
+                .height(184)
+                .backgroundColor(Constants.COLOR_MAP_SURFACE)
+                .borderRadius(Constants.RADIUS_LG)
+
+              Line()
+                .width(250)
+                .height(116)
+                .startPoint([125, 58])
+                .endPoint([30, 22])
+                .stroke(Constants.COLOR_MAP_LINE)
+                .strokeWidth(1)
+              Line()
+                .width(250)
+                .height(116)
+                .startPoint([125, 58])
+                .endPoint([218, 18])
+                .stroke(Constants.COLOR_MAP_LINE)
+                .strokeWidth(1)
+              Line()
+                .width(250)
+                .height(116)
+                .startPoint([125, 58])
+                .endPoint([207, 102])
+                .stroke(Constants.COLOR_MAP_LINE)
+                .strokeWidth(1)
+
+              Column()
+                .width(54)
+                .height(54)
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(27)
+                .shadow({ radius: 8, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 2 })
+              Column().width(18).height(18).backgroundColor(Constants.COLOR_BRAND_LIGHT).borderRadius(9).position({ x: 36, y: 38 })
+              Column().width(14).height(14).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(7).position({ x: 246, y: 30 })
+              Column().width(11).height(11).backgroundColor(Constants.COLOR_WARNING).borderRadius(6).position({ x: 234, y: 132 })
+
+              Column({ space: 5 }) {
+                Text('学习星图')
+                  .fontSize(19)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                Text('查看知识之间的联系与掌握状态')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+              }
+              .alignItems(HorizontalAlign.Start)
+              .position({ x: 22, y: 118 })
+
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(20)
+                .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                .position({ x: 292, y: 137 })
+            }
+            .width('100%')
+            .height(184)
+            .onClick((): void => { this.openLearningMap(); })
 
             Row() {
               this.Metric(Math.round(this.profile.stats.accuracy * 100).toString() + '%', '正确率', Constants.COLOR_SUCCESS)
