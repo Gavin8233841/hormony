@@ -4618,3 +4618,13 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 用户确认发送后仍走现有 Health、SSE、RAG、Safety 和失败阻断链路；没有本地模板回答。
 - HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 18 s 915 ms`。
 
+---
+
+## 2026-07-01 Codex：本地练习自适应选题
+
+- `Practice.ets` 不再固定截取 Topic 前 5 题。
+- 选题顺序改为：当前 Topic 未解决错题 → 从未作答题 → 已作答题；数据来自 ArkData 的错题项与答题结果。
+- 保持最多 5 题、完全离线、本地评分，不增加服务器状态或额外模型调用。
+- 本地仓库读取失败和 Topic 无题均显示明确错误/空态。
+- HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 14 s 457 ms`。
+

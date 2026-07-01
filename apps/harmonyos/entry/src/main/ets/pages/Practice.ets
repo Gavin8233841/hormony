@@ -36,10 +36,41 @@ struct PracticePage {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topic = AppStorage.get<string>('selectedPracticeTopic') ?? '';
-    const selectedQuestions = LearningContentRepository.getQuestions(this.courseId, this.topic).slice(0, 5);
+    this.loadQuestions().catch((): void => {
+      this.message = '本地练习加载失败，请重新进入';
+    });
+  }
+
+  private async loadQuestions(): Promise<void> {
+    const available = LearningContentRepository.getQuestions(this.courseId, this.topic);
+    const reviews = await LocalLearningRepository.getReviewItems(true);
+    const results = await LocalLearningRepository.getQuizResults();
+    const reviewIds: string[] = [];
+    const attemptedIds: string[] = [];
+    for (const review of reviews) {
+      if (review.courseId === this.courseId && review.topic === this.topic) reviewIds.push(review.questionId);
+    }
+    for (const result of results) {
+      if (result.courseId !== this.courseId || result.topic !== this.topic) continue;
+      for (const detail of result.details) {
+        if (!attemptedIds.includes(detail.questionId)) attemptedIds.push(detail.questionId);
+      }
+    }
+    const ordered: CuratedQuestion[] = [];
+    for (const question of available) {
+      if (reviewIds.includes(question.id)) ordered.push(question);
+    }
+    for (const question of available) {
+      if (!reviewIds.includes(question.id) && !attemptedIds.includes(question.id)) ordered.push(question);
+    }
+    for (const question of available) {
+      if (!reviewIds.includes(question.id) && attemptedIds.includes(question.id)) ordered.push(question);
+    }
+    const selectedQuestions = ordered.slice(0, 5);
     this.answers = new Array<string>(selectedQuestions.length).fill('');
     this.questions = selectedQuestions;
     this.activeQuestion = selectedQuestions.length > 0 ? selectedQuestions[0] : EMPTY_QUESTION;
+    this.message = selectedQuestions.length > 0 ? '' : '这个主题还没有精选练习';
   }
 
   private choose(option: string): void {
