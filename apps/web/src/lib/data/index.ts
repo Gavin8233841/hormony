@@ -40,7 +40,7 @@ export const allKnowledgeChunks = [
   ...cs103KnowledgeChunks,
 ];
 
-// 全部题库（25个Quiz对象，70道题目）
+// 全部题库（33个Quiz对象，186道题目）
 export const allQuizzes = [
   ...cs101Quizzes,
   ...cs102Quizzes,

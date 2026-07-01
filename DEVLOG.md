@@ -4648,3 +4648,91 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 云端和本地均无结果时保持明确空态；只有两者均失败才显示错误态。
 - HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 14 s 954 ms`。
 
+---
+
+## [2026-07-01T15:41:44Z] [2026-07-01 23:41:44 CST] 模型: Claude (Trae)
+
+### 精选题库扩充任务（批次A）完成
+
+#### 操作摘要
+
+修改 `apps/web/src/lib/data/quizzes.ts`（唯一数据源），使三门课程共 33 个 Topic 每个 Topic 至少有 5 道选择题（type: "choice"），然后生成端侧 `quizzes.json`。
+
+#### 涉及文件
+
+| 文件 | 操作 |
+|------|------|
+| `apps/web/src/lib/data/quizzes.ts` | 修改：修复 9 个 Topic 名称，拆分 2 个 Block（哈希表与堆、TCP握手与流量控制），新增 6 个 Block，补充 105 道选择题 |
+| `apps/web/src/lib/data/index.ts` | 修改：更新注释（25→33 Block，70→186 题） |
+| `apps/web/src/lib/data/data-integrity.test.ts` | 修改：新增同源、33 Topic、选项格式与解析完整性校验 |
+| `scripts/generate-quizzes-json.mjs` | 新建：使用仓库现有 TypeScript 编译器生成并完整比对端侧 JSON |
+| `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json` | 重新生成：165 条选择题 |
+
+#### 数据变化
+
+- Quiz Block：25 → 33（+8：6 个全新 + 2 个拆分产生）
+- 选择题：60 → 165（+105）
+- 简答题：21（不变）
+- 总题目：81 → 186
+- 每 Topic 选择题数：0~7 → 恰好 5（全部 33 个 Topic）
+
+#### 验证结果
+
+| 命令 | 退出码 | 结果 |
+|------|--------|------|
+| `cd apps/web && npx tsc --noEmit` | 0 | 0 errors |
+| `cd apps/web && npx vitest run` | 0 | 9 test files, 88 tests passed |
+| `python scripts/validate-topic-relations.py` | 0 | ALL CHECKS PASSED |
+
+#### 受保护区域
+
+`apps/web/src/lib/agents/`、`apps/web/src/app/api/`、`apps/harmonyos/` 下 .ets 文件、`model.ts`、`orchestrator.ts` 均未修改。
+
+#### 未完成项
+
+无。批次A全部完成。
+
+---
+
+## 2026-07-01 Codex：题库同源、CLI 冒烟与离线资料可达性验收
+
+### 题库复核
+
+- 采纳 Trae 扩充后的 Web 题库：33 个 Quiz Block、186 道总题，其中 165 道四选一题。
+- HarmonyOS `quizzes.json` 只保留端侧可执行的 165 道四选一题；33 Topic 每个恰好 5 道。
+- `generate-quizzes-json.mjs` 使用仓库已安装的 TypeScript 在内存加载 Web 数据，不新增依赖、不写临时文件；生成后对全部字段逐条深比较。
+- Web 完整性测试直接读取 HarmonyOS rawfile，校验两端完全一致、33 Topic 覆盖、A-D 前缀、答案范围及至少两句解析。
+
+### CLI 冒烟与路由修正
+
+- 修正 `harmonyos-app-smoke.ps1`：精确 Bundle Name、绝对 HDC/Hvigor 路径、实际 unsigned HAP、真实 UI 树路径与 `attributes.text/bounds`、JPEG 截图、失败立即退出。
+- 冒烟覆盖首页、课程详情、五题选择与提交、逐题复盘、错题追问、Chat 状态、学习记录、错题本、成就和三课程学习星图。
+- 冒烟发现 `pages/Chat` 未注册，导致“向学伴追问”停留在 Practice；已补入 `main_pages.json`，复测进入真实 Chat 并保留预填问题。
+
+### 离线资料与视觉验收
+
+- 当前模拟器访问 AI Quiz 时明确返回“云端学伴暂不可用，请检查网络后重试”。
+- 发现 Knowledge 仅能从 AI Quiz 结果进入，云端不可用时离线资料不可达；课程详情新增“搜课程资料”入口，复用现有 Knowledge 页面与课程上下文。
+- “二叉搜索树”检索在云端不可用时返回 4 条本地课程资料，来源、相关度、折叠正文与继续测验入口均正常。
+- DevEco ArkTS 诊断：`CourseDetail.ets` 无诊断。
+- DevEco 截图确认 Practice 结果标题、环形成绩、逐题复盘和状态栏均正常；HDC `snapshot_display` 的结果页黑色状态栏为抓图缺陷，不修改页面。
+
+### 验证
+
+| 命令 | 结果 |
+|------|------|
+| `node scripts/generate-quizzes-json.mjs` | 165 题生成并完整一致性校验通过 |
+| `python scripts/validate-topic-relations.py` | 33 节点、147 切片全部通过 |
+| `pnpm lint` | 通过，无警告或错误 |
+| `pnpm typecheck` | 通过，0 个 TypeScript 错误 |
+| `pnpm test` | 9 个测试文件、88 项测试通过 |
+| `apps/harmonyos/hvigorw.bat assembleHap --no-daemon` | `BUILD SUCCESSFUL in 17 s 317 ms` |
+| `scripts/harmonyos-app-smoke.ps1` | 66 PASS、0 FAIL |
+| `git diff --check` | 通过 |
+
+视觉证据：
+
+- `screenshots/trae-smoke-20260701-154926/`
+- `screenshots/codex-visual-pass-20260701-harmony11/knowledge-local-result.jpeg`
+- `screenshots/codex-visual-pass-20260701-harmony11/practice-result-deveco.png`
+

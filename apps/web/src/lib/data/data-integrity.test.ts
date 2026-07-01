@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   COURSE_IDS,
@@ -12,6 +14,35 @@ const MINIMUM_COUNTS = {
   cs102: { chunks: 40, questions: 20, choices: 20 },
   cs103: { chunks: 40, questions: 20, choices: 20 },
 };
+
+interface RawQuizQuestion {
+  id: string;
+  courseId: string;
+  topic: string;
+  question: string;
+  options?: string[];
+  answer: string;
+  explanation: string;
+}
+
+interface TopicRelation {
+  courseId: string;
+  topic: string;
+}
+
+const harmonyResourceUrl = (fileName: string) =>
+  new URL(
+    `../../../../harmonyos/entry/src/main/resources/rawfile/learning/${fileName}`,
+    import.meta.url
+  );
+
+const rawQuizQuestions = JSON.parse(
+  readFileSync(fileURLToPath(harmonyResourceUrl("quizzes.json")), "utf8")
+) as RawQuizQuestion[];
+
+const topicRelations = JSON.parse(
+  readFileSync(fileURLToPath(harmonyResourceUrl("topic-relations.json")), "utf8")
+) as TopicRelation[];
 
 describe("课程数据资产完整性", () => {
   it("知识切片应满足课程覆盖、长度和唯一性约束", () => {
@@ -85,6 +116,46 @@ describe("课程数据资产完整性", () => {
     }
   });
 
+  it("Web 与 HarmonyOS 题库应同源并完整覆盖 33 个 Topic", () => {
+    const webQuestions: RawQuizQuestion[] = allQuizzes.flatMap((quiz) =>
+      quiz.questions
+        .filter((q) => q.type === "choice")
+        .map((question) => ({
+          id: question.id,
+          courseId: quiz.courseId,
+          topic: quiz.topic,
+          question: question.stem,
+          ...(question.options ? { options: question.options } : {}),
+          answer: question.answer,
+          explanation: question.explanation,
+        }))
+    );
+
+    expect(rawQuizQuestions).toEqual(webQuestions);
+
+    for (const relation of topicRelations) {
+      const topicQuestions = webQuestions.filter(
+        (question) =>
+          question.courseId === relation.courseId &&
+          question.topic === relation.topic
+      );
+      const choiceQuestions = topicQuestions.filter(
+        (question) => question.options?.length === 4
+      );
+      expect(choiceQuestions.length).toBeGreaterThanOrEqual(3);
+
+      for (const question of choiceQuestions) {
+        expect(question.options).toHaveLength(4);
+        question.options?.forEach((option, index) => {
+          expect(option).toMatch(new RegExp(`^${String.fromCharCode(65 + index)}\\.`));
+        });
+        expect(["A", "B", "C", "D"]).toContain(question.answer);
+        expect(question.explanation.match(/[^。！？.!?]+[。！？.!?]/g)?.length ?? 0)
+          .toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
   it("外部资源应使用受支持类型、HTTPS 地址和有效课程关联", () => {
     const ids = new Set<string>();
     const titles = new Set<string>();
@@ -114,4 +185,5 @@ describe("课程数据资产完整性", () => {
       expect(externalResources.some((resource) => resource.type === type)).toBe(true);
     }
   });
+
 });
