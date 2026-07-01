@@ -4070,3 +4070,13 @@ Agent 模块打通闭环——移除假降级 + 修复无效模型名 + 添加�
 - [ ] 验证 Plan AI 计划生成功能
 - [ ] 将 Constants.ets BASE_URL 恢复为 Vercel 生产地址（当前为 `http://10.0.2.2:3001` 代理地址）
 
+---
+
+## [2026-07-01 14:02 CST] Codex：Ponytail 接入与端侧学习信息架构推进
+
+- 使用官方 skill installer 从 `DietrichGebert/ponytail` 安装 `ponytail`、`ponytail-review`、`ponytail-audit`、`ponytail-debt`、`ponytail-gain`、`ponytail-help`，当前开发采用 full 模式：现有代码、标准库、ArkUI 原生能力优先。
+- 新增学习记录、错题本、成就三个真实本地数据页面，并在个人页按“成长记录”分组提供唯一入口；页面读取 ArkData 派生数据，不使用演示统计。
+- 重构 `Lesson.ets` 阅读层级：不改写课程原文，只把知识切片拆为核心句、理解要点和来源，降低大段纯文本阅读负担；保持逐节完成、进度持久化和练习跳转。
+- 调研 OpenHarmony-TPC `@ohos/lottie` 作为完成/成就动效渲染器；本机 OHPM 官方源请求返回 502，本轮未写入依赖或半成品配置，后续在源恢复并完成许可证、API 12 与真机性能验证后再接入。
+- CLI 验证：`hvigorw assembleHap --no-daemon`，`CompileArkTS` 与 `PackageHap` 通过，`BUILD SUCCESSFUL in 14 s 971 ms`。
+

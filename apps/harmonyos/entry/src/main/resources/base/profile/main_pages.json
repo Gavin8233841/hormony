@@ -7,6 +7,9 @@
     "pages/CourseDetail",
     "pages/Practice",
     "pages/LearningMap",
-    "pages/Lesson"
+    "pages/Lesson",
+    "pages/ActivityRecords",
+    "pages/MistakeBook",
+    "pages/Achievements"
   ]
 }

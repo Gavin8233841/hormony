@@ -58,6 +58,14 @@ struct LessonPage {
     this.activeChunk = this.chunks[index];
   }
 
+  private contentBeats(): string[] {
+    return this.activeChunk.text
+      .split('。')
+      .map((sentence: string): string => sentence.trim())
+      .filter((sentence: string): boolean => sentence.length > 0)
+      .map((sentence: string): string => sentence + '。');
+  }
+
   private async completeCurrent(): Promise<void> {
     if (this.saving || this.activeChunk.id.length === 0) return;
     this.saving = true;
@@ -133,38 +141,92 @@ struct LessonPage {
         .padding({ left: 18, right: 18, top: 4, bottom: 12 })
 
         Scroll() {
-          Column({ space: 18 }) {
-            Text(this.activeChunk.text)
+          Column({ space: 24 }) {
+            Column({ space: 12 }) {
+              Row({ space: 8 }) {
+                SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
+                  .fontSize(18)
+                  .fontColor([Constants.COLOR_BRAND])
+                Text('先抓住核心')
+                  .fontSize(13)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_BRAND)
+              }
               .width('100%')
-              .fontSize(16)
-              .lineHeight(28)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              .textAlign(TextAlign.Start)
 
-            Divider().color(Constants.COLOR_BORDER)
+              Text(this.contentBeats()[0] ?? this.activeChunk.text)
+                .width('100%')
+                .fontSize(22)
+                .fontWeight(FontWeight.Bold)
+                .lineHeight(34)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            }
+            .width('100%')
+            .padding({ left: 20, right: 20, top: 22, bottom: 22 })
+            .backgroundColor(Constants.COLOR_SURFACE_TINT)
+            .borderRadius(Constants.RADIUS_LG)
 
-            Row({ space: 8 }) {
+            if (this.contentBeats().length > 1) {
+              Column({ space: 16 }) {
+                Text('拆开理解')
+                  .width('100%')
+                  .fontSize(17)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+
+                ForEach(this.contentBeats().slice(1), (sentence: string, index: number): void => {
+                  Row({ space: 12 }) {
+                    Column()
+                      .width(8)
+                      .height(8)
+                      .backgroundColor(index === this.contentBeats().length - 2 ?
+                        Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+                      .borderRadius(4)
+                      .margin({ top: 9 })
+                    Text(sentence)
+                      .layoutWeight(1)
+                      .fontSize(15)
+                      .lineHeight(26)
+                      .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                  }
+                  .width('100%')
+                  .alignItems(VerticalAlign.Top)
+                })
+              }
+              .width('100%')
+            }
+
+            Row({ space: 10 }) {
               SymbolGlyph($r('sys.symbol.book_open_fill'))
-                .fontSize(16)
+                .fontSize(17)
                 .fontColor([Constants.COLOR_TEXT_SECONDARY])
-              Text('来源：' + this.activeChunk.source)
-                .layoutWeight(1)
-                .fontSize(12)
-                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              Column({ space: 2 }) {
+                Text('内容来源')
+                  .fontSize(11)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                Text(this.activeChunk.source)
+                  .fontSize(13)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
               if (this.completedChunkIds.includes(this.activeChunk.id)) {
                 Text('已学')
                   .fontSize(11)
                   .fontColor(Constants.COLOR_SUCCESS)
+                  .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+                  .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+                  .borderRadius(Constants.RADIUS_SM)
               }
             }
             .width('100%')
+            .padding({ top: 16 })
+            .border({ width: { top: 1 }, color: Constants.COLOR_BORDER })
           }
           .width('100%')
           .constraintSize({ minHeight: '100%' })
           .justifyContent(FlexAlign.Start)
-          .padding(20)
-          .backgroundColor(Constants.COLOR_BG_CARD)
-          .borderRadius(Constants.RADIUS_LG)
+          .padding({ left: 18, right: 18, top: 4, bottom: 24 })
         }
         .width('100%')
         .layoutWeight(1)

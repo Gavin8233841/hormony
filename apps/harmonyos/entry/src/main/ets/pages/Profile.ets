@@ -36,6 +36,33 @@ export struct ProfileContent {
     });
   }
 
+  private openPage(url: string): void {
+    this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ProfileContent page navigation failed: %{public}s', error.message);
+    });
+  }
+
+  @Builder
+  GrowthEntry(title: string, subtitle: string, icon: Resource, url: string) {
+    Row({ space: 12 }) {
+      Stack({ alignContent: Alignment.Center }) {
+        Column().width(38).height(38).backgroundColor(Constants.COLOR_BRAND_LIGHT).borderRadius(12)
+        SymbolGlyph(icon).fontSize(20).fontColor([Constants.COLOR_BRAND])
+      }
+      Column({ space: 3 }) {
+        Text(title).fontSize(15).fontWeight(FontWeight.Medium).fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(subtitle).fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(17).fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
+    }
+    .width('100%')
+    .height(62)
+    .onClick((): void => { this.openPage(url); })
+  }
+
   @Builder
   Metric(value: string, label: string, color: ResourceColor) {
     Column({ space: 4 }) {
@@ -118,6 +145,18 @@ export struct ProfileContent {
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
             .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+
+            Column() {
+              this.GrowthEntry('学习记录', '按时间回看练习与任务', $r('sys.symbol.clock'), 'pages/ActivityRecords')
+              Divider().color(Constants.COLOR_BORDER).margin({ left: 50 })
+              this.GrowthEntry('错题本', '集中复习尚未解决的问题', $r('sys.symbol.xmark_circle_fill'), 'pages/MistakeBook')
+              Divider().color(Constants.COLOR_BORDER).margin({ left: 50 })
+              this.GrowthEntry('成就', '用真实完成记录解锁里程碑', $r('sys.symbol.star_fill'), 'pages/Achievements')
+            }
+            .width('100%')
+            .padding({ left: 14, right: 14, top: 4, bottom: 4 })
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(Constants.RADIUS_LG)
 
             Stack({ alignContent: Alignment.Center }) {
               Column()
