@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import type { ChatCompletionCreateParamsNonStreaming } from "openai/resources/chat/completions";
 
 const DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
-const DEFAULT_MODEL_NAME = "doubao-seed-1-6-250615";
+const DEFAULT_MODEL_NAME = "doubao-seed-2-1-pro-260628";
 const DEFAULT_TIMEOUT_MS = 45000;
 const MODEL_API_KEY_PLACEHOLDERS = new Set([
   "your-api-key-here",
@@ -120,6 +120,20 @@ function getModelClient(config: ModelConfig): OpenAI | null {
   return cachedClient;
 }
 
+async function createChatCompletion(
+  client: OpenAI,
+  request: ArkChatCompletionRequest,
+  timeoutMs: number
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await client.chat.completions.create(request, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function getModelRuntimeInfo(): ModelRuntimeInfo {
   const config = readModelConfig();
   const testConfigured = readTestModelResponse() !== undefined;
@@ -165,7 +179,7 @@ export async function callModel(
       max_tokens: Math.min(Math.max(opts?.maxTokens ?? 1024, 128), 2048),
       thinking: { type: "disabled" },
     };
-    const res = await client.chat.completions.create(request);
+    const res = await createChatCompletion(client, request, config.timeoutMs);
 
     const content = res.choices[0]?.message?.content;
     if (typeof content === "string" && content.trim().length > 0) {
@@ -216,7 +230,7 @@ export async function callModelWithHistory(
       max_tokens: Math.min(Math.max(opts?.maxTokens ?? 1024, 128), 2048),
       thinking: { type: "disabled" },
     };
-    const res = await client.chat.completions.create(request);
+    const res = await createChatCompletion(client, request, config.timeoutMs);
 
     const content = res.choices[0]?.message?.content;
     if (typeof content === "string" && content.trim().length > 0) {

@@ -4090,3 +4090,12 @@ Agent 模块打通闭环——移除假降级 + 修复无效模型名 + 添加�
 - 资源筛选：拒绝把 Web 专用 Zustand、Comlink、BlurHash、SpinKit、canvas-confetti 和 ArkWeb 运行时接入 HAP；这些资源不能改善端侧核心体验且会增加依赖。仅保留 `@ohos/lottie` 作为待验证的完成/成就动效渲染器方向。
 - CLI 验证：`hvigorw assembleHap --no-daemon`，`BUILD SUCCESSFUL in 17 s 454 ms`。
 
+---
+
+## [2026-07-01 14:32 CST] Codex：Agent 超时根因修复与模型配置纠偏
+
+- 审查 Trae 的 Agent 超时实现后，删除只覆盖 Planner/Quiz/Evaluator/Tutor 的编排器 `Promise.race`；该实现未覆盖 Profile 与 Safety、未清理定时器、也未取消底层 HTTP 请求。
+- 在唯一模型边界 `model.ts` 使用 OpenAI SDK 类型明确支持的 `AbortSignal`，按 `MODEL_TIMEOUT_MS` 中止请求并在 `finally` 清理定时器；所有 Agent 自动获得同一超时边界。
+- 火山引擎官方产品页确认 Doubao Seed 2.1 Pro 已发布，官方 Chat API 确认支持 `thinking.type=disabled`。恢复用户控制台示例明确给出的 `doubao-seed-2-1-pro-260628`；认证错误不能作为模型不存在的证据。
+- Web 验证：`pnpm lint`、`pnpm typecheck`、`pnpm test` 全部通过，9 个测试文件、85 项测试通过。
+

@@ -12,25 +12,8 @@ import { runPlannerAgent } from "./planner-agent";
 import { runQuizAgent } from "./quiz-agent";
 import { runEvaluatorAgent } from "./evaluator-agent";
 import { runSafetyAgent } from "./safety-agent";
-import { ModelUnavailableError } from "./model";
 import type { AgentResult, Citation, StreamEvent, ChatRequest, ChatMessage, SafetyResult } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-
-// 硬超时包装：当 SDK 自身超时机制失效时作为安全网，
-// 确保 Agent 调用不会无限期挂起导致 Vercel 函数超时。
-const AGENT_TIMEOUT_MS = 50_000;
-
-function withAgentTimeout<T>(promise: Promise<T>, agentName: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(
-        () => reject(new ModelUnavailableError(`${agentName} Agent 调用超时（${AGENT_TIMEOUT_MS / 1000}s）`)),
-        AGENT_TIMEOUT_MS
-      )
-    ),
-  ]);
-}
 
 // 简易意图识别（关键词路由）
 type Intent = "tutor" | "plan" | "quiz" | "evaluate" | "general";
@@ -110,7 +93,7 @@ async function routeMainAgent(
   switch (intent) {
     case "plan":
       emit?.({ type: "thinking", agent: "Planner" });
-      mainResult = await withAgentTimeout((async () => {
+      mainResult = await (async () => {
         const plan = await runPlannerAgent(req.userId, req.message, 14, 90, req.profile);
         return {
           agent: "Planner" as const,
@@ -120,11 +103,11 @@ async function routeMainAgent(
                 .join("\n")}`
             : JSON.stringify(plan, null, 2),
         };
-      })(), "Planner");
+      })();
       break;
     case "quiz":
       emit?.({ type: "thinking", agent: "Quiz" });
-      mainResult = await withAgentTimeout((async () => {
+      mainResult = await (async () => {
         const quiz = await runQuizAgent(
           req.userId,
           req.context?.courseId ?? "cs101",
@@ -143,30 +126,24 @@ async function routeMainAgent(
                 .join("\n\n")}`
             : JSON.stringify(quiz, null, 2),
         };
-      })(), "Quiz");
+      })();
       break;
     case "evaluate":
       emit?.({ type: "thinking", agent: "Evaluator" });
-      mainResult = await withAgentTimeout(
-        runEvaluatorAgent(req.userId, [], req.profile),
-        "Evaluator"
-      );
+      mainResult = await runEvaluatorAgent(req.userId, [], req.profile);
       break;
     case "tutor":
     case "general":
     default:
       emit?.({ type: "thinking", agent: "Tutor" });
-      mainResult = await withAgentTimeout(
-        runTutorAgent(
+      mainResult = await runTutorAgent(
           req.userId,
           req.message,
           retrievalResult.content,
           retrievalResult.citations ?? [],
           history,
           req.profile
-        ),
-        "Tutor"
-      );
+        );
       break;
   }
   return mainResult;
