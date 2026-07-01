@@ -48,19 +48,32 @@ export default class EntryFormAbility extends FormExtensionAbility {
 
   private buildData(plan: StudyPlan | null): LearningFormData {
     if (plan === null || plan.tasks.length === 0) return this.defaultData();
-    const pending: PlanTask[] = plan.tasks.filter((task: PlanTask): boolean => task.done !== true);
+    const now = new Date();
+    const month = (now.getMonth() + 1).toString();
+    const day = now.getDate().toString();
+    const today = now.getFullYear().toString() + '-' + (month.length === 1 ? '0' + month : month) + '-' +
+      (day.length === 1 ? '0' + day : day);
+    const todayTasks: PlanTask[] = plan.tasks.filter((task: PlanTask): boolean => task.date === today);
+    if (todayTasks.length === 0) {
+      return {
+        taskTitle: '今天没有安排',
+        taskMeta: plan.goal,
+        progressText: '查看完整计划'
+      };
+    }
+    const pending: PlanTask[] = todayTasks.filter((task: PlanTask): boolean => task.done !== true);
     if (pending.length === 0) {
       return {
         taskTitle: '今天的任务已全部完成',
         taskMeta: plan.goal,
-        progressText: plan.tasks.length + '/' + plan.tasks.length + ' 已完成'
+        progressText: todayTasks.length + '/' + todayTasks.length + ' 已完成'
       };
     }
-    const completed = plan.tasks.length - pending.length;
+    const completed = todayTasks.length - pending.length;
     return {
       taskTitle: pending[0].title,
       taskMeta: pending[0].estimatedMin + ' 分钟 · ' + plan.goal,
-      progressText: completed + '/' + plan.tasks.length + ' 已完成'
+      progressText: completed + '/' + todayTasks.length + ' 已完成'
     };
   }
 }

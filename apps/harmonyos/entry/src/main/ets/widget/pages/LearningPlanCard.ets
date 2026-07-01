@@ -21,7 +21,7 @@ struct LearningPlanCard {
             Text('鸿学伴')
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
-              .fontColor('#246BFD')
+              .fontColor('#176BFF')
             Text('今日学习')
               .fontSize(23)
               .fontWeight(FontWeight.Bold)
@@ -31,7 +31,7 @@ struct LearningPlanCard {
           Blank()
           SymbolGlyph($r('sys.symbol.book_open_fill'))
             .fontSize(30)
-            .fontColor(['#246BFD'])
+            .fontColor(['#176BFF'])
         }
         .width('100%')
 
@@ -46,7 +46,7 @@ struct LearningPlanCard {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text(this.taskMeta)
             .fontSize(12)
-            .fontColor('#667085')
+            .fontColor('#6F7A8F')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -56,14 +56,14 @@ struct LearningPlanCard {
         Row() {
           Text(this.progressText)
             .fontSize(12)
-            .fontColor('#246BFD')
+            .fontColor('#176BFF')
           Blank()
           Text('打开')
             .fontSize(12)
             .fontWeight(FontWeight.Medium)
             .fontColor('#FFFFFF')
             .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-            .backgroundColor('#246BFD')
+            .backgroundColor('#176BFF')
             .borderRadius(15)
         }
         .width('100%')
@@ -72,7 +72,7 @@ struct LearningPlanCard {
       .width('100%')
       .height('100%')
       .padding(18)
-      .backgroundColor('#F7FAFF')
+      .backgroundColor('#F4F7FC')
     }
   }
 }

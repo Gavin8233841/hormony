@@ -4628,3 +4628,13 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本地仓库读取失败和 Topic 无题均显示明确错误/空态。
 - HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 14 s 457 ms`。
 
+---
+
+## 2026-07-01 Codex：服务卡片今日任务语义统一
+
+- 复核确认 `EntryFormAbility` 已从 ArkData 读取计划并通过 `formProvider.updateForm` 更新卡片，旧差距文档的“完全静态”结论已过时。
+- 修正 `buildData()`：只统计本地日期当天任务；无当日任务、全部完成、仍有待办分别返回真实状态。
+- `LearningPlanCard.ets` 统一品牌蓝、文字色和页面背景色，减少 App 与系统卡片的视觉割裂。
+- 卡片仍只读本地计划，不依赖公网模型服务展示；点击进入 App 后再使用真实 Agent。
+- HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 14 s 389 ms`。
+
