@@ -16,9 +16,10 @@ export async function GET() {
       configured: modelInfo.configured,
       mode: modelInfo.mode,
       provider: modelInfo.provider,
+      name: modelInfo.modelName,
     },
     deploymentMode: process.env.DEPLOYMENT_MODE?.trim() || "development",
-    version: "1.0.0",
+    version: "1.0.1",
   }, { status: modelInfo.configured ? 200 : 503 });
 }
 
