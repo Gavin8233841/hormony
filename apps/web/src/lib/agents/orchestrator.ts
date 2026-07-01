@@ -1,6 +1,7 @@
 // Orchestrator：多 Agent 编排器
 // 职责：意图识别 → 调用对应 Agent → 安全审核 → 汇总输出
-// 每个 Agent 调用独立 try-catch，单个 Agent 失败不阻断整体流程
+// 任何 Agent 失败均向上抛出异常，由 API 路由返回对应错误码。
+// 不提供假降级、假回答或假反馈——失败即报错。
 // orchestrate（非流式）与 orchestrateStream（流式）共享前置 Agent、
 // 主 Agent 路由、安全审核、会话持久化等公共逻辑（见下方辅助函数）。
 
@@ -24,22 +25,6 @@ function detectIntent(message: string): Intent {
   if (/(分析|诊断|错题|薄弱|总结|评估|成绩|答题记录)/.test(m)) return "evaluate";
   if (/(什么是|解释|讲解|怎么理解|区别|原理|为什么|如何|说明|含义)/.test(m)) return "tutor";
   return "general";
-}
-
-// 安全执行单个 Agent，失败时返回降级结果
-async function safeAgentCall(
-  agentName: AgentResult["agent"],
-  fn: () => Promise<AgentResult>
-): Promise<AgentResult> {
-  try {
-    return await fn();
-  } catch (err) {
-    console.error(`[orchestrator] ${agentName} agent failed:`, err instanceof Error ? err.message : String(err));
-    return {
-      agent: agentName,
-      content: `${agentName} 服务暂时不可用，已跳过。`,
-    };
-  }
 }
 
 export interface OrchestrationResult {
@@ -66,8 +51,9 @@ function prepareContext(req: ChatRequest): {
   return { intent, sessionId, history };
 }
 
-// 执行前置 Agent：Profile + Retrieval（失败不阻断）。
+// 执行前置 Agent：Profile + Retrieval。
 // 两个 Agent 完全独立，并行执行以减少总延迟。
+// 任何 Agent 失败均向上抛出异常，不提供假降级。
 // 传入 emit 时按流式协议推送 thinking / trace 事件。
 async function runPreAgents(
   req: ChatRequest,
@@ -77,8 +63,8 @@ async function runPreAgents(
   emit?.({ type: "thinking", agent: "Retrieval" });
 
   const [profileResult, retrievalResult] = await Promise.all([
-    safeAgentCall("Profile", () => runProfileAgent(req.profile)),
-    safeAgentCall("Retrieval", () => runRetrievalAgent(req.message, req.context?.courseId)),
+    runProfileAgent(req.profile),
+    runRetrievalAgent(req.message, req.context?.courseId),
   ]);
 
   emit?.({ type: "trace", agent: "Profile", content: profileResult.content });
@@ -91,7 +77,8 @@ async function runPreAgents(
   return { profileResult, retrievalResult };
 }
 
-// 按意图路由到主 Agent（失败不阻断）。
+// 按意图路由到主 Agent。
+// 任何 Agent 失败均向上抛出异常，不提供假降级。
 // 传入 emit 时按流式协议推送 thinking 事件；plan/quiz 在流式 / 非流式下采用不同内容格式。
 async function routeMainAgent(
   intent: Intent,
@@ -162,26 +149,16 @@ async function routeMainAgent(
   return mainResult;
 }
 
-// 安全审核（失败时阻断正文输出）。
+// 安全审核。
 // 传入 emit 时推送 thinking + trace 事件；返回 safety 结果与对应的 AgentResult。
+// 安全审核失败时向上抛出异常，不提供假降级。
 async function runSafetyCheck(
   content: string,
   citations: Citation[],
   emit?: (event: StreamEvent) => void
 ): Promise<{ safety: SafetyResult; safetyAgentResult: AgentResult }> {
   emit?.({ type: "thinking", agent: "Safety" });
-  const safety = await runSafetyAgent(content, citations).catch((err) => {
-    console.error(
-      `[orchestrator${emit ? "/stream" : ""}] Safety agent failed:`,
-      err instanceof Error ? err.message : String(err)
-    );
-    return {
-      passed: false,
-      flags: ["安全审核服务不可用"],
-      hallucinationRisk: "high" as const,
-      suggestion: "安全审核失败，已阻断本次回答。",
-    };
-  });
+  const safety = await runSafetyAgent(content, citations);
   const safetyAgentResult: AgentResult = {
     agent: "Safety",
     content: safety.passed
@@ -206,15 +183,15 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
   const { intent, sessionId, history } = prepareContext(req);
   const agentResults: AgentResult[] = [];
 
-  // 1. 前置 Agent：Profile + Retrieval（失败不阻断）
+  // 1. 前置 Agent：Profile + Retrieval
   const { profileResult, retrievalResult } = await runPreAgents(req);
   agentResults.push(profileResult, retrievalResult);
 
-  // 2. 按意图路由到主 Agent（失败不阻断）
+  // 2. 按意图路由到主 Agent
   const mainResult = await routeMainAgent(intent, req, retrievalResult, history);
   agentResults.push(mainResult);
 
-  // 3. 安全审核（失败不阻断）
+  // 3. 安全审核
   const { safety, safetyAgentResult } = await runSafetyCheck(
     mainResult.content,
     mainResult.citations ?? []
@@ -243,10 +220,10 @@ export async function orchestrateStream(
 ): Promise<void> {
   const { intent, sessionId, history } = prepareContext(req);
 
-  // 1. 前置 Agent：Profile + Retrieval（失败不阻断，流式推送 trace）
+  // 1. 前置 Agent：Profile + Retrieval（流式推送 trace）
   const { retrievalResult } = await runPreAgents(req, emit);
 
-  // 2. 按意图路由到主 Agent（失败不阻断）
+  // 2. 按意图路由到主 Agent
   const mainResult = await routeMainAgent(intent, req, retrievalResult, history, emit);
 
   // 3. 安全审核必须先于任何正文输出。

@@ -4003,3 +4003,11 @@ Loop Engineering — Agent 模块端到端打通：离线降级移除 + 代理�
 - 新增 `docs/TRAE-APP-IMPLEMENTATION-WORK-PACKAGE-2.md`：题库扩充、知识关系图数据、CLI 自动回归、设备适配审计和内容质量审计。
 - 视觉骨架、知识星图交互、导航、ArkData 核心和模型安全边界继续由 Codex 负责。
 
+---
+
+## [2026-07-01 13:22 CST] Codex：Agent 失败边界收紧
+
+- 删除 `orchestrator.ts` 的 `safeAgentCall` 文本降级；Profile、Retrieval、主 Agent 或 Safety 任一真实调用失败均向 API 路由抛出异常。
+- Safety 异常不再被包装成看似正常的 Agent 结果，保持失败即报错、正文输出前阻断的边界。
+- 验证：`pnpm lint`、`pnpm typecheck`、`pnpm test` 全部通过，9 个测试文件、85 项测试通过。
+
