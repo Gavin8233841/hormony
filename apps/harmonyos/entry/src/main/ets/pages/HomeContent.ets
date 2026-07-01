@@ -48,12 +48,23 @@ export struct HomeContent {
     }
   }
 
-  private taskStatus(task: PlanTask, index: number): string {
+  private todayDate(): string {
+    const now = new Date();
+    const month = (now.getMonth() + 1).toString();
+    const day = now.getDate().toString();
+    return now.getFullYear().toString() + '-' + (month.length === 1 ? '0' + month : month) + '-' +
+      (day.length === 1 ? '0' + day : day);
+  }
+
+  private todayTasks(): PlanTask[] {
+    const today = this.todayDate();
+    return this.planTasks.filter((task: PlanTask): boolean => task.date === today);
+  }
+
+  private taskStatus(task: PlanTask): string {
     if (task.done) return '已完成';
-    for (let i = 0; i < index; i++) {
-      if (!this.planTasks[i].done) return '待开始';
-    }
-    return '进行中';
+    const firstPending = this.todayTasks().find((item: PlanTask): boolean => item.done !== true);
+    return firstPending?.id === task.id ? '进行中' : '待开始';
   }
 
   private async toggleTask(task: PlanTask): Promise<void> {
@@ -107,10 +118,11 @@ export struct HomeContent {
   }
 
   private currentTaskTitle(): string {
-    for (const task of this.planTasks) {
+    for (const task of this.todayTasks()) {
       if (!task.done) return task.title;
     }
-    return this.planTasks.length === 0 ? '制定今日学习计划' : '今日任务已完成';
+    if (this.planTasks.length === 0) return '制定今日学习计划';
+    return this.todayTasks().length === 0 ? '今天没有安排' : '今日任务已完成';
   }
 
   private submitQuickAsk(): void {
@@ -244,7 +256,7 @@ export struct HomeContent {
                 .fontColor([Constants.COLOR_BRAND])
             }
             Column() {
-              Text('当前章节')
+              Text('当前任务')
                 .fontSize(12)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
               Text(this.currentTaskTitle())
@@ -345,19 +357,19 @@ export struct HomeContent {
         Column()
           .width(34)
           .height(34)
-          .backgroundColor(this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
-            this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
+          .backgroundColor(this.taskStatus(task) === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
+            this.taskStatus(task) === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
           .border({
             width: 1,
-            color: this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS :
-              this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER,
+            color: this.taskStatus(task) === '已完成' ? Constants.COLOR_SUCCESS :
+              this.taskStatus(task) === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER,
           })
           .borderRadius(17)
-        if (this.taskStatus(task, index) === '已完成') {
+        if (this.taskStatus(task) === '已完成') {
           SymbolGlyph($r('sys.symbol.checkmark'))
             .fontSize(16)
             .fontColor([Constants.COLOR_SUCCESS])
-        } else if (this.taskStatus(task, index) === '进行中') {
+        } else if (this.taskStatus(task) === '进行中') {
           SymbolGlyph($r('sys.symbol.arrow_right'))
             .fontSize(16)
             .fontColor([Constants.COLOR_BRAND])
@@ -377,13 +389,13 @@ export struct HomeContent {
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
 
-      Text(this.taskStatus(task, index))
+      Text(this.taskStatus(task))
         .fontSize(11)
-        .fontColor(this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS :
-          this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY)
+        .fontColor(this.taskStatus(task) === '已完成' ? Constants.COLOR_SUCCESS :
+          this.taskStatus(task) === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY)
         .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-        .backgroundColor(this.taskStatus(task, index) === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
-          this.taskStatus(task, index) === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
+        .backgroundColor(this.taskStatus(task) === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
+          this.taskStatus(task) === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
         .borderRadius(12)
     }
     .width('100%')
@@ -445,10 +457,29 @@ export struct HomeContent {
           }
           .width('100%')
           .padding({ top: 18, bottom: 18 })
+        } else if (this.todayTasks().length === 0) {
+          Column({ space: 8 }) {
+            Text('今天没有安排')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text('可以休息，或从完整计划中选择一项继续')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Button('查看完整计划')
+              .height(36)
+              .fontSize(13)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .fontColor(Constants.COLOR_BRAND)
+              .borderRadius(18)
+              .onClick(() => this.openPlan())
+          }
+          .width('100%')
+          .padding({ top: 18, bottom: 18 })
         } else {
-          ForEach(this.planTasks.slice(0, 3), (task: PlanTask, index: number) => {
+          ForEach(this.todayTasks().slice(0, 3), (task: PlanTask, index: number) => {
             this.TaskRow(task, index)
-            if (index < Math.min(this.planTasks.length, 3) - 1) {
+            if (index < Math.min(this.todayTasks().length, 3) - 1) {
               Divider()
                 .color(Constants.COLOR_BORDER)
                 .margin({ left: 46 })

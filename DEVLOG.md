@@ -4581,3 +4581,20 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 修正后再次增量构建：`BUILD SUCCESSFUL in 14 s 736 ms`；DevEco MCP 成功安装并启动最新 HAP。
 - 新增 `docs/TRAE-NEXT-WORK-20260701.md`，将 CLI 冒烟脚本修正、33 Topic 本地题库覆盖和只读适配审计交给 Trae。
 
+---
+
+## 2026-07-01 Codex：首页真实今日任务与模型发布策略
+
+### 首页修正
+
+- `HomeContent.ets` 按本地日期 `YYYY-MM-DD` 筛选今日任务，不再把计划前 3 项冒充今日安排。
+- “当前章节”改为“当前任务”；任务的进行中/待开始顺序只在当天任务内计算。
+- 已有计划但当天无任务时明确显示“今天没有安排”，并提供查看完整计划入口。
+- HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 15 s 524 ms`。
+
+### 模型策略
+
+- 火山方舟官方文档确认低成本模型精确 ID 为 `doubao-seed-2-0-lite-260215`。
+- 当前 `doubao-seed-2-1-pro-260628` 已完成四接口真实回归且免费额度充足，本轮不切换生产环境，避免无收益的回归风险。
+- 新增 `docs/MODEL-ROLLOUT-STRATEGY.md`：模型只通过 Vercel `MODEL_NAME` 切换，每次必须重跑 Health/Chat/Plan/Quiz 与端侧闭环，提交前使用通过验收的最高质量模型。
+
