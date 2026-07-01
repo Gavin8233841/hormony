@@ -129,7 +129,7 @@ export const cs103KnowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "cs103_k17",
-    text: "TIME_WAIT状态是主动关闭连接的一方在发送最后一个ACK后进入的状态，持续时间为2倍MSL（最大报文段生存时间，RFC 793建议MSL为2分钟，Linux默认为60秒，因此TIME_WAIT持续约60秒）。TIME_WAIT状态的作用有两个：一是确保最后一个ACK能到达被动关闭方，若被动关闭方因ACK丢失而重传FIN，处于TIME_WAIT状态的一方仍能再次发送ACK；二是使本次连接的所有报文段在网络中消亡，防止延迟到达的旧报文段被误认为是新连接的数据。大量短连接会导致TIME_WAIT状态堆积耗尽端口资源，可通过调整tcp_max_tw_buckets和tcp_tw_reuse等内核参数缓解。",
+    text: "TIME_WAIT状态是主动关闭连接的一方在发送最后一个ACK后进入的状态，持续时间为2倍MSL（最大报文段生存时间）。RFC 793给出的MSL为2分钟，因此按该规范计算TIME_WAIT为4分钟；Linux主线内核则将TCP_TIMEWAIT_LEN定义为60秒。TIME_WAIT状态的作用有两个：一是确保最后一个ACK能到达被动关闭方，若被动关闭方因ACK丢失而重传FIN，处于TIME_WAIT状态的一方仍能再次发送ACK；二是使本次连接的所有报文段在网络中消亡，防止延迟到达的旧报文段被误认为是新连接的数据。大量短连接会导致TIME_WAIT状态堆积耗尽端口资源，可通过调整tcp_max_tw_buckets和tcp_tw_reuse等内核参数缓解。",
     source: "计算机网络：自顶向下方法",
     courseId: "cs103",
     topic: "TCP握手与挥手",

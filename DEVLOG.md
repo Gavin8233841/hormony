@@ -4762,3 +4762,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - CLI 冒烟：69 PASS、0 FAIL；新增按根 UI bounds 滑动并验证“连续天数”。
 - schema v5 真实迁移后，错题本显示 `2 道待巩固 · 0 道今日复习`，与次日到期策略一致。
 - 证据：`screenshots/trae-smoke-20260701-160553/`。
+
+---
+
+## 2026-07-01 Codex：Trae 内容审计复核与 TIME_WAIT 修正
+
+### 采用
+
+- 复核 `cs103_k17`：RFC 793 给出的 MSL 为 2 分钟，规范中的 TIME_WAIT 为 2×MSL；Linux 主线内核 `include/net/tcp.h` 将 `TCP_TIMEWAIT_LEN` 定义为 `60*HZ`。
+- 同步修正 Web TypeScript 数据源和 HarmonyOS `knowledge-chunks.json`，明确区分规范值与 Linux 主线内核实现。
+- 一手依据：`https://www.rfc-editor.org/rfc/rfc793.html`、`https://github.com/torvalds/linux/blob/master/include/net/tcp.h`。
+
+### 暂不采用
+
+- `docs/QUIZ-CONTENT-AUDIT-2.md`：生成脚本和测试数量描述与当前实现不一致。
+- `docs/HARMONYOS-LAYOUT-AUDIT-2.md`：未完成横屏、平板和安全区域实测，不能把推断标为 P0。
+- `docs/CONTENT-QUALITY-AUDIT.md`：外部资源仅检查 URL 格式却写成标题一致性已核对，审计边界不成立。
+- `docs/FRONTEND-RESOURCE-ADOPTION.md` 的本轮扩写：把未运行验证的 API 12 与 Lottie 能力写成已确认；OHPM 查询本轮返回 HTTP 502，暂不新增依赖。
+
+### 验证
+
+- Web：lint 通过、TypeScript 通过、Vitest 9 个文件 88 项测试通过。
+- 关系数据：`python scripts/validate-topic-relations.py` 6 项全部通过。
+- HarmonyOS：DevEco MCP `entry@default` debug HAP 构建成功，ArkTS 编译与打包通过。
+- CLI 环境说明：直接调用 PATH 中的 Hvigor 时，仓库 wrapper 指向的 bundled SDK 已是 API 26，而项目目标为 API 12；本轮不修改用户环境或构建配置。
