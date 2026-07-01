@@ -233,7 +233,7 @@ export struct ProfileContent {
               Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
               this.Metric(this.profile.stats.totalQuestions.toString(), '累计答题', Constants.COLOR_TEXT_PRIMARY)
               Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
-              this.Metric(this.profile.stats.studyDays.toString(), '学习天数', Constants.COLOR_BRAND)
+              this.Metric(this.profile.stats.streakDays.toString(), '连续天数', Constants.COLOR_BRAND)
             }
             .width('100%')
             .padding({ top: 16, bottom: 16 })

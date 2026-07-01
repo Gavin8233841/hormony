@@ -3,6 +3,7 @@ import { Course, PlanTask, StudyEvent, StudyPlan } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningReminder } from '../common/LearningReminder';
+import { LearningFormUpdater } from '../common/LearningFormUpdater';
 import { common } from '@kit.AbilityKit';
 
 @Component
@@ -89,6 +90,7 @@ export struct HomeContent {
       };
       plan.tasks = nextTasks;
       await LocalLearningRepository.savePlan(plan);
+      await LearningFormUpdater.refreshAll();
       const changedTask = nextTasks.find((item: PlanTask): boolean => item.id === task.id);
       if (changedTask?.done === true) {
         const event: StudyEvent = {

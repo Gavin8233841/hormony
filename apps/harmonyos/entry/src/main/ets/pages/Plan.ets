@@ -8,6 +8,7 @@ import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { StudyEvent, StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { LearningFormUpdater } from '../common/LearningFormUpdater';
 
 @Entry
 @Component
@@ -76,6 +77,7 @@ struct PlanPage {
       if (current === null) throw new Error('本地计划不存在');
       current.tasks = nextTasks;
       await LocalLearningRepository.savePlan(current);
+      await LearningFormUpdater.refreshAll();
       if (nextDone) {
         const event: StudyEvent = {
           id: 'event_' + Date.now().toString(),
@@ -370,6 +372,7 @@ struct PlanPage {
       };
       const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, JSON.stringify(req));
       await LocalLearningRepository.savePlan(plan);
+      await LearningFormUpdater.refreshAll();
       this.tasks = plan.tasks;
       this.message = '计划已生成并同步到首页';
     } catch (e) {

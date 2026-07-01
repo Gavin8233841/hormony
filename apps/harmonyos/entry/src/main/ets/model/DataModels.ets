@@ -16,6 +16,7 @@ export interface UserStats {
   totalQuestions: number;
   accuracy: number;
   studyDays: number;
+  streakDays: number;
 }
 
 export interface Course {
@@ -190,6 +191,8 @@ export interface ReviewItem {
   explanation: string;
   attempts: number;
   resolved: boolean;
+  intervalDays: number;
+  nextReviewAt: string;
   updatedAt: string;
 }
 

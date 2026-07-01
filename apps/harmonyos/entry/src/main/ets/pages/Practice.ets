@@ -43,7 +43,7 @@ struct PracticePage {
 
   private async loadQuestions(): Promise<void> {
     const available = LearningContentRepository.getQuestions(this.courseId, this.topic);
-    const reviews = await LocalLearningRepository.getReviewItems(true);
+    const reviews = await LocalLearningRepository.getDueReviewItems();
     const results = await LocalLearningRepository.getQuizResults();
     const reviewIds: string[] = [];
     const attemptedIds: string[] = [];

@@ -8,6 +8,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 @Component
 struct MistakeBookPage {
   @State items: ReviewItem[] = [];
+  @State reviewSummary: string = '0 道待巩固 · 0 道今日复习';
   @State expandedId: string = '';
   @State loading: boolean = true;
   @State message: string = '';
@@ -18,7 +19,12 @@ struct MistakeBookPage {
 
   private async loadItems(): Promise<void> {
     try {
-      this.items = (await LocalLearningRepository.getReviewItems()).slice().reverse();
+      const dueItems = await LocalLearningRepository.getDueReviewItems();
+      const activeItems = await LocalLearningRepository.getReviewItems();
+      const dueIds = dueItems.map((item: ReviewItem): string => item.id);
+      this.items = dueItems.concat(activeItems.filter((item: ReviewItem): boolean => !dueIds.includes(item.id)));
+      this.reviewSummary = this.items.length.toString() + ' 道待巩固 · ' +
+        dueItems.length.toString() + ' 道今日复习';
     } catch (error) {
       this.message = '错题记录读取失败';
     } finally {
@@ -41,7 +47,11 @@ struct MistakeBookPage {
 
   build() {
     Column() {
-      TitleBar('错题本', this.items.length.toString() + ' 道待巩固', () => this.getUIContext().getRouter().back())
+      if (this.loading) {
+        TitleBar('错题本', '正在读取本地复习队列', () => this.getUIContext().getRouter().back())
+      } else {
+        TitleBar('错题本', this.reviewSummary, () => this.getUIContext().getRouter().back())
+      }
       if (this.loading) {
         Column().width('90%').height(200).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
       } else if (this.items.length === 0) {
@@ -122,6 +132,7 @@ struct MistakeBookPage {
           })
         }
         .width('100%')
+        .height('100%')
         .layoutWeight(1)
         .padding({ left: 16, right: 16, bottom: 24 })
         .scrollBar(BarState.Off)

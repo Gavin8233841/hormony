@@ -4736,3 +4736,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `screenshots/codex-visual-pass-20260701-harmony11/knowledge-local-result.jpeg`
 - `screenshots/codex-visual-pass-20260701-harmony11/practice-result-deveco.png`
 
+---
+
+## 2026-07-01 Codex：复习到期队列、连续学习与卡片主动刷新
+
+### 本地学习状态
+
+- ArkData schema 升级到 v5；旧错题迁移时补齐 `intervalDays` 与 `nextReviewAt`，不删除已有记录。
+- 答错题目按本地提交时间安排次日复习；`getDueReviewItems()` 只返回未解决且已到期项目，并按到期时间排序。
+- Practice 自动选题改为优先已到期错题；未到期错题仍可从错题本手动重练。
+- 错题本按“到期在前、未到期在后”展示，并显示真实“待巩固 / 今日复习”数量。
+- Profile 保留历史学习天数，新增按本地自然日计算的连续学习天数；今天无记录时允许昨天延续，超过一天未学习则归零。
+
+### 服务卡片更新时机
+
+- 根据 FormExtensionAbility 官方生命周期要求持久保存 formId，新增与删除卡片时分别注册和移除。
+- 新增 `LearningFormUpdater.ets`，复用唯一的今日任务语义生成卡片数据。
+- Home 与 Plan 在保存计划或切换任务完成状态后主动刷新全部已注册卡片；单张卡片更新失败不影响其他卡片或本地计划写入。
+- 当前模拟器未放置服务卡片实例，因此本轮验证了生命周期代码、ArkTS 诊断与 HAP 编译，未声明宿主桌面实时截图结果。
+
+### 验证
+
+- DevEco ArkTS：`LearningFormUpdater.ets`、`EntryFormAbility.ets`、`LocalLearningRepository.ets`、`MistakeBook.ets` 均无诊断。
+- HarmonyOS 增量构建：`BUILD SUCCESSFUL in 16 s 134 ms`。
+- CLI 冒烟：69 PASS、0 FAIL；新增按根 UI bounds 滑动并验证“连续天数”。
+- schema v5 真实迁移后，错题本显示 `2 道待巩固 · 0 道今日复习`，与次日到期策略一致。
+- 证据：`screenshots/trae-smoke-20260701-160553/`。

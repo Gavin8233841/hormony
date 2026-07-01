@@ -184,6 +184,28 @@ function Click-FirstOptionA() {
     return $true
 }
 
+function Swipe-Viewport($direction) {
+    $uiTree = Get-UiTree
+    $center = Get-BoundsCenter $uiTree.attributes.bounds
+    if (-not $center -or $uiTree.attributes.bounds -notmatch '\[(\d+),(\d+)\]\[(\d+),(\d+)\]') {
+        Write-Step "Swipe: $direction" "FAIL" "Invalid root bounds"
+        return $false
+    }
+    $x = [math]::Round(([int]$Matches[1] + [int]$Matches[3]) / 2)
+    $top = [int]$Matches[2]
+    $bottom = [int]$Matches[4]
+    $fromY = if ($direction -eq 'up') { [math]::Round($top + ($bottom - $top) * 0.75) } else {
+        [math]::Round($top + ($bottom - $top) * 0.35)
+    }
+    $toY = if ($direction -eq 'up') { [math]::Round($top + ($bottom - $top) * 0.35) } else {
+        [math]::Round($top + ($bottom - $top) * 0.75)
+    }
+    Invoke-HdcShell @("uitest", "uiInput", "swipe", $x, $fromY, $x, $toY, "600") | Out-Null
+    Start-Sleep -Milliseconds 700
+    Write-Step "Swipe: $direction" "PASS" "root=$($uiTree.attributes.bounds)"
+    return $true
+}
+
 function Verify-TextExists($textPattern, $description) {
     $uiTree = Get-UiTree
     if (-not $uiTree) {
@@ -356,6 +378,9 @@ Write-Output "`n[INFO] Navigating to Profile tab..."
 if (-not (Click-Element "我的" "Profile tab")) { exit 1 }
 Start-Sleep -Seconds 2
 Take-Screenshot "08-profile-tab"
+if (-not (Swipe-Viewport "up")) { exit 1 }
+if (-not (Verify-TextExists "连续天数" "Learning streak")) { exit 1 }
+if (-not (Swipe-Viewport "down")) { exit 1 }
 
 # 16. 验证三个 Profile 子页面
 foreach ($profilePage in @(

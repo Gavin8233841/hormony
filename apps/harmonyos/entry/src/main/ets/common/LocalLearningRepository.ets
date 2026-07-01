@@ -15,7 +15,7 @@ import {
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 4;
+const SCHEMA_VERSION: number = 5;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -25,6 +25,7 @@ const KEY_CHAT_HISTORY: string = 'chat_history';
 const KEY_STUDY_EVENTS: string = 'study_events';
 const KEY_LESSON_PROGRESS: string = 'lesson_progress';
 const KEY_REVIEW_ITEMS: string = 'review_items';
+const KEY_FORM_IDS: string = 'form_ids';
 
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
@@ -58,7 +59,7 @@ export class LocalLearningRepository {
       const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
       if (profile !== null && profile.stats.totalQuestions === 128 &&
         Math.abs(profile.stats.accuracy - 0.76) < 0.001 && profile.stats.studyDays === 23) {
-        profile.stats = { totalQuestions: 0, accuracy: 0, studyDays: 0 };
+        profile.stats = { totalQuestions: 0, accuracy: 0, studyDays: 0, streakDays: 0 };
         profile.weakTopics = [];
         profile.strongTopics = [];
         await LocalLearningRepository.putValue<UserProfile>(KEY_PROFILE, profile);
@@ -89,6 +90,16 @@ export class LocalLearningRepository {
       await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, []);
       await LocalLearningRepository.putValue<ReviewItem[]>(KEY_REVIEW_ITEMS, []);
     }
+    if (previousVersion < 5) {
+      const items = await LocalLearningRepository.getValue<ReviewItem[]>(KEY_REVIEW_ITEMS);
+      if (items !== null) {
+        for (const item of items) {
+          item.intervalDays = item.intervalDays ?? 1;
+          item.nextReviewAt = item.nextReviewAt ?? item.updatedAt;
+        }
+        await LocalLearningRepository.putValue<ReviewItem[]>(KEY_REVIEW_ITEMS, items);
+      }
+    }
   }
 
   private static async ensureDefaults(): Promise<void> {
@@ -100,7 +111,7 @@ export class LocalLearningRepository {
         weakTopics: [],
         strongTopics: [],
         learningStyle: '视觉型',
-        stats: { totalQuestions: 0, accuracy: 0, studyDays: 0 }
+        stats: { totalQuestions: 0, accuracy: 0, studyDays: 0, streakDays: 0 }
       };
       await LocalLearningRepository.saveProfile(profile);
     }
@@ -168,18 +179,19 @@ export class LocalLearningRepository {
     for (const result of results) {
       totalQuestions += result.totalQuestions;
       correctQuestions += result.correctCount;
-      const date = result.submittedAt.slice(0, 10);
+      const date = LocalLearningRepository.localDateKey(new Date(result.submittedAt));
       if (!studyDates.includes(date)) studyDates.push(date);
     }
     const events = await LocalLearningRepository.getStudyEvents();
     for (const event of events) {
-      const date = event.timestamp.slice(0, 10);
+      const date = LocalLearningRepository.localDateKey(new Date(event.timestamp));
       if (!studyDates.includes(date)) studyDates.push(date);
     }
     profile.stats = {
       totalQuestions: totalQuestions,
       accuracy: totalQuestions > 0 ? correctQuestions / totalQuestions : 0,
-      studyDays: studyDates.length
+      studyDays: studyDates.length,
+      streakDays: LocalLearningRepository.calculateStreakDays(studyDates)
     };
     return profile;
   }
@@ -234,6 +246,24 @@ export class LocalLearningRepository {
 
   static async savePlan(plan: StudyPlan): Promise<void> {
     await LocalLearningRepository.putValue<StudyPlan>(KEY_PLAN, plan);
+  }
+
+  static async getFormIds(): Promise<string[]> {
+    return (await LocalLearningRepository.getValue<string[]>(KEY_FORM_IDS)) ?? [];
+  }
+
+  static async registerFormId(formId: string): Promise<void> {
+    const ids = await LocalLearningRepository.getFormIds();
+    if (!ids.includes(formId)) {
+      ids.push(formId);
+      await LocalLearningRepository.putValue<string[]>(KEY_FORM_IDS, ids);
+    }
+  }
+
+  static async removeFormId(formId: string): Promise<void> {
+    const ids = await LocalLearningRepository.getFormIds();
+    await LocalLearningRepository.putValue<string[]>(KEY_FORM_IDS,
+      ids.filter((id: string): boolean => id !== formId));
   }
 
   static async getQuizResults(): Promise<QuizResult[]> {
@@ -294,6 +324,8 @@ export class LocalLearningRepository {
         explanation: detail.explanation,
         attempts: existingIndex >= 0 ? items[existingIndex].attempts + 1 : 1,
         resolved: false,
+        intervalDays: 1,
+        nextReviewAt: LocalLearningRepository.addDays(result.submittedAt, 1),
         updatedAt: result.submittedAt
       };
       if (existingIndex >= 0) items[existingIndex] = next;
@@ -305,6 +337,13 @@ export class LocalLearningRepository {
   static async getReviewItems(activeOnly: boolean = true): Promise<ReviewItem[]> {
     const items = (await LocalLearningRepository.getValue<ReviewItem[]>(KEY_REVIEW_ITEMS)) ?? [];
     return activeOnly ? items.filter((item: ReviewItem): boolean => !item.resolved) : items;
+  }
+
+  static async getDueReviewItems(now: Date = new Date()): Promise<ReviewItem[]> {
+    const items = await LocalLearningRepository.getReviewItems(true);
+    const due = items.filter((item: ReviewItem): boolean => new Date(item.nextReviewAt).getTime() <= now.getTime());
+    return due.sort((left: ReviewItem, right: ReviewItem): number =>
+      new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime());
   }
 
   static async getLessonProgress(courseId?: string): Promise<LessonProgress[]> {
@@ -427,5 +466,32 @@ export class LocalLearningRepository {
       target: target,
       unlockedAt: unlockedAt
     };
+  }
+
+  private static addDays(timestamp: string, days: number): string {
+    const date = new Date(timestamp);
+    date.setDate(date.getDate() + days);
+    return date.toISOString();
+  }
+
+  private static localDateKey(date: Date): string {
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return date.getFullYear().toString() + '-' + month + '-' + day;
+  }
+
+  private static calculateStreakDays(studyDates: string[]): number {
+    if (studyDates.length === 0) return 0;
+    const today = new Date();
+    const todayKey = LocalLearningRepository.localDateKey(today);
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    let cursor = studyDates.includes(todayKey) ? today : yesterday;
+    if (!studyDates.includes(LocalLearningRepository.localDateKey(cursor))) return 0;
+    let streak = 0;
+    while (studyDates.includes(LocalLearningRepository.localDateKey(cursor))) {
+      streak += 1;
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 1);
+    }
+    return streak;
   }
 }
