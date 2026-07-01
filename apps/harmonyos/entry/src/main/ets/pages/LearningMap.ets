@@ -12,7 +12,7 @@ interface MapNode {
 }
 
 const NODE_POSITIONS: number[][] = [
-  [26, 36], [220, 26], [248, 126], [210, 230], [34, 236], [2, 132]
+  [12, 42], [222, 34], [230, 132], [202, 238], [28, 242], [0, 138]
 ];
 
 @Entry
@@ -75,8 +75,8 @@ struct LearningMapPage {
   }
 
   private nodeSize(node: MapNode): number {
-    if (node.mastery === null) return 48;
-    return Math.min(48 + node.mastery.attempts * 4, 62);
+    if (node.mastery === null) return 34;
+    return Math.min(38 + node.mastery.attempts * 3, 50);
   }
 
   private masteryLabel(node: MapNode): string {
@@ -117,35 +117,35 @@ struct LearningMapPage {
     Stack({ alignContent: Alignment.Center }) {
       Column()
         .width(328)
-        .height(330)
+        .height(342)
         .backgroundColor(Constants.COLOR_MAP_SURFACE)
         .borderRadius(Constants.RADIUS_LG)
 
       ForEach(this.nodes, (node: MapNode): void => {
         Line()
           .width(328)
-          .height(330)
-          .startPoint([164, 165])
-          .endPoint([node.x + this.nodeSize(node) / 2, node.y + this.nodeSize(node) / 2])
+          .height(342)
+          .startPoint([164, 171])
+          .endPoint([node.x + 47, node.y + 27])
           .stroke(node.mastery === null ? Constants.COLOR_MAP_LINE : Constants.COLOR_MAP_LINE_ACTIVE)
           .strokeWidth(node.mastery === null ? 1 : 1.5)
       })
 
-      Column({ space: 3 }) {
+      Column({ space: 4 }) {
         Text(this.selectedCourseTitle)
-          .fontSize(15)
+          .fontSize(14)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
         Text(this.nodes.length.toString() + ' 个主题')
           .fontSize(10)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
       }
-      .width(94)
-      .height(94)
+      .width(104)
+      .height(72)
       .justifyContent(FlexAlign.Center)
-      .backgroundColor(Constants.COLOR_BRAND)
-      .borderRadius(47)
-      .shadow({ radius: 10, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 3 })
+      .backgroundColor(Constants.COLOR_MAP_CORE)
+      .borderRadius(Constants.RADIUS_LG)
+      .shadow({ radius: 8, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 3 })
 
       ForEach(this.nodes, (node: MapNode): void => {
         Stack({ alignContent: Alignment.Center }) {
@@ -154,19 +154,27 @@ struct LearningMapPage {
             .height(this.nodeSize(node))
             .backgroundColor(this.nodeColor(node))
             .borderRadius(this.nodeSize(node) / 2)
-            .opacity(node.mastery === null ? 0.82 : 1)
+            .opacity(node.mastery === null ? 0.14 : 0.18)
+          Column()
+            .width(node.mastery === null ? 10 : 14)
+            .height(node.mastery === null ? 10 : 14)
+            .backgroundColor(this.nodeColor(node))
+            .borderRadius(node.mastery === null ? 5 : 7)
+            .shadow(node.mastery === null ? undefined :
+              { radius: 5, color: this.nodeColor(node), offsetX: 0, offsetY: 0 })
           Text(node.topic)
-            .width(this.nodeSize(node) - 8)
-            .fontSize(node.topic.length > 6 ? 8 : 9)
+            .width(90)
+            .fontSize(node.topic.length > 7 ? 10 : 11)
             .fontWeight(FontWeight.Medium)
-            .fontColor(node.mastery === null ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_TEXT_ON_GRADIENT)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .textAlign(TextAlign.Center)
-            .maxLines(2)
+            .maxLines(1)
             .wordBreak(WordBreak.BREAK_ALL)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .position({ x: 2, y: 40 })
         }
-        .width(this.nodeSize(node))
-        .height(this.nodeSize(node))
+        .width(94)
+        .height(58)
         .position({ x: node.x, y: node.y })
         .scale({ x: this.selectedTopic === node.topic ? 1.08 : 1, y: this.selectedTopic === node.topic ? 1.08 : 1 })
         .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
@@ -174,7 +182,7 @@ struct LearningMapPage {
       })
     }
     .width(328)
-    .height(330)
+    .height(342)
   }
 
   build() {
@@ -188,7 +196,7 @@ struct LearningMapPage {
           }
 
           if (this.loading) {
-            Column().width(328).height(330).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
+            Column().width(328).height(342).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
           } else if (this.nodes.length === 0) {
             Column({ space: 8 }) {
               Text(this.message.length > 0 ? this.message : '还没有可展示的课程主题')

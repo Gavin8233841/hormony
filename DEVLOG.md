@@ -4080,3 +4080,13 @@ Agent 模块打通闭环——移除假降级 + 修复无效模型名 + 添加�
 - 调研 OpenHarmony-TPC `@ohos/lottie` 作为完成/成就动效渲染器；本机 OHPM 官方源请求返回 502，本轮未写入依赖或半成品配置，后续在源恢复并完成许可证、API 12 与真机性能验证后再接入。
 - CLI 验证：`hvigorw assembleHap --no-daemon`，`CompileArkTS` 与 `PackageHap` 通过，`BUILD SUCCESSFUL in 14 s 971 ms`。
 
+---
+
+## [2026-07-01 14:18 CST] Codex：学习图谱视觉语言重构与资源筛选
+
+- 将学习图谱从深色圆泡泡图改为浅色数据投影：课程核心使用深色锚点，主题使用“状态光晕 + 实心数据点 + 稳定标签”，未练习、学习中、已掌握继续绑定真实掌握数据。
+- 个人页图谱入口同步使用同一视觉语法，消除深蓝大卡与页面冷白设计系统的冲突；中心加入课程 Symbol，避免无意义空块。
+- 设备 CLI 验证：重新安装 HAP、强制停止旧进程后启动，核查个人页、学习图谱与分段课程正文。节点标签无重叠，课程切换和节点入口保留；证据位于 `screenshots/codex-visual-pass-20260701/`。
+- 资源筛选：拒绝把 Web 专用 Zustand、Comlink、BlurHash、SpinKit、canvas-confetti 和 ArkWeb 运行时接入 HAP；这些资源不能改善端侧核心体验且会增加依赖。仅保留 `@ohos/lottie` 作为待验证的完成/成就动效渲染器方向。
+- CLI 验证：`hvigorw assembleHap --no-daemon`，`BUILD SUCCESSFUL in 17 s 454 ms`。
+

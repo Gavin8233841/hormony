@@ -53,12 +53,13 @@ export class Constants {
   static readonly COLOR_BRAND_LIGHT: string = '#eaf2ff';
   static readonly COLOR_ERROR_LIGHT: string = '#fff0f1';
   static readonly COLOR_SUCCESS_LIGHT: string = '#eaf8ef';
-  // 学习星图：仅用于个人成长可视化，不扩散到普通页面。
-  static readonly COLOR_MAP_SURFACE: string = '#101827';
-  static readonly COLOR_MAP_LINE: string = '#3f5d89';
-  static readonly COLOR_MAP_LINE_ACTIVE: string = '#5679ad';
-  static readonly COLOR_MAP_NODE_IDLE: string = '#d9e2f0';
-  static readonly COLOR_MAP_TEXT_MUTED: string = '#b8c6da';
+  // 学习图谱：浅色科学画布 + 真实状态色，不用装饰线冒充先修关系。
+  static readonly COLOR_MAP_SURFACE: string = '#eef2f7';
+  static readonly COLOR_MAP_LINE: string = '#cbd4e1';
+  static readonly COLOR_MAP_LINE_ACTIVE: string = '#8aa8d8';
+  static readonly COLOR_MAP_NODE_IDLE: string = '#aeb9c9';
+  static readonly COLOR_MAP_TEXT_MUTED: string = '#65738a';
+  static readonly COLOR_MAP_CORE: string = '#151a23';
 
   // 阴影色（带透明度的黑色）
   static readonly SHADOW_CARD: string = '#120f2748';
