@@ -4,17 +4,15 @@
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
 import type { StudyPlan } from "@/lib/types";
+import { isJsonObject, readJsonObject } from "@/lib/request-json";
 
 export const dynamic = "force-dynamic";
 
 // 保存完整计划
 export async function POST(req: Request) {
-  let body: StudyPlan;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-  }
+  const parsed = await readJsonObject<StudyPlan>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
 
   const userId = sanitizeUserId(body.userId);
   const goal = String(body.goal ?? "").trim();
@@ -31,6 +29,12 @@ export async function POST(req: Request) {
   }
   if (tasks.length > 50) {
     return Response.json({ error: "任务数量超出上限（50 个）", code: "TOO_MANY_TASKS" }, { status: 400 });
+  }
+  if (!tasks.every(isJsonObject)) {
+    return Response.json(
+      { error: "任务列表必须只包含对象", code: "INVALID_TASKS" },
+      { status: 400 }
+    );
   }
 
   const plan: StudyPlan = {
@@ -62,12 +66,13 @@ export async function POST(req: Request) {
 
 // 更新任务打卡状态
 export async function PATCH(req: Request) {
-  let body: { userId?: string; taskId?: string; done?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-  }
+  const parsed = await readJsonObject<{
+    userId?: string;
+    taskId?: string;
+    done?: boolean;
+  }>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
 
   const userId = sanitizeUserId(body.userId);
   const taskId = String(body.taskId ?? "").trim();

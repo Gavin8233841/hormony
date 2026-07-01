@@ -5,17 +5,15 @@ import { runEvaluatorAgent } from "@/lib/agents/evaluator-agent";
 import { retrieve } from "@/lib/rag";
 import { sanitizeUserId } from "@/lib/utils";
 import type { QuizSubmission, QuizResult, QuizResultDetail } from "@/lib/types";
+import { isJsonObject, readJsonObject } from "@/lib/request-json";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    let body: QuizSubmission;
-    try {
-      body = await req.json();
-    } catch {
-      return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-    }
+    const parsed = await readJsonObject<QuizSubmission>(req);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body;
 
     const quizId = String(body.quizId ?? "").trim();
     const userId = sanitizeUserId(body.userId);
@@ -29,6 +27,12 @@ export async function POST(req: Request) {
     }
     if (answers.length > 50) {
       return Response.json({ error: "答案数量超出上限（50 题）", code: "TOO_MANY_ANSWERS" }, { status: 400 });
+    }
+    if (!answers.every(isJsonObject)) {
+      return Response.json(
+        { error: "答案列表必须只包含对象", code: "INVALID_ANSWERS" },
+        { status: 400 }
+      );
     }
 
     const quiz = store.getQuiz(quizId);

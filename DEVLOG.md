@@ -4786,3 +4786,21 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 关系数据：`python scripts/validate-topic-relations.py` 6 项全部通过。
 - HarmonyOS：DevEco MCP `entry@default` debug HAP 构建成功，ArkTS 编译与打包通过。
 - CLI 环境说明：直接调用 PATH 中的 Hvigor 时，仓库 wrapper 指向的 bundled SDK 已是 API 26，而项目目标为 API 12；本轮不修改用户环境或构建配置。
+
+---
+
+## 2026-07-01 Codex：Web 写接口 JSON 结构边界
+
+### 修复
+
+- 新增 `readJsonObject()`，统一拒绝格式错误的 JSON，以及 `null`、数组、字符串、数字和布尔值等非对象 JSON 请求体。
+- 接入 Chat、课程、知识检索/上传、计划生成/保存、画像更新、测验生成/提交和安全审核，共 11 个写接口入口。
+- 继续校验嵌套结构：Chat `context`/`history`、计划 `tasks`、测验 `answers`、安全审核 `citations` 含非法元素时返回明确 400，不再因字段访问抛出 500。
+- 保持所有合法请求、成功响应结构、Agent 调用、安全规则和模型边界不变。
+
+### 验证
+
+- 定向：`request-json.test.ts` 与 `request-validation.test.ts` 共 25 项通过。
+- Web 全量：ESLint 通过、TypeScript 通过、Vitest 11 个文件 133 项通过。
+- Next.js 生产构建通过，10 个静态页面生成成功，全部 API 路由完成编译。
+- 本批次只修改 Web 后端请求边界与测试；Trae 并行的页面和 `client-api` 文件未纳入本批次。

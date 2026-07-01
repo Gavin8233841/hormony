@@ -8,6 +8,7 @@ import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
 import { modelErrorResponse } from "@/lib/api-errors";
 import type { LearningProfileSnapshot } from "@/lib/types";
 import { validateUserInput } from "@/lib/agents/safety-agent";
+import { readJsonObject } from "@/lib/request-json";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -34,12 +35,15 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  let body: { userId?: string; goal?: string; durationDays?: number; dailyMinutes?: number; profile?: LearningProfileSnapshot };
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-  }
+  const parsed = await readJsonObject<{
+    userId?: string;
+    goal?: string;
+    durationDays?: number;
+    dailyMinutes?: number;
+    profile?: LearningProfileSnapshot;
+  }>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
 
   const userId = sanitizeUserId(body.userId);
   const goal = String(body.goal ?? "").trim();

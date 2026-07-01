@@ -3,6 +3,7 @@
 import { retrieve } from "@/lib/rag";
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
+import { readJsonObject } from "@/lib/request-json";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +15,9 @@ interface KnowledgeSearchRequest {
 }
 
 export async function POST(req: Request) {
-  let body: KnowledgeSearchRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-  }
+  const parsed = await readJsonObject<KnowledgeSearchRequest>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
 
   const query = body.query?.trim();
   if (!query) {

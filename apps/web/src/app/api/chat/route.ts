@@ -14,18 +14,16 @@ import { getModelRuntimeInfo } from "@/lib/agents/model";
 import { validateUserInput } from "@/lib/agents/safety-agent";
 import type { LearningProfileSnapshot } from "@/lib/types";
 import { modelErrorResponse } from "@/lib/api-errors";
+import { isJsonObject, readJsonObject } from "@/lib/request-json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
-  let body: ChatRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "无效的 JSON 请求体", code: "BAD_REQUEST" }, { status: 400 });
-  }
+  const parsed = await readJsonObject<ChatRequest>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
 
   if (!body.message) {
     return Response.json({ error: "缺少 message 字段", code: "MISSING_FIELD" }, { status: 400 });
@@ -49,12 +47,28 @@ export async function POST(req: NextRequest) {
 
   const userId = sanitizeUserId(body.userId);
   body.profile = sanitizeProfile(body.profile);
+  if (body.context !== undefined && !isJsonObject(body.context)) {
+    return Response.json(
+      { error: "context 必须是对象", code: "INVALID_CONTEXT" },
+      { status: 400 }
+    );
+  }
   if (body.context) {
     const courseId = String(body.context.courseId ?? "");
-    body.context.courseId = ["cs101", "cs102", "cs103"].includes(courseId)
-      ? courseId
-      : undefined;
-    body.context.sessionId = String(body.context.sessionId ?? "").slice(0, 100) || undefined;
+    body.context = {
+      courseId: ["cs101", "cs102", "cs103"].includes(courseId) ? courseId : undefined,
+      sessionId: String(body.context.sessionId ?? "").slice(0, 100) || undefined,
+    };
+  }
+
+  if (
+    body.history !== undefined &&
+    (!Array.isArray(body.history) || !body.history.every(isJsonObject))
+  ) {
+    return Response.json(
+      { error: "history 必须是消息对象数组", code: "INVALID_HISTORY" },
+      { status: 400 }
+    );
   }
 
   if (!getModelRuntimeInfo().configured) {
@@ -65,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 限制对话历史大小（最多 12 条消息，每条最多 1000 字符，仅允许 user/assistant 角色）
-  if (body.history && Array.isArray(body.history)) {
+  if (body.history) {
     body.history = body.history
       .filter((m) => m.role === "user" || m.role === "assistant")
       .slice(-12)

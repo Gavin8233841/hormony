@@ -4,6 +4,7 @@
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
 import type { Course } from "@/lib/types";
+import { readJsonObject } from "@/lib/request-json";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +21,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  let body: Partial<Course> & { userId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-  }
+  const parsed = await readJsonObject<Partial<Course> & { userId?: string }>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
 
   const userId = sanitizeUserId(body.userId);
   const id = String(body.id ?? `course_${Date.now().toString(36)}`).trim();

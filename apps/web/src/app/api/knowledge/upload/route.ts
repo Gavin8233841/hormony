@@ -5,6 +5,7 @@ import { store } from "@/lib/store/db";
 import { generateId, sanitizeUserId } from "@/lib/utils";
 import { invalidateRagCache } from "@/lib/rag";
 import type { KnowledgeUploadRequest, KnowledgeChunk } from "@/lib/types";
+import { readJsonObject } from "@/lib/request-json";
 
 export const dynamic = "force-dynamic";
 
@@ -53,12 +54,9 @@ function chunkText(text: string): string[] {
 
 export async function POST(req: Request) {
   try {
-    let body: KnowledgeUploadRequest;
-    try {
-      body = await req.json();
-    } catch {
-      return Response.json({ error: "无效的 JSON", code: "BAD_REQUEST" }, { status: 400 });
-    }
+    const parsed = await readJsonObject<KnowledgeUploadRequest>(req);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body;
 
     const courseId = String(body.courseId ?? "").trim();
     const userId = sanitizeUserId(body.userId);
