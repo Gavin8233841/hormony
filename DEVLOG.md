@@ -4099,3 +4099,11 @@ Agent 模块打通闭环——移除假降级 + 修复无效模型名 + 添加�
 - 火山引擎官方产品页确认 Doubao Seed 2.1 Pro 已发布，官方 Chat API 确认支持 `thinking.type=disabled`。恢复用户控制台示例明确给出的 `doubao-seed-2-1-pro-260628`；认证错误不能作为模型不存在的证据。
 - Web 验证：`pnpm lint`、`pnpm typecheck`、`pnpm test` 全部通过，9 个测试文件、85 项测试通过。
 
+---
+
+## [2026-07-01 14:41 CST] Codex：AI 出题接入课程依据
+
+- `Quiz Agent` 复用现有 RAG，在单次模型调用前按 `courseId + topic` 检索 5 条课程知识并写入提示词；题干、答案和解析被约束为只使用提供的课程资料。
+- 模型题目结构收紧为固定 4 个选项、A-D 答案和非空解析；不合格结果统一按 `MODEL_INVALID_RESPONSE` 拒绝，不向 App 下发残缺题目。
+- 新增 API 契约测试覆盖错误选项数和错误答案字母；`pnpm lint`、`pnpm typecheck`、`pnpm test` 通过，9 个测试文件、86 项测试通过。
+

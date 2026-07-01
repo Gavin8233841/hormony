@@ -69,6 +69,31 @@ describe("题库与资源 API 闭环", () => {
     expect(response.status).toBe(503);
   });
 
+  it("应拒绝选项数量或答案格式不合格的 AI 题目", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([{
+      type: "choice",
+      stem: "不完整题目",
+      options: ["A. 选项一", "B. 选项二"],
+      answer: "Z",
+      explanation: "测试解析。",
+    }]);
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 1,
+          difficulty: "medium",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
   it("课程题库目录不应返回题目答案", async () => {
     const response = await getQuizData(
       new Request("http://localhost/api/quiz?courseId=cs102")
