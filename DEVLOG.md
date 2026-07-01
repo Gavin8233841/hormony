@@ -4608,3 +4608,13 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 失败请求仍删除空助手消息，不保存失败内容，不用本地文本伪装 AI。
 - HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 15 s 58 ms`。
 
+---
+
+## 2026-07-01 Codex：错题到真实学伴讲解闭环
+
+- 共享 `ReviewDetailRow` 在展开解析中增加“向学伴追问”，不复制到页面各自实现。
+- `Practice.ets` 与 `Quiz.ets` 将题干、用户答案、正确答案组成明确学习问题并打开 Chat。
+- `Chat.ets` 读取一次性 `pendingChatQuestion` 后立即清空，仅预填输入框，不自动发送，不产生隐式模型费用。
+- 用户确认发送后仍走现有 Health、SSE、RAG、Safety 和失败阻断链路；没有本地模板回答。
+- HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 18 s 915 ms`。
+

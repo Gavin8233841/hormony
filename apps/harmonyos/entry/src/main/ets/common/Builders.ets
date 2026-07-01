@@ -155,7 +155,8 @@ export function ReviewDetailRow(
   detail: QuizResultDetail,
   index: number,
   expanded: boolean,
-  onToggle: () => void
+  onToggle: () => void,
+  onAskTutor: () => void
 ) {
   Column({ space: 10 }) {
     Row({ space: 10 }) {
@@ -173,6 +174,7 @@ export function ReviewDetailRow(
         .fontColor([Constants.COLOR_TEXT_SECONDARY])
     }
     .width('100%')
+    .onClick((): void => { onToggle(); })
 
     if (expanded) {
       Column({ space: 7 }) {
@@ -191,6 +193,23 @@ export function ReviewDetailRow(
           .fontSize(13)
           .lineHeight(21)
           .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        Button({ type: ButtonType.Normal }) {
+          Row({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
+              .fontSize(15)
+              .fontColor([Constants.COLOR_BRAND])
+            Text('向学伴追问')
+              .fontSize(12)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_BRAND)
+          }
+        }
+        .height(36)
+        .padding({ left: 12, right: 12 })
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+        .alignSelf(ItemAlign.Start)
+        .onClick((): void => { onAskTutor(); })
       }
       .width('100%')
       .padding(12)
@@ -200,5 +219,4 @@ export function ReviewDetailRow(
   }
   .width('100%')
   .padding({ left: 14, right: 14, top: 14, bottom: 14 })
-  .onClick((): void => { onToggle(); })
 }

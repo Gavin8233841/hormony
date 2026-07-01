@@ -67,6 +67,16 @@ struct QuizPage {
     this.answers = nextAnswers;
   }
 
+  private askTutor(detail: QuizResultDetail): void {
+    const question = '请结合课程资料讲解这道题：' + detail.stem +
+      '。我的答案是“' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答') +
+      '”，正确答案是“' + detail.correctAnswer + '”。请指出关键概念和判断步骤。';
+    AppStorage.setOrCreate<string>('pendingChatQuestion', question);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
+      this.message = '无法打开学伴，请重试';
+    });
+  }
+
   private resetQuiz(): void {
     this.quizId = '';
     this.questions = [];
@@ -414,7 +424,7 @@ struct QuizPage {
         ForEach(this.resultDetails, (detail: QuizResultDetail, index: number): void => {
           ReviewDetailRow(detail, index, this.expandedResultId === detail.questionId, (): void => {
             this.expandedResultId = this.expandedResultId === detail.questionId ? '' : detail.questionId;
-          })
+          }, (): void => { this.askTutor(detail); })
           if (index < this.resultDetails.length - 1) {
             Divider().color(Constants.COLOR_BORDER).margin({ left: 44 })
           }

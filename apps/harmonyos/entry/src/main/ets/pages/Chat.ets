@@ -46,9 +46,9 @@ export struct ChatContent {
     this.isCancelled = false;
     this.loadLocalHistory();
     this.probeCloudAgent();
-    if (this.quickQuestion.trim().length > 0) {
-      this.inputText = this.quickQuestion.trim();
-    }
+    const pendingQuestion = AppStorage.get<string>('pendingChatQuestion') ?? '';
+    this.inputText = this.quickQuestion.trim().length > 0 ? this.quickQuestion.trim() : pendingQuestion.trim();
+    AppStorage.setOrCreate<string>('pendingChatQuestion', '');
   }
 
   aboutToDisappear() {
