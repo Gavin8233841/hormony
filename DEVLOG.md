@@ -4574,3 +4574,10 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `apps/harmonyos/hvigorw.bat assembleHap --no-daemon`：`BUILD SUCCESSFUL in 21 s 236 ms`。
 - Trae 新增的 `scripts/harmonyos-app-smoke.ps1` 尚未纳入提交：脚本内 Bundle Name 与工程真实值不一致，且环境路径假设未修正。
 
+### 视觉复核修正
+
+- 首次模拟器截图发现同层 5 个主题标签重叠；已改为编号点阵，只有选中节点显示完整主题，完整状态与动作集中在详情面板。
+- `screenshots/codex-visual-pass-20260701/learning-map-dag-final.png` 已确认：12 个数据结构主题、5 层真实关系、节点编号、选中聚焦和图例均无重叠。
+- 修正后再次增量构建：`BUILD SUCCESSFUL in 14 s 736 ms`；DevEco MCP 成功安装并启动最新 HAP。
+- 新增 `docs/TRAE-NEXT-WORK-20260701.md`，将 CLI 冒烟脚本修正、33 Topic 本地题库覆盖和只读适配审计交给 Trae。
+

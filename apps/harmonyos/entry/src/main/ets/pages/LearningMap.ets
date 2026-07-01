@@ -7,6 +7,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 
 interface MapNode {
   id: string;
+  order: number;
   topic: string;
   prerequisiteIds: string[];
   level: number;
@@ -72,7 +73,8 @@ struct LearningMapPage {
     const nextNodes: MapNode[] = [];
     const levels: number[] = [];
     let maxLevel = 0;
-    for (const relation of relations) {
+    for (let relationIndex = 0; relationIndex < relations.length; relationIndex++) {
+      const relation = relations[relationIndex];
       const peers = relations.filter((item: TopicRelation): boolean => item.level === relation.level);
       const peerIndex = peers.findIndex((item: TopicRelation): boolean => item.id === relation.id);
       const item = mastery.find((value: TopicMastery): boolean => value.topic === relation.topic) ?? null;
@@ -80,6 +82,7 @@ struct LearningMapPage {
       maxLevel = Math.max(maxLevel, relation.level);
       nextNodes.push({
         id: relation.id,
+        order: relationIndex + 1,
         topic: relation.topic,
         prerequisiteIds: relation.prerequisiteIds,
         level: relation.level,
@@ -89,6 +92,7 @@ struct LearningMapPage {
       });
     }
     this.nodes = nextNodes;
+    this.selectedTopic = nextNodes[0]?.topic ?? '';
     const nextEdges: MapEdge[] = [];
     for (const node of nextNodes) {
       for (const prerequisiteId of node.prerequisiteIds) {
@@ -219,22 +223,32 @@ struct LearningMapPage {
             .borderRadius(this.nodeSize(node) / 2)
             .opacity(node.mastery === null ? 0.14 : 0.18)
           Column()
-            .width(node.mastery === null ? 10 : 14)
-            .height(node.mastery === null ? 10 : 14)
+            .width(node.mastery === null ? 26 : 30)
+            .height(node.mastery === null ? 26 : 30)
             .backgroundColor(this.nodeColor(node))
-            .borderRadius(node.mastery === null ? 5 : 7)
+            .borderRadius(node.mastery === null ? 13 : 15)
+            .border({
+              width: this.selectedTopic === node.topic ? 2 : 0,
+              color: Constants.COLOR_BG_CARD
+            })
             .shadow(node.mastery === null ? undefined :
               { radius: 5, color: this.nodeColor(node), offsetX: 0, offsetY: 0 })
-          Text(node.topic)
+          Text((node.order < 10 ? '0' : '') + node.order.toString())
+            .fontSize(9)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(node.mastery === null ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_ON_GRADIENT)
+          if (this.selectedTopic === node.topic) {
+            Text(node.topic)
             .width(NODE_WIDTH)
             .fontSize(node.topic.length > 7 ? 9 : 10)
-            .fontWeight(FontWeight.Medium)
+            .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .textAlign(TextAlign.Center)
             .maxLines(2)
             .wordBreak(WordBreak.BREAK_ALL)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .position({ x: 2, y: 40 })
+          }
         }
         .width(NODE_WIDTH)
         .height(72)
