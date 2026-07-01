@@ -154,13 +154,18 @@ export async function POST(req: NextRequest) {
 
         if (orchestrateError) {
           // 流中错误：HTTP 状态已固化为 200，通过 SSE 事件通知客户端
-          // 临时：附带详细错误信息用于诊断
           const errDetail = orchestrateError instanceof Error
             ? orchestrateError.message
             : String(orchestrateError);
           const errCode = (orchestrateError as { code?: string })?.code ?? "INTERNAL_ERROR";
+          // 对用户展示安全摘要，完整错误仅入日志
+          const userMessage = errCode === "MODEL_UNAVAILABLE"
+            ? "云端学伴暂不可用，请稍后重试"
+            : errCode === "MODEL_INVALID_RESPONSE"
+              ? "模型返回内容无效，请重新生成"
+              : "服务处理异常，请稍后重试";
           controller.enqueue(
-            sse({ type: "error", code: errCode, message: errDetail })
+            sse({ type: "error", code: errCode, message: userMessage })
           );
           controller.enqueue(sse({ type: "done", sessionId: "error" }));
           console.error(

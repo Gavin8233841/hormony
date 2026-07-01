@@ -4092,6 +4092,59 @@ Agent 模块打通闭环——移除假降级 + 修复无效模型名 + 添加�
 
 ---
 
+## [2026-07-01T06:24:00Z] [2026-07-01 14:24 CST] 模型: Trae (Loop Engineering)
+
+### 操作
+
+Agent 模块端到端验证全部通过——Vercel 部署修复 + 三个 AI 功能线上验证完成
+
+### 背景
+
+上一轮修复了无效模型名和假降级代码，但 Vercel 部署失败（Root Directory 未设置为 `apps/web`）。本轮通过 Vercel API 修复项目配置，触发重新部署，并完成全部端到端验证。
+
+### 改动文件
+
+| 文件 | 改动类型 | 说明 |
+|------|----------|------|
+| `apps/web/src/app/api/health/route.ts` | 增强 | health 端点暴露 `model.name` 字段用于诊断；版本号升至 `1.0.1` |
+| `apps/web/src/app/api/chat/route.ts` | 优化 | SSE 错误事件改为按错误码分类展示安全摘要（MODEL_UNAVAILABLE/MODEL_INVALID_RESPONSE/INTERNAL_ERROR），完整错误仅入日志 |
+
+### Vercel 部署修复
+
+| 问题 | 修复方式 |
+|------|----------|
+| Root Directory 未设置 | 通过 Vercel API PATCH `/v9/projects/hormony` 设置 `rootDirectory: "apps/web"` |
+| MODEL_NAME 环境变量可能为旧值 | 删除旧环境变量并重新创建（代码默认值已正确，环境变量缺失时回退到 `doubao-seed-1-6-250615`） |
+| 部署未触发 | 通过 Vercel API POST `/v13/deployments` 手动触发生产部署 |
+
+### 端到端验证
+
+| 验证项 | 结果 | 证据 |
+|--------|------|------|
+| Health 端点 | PASS | `GET /api/health` → `{"status":"ready","model":{"configured":true,"name":"doubao-seed-1-6-250615"},"version":"1.0.1"}` |
+| Chat SSE 完整对话流 | PASS | `POST /api/chat` → Profile → Retrieval → Tutor → Safety → Delta → Citations → Done。AI 正确回答"什么是二叉搜索树？"，包含中序有序性、结构特点、性能特性，附 3 条引用 |
+| Quiz AI 出题 | PASS | `POST /api/quiz` → 生成 3 道二叉搜索树选择题，含选项、答案和解析 |
+| Plan AI 计划生成 | PASS | `POST /api/plan` → 生成 14 天考研数据结构复习计划，含 10 个任务（阅读/练习/复习/测验） |
+| TSC 编译 | PASS | `npx tsc --noEmit` exit code 0 |
+| 单元测试 | PASS | `npx vitest run` — 9 files, 86 tests passed |
+| Constants.ets | 无需修改 | `BASE_URL` 已为 `https://hormony-ruddy.vercel.app`（生产地址） |
+
+### 安全说明
+
+- Vercel Token 仅作为 PowerShell 会话环境变量使用，未写入任何文件或日志
+- `chat/route.ts` 错误处理对用户展示安全摘要，完整错误仅入 `console.error` 日志
+- `health/route.ts` 暴露模型名用于运维诊断，不包含 API Key 等敏感信息
+
+### 待完成
+
+- [x] 推送 Git 触发 Vercel 自动部署后，使用新模型名端到端验证
+- [x] 验证 Chat SSE 完整对话流
+- [x] 验证 Quiz AI 出题功能
+- [x] 验证 Plan AI 计划生成功能
+- [x] Constants.ets BASE_URL 确认为生产地址
+
+---
+
 ## [2026-07-01 14:32 CST] Codex：Agent 超时根因修复与模型配置纠偏
 
 - 审查 Trae 的 Agent 超时实现后，删除只覆盖 Planner/Quiz/Evaluator/Tutor 的编排器 `Promise.race`；该实现未覆盖 Profile 与 Safety、未清理定时器、也未取消底层 HTTP 请求。
