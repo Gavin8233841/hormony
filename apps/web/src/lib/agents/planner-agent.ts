@@ -13,9 +13,11 @@ export async function runPlannerAgent(
   profileSnapshot?: LearningProfileSnapshot
 ): Promise<StudyPlan> {
   const profile = getProfileContext(profileSnapshot);
+  const startDate = new Date().toISOString().slice(0, 10);
 
   const systemPrompt = `你是一位学习规划专家。根据学生画像和学习目标，制定结构化学习计划。
 输出 JSON 数组，每个元素格式：{"title":"","date":"YYYY-MM-DD","estimatedMin":45,"type":"review|practice|reading|quiz"}
+计划从 ${startDate} 开始，所有日期必须位于接下来 ${durationDays} 天内。
 只输出 JSON，不要额外文字。`;
 
   const userPrompt = `学生画像：${JSON.stringify(profile)}
@@ -26,7 +28,7 @@ export async function runPlannerAgent(
 
   const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.4, maxTokens: 1200 });
 
-  const tasks = parseTasks(raw);
+  const tasks = parseTasks(raw, startDate, durationDays);
   if (tasks.length === 0) {
     throw new Error("MODEL_INVALID_RESPONSE: 学习计划不是有效 JSON");
   }
@@ -40,19 +42,25 @@ export async function runPlannerAgent(
   return plan;
 }
 
-function parseTasks(raw: string): PlanTask[] {
+function parseTasks(raw: string, startDate: string, durationDays: number): PlanTask[] {
   try {
     const arr = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
-      return arr.slice(0, 10).map((t: Record<string, unknown>, i: number) => ({
-        id: generateId("task"),
-        title: String(t.title ?? `任务 ${i + 1}`),
-        date: String(t.date ?? new Date(Date.now() + i * 86400000).toISOString().slice(0, 10)),
-        estimatedMin: Number(t.estimatedMin ?? 45),
-        type: (["review", "practice", "reading", "quiz"].includes(String(t.type))
-          ? t.type
-          : "review") as PlanTask["type"],
-      }));
+      const selected = arr.slice(0, 10);
+      const startTime = Date.parse(startDate + "T00:00:00.000Z");
+      return selected.map((t: Record<string, unknown>, i: number) => {
+        const dayOffset = Math.min(durationDays - 1, Math.floor(i * durationDays / selected.length));
+        const taskDate = new Date(startTime + dayOffset * 86400000).toISOString().slice(0, 10);
+        return {
+          id: generateId("task"),
+          title: String(t.title ?? `任务 ${i + 1}`),
+          date: taskDate,
+          estimatedMin: Number(t.estimatedMin ?? 45),
+          type: (["review", "practice", "reading", "quiz"].includes(String(t.type))
+            ? t.type
+            : "review") as PlanTask["type"],
+        };
+      });
     }
   } catch {
     return [];

@@ -4,6 +4,7 @@ import {
   CuratedKnowledgeChunk,
   CuratedQuestion,
   ExternalLearningResource,
+  LessonExperience,
   TopicRelation
 } from '../model/DataModels';
 
@@ -11,6 +12,7 @@ const KNOWLEDGE_PATH: string = 'learning/knowledge-chunks.json';
 const QUIZZES_PATH: string = 'learning/quizzes.json';
 const RESOURCES_PATH: string = 'learning/external-resources.json';
 const TOPIC_RELATIONS_PATH: string = 'learning/topic-relations.json';
+const LESSON_EXPERIENCES_PATH: string = 'learning/lesson-experiences.json';
 
 export class LearningContentRepository {
   private static manager: resourceManager.ResourceManager | null = null;
@@ -18,6 +20,7 @@ export class LearningContentRepository {
   private static questions: CuratedQuestion[] = [];
   private static resources: ExternalLearningResource[] = [];
   private static topicRelations: TopicRelation[] = [];
+  private static lessonExperiences: LessonExperience[] = [];
 
   static async initialize(manager: resourceManager.ResourceManager): Promise<void> {
     if (LearningContentRepository.manager !== null) return;
@@ -27,6 +30,8 @@ export class LearningContentRepository {
     LearningContentRepository.resources = await LearningContentRepository.readJson<ExternalLearningResource[]>(RESOURCES_PATH);
     LearningContentRepository.topicRelations =
       await LearningContentRepository.readJson<TopicRelation[]>(TOPIC_RELATIONS_PATH);
+    LearningContentRepository.lessonExperiences =
+      await LearningContentRepository.readJson<LessonExperience[]>(LESSON_EXPERIENCES_PATH);
   }
 
   private static async readJson<T>(path: string): Promise<T> {
@@ -71,5 +76,10 @@ export class LearningContentRepository {
 
   static getTopicRelations(courseId: string): TopicRelation[] {
     return LearningContentRepository.topicRelations.filter((item: TopicRelation): boolean => item.courseId === courseId);
+  }
+
+  static getLessonExperience(courseId: string, topic: string): LessonExperience | null {
+    return LearningContentRepository.lessonExperiences.find((item: LessonExperience): boolean =>
+      item.courseId === courseId && item.topic === topic) ?? null;
   }
 }

@@ -2,7 +2,7 @@ import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { CuratedKnowledgeChunk, LessonProgress } from '../model/DataModels';
+import { CuratedKnowledgeChunk, LessonExperience, LessonProgress } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const EMPTY_CHUNK: CuratedKnowledgeChunk = {
@@ -25,12 +25,15 @@ struct LessonPage {
   @State currentIndex: number = 0;
   @State saving: boolean = false;
   @State message: string = '';
+  @State experience: LessonExperience | null = null;
+  @State selectedPrediction: number = -1;
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topic = AppStorage.get<string>('selectedContentTopic') ?? '';
     const content = LearningContentRepository.getKnowledge(this.courseId, this.topic);
+    this.experience = LearningContentRepository.getLessonExperience(this.courseId, this.topic);
     this.chunks = content;
     this.activeChunk = content.length > 0 ? content[0] : EMPTY_CHUNK;
     this.loadProgress();
@@ -56,6 +59,18 @@ struct LessonPage {
     if (index < 0 || index >= this.chunks.length) return;
     this.currentIndex = index;
     this.activeChunk = this.chunks[index];
+  }
+
+  private choosePrediction(index: number): void {
+    this.selectedPrediction = index;
+  }
+
+  private predictionIsCorrect(): boolean {
+    return this.experience !== null && this.selectedPrediction === this.experience.answerIndex;
+  }
+
+  private experienceStepCount(): number {
+    return this.experience === null ? 0 : this.experience.visualSteps.length;
   }
 
   private contentBeats(): string[] {
@@ -165,6 +180,140 @@ struct LessonPage {
             .padding({ left: 20, right: 20, top: 22, bottom: 22 })
             .backgroundColor(Constants.COLOR_SURFACE_TINT)
             .borderRadius(Constants.RADIUS_LG)
+
+            if (this.experience !== null) {
+              Column({ space: 14 }) {
+                Row({ space: 8 }) {
+                  SymbolGlyph($r('sys.symbol.book_open_fill'))
+                    .fontSize(18)
+                    .fontColor([Constants.COLOR_BRAND])
+                  Text('一眼看懂')
+                    .fontSize(17)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                }
+                .width('100%')
+
+                Text(this.experience.visualTitle)
+                  .width('100%')
+                  .fontSize(13)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+
+                Row({ space: 6 }) {
+                  ForEach(this.experience.visualSteps, (step: string, index: number): void => {
+                    Text(step)
+                      .layoutWeight(1)
+                      .height(44)
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(index === this.experienceStepCount() - 1 ?
+                        Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+                      .textAlign(TextAlign.Center)
+                      .padding({ left: 4, right: 4 })
+                      .backgroundColor(index === this.experienceStepCount() - 1 ?
+                        Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
+                      .borderRadius(Constants.RADIUS_SM)
+                  })
+                }
+                .width('100%')
+              }
+              .width('100%')
+
+              Column({ space: 8 }) {
+                Row({ space: 8 }) {
+                  SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
+                    .fontSize(17)
+                    .fontColor([Constants.COLOR_WARNING])
+                  Text(this.experience.caseTitle)
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                }
+                .width('100%')
+                Text(this.experience.caseBody)
+                  .width('100%')
+                  .fontSize(14)
+                  .lineHeight(24)
+                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
+              }
+              .width('100%')
+              .padding(16)
+              .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+
+              Column() {
+                Row() {
+                  Text(this.experience.language)
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  Text('阅读并预测')
+                    .fontSize(11)
+                    .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.SpaceBetween)
+                .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+
+                Text(this.experience.code)
+                  .width('100%')
+                  .fontSize(13)
+                  .fontFamily('monospace')
+                  .lineHeight(22)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .padding({ left: 14, right: 14, bottom: 16 })
+              }
+              .width('100%')
+              .backgroundColor(Constants.COLOR_MAP_CORE)
+              .borderRadius(Constants.RADIUS_MD)
+
+              Column({ space: 10 }) {
+                Text(this.experience.prompt)
+                  .width('100%')
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                ForEach(this.experience.options, (option: string, index: number): void => {
+                  Button(option)
+                    .width('100%')
+                    .height(44)
+                    .fontSize(13)
+                    .fontColor(this.selectedPrediction === index ?
+                      Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+                    .backgroundColor(this.selectedPrediction === index ?
+                      (this.predictionIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING) :
+                      Constants.COLOR_BG_TAG)
+                    .borderRadius(Constants.RADIUS_MD)
+                    .onClick((): void => { this.choosePrediction(index); })
+                })
+                if (this.selectedPrediction >= 0) {
+                  Row({ space: 8 }) {
+                    SymbolGlyph(this.predictionIsCorrect() ?
+                      $r('sys.symbol.checkmark_circle_fill') : $r('sys.symbol.xmark_circle_fill'))
+                      .fontSize(18)
+                      .fontColor([this.predictionIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING])
+                    Column({ space: 3 }) {
+                      Text(this.predictionIsCorrect() ? '判断正确，关键步骤已掌握' : '再推演一次，错误也是有效反馈')
+                        .fontSize(13)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(this.predictionIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                      Text(this.experience.explanation)
+                        .fontSize(12)
+                        .lineHeight(20)
+                        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                    }
+                    .layoutWeight(1)
+                    .alignItems(HorizontalAlign.Start)
+                  }
+                  .width('100%')
+                  .padding(12)
+                  .backgroundColor(this.predictionIsCorrect() ?
+                    Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_SURFACE_TINT)
+                  .borderRadius(Constants.RADIUS_SM)
+                }
+              }
+              .width('100%')
+            }
 
             if (this.contentBeats().length > 1) {
               Column({ space: 16 }) {

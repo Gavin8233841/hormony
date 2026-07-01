@@ -204,6 +204,21 @@ export interface CuratedKnowledgeChunk {
   topic: string;
 }
 
+export interface LessonExperience {
+  courseId: string;
+  topic: string;
+  visualTitle: string;
+  visualSteps: string[];
+  caseTitle: string;
+  caseBody: string;
+  language: string;
+  code: string;
+  prompt: string;
+  options: string[];
+  answerIndex: number;
+  explanation: string;
+}
+
 export interface CuratedQuestion {
   id: string;
   courseId: string;

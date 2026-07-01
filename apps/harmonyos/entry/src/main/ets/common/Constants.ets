@@ -7,6 +7,9 @@ export class Constants {
   // Web 后端地址
   // 发布配置必须指向公网无状态网关，不得依赖开发电脑或本地代理。
   static readonly BASE_URL: string = 'https://hormony-ruddy.vercel.app';
+  // 模拟器无法直连 Vercel 时，经宿主机固定目标网关转发；不携带模型密钥。
+  static readonly SIMULATOR_GATEWAY_URL: string = 'http://10.0.2.2:3001';
+  static readonly API_BASE_URLS: string[] = [Constants.BASE_URL, Constants.SIMULATOR_GATEWAY_URL];
 
   // API 路径
   static readonly API_CHAT: string = '/api/chat';
@@ -25,6 +28,8 @@ export class Constants {
 
   // 请求超时（毫秒）
   static readonly REQUEST_TIMEOUT: number = 30000;
+  static readonly CONNECT_TIMEOUT: number = 8000;
+  static readonly MODEL_REQUEST_TIMEOUT: number = 120000;
   // SSE 流式请求超时（毫秒）——多 Agent 编排可能需要 30-40s，设 90s 留足余量
   static readonly SSE_TIMEOUT: number = 90000;
 

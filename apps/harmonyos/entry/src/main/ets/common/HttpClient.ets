@@ -14,30 +14,38 @@ export class HttpClient {
    * 发送 GET 请求
    */
   static async get<T>(path: string): Promise<T> {
-    const httpRequest = http.createHttp();
-    try {
-      const url = Constants.BASE_URL + path;
-      const response = await httpRequest.request(url, {
-        method: http.RequestMethod.GET,
-        header: { 'Content-Type': 'application/json' },
-        connectTimeout: Constants.REQUEST_TIMEOUT,
-        readTimeout: Constants.REQUEST_TIMEOUT,
-        expectDataType: http.HttpDataType.STRING,
-      });
-      if (response.responseCode === 200) {
+    let lastNetworkError: Error = new Error('Network request failed');
+    for (const baseUrl of Constants.API_BASE_URLS) {
+      const httpRequest = http.createHttp();
+      try {
+        const response = await httpRequest.request(baseUrl + path, {
+          method: http.RequestMethod.GET,
+          header: { 'Content-Type': 'application/json' },
+          connectTimeout: Constants.CONNECT_TIMEOUT,
+          readTimeout: Constants.REQUEST_TIMEOUT,
+          expectDataType: http.HttpDataType.STRING,
+        });
+        if (response.responseCode !== 200) {
+          throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+        }
         const result = response.result;
         if (typeof result !== 'string') {
           throw new Error('Response is not a string');
         }
         const parsed: T = JSON.parse(result);
         return parsed;
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error('Network request failed');
+        if (error.message.startsWith('HTTP ') || error.message === 'Response is not a string' ||
+          error.name === 'SyntaxError') {
+          throw error;
+        }
+        lastNetworkError = error;
+      } finally {
+        httpRequest.destroy();
       }
-      throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
-    } catch (e) {
-      throw e instanceof Error ? e : new Error('Network request failed');
-    } finally {
-      httpRequest.destroy();
     }
+    throw lastNetworkError;
   }
 
   /**
@@ -45,62 +53,78 @@ export class HttpClient {
    * body 参数为 JSON 字符串（调用方负责 JSON.stringify）
    */
   static async post<T>(path: string, body: string): Promise<T> {
-    const httpRequest = http.createHttp();
-    try {
-      const url = Constants.BASE_URL + path;
-      const response = await httpRequest.request(url, {
-        method: http.RequestMethod.POST,
-        header: { 'Content-Type': 'application/json' },
-        extraData: body,
-        connectTimeout: Constants.REQUEST_TIMEOUT,
-        readTimeout: Constants.REQUEST_TIMEOUT,
-        expectDataType: http.HttpDataType.STRING,
-      });
-      if (response.responseCode === 200) {
+    let lastNetworkError: Error = new Error('Network request failed');
+    for (const baseUrl of Constants.API_BASE_URLS) {
+      const httpRequest = http.createHttp();
+      try {
+        const response = await httpRequest.request(baseUrl + path, {
+          method: http.RequestMethod.POST,
+          header: { 'Content-Type': 'application/json' },
+          extraData: body,
+          connectTimeout: Constants.CONNECT_TIMEOUT,
+          readTimeout: Constants.MODEL_REQUEST_TIMEOUT,
+          expectDataType: http.HttpDataType.STRING,
+        });
+        if (response.responseCode !== 200) {
+          throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+        }
         const result = response.result;
         if (typeof result !== 'string') {
           throw new Error('Response is not a string');
         }
         const parsed: T = JSON.parse(result);
         return parsed;
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error('Network request failed');
+        if (error.message.startsWith('HTTP ') || error.message === 'Response is not a string' ||
+          error.name === 'SyntaxError') {
+          throw error;
+        }
+        lastNetworkError = error;
+      } finally {
+        httpRequest.destroy();
       }
-      throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
-    } catch (e) {
-      throw e instanceof Error ? e : new Error('Network request failed');
-    } finally {
-      httpRequest.destroy();
     }
+    throw lastNetworkError;
   }
 
   /**
    * 发送 PATCH 请求
    */
   static async patch<T>(path: string, body: string): Promise<T> {
-    const httpRequest = http.createHttp();
-    try {
-      const url = Constants.BASE_URL + path;
-      const response = await httpRequest.request(url, {
-        method: http.RequestMethod.PATCH,
-        header: { 'Content-Type': 'application/json' },
-        extraData: body,
-        connectTimeout: Constants.REQUEST_TIMEOUT,
-        readTimeout: Constants.REQUEST_TIMEOUT,
-        expectDataType: http.HttpDataType.STRING,
-      });
-      if (response.responseCode === 200) {
+    let lastNetworkError: Error = new Error('Network request failed');
+    for (const baseUrl of Constants.API_BASE_URLS) {
+      const httpRequest = http.createHttp();
+      try {
+        const response = await httpRequest.request(baseUrl + path, {
+          method: http.RequestMethod.PATCH,
+          header: { 'Content-Type': 'application/json' },
+          extraData: body,
+          connectTimeout: Constants.CONNECT_TIMEOUT,
+          readTimeout: Constants.MODEL_REQUEST_TIMEOUT,
+          expectDataType: http.HttpDataType.STRING,
+        });
+        if (response.responseCode !== 200) {
+          throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+        }
         const result = response.result;
         if (typeof result !== 'string') {
           throw new Error('Response is not a string');
         }
         const parsed: T = JSON.parse(result);
         return parsed;
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error('Network request failed');
+        if (error.message.startsWith('HTTP ') || error.message === 'Response is not a string' ||
+          error.name === 'SyntaxError') {
+          throw error;
+        }
+        lastNetworkError = error;
+      } finally {
+        httpRequest.destroy();
       }
-      throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
-    } catch (e) {
-      throw e instanceof Error ? e : new Error('Network request failed');
-    } finally {
-      httpRequest.destroy();
     }
+    throw lastNetworkError;
   }
 
   /**
@@ -116,33 +140,9 @@ export class HttpClient {
     onError: (err: Error) => void,
     onCreated?: (req: http.HttpRequest) => void
   ): void {
-    const httpRequest = http.createHttp();
-    if (onCreated) {
-      onCreated(httpRequest);
-    }
-
-    const url = Constants.BASE_URL + path;
     let doneCalled: boolean = false;
-    let cleanedUp: boolean = false;
     let eventBuffer: string = '';
     const decoder = util.TextDecoder.create('utf-8');
-
-    const cleanup = (): void => {
-      if (cleanedUp) {
-        return;
-      }
-      cleanedUp = true;
-      try {
-        httpRequest.off('dataReceive');
-      } catch (e) {
-        // 监听器可能已移除，忽略
-      }
-      try {
-        httpRequest.destroy();
-      } catch (e) {
-        // 可能已销毁，忽略
-      }
-    };
 
     const consumeText = (text: string): void => {
       eventBuffer += text;
@@ -168,37 +168,65 @@ export class HttpClient {
       }
     };
 
-    // 注册数据接收回调（流式）
-    httpRequest.on('dataReceive', (data: ArrayBuffer) => {
-      const text = decoder.decodeToString(new Uint8Array(data), { stream: true });
-      consumeText(text);
-    });
+    const startRequest = (baseIndex: number): void => {
+      const httpRequest = http.createHttp();
+      let cleanedUp: boolean = false;
+      let receivedData: boolean = false;
+      if (onCreated) {
+        onCreated(httpRequest);
+      }
 
-    // 流式请求完成
-    httpRequest.requestInStream(url, {
-      method: http.RequestMethod.POST,
-      header: {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-      },
-      extraData: body,
-      connectTimeout: Constants.SSE_TIMEOUT,
-      readTimeout: Constants.SSE_TIMEOUT,
-    }).then((responseCode: number) => {
-      if (responseCode !== 200) {
-        onError(new Error('HTTP ' + responseCode));
+      const cleanup = (): void => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        try {
+          httpRequest.off('dataReceive');
+        } catch (e) {
+          // 监听器可能已移除，忽略
+        }
+        try {
+          httpRequest.destroy();
+        } catch (e) {
+          // 请求可能已销毁，忽略
+        }
+      };
+
+      httpRequest.on('dataReceive', (data: ArrayBuffer) => {
+        receivedData = true;
+        const text = decoder.decodeToString(new Uint8Array(data), { stream: true });
+        consumeText(text);
+      });
+
+      httpRequest.requestInStream(Constants.API_BASE_URLS[baseIndex] + path, {
+        method: http.RequestMethod.POST,
+        header: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        extraData: body,
+        connectTimeout: Constants.CONNECT_TIMEOUT,
+        readTimeout: Constants.SSE_TIMEOUT,
+      }).then((responseCode: number) => {
+        if (responseCode !== 200) {
+          onError(new Error('HTTP ' + responseCode));
+          cleanup();
+          return;
+        }
+        if (!doneCalled) {
+          doneCalled = true;
+          onDone();
+        }
         cleanup();
-        return;
-      }
-      // 流结束但未收到 done 事件时，确保 onDone 被调用
-      if (!doneCalled) {
-        doneCalled = true;
-        onDone();
-      }
-      cleanup();
-    }).catch((e: Error) => {
-      onError(e);
-      cleanup();
-    });
+      }).catch((e: Error) => {
+        cleanup();
+        if (!receivedData && baseIndex + 1 < Constants.API_BASE_URLS.length) {
+          startRequest(baseIndex + 1);
+          return;
+        }
+        onError(e);
+      });
+    };
+
+    startRequest(0);
   }
 }

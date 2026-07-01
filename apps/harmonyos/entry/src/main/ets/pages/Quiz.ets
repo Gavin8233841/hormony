@@ -57,8 +57,9 @@ struct QuizPage {
     }
   }
 
-  private get currentAnswer(): string {
-    return this.answers[this.currentIndex] ?? '';
+  private currentAnswerText(): string {
+    const answer = this.answers[this.currentIndex];
+    return typeof answer === 'string' ? answer : '';
   }
 
   private chooseAnswer(answer: string): void {
@@ -117,10 +118,16 @@ struct QuizPage {
         Constants.API_QUIZ,
         JSON.stringify(request)
       );
+      if (!Array.isArray(response.questions) || !Array.isArray(response.grading) ||
+        response.questions.length === 0 || response.questions.length !== response.grading.length) {
+        throw new Error('Invalid quiz response');
+      }
+      const nextAnswers = new Array<string>(response.questions.length).fill('');
       this.quizId = response.quizId;
-      this.questions = response.questions;
       this.grading = response.grading;
-      this.answers = new Array<string>(response.questions.length).fill('');
+      // 先提交答案槽位，最后提交题目，避免 ArkUI 在两次状态更新之间读取未初始化答案。
+      this.answers = nextAnswers;
+      this.questions = response.questions;
       if (this.questions.length === 0) {
         this.message = '当前主题暂时没有可用题目';
       }
@@ -308,7 +315,7 @@ struct QuizPage {
 
       Column({ space: 10 }) {
         ForEach(this.questions[this.currentIndex].options ?? [], (option: string): void => {
-          AnswerOption(option, this.currentAnswer === option, (): void => { this.chooseAnswer(option); })
+          AnswerOption(option, this.currentAnswerText() === option, (): void => { this.chooseAnswer(option); })
         })
       }
       .width('100%')
@@ -329,20 +336,20 @@ struct QuizPage {
             .layoutWeight(1)
             .height(48)
             .fontSize(14)
-            .fontColor(this.currentAnswer.length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-            .backgroundColor(this.currentAnswer.length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+            .fontColor(this.currentAnswerText().length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            .backgroundColor(this.currentAnswerText().length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
-            .enabled(this.currentAnswer.length > 0)
+            .enabled(this.currentAnswerText().length > 0)
             .onClick(() => { this.currentIndex += 1; })
         } else {
           Button(this.submitting ? '评分中...' : '提交评分')
             .layoutWeight(1)
             .height(48)
             .fontSize(14)
-            .fontColor(this.currentAnswer.length > 0 && !this.submitting ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-            .backgroundColor(this.currentAnswer.length > 0 && !this.submitting ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+            .fontColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            .backgroundColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
-            .enabled(this.currentAnswer.length > 0 && !this.submitting)
+            .enabled(this.currentAnswerText().length > 0 && !this.submitting)
             .onClick(() => { this.submitQuiz(); })
         }
       }
