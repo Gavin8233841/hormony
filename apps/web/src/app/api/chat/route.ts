@@ -154,13 +154,18 @@ export async function POST(req: NextRequest) {
 
         if (orchestrateError) {
           // 流中错误：HTTP 状态已固化为 200，通过 SSE 事件通知客户端
+          // 临时：附带详细错误信息用于诊断
+          const errDetail = orchestrateError instanceof Error
+            ? orchestrateError.message
+            : String(orchestrateError);
+          const errCode = (orchestrateError as { code?: string })?.code ?? "INTERNAL_ERROR";
           controller.enqueue(
-            sse({ type: "error", code: "INTERNAL_ERROR", message: "服务处理异常，请稍后重试" })
+            sse({ type: "error", code: errCode, message: errDetail })
           );
           controller.enqueue(sse({ type: "done", sessionId: "error" }));
           console.error(
             "[chat] orchestrate error (mid-stream):",
-            orchestrateError instanceof Error ? orchestrateError.message : String(orchestrateError)
+            errDetail
           );
         }
       } catch (err) {
