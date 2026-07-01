@@ -1,0 +1,233 @@
+[
+  {
+    "id": "cs101_array",
+    "courseId": "cs101",
+    "topic": "数组与线性表",
+    "prerequisiteIds": [],
+    "level": 0
+  },
+  {
+    "id": "cs101_linked_list",
+    "courseId": "cs101",
+    "topic": "链表",
+    "prerequisiteIds": ["cs101_array"],
+    "level": 1
+  },
+  {
+    "id": "cs101_stack_queue",
+    "courseId": "cs101",
+    "topic": "栈与队列",
+    "prerequisiteIds": ["cs101_array", "cs101_linked_list"],
+    "level": 2
+  },
+  {
+    "id": "cs101_bst",
+    "courseId": "cs101",
+    "topic": "二叉树与BST",
+    "prerequisiteIds": ["cs101_array"],
+    "level": 1
+  },
+  {
+    "id": "cs101_avl_rb",
+    "courseId": "cs101",
+    "topic": "AVL树与红黑树",
+    "prerequisiteIds": ["cs101_bst"],
+    "level": 2
+  },
+  {
+    "id": "cs101_graph",
+    "courseId": "cs101",
+    "topic": "图的表示与遍历",
+    "prerequisiteIds": ["cs101_stack_queue", "cs101_bst"],
+    "level": 3
+  },
+  {
+    "id": "cs101_shortest_path",
+    "courseId": "cs101",
+    "topic": "最短路径算法",
+    "prerequisiteIds": ["cs101_graph"],
+    "level": 4
+  },
+  {
+    "id": "cs101_sorting",
+    "courseId": "cs101",
+    "topic": "排序算法",
+    "prerequisiteIds": ["cs101_array"],
+    "level": 1
+  },
+  {
+    "id": "cs101_dp",
+    "courseId": "cs101",
+    "topic": "动态规划",
+    "prerequisiteIds": ["cs101_sorting"],
+    "level": 2
+  },
+  {
+    "id": "cs101_greedy_divide",
+    "courseId": "cs101",
+    "topic": "贪心算法与分治",
+    "prerequisiteIds": ["cs101_sorting"],
+    "level": 2
+  },
+  {
+    "id": "cs101_hash",
+    "courseId": "cs101",
+    "topic": "哈希表",
+    "prerequisiteIds": ["cs101_array"],
+    "level": 1
+  },
+  {
+    "id": "cs101_heap",
+    "courseId": "cs101",
+    "topic": "堆与优先队列",
+    "prerequisiteIds": ["cs101_bst", "cs101_sorting"],
+    "level": 2
+  },
+  {
+    "id": "cs102_process",
+    "courseId": "cs102",
+    "topic": "进程与线程",
+    "prerequisiteIds": [],
+    "level": 0
+  },
+  {
+    "id": "cs102_cpu_scheduling",
+    "courseId": "cs102",
+    "topic": "CPU调度算法",
+    "prerequisiteIds": ["cs102_process"],
+    "level": 1
+  },
+  {
+    "id": "cs102_memory_mgmt",
+    "courseId": "cs102",
+    "topic": "内存管理基础",
+    "prerequisiteIds": ["cs102_process"],
+    "level": 1
+  },
+  {
+    "id": "cs102_virtual_memory",
+    "courseId": "cs102",
+    "topic": "虚拟内存与分页",
+    "prerequisiteIds": ["cs102_memory_mgmt"],
+    "level": 2
+  },
+  {
+    "id": "cs102_segmentation",
+    "courseId": "cs102",
+    "topic": "分段与段页式",
+    "prerequisiteIds": ["cs102_virtual_memory"],
+    "level": 3
+  },
+  {
+    "id": "cs102_file_system",
+    "courseId": "cs102",
+    "topic": "文件系统",
+    "prerequisiteIds": ["cs102_memory_mgmt"],
+    "level": 2
+  },
+  {
+    "id": "cs102_io_disk",
+    "courseId": "cs102",
+    "topic": "I/O系统与磁盘调度",
+    "prerequisiteIds": ["cs102_file_system"],
+    "level": 3
+  },
+  {
+    "id": "cs102_deadlock",
+    "courseId": "cs102",
+    "topic": "死锁",
+    "prerequisiteIds": ["cs102_process"],
+    "level": 1
+  },
+  {
+    "id": "cs102_sync",
+    "courseId": "cs102",
+    "topic": "同步与互斥",
+    "prerequisiteIds": ["cs102_process"],
+    "level": 1
+  },
+  {
+    "id": "cs102_ipc",
+    "courseId": "cs102",
+    "topic": "进程间通信",
+    "prerequisiteIds": ["cs102_sync"],
+    "level": 2
+  },
+  {
+    "id": "cs103_osi_model",
+    "courseId": "cs103",
+    "topic": "OSI与TCP/IP模型",
+    "prerequisiteIds": [],
+    "level": 0
+  },
+  {
+    "id": "cs103_physical_link",
+    "courseId": "cs103",
+    "topic": "物理层与数据链路层",
+    "prerequisiteIds": ["cs103_osi_model"],
+    "level": 1
+  },
+  {
+    "id": "cs103_network_ip",
+    "courseId": "cs103",
+    "topic": "网络层与IP协议",
+    "prerequisiteIds": ["cs103_physical_link"],
+    "level": 2
+  },
+  {
+    "id": "cs103_tcp_handshake",
+    "courseId": "cs103",
+    "topic": "TCP握手与挥手",
+    "prerequisiteIds": ["cs103_network_ip"],
+    "level": 3
+  },
+  {
+    "id": "cs103_tcp_flow",
+    "courseId": "cs103",
+    "topic": "TCP流量控制与拥塞控制",
+    "prerequisiteIds": ["cs103_tcp_handshake"],
+    "level": 4
+  },
+  {
+    "id": "cs103_udp",
+    "courseId": "cs103",
+    "topic": "UDP协议",
+    "prerequisiteIds": ["cs103_network_ip"],
+    "level": 3
+  },
+  {
+    "id": "cs103_http",
+    "courseId": "cs103",
+    "topic": "HTTP协议",
+    "prerequisiteIds": ["cs103_tcp_handshake"],
+    "level": 4
+  },
+  {
+    "id": "cs103_https_tls",
+    "courseId": "cs103",
+    "topic": "HTTPS与TLS",
+    "prerequisiteIds": ["cs103_http", "cs103_tcp_flow"],
+    "level": 5
+  },
+  {
+    "id": "cs103_dns",
+    "courseId": "cs103",
+    "topic": "DNS系统",
+    "prerequisiteIds": ["cs103_http", "cs103_udp"],
+    "level": 5
+  },
+  {
+    "id": "cs103_routing",
+    "courseId": "cs103",
+    "topic": "路由算法与协议",
+    "prerequisiteIds": ["cs103_network_ip"],
+    "level": 3
+  },
+  {
+    "id": "cs103_security",
+    "courseId": "cs103",
+    "topic": "网络安全基础",
+    "prerequisiteIds": ["cs103_https_tls", "cs103_dns"],
+    "level": 6
+  }
+]

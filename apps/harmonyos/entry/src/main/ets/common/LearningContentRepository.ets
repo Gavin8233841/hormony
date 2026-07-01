@@ -3,18 +3,21 @@ import { util } from '@kit.ArkTS';
 import {
   CuratedKnowledgeChunk,
   CuratedQuestion,
-  ExternalLearningResource
+  ExternalLearningResource,
+  TopicRelation
 } from '../model/DataModels';
 
 const KNOWLEDGE_PATH: string = 'learning/knowledge-chunks.json';
 const QUIZZES_PATH: string = 'learning/quizzes.json';
 const RESOURCES_PATH: string = 'learning/external-resources.json';
+const TOPIC_RELATIONS_PATH: string = 'learning/topic-relations.json';
 
 export class LearningContentRepository {
   private static manager: resourceManager.ResourceManager | null = null;
   private static knowledge: CuratedKnowledgeChunk[] = [];
   private static questions: CuratedQuestion[] = [];
   private static resources: ExternalLearningResource[] = [];
+  private static topicRelations: TopicRelation[] = [];
 
   static async initialize(manager: resourceManager.ResourceManager): Promise<void> {
     if (LearningContentRepository.manager !== null) return;
@@ -22,6 +25,8 @@ export class LearningContentRepository {
     LearningContentRepository.knowledge = await LearningContentRepository.readJson<CuratedKnowledgeChunk[]>(KNOWLEDGE_PATH);
     LearningContentRepository.questions = await LearningContentRepository.readJson<CuratedQuestion[]>(QUIZZES_PATH);
     LearningContentRepository.resources = await LearningContentRepository.readJson<ExternalLearningResource[]>(RESOURCES_PATH);
+    LearningContentRepository.topicRelations =
+      await LearningContentRepository.readJson<TopicRelation[]>(TOPIC_RELATIONS_PATH);
   }
 
   private static async readJson<T>(path: string): Promise<T> {
@@ -62,5 +67,9 @@ export class LearningContentRepository {
       if (item.courseId === courseId && !topics.includes(item.topic)) topics.push(item.topic);
     }
     return topics;
+  }
+
+  static getTopicRelations(courseId: string): TopicRelation[] {
+    return LearningContentRepository.topicRelations.filter((item: TopicRelation): boolean => item.courseId === courseId);
   }
 }

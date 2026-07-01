@@ -170,6 +170,14 @@ export interface TopicMastery {
   lastPracticedAt?: string;
 }
 
+export interface TopicRelation {
+  id: string;
+  courseId: string;
+  topic: string;
+  prerequisiteIds: string[];
+  level: number;
+}
+
 export interface ReviewItem {
   id: string;
   questionId: string;

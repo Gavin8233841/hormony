@@ -4550,3 +4550,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `pnpm test`：通过，9 个测试文件、87 项测试。
 - `apps/harmonyos/hvigorw.bat assembleHap --no-daemon`：`BUILD SUCCESSFUL in 17 s 564 ms`；未配置签名，debug HAP 跳过签名。
 
+---
+
+## 2026-07-01 Codex：真实知识 DAG 接入学习星图
+
+### 完成内容
+
+- 接收并复核 Trae 生成的 `topic-relations.json`：3 门课程、33 个主题节点，包含精确先修节点与层级。
+- `DataModels.ets` 新增 `TopicRelation`；`LearningContentRepository.ets` 在初始化阶段读取关系资产，并按课程提供只读查询。
+- 重构 `LearningMap.ets`：取消“仅展示前 6 个主题”和“全部连接中心点”的装饰图，改为全部主题、真实先修边、按 DAG 层级投影。
+- 节点颜色和大小继续只由本地真实答题记录驱动；顶部原生环形进度展示真实已掌握主题数。
+- 点击节点展示掌握状态和先修主题，并提供“学习主题”“主题练习”两个唯一明确动作。
+
+### 模型选择边界
+
+- 当前继续使用已完成真实接口验证的 `doubao-seed-2-1-pro-260628`，模型名仅由 Vercel `MODEL_NAME` 注入。
+- mini/lite 等模型只有取得控制台精确接入点 ID 并完成 Health/Chat/Plan/Quiz 回归后才能切换，禁止根据产品显示名猜写。
+- 作品提交前使用同一回归流程确认最高质量模型；源码和 HAP 不固化 API Key。
+
+### 验证
+
+- `python scripts/validate-topic-relations.py`：33 节点 ID 唯一、引用完整、DAG 无环、3 门课程连通、层级一致、与 147 条知识切片 Topic 完全一致。
+- `apps/harmonyos/hvigorw.bat assembleHap --no-daemon`：`BUILD SUCCESSFUL in 21 s 236 ms`。
+- Trae 新增的 `scripts/harmonyos-app-smoke.ps1` 尚未纳入提交：脚本内 Bundle Name 与工程真实值不一致，且环境路径假设未修正。
+
