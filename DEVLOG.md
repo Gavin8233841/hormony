@@ -4820,3 +4820,20 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 新增 4 项中间件测试：无状态预检、无状态错误 CORS、非白名单拒绝回显、限流错误 CORS。
 - Web 全量：ESLint、TypeScript、Vitest 12 个文件 137 项、Next.js 生产构建全部通过。
 - 本批次只修改 `middleware.ts` 与 `middleware.test.ts`，未纳入 Trae 的 `client-api` 文件。
+
+---
+
+## 2026-07-01 Codex：根目录开发代理规范
+
+### 新增
+
+- 新增根目录 `AGENTS.md`，覆盖文件与 Git 安全、并行工作隔离、架构不变量、Web/HarmonyOS 开发规则、主代理与委派代理权限、证据等级、验证矩阵和提交要求。
+- 固定题库单一来源、无状态云端与 ArkData 状态边界、真实 Agent/Safety/模型发布边界，以及 API 输入和错误契约。
+- 明确真机、模拟器、构建、静态诊断和源码确认不能相互替代。
+- 引用 AGENTS.md 开放格式、Next.js、OWASP API Security 和 HarmonyOS/Hvigor 官方规范。
+
+### 验证
+
+- `git diff --check -- AGENTS.md` 通过。
+- 核对文档引用的仓库路径、Web 脚本、API 12 构建配置和 HarmonyOS 空依赖配置。
+- 只提交 `AGENTS.md` 与本段 DEVLOG；Trae 页面、`client-api` 和历史未提交资产不纳入。
