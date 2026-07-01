@@ -70,6 +70,14 @@ function applyCorsHeaders(res: NextResponse, req: NextRequest) {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // CORS 预检必须早于无状态接口拦截，否则受限接口会返回 404，客户端无法发起实际请求。
+  if (pathname.startsWith("/api/") && req.method === "OPTIONS") {
+    const res = new NextResponse(null, { status: 204 });
+    addSecurityHeaders(res);
+    applyCorsHeaders(res, req);
+    return res;
+  }
+
   if (
     process.env.DEPLOYMENT_MODE === "stateless" &&
     STATEFUL_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
@@ -79,19 +87,12 @@ export function middleware(req: NextRequest) {
       { status: 404 }
     );
     addSecurityHeaders(res);
+    applyCorsHeaders(res, req);
     return res;
   }
 
   // 仅对 API 路由执行速率限制
   if (pathname.startsWith("/api/")) {
-    // CORS 预检直接放行（仅允许白名单来源）
-    if (req.method === "OPTIONS") {
-      const res = new NextResponse(null, { status: 204 });
-      addSecurityHeaders(res);
-      applyCorsHeaders(res, req);
-      return res;
-    }
-
     // 速率限制（基于 IP）
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
     const now = Date.now();
@@ -107,6 +108,7 @@ export function middleware(req: NextRequest) {
         );
         res.headers.set("Retry-After", String(Math.ceil((record.resetTime - now) / 1000)));
         addSecurityHeaders(res);
+        applyCorsHeaders(res, req);
         return res;
       }
     } else {

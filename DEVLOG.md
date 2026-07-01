@@ -4804,3 +4804,19 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Web 全量：ESLint 通过、TypeScript 通过、Vitest 11 个文件 133 项通过。
 - Next.js 生产构建通过，10 个静态页面生成成功，全部 API 路由完成编译。
 - 本批次只修改 Web 后端请求边界与测试；Trae 并行的页面和 `client-api` 文件未纳入本批次。
+
+---
+
+## 2026-07-01 Codex：无状态网关 CORS 与预检顺序
+
+### 修复
+
+- API `OPTIONS` 预检提前到无状态接口拦截之前，受限接口不再把浏览器预检错误返回为 404。
+- 无状态接口的 `ENDPOINT_DISABLED` 以及限流 `RATE_LIMITED` 早返回统一附带允许来源的 CORS 头。
+- 不在白名单内的 Origin 仍不回显 `Access-Control-Allow-Origin`；现有安全响应头与 `Retry-After` 保持有效。
+
+### 验证
+
+- 新增 4 项中间件测试：无状态预检、无状态错误 CORS、非白名单拒绝回显、限流错误 CORS。
+- Web 全量：ESLint、TypeScript、Vitest 12 个文件 137 项、Next.js 生产构建全部通过。
+- 本批次只修改 `middleware.ts` 与 `middleware.test.ts`，未纳入 Trae 的 `client-api` 文件。
