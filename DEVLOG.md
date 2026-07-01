@@ -4837,3 +4837,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `git diff --check -- AGENTS.md` 通过。
 - 核对文档引用的仓库路径、Web 脚本、API 12 构建配置和 HarmonyOS 空依赖配置。
 - 只提交 `AGENTS.md` 与本段 DEVLOG；Trae 页面、`client-api` 和历史未提交资产不纳入。
+
+---
+
+## 2026-07-01 Codex：成长中心原生界面重构
+
+### 成就页
+
+- 用真实解锁数量生成紧凑的里程碑摘要、总进度和下一目标，不新增虚构指标。
+- 将三张重复大卡收敛为单一“全部成就”列表，保留解锁、未解锁和各自进度的明确语义色。
+- 页面从松散展示改为“总览 -> 下一目标 -> 逐项进度”的阅读顺序。
+
+### 学习记录页
+
+- 按事件日期分组，并为最近日期提供克制标识。
+- 事件图标增加真实状态底色；提交练习显示课程主题与 `正确数/总题数`。
+- 标题栏显示真实活动数量；加载完成后的副标题经过重新安装复测，未停留在加载文案。
+
+### 验证
+
+- DevEco ArkTS Check：`Achievements.ets`、`ActivityRecords.ets` 均无诊断。
+- `entry@default` debug HAP 增量构建成功。
+- Pura 90 Pro Max 模拟器安装、启动、返回导航、学习记录和成就页均通过。
+- 视觉证据：`screenshots/codex-growth-design-20260701/activity-records-final.jpeg`、`achievements.jpeg`。
+- 未改动 Trae 正在施工的 Web 页面和 `client-api` 文件。

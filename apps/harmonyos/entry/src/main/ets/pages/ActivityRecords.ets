@@ -34,6 +34,9 @@ struct ActivityRecordsPage {
   }
 
   private detail(event: StudyEvent): string {
+    if (event.topic !== undefined && event.totalQuestions !== undefined && event.correctCount !== undefined) {
+      return event.topic + ' · ' + event.correctCount.toString() + '/' + event.totalQuestions.toString() + ' 题正确';
+    }
     if (event.topic !== undefined) return event.topic;
     if (event.taskId !== undefined) return '任务 ' + event.taskId;
     return '本地学习记录';
@@ -44,6 +47,30 @@ struct ActivityRecordsPage {
       return $r('sys.symbol.checkmark_circle_fill');
     }
     return $r('sys.symbol.book_open_fill');
+  }
+
+  private iconColor(event: StudyEvent): string {
+    if (event.type === 'task_completed' || event.type === 'lesson_completed' || event.type === 'quiz_mastered') {
+      return Constants.COLOR_SUCCESS;
+    }
+    return Constants.COLOR_BRAND;
+  }
+
+  private iconBackground(event: StudyEvent): string {
+    if (event.type === 'task_completed' || event.type === 'lesson_completed' || event.type === 'quiz_mastered') {
+      return Constants.COLOR_SUCCESS_LIGHT;
+    }
+    return Constants.COLOR_BRAND_LIGHT;
+  }
+
+  private isFirstOfDay(index: number): boolean {
+    if (index === 0) return true;
+    return this.events[index - 1].timestamp.slice(0, 10) !== this.events[index].timestamp.slice(0, 10);
+  }
+
+  private dateLabel(timestamp: string): string {
+    const date = timestamp.slice(0, 10);
+    return date.slice(5, 7) + '月' + date.slice(8, 10) + '日';
   }
 
   private openEvent(event: StudyEvent): void {
@@ -61,7 +88,12 @@ struct ActivityRecordsPage {
 
   build() {
     Column() {
-      TitleBar('学习记录', '所有数据只保存在本机', () => this.getUIContext().getRouter().back())
+      if (this.loading) {
+        TitleBar('学习记录', '正在读取本地记录', () => this.getUIContext().getRouter().back())
+      } else {
+        TitleBar('学习记录', this.events.length.toString() + ' 条活动 · 仅保存在本机',
+          () => this.getUIContext().getRouter().back())
+      }
       if (this.loading) {
         Column().width('90%').height(180).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
       } else if (this.events.length === 0) {
@@ -74,43 +106,79 @@ struct ActivityRecordsPage {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        List({ space: 0 }) {
+        List({ space: 10 }) {
           ForEach(this.events, (event: StudyEvent, index: number): void => {
             ListItem() {
               Column() {
+                if (this.isFirstOfDay(index)) {
+                  Row() {
+                    Text(this.dateLabel(event.timestamp))
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                    if (index === 0) {
+                      Text('最近')
+                        .fontSize(10)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(Constants.COLOR_BRAND)
+                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                        .borderRadius(Constants.RADIUS_SM)
+                    }
+                  }
+                  .width('100%')
+                  .justifyContent(FlexAlign.SpaceBetween)
+                  .padding({ left: 4, right: 4, top: index === 0 ? 2 : 12, bottom: 2 })
+                }
+
                 Row({ space: 12 }) {
-                  SymbolGlyph(this.icon(event))
-                    .fontSize(21)
-                    .fontColor([event.type === 'quiz_mastered' ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND])
+                  Stack({ alignContent: Alignment.Center }) {
+                    Column()
+                      .width(44)
+                      .height(44)
+                      .backgroundColor(this.iconBackground(event))
+                      .borderRadius(Constants.RADIUS_MD)
+                    SymbolGlyph(this.icon(event))
+                      .fontSize(21)
+                      .fontColor([this.iconColor(event)])
+                  }
                   Column({ space: 4 }) {
-                    Text(this.title(event)).fontSize(15).fontWeight(FontWeight.Medium).fontColor(Constants.COLOR_TEXT_PRIMARY)
-                    Text(this.detail(event)).fontSize(12).fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    Text(this.title(event))
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                    Text(this.detail(event))
+                      .fontSize(12)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .layoutWeight(1)
                   .alignItems(HorizontalAlign.Start)
-                  Column({ space: 3 }) {
-                    Text(event.timestamp.slice(5, 10)).fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
-                    Text(event.timestamp.slice(11, 16)).fontSize(10).fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
-                  }
+                  Text(event.timestamp.slice(11, 16))
+                    .fontSize(11)
+                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   if (event.courseId !== undefined) {
-                    SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
+                    SymbolGlyph($r('sys.symbol.chevron_right'))
+                      .fontSize(15)
+                      .fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
                   }
                 }
                 .width('100%')
-                .height(74)
+                .constraintSize({ minHeight: 76 })
+                .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+                .backgroundColor(Constants.COLOR_BG_CARD)
+                .borderRadius(Constants.RADIUS_LG)
                 .onClick((): void => { this.openEvent(event); })
-                if (index < this.events.length - 1) {
-                  Divider().color(Constants.COLOR_BORDER).margin({ left: 32 })
-                }
               }
               .width('100%')
             }
           })
         }
         .width('100%')
+        .height('100%')
         .layoutWeight(1)
-        .padding({ left: 18, right: 18, bottom: 24 })
-        .backgroundColor(Constants.COLOR_BG_CARD)
+        .padding({ left: 16, right: 16, bottom: 24 })
         .scrollBar(BarState.Off)
       }
     }
