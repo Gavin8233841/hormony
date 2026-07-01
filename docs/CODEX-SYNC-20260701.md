@@ -399,3 +399,167 @@ Codex 在 `a24219b` 提交中创建了：
 ### API 文档
 - `docs/api-spec.md` — API 接口规范
 - `docs/DEPLOYMENT-GUIDE.md` — 含 API 端点清单
+
+---
+
+## ⚠️ 资产更新通知（2026-07-01 22:27 CST）
+
+> **Codex 必读**：Trae 已完成前端资源调研，方向已调整为鸿蒙端侧原生资源。
+> 下列内容是调研记录，不是安装指令；最终采用结论见 `docs/FRONTEND-RESOURCE-ADOPTION.md`。
+
+### 调研概述
+
+Trae 派出14个子代理执行全面调研（10个Web前端 + 4个鸿蒙端侧），用户审查后否决了大部分Web资源（Zustand/Comlink/BlurHash/SpinKit/confetti等），仅保留@ohos/lottie方向和3份Lottie动画JSON素材。方向已调整为鸿蒙端侧原生资源。
+
+### 新增资产
+
+| 资产 | 位置 | 说明 |
+|------|------|------|
+| **资产清单文档** | `docs/ASSET-INVENTORY.md` | 完整的鸿蒙端侧资源清单，含ohpm安装命令、ArkUI集成方法、竞赛创新策略 |
+| SVG图标包 | `assets/frontend-resources/icons/` | 37个教育主题SVG图标（Tabler 31个 + Phosphor 6个），MIT许可证 |
+| Lottie动画JSON | `assets/frontend-resources/animations/` | 3个动画文件（成功对勾、进度填充、奖杯庆祝），待@ohos/lottie真机验证 |
+| Web端CSS/库模板 | `assets/frontend-resources/css/` `libs/` | Web端专用，HAP不使用（用户已否决） |
+
+### Codex 需关注的核心发现
+
+#### 推荐引入的ohpm三方库
+
+| 优先级 | 包名 | 用途 | 版本 |
+|--------|------|------|------|
+| P0 | `@ohos/lottie-turbo` | 声明式Lottie动画（官方推荐替代@ohos/lottie） | V1.0.12 |
+| P0 | `@ohos/mpchart` | 学习数据可视化（7种图表） | - |
+| P0 | `@ohos/axios` | Promise网络请求 | - |
+| P0 | `@pura/harmony-utils` | 综合工具库（日期/加密/JSON/首选项/扫码） | V1.3.3 |
+| P0 | `@ohos/imageknife` | 图片加载缓存 | - |
+| P1 | `@pura/harmony-dialog` | 17种弹窗类型 | V1.1.8 |
+| P1 | `@luvi/lv-markdown-in` | Markdown渲染+代码高亮+流式（AI对话必需） | V3.4.4 |
+| P1 | `@ohmos/calendar` | 学习计划日历 | V2.1.4 |
+| P1 | `@ohos/pulltorefresh` | 下拉刷新/上拉加载 | V2.0.1 |
+
+#### ArkUI原生能力（无需第三方库）
+
+- **Particle粒子动画**（API 12+）：测验全对烟花、成就解锁金粉
+- **springMotion弹簧物理**（API 9+）：卡片弹性弹出、拖拽跟随
+- **geometryTransition一镜到底**（API 11+）：卡片点击展开详情
+- **keyframeAnimateTo关键帧**（API 11+）：成就解锁多段动画
+- **DataPanel/Gauge/Progress**：原生数据可视化
+- **@ObservedV2/@Trace**（API 12+）：精细状态管理V2
+- **AttributeModifier/AttributeUpdater**（API 11+/12+）：动态样式
+
+#### 竞赛核心创新方向（端侧AI + 分布式）
+
+竞赛明确聚焦"HarmonyOS端侧AI + 全场景分布式核心技术"。推荐创新叙事：
+
+> **"端侧AI驱动的无边界学习"**
+
+1. **拍照学**：Core Vision Kit OCR（端侧，拍照教材→知识卡片，创新5/难度2）
+2. **听学/说学**：Core Speech Kit TTS/ASR（端侧离线，创新5/难度2）
+3. **跨设备学**：distributedKVStore + 跨端迁移（API 12+免权限，创新5/难度3）
+4. **系统级学**：Intents Kit/小艺智能体（需白名单，创新5/难度4）
+5. **沉浸式学**：分屏多窗口 + Particle粒子 + 毛玻璃（创新4/难度3）
+
+**最高性价比路线**：OCR + TTS + 分布式KVStore + 跨端迁移 + 服务卡片 + 代理提醒 = 创新分28/难度14
+
+### 验证待办（Codex 需执行）
+
+- [ ] `@ohos/lottie-turbo` 在API 12环境 `ohpm install` 验证
+- [ ] 3个Lottie JSON在真机/模拟器渲染验证（注意：5.0真机有无法播放的报告）
+- [ ] `@ohos/mpchart` 雷达图在Profile页集成验证
+- [ ] `@luvi/lv-markdown-in` 流式Markdown在Chat页集成验证
+- [ ] Core Vision Kit OCR 真机验证（不支持模拟器）
+- [ ] Core Speech Kit TTS 真机验证
+- [ ] distributedKVStore 跨设备同步验证（需多设备）
+
+### 注意事项
+
+1. **Web资源已否决**：`assets/frontend-resources/css/` 和 `libs/` 目录中的Web端资源（Zustand/Comlink/BlurHash/SpinKit CSS）已被用户否决，不纳入HAP依赖。保留在工作区仅供参考。
+2. **@ohos/lottie真机风险**：搜索显示5.0真机存在Lottie无法播放的报告，引入前务必在目标真机实测。建议优先使用@ohos/lottie-turbo。
+3. **品牌色约束**：所有新增UI必须使用 `#0a59f7`，禁止 `#007DFF`。
+4. **不涉及Git提交**：本次工作未提交Git，所有新增文件待Codex审查。
+
+---
+
+## ⚠️ ohpm包源验证与评估结果（2026-07-01 22:38 CST）
+
+> **Codex 必读**：Trae 已完成全部11个ohpm包的 `ohpm info` 验证和3个Lottie JSON格式验证。以下为验证结果和可靠性/可用性/创新性评估。
+
+### 包源验证结果
+
+| 包名 | 实际最新版 | 许可证 | 最近发布 | 版本数 | 验证状态 |
+|------|-----------|--------|---------|--------|---------|
+| `@ohos/lottie` | 2.0.31 | MIT | 11个月前 | 107 | ✅ 可用，稳定版较旧 |
+| `@ohos/lottie-turbo` | 1.0.12 | Apache-2.0 | 1个月前 | 39 | ✅ 可用，活跃维护 |
+| `@ohos/mpchart` | 3.0.28 | Apache-2.0 | **~2年前** | 64 | ⚠️ 可用但稳定版维护停滞 |
+| `@luvi/lv-markdown-in` | 3.4.4 | MIT | **6天前** | 58 | ✅ 可用，非常活跃 |
+| `@ohos/axios` | 2.2.10 | MIT | 1个月前 | 39 | ✅ 可用 |
+| `@pura/harmony-utils` | **1.4.1** | Apache-2.0 | 1个月前 | 33 | ✅ 可用（版本高于此前报告） |
+| `@ohos/imageknife` | 3.2.9 | Apache-2.0 | - | 95 | ✅ 可用 |
+| `@pura/harmony-dialog` | 1.1.8 | Apache-2.0 | 9个月前 | 19 | ✅ 可用 |
+| `@ohmos/calendar` | 2.1.4 | Apache-2.0 | >1年前 | 7 | ⚠️ 维护停滞 |
+| `@ohos/pulltorefresh` | **3.0.1** | Apache-2.0 | 1个月前 | 20 | ✅ 可用（版本高于此前报告） |
+
+### Lottie JSON 验证结果
+
+3个文件全部通过 `ConvertFrom-Json` 验证，Lottie schema v5.7.4：
+- `checkmark-success.json`: 200x200, 3层, 60帧/2秒 ✅
+- `learning-progress.json`: 320x80, 3层, 90帧/3秒 ✅
+- `trophy-celebration.json`: 200x200, 10层, 75帧/2.5秒 ✅
+
+### 项目现状确认
+
+- API版本: `5.0.0(12)` — API 12
+- **当前ohpm依赖: 零**（oh-package.json5 dependencies为空）
+- Chat.ets: **无Markdown渲染**（纯文本），仅用LoadingProgress
+- Profile.ets: **无任何数据可视化**（无DataPanel/Gauge/Chart）
+- Quiz.ets: 使用原生Progress(Linear)，无动画
+
+### Trae 评估结论（可靠性/可用性/创新性）
+
+#### 第一优先级 — 立即可引入
+
+1. **`@luvi/lv-markdown-in`** — 可靠性5/可用性5/创新性4
+   - Chat.ets当前无Markdown渲染，AI回复纯文本展示，**急需补强**
+   - 流式渲染完美匹配AI对话SSE场景
+   - 6天前发布，58个版本，非常活跃
+   - ⚠️ 3个依赖链需验证兼容性
+
+2. **`@ohos/lottie-turbo`** — 可靠性4/可用性5/创新性3
+   - 3个Lottie JSON已就绪待渲染
+   - 声明式LottieView，比@ohos/lottie更适配ArkUI
+   - ⚠️ native .so需真机架构验证；5.0真机有Lottie播放问题报告
+
+#### 第二优先级 — 推荐引入
+
+3. **`@pura/harmony-utils`** — 可靠性5/可用性5/创新性1
+   - 零依赖，V1.4.1，日期/加密/JSON/首选项/扫码
+
+4. **`@pura/harmony-dialog`** — 可靠性4/可用性5/创新性1
+   - 17种弹窗，一行代码调用
+
+#### 第三优先级 — 需评估必要性
+
+5. **`@ohos/mpchart`** — ⚠️ 稳定版近2年未更新。建议**先试原生DataPanel/Gauge**
+6. **`@ohos/axios`** — 项目已有HttpClient.ets，替换涉及API契约边界（受保护）
+7. **`@ohmos/calendar`** — 维护停滞，建议评估原生自实现
+8. **`@ohos/imageknife`** — 项目图片量不大，可暂缓
+9. **`@ohos/pulltorefresh`** — 列表场景不多，可暂缓
+
+#### 免依赖竞赛加分项 — 立即可用（无需ohpm install）
+
+| 能力 | API版本 | 创新性 | 鸿学伴场景 |
+|------|---------|--------|-----------|
+| **Particle粒子动画** | 12+ | 4/5 | 测验全对烟花、成就金粉 |
+| springMotion弹簧物理 | 9+ | 3/5 | 卡片弹性交互 |
+| geometryTransition一镜到底 | 11+ | 3/5 | 卡片展开详情 |
+| DataPanel/Gauge数据展示 | 7+/8+ | 2/5 | Profile页学习进度 |
+
+> **关键发现**：Profile.ets当前无任何数据可视化组件，连原生DataPanel/Gauge都未使用。建议优先用原生组件补强。
+
+### Codex 需执行的真机验证
+
+以下待办Trae无法完成（需真机/多设备）：
+
+- [ ] `@ohos/lottie-turbo` 在真机安装并渲染3个Lottie JSON
+- [ ] Core Vision Kit OCR 真机验证（不支持模拟器）
+- [ ] Core Speech Kit TTS 真机验证
+- [ ] distributedKVStore 跨设备同步验证（需多设备）

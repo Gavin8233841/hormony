@@ -4160,3 +4160,393 @@ Agent 模块端到端验证全部通过——Vercel 部署修复 + 三个 AI 功
 - 模型题目结构收紧为固定 4 个选项、A-D 答案和非空解析；不合格结果统一按 `MODEL_INVALID_RESPONSE` 拒绝，不向 App 下发残缺题目。
 - 新增 API 契约测试覆盖错误选项数和错误答案字母；`pnpm lint`、`pnpm typecheck`、`pnpm test` 通过，9 个测试文件、86 项测试通过。
 
+---
+
+## [2026-07-01T14:27:24Z] [2026-07-01 22:27 CST] 模型: Trae (Claude in TRAE Work)
+
+### 操作
+
+前端资源调研（14个子代理）+ 方向调整 + 鸿蒙端侧资产下载 + 资产清单创建
+
+#### 调研范围
+
+派出14个子代理执行全面调研：
+- Wave 1-4（10个子代理）：Web前端资源搜索（动画/可视化/UI/教育交互/手势/创意编码/图标/加载/鸿蒙适配/性能优化）
+- Wave 5-8（4个子代理）：鸿蒙端侧原生资源搜索（OpenHarmony-TPC生态/ohpm包/ArkUI原生能力/HMS AI+分布式SDK）
+
+#### 用户审查结果
+
+用户否决了大部分Web资源（Zustand/Comlink/BlurHash/SpinKit CSS/canvas-confetti/React生态库），理由是对独立HAP无价值。仅保留@ohos/lottie方向和3份Lottie动画JSON素材，前提是包源恢复、素材渲染及性能实测通过。方向调整为搜索鸿蒙端侧原生资源。
+
+#### 鸿蒙端侧核心发现
+
+**ohpm三方库（P0核心必选）**：
+- `@ohos/lottie-turbo` V1.0.12（Apache-2.0，声明式LottieView，+30%性能，官方推荐替代@ohos/lottie）
+- `@ohos/mpchart`（Apache-2.0，7种图表，学习数据可视化）
+- `@ohos/axios`（MIT，Promise网络请求）
+- `@pura/harmony-utils` V1.3.3（Apache-2.0，综合工具库）
+- `@ohos/imageknife`（MIT，图片加载缓存）
+
+**ohpm三方库（P1强烈推荐）**：
+- `@pura/harmony-dialog` V1.1.8（17种弹窗类型，334 Likes）
+- `@luvi/lv-markdown-in` V3.4.4（MIT，Markdown+代码高亮+数学公式+流式渲染，AI对话必需）
+- `@ohmos/calendar` V2.1.4（日历组件，学习计划日历）
+- `@ohos/pulltorefresh` V2.0.1（下拉刷新/上拉加载）
+
+**ArkUI原生能力（无需第三方库）**：
+- Particle粒子动画（API 12+，测验庆祝烟花）
+- springMotion弹簧物理动画（API 9+，卡片弹性交互）
+- geometryTransition一镜到底（API 11+，卡片展开详情）
+- keyframeAnimateTo关键帧（API 11+，成就解锁多段动画）
+- DataPanel/Gauge/Progress原生数据可视化
+- @ObservedV2/@Trace状态管理V2（API 12+）
+- AttributeModifier/AttributeUpdater动态样式
+
+**HarmonyOS端侧AI能力（竞赛核心创新）**：
+- Core Vision Kit OCR（端侧，拍照教材→知识卡片，创新5/难度2）
+- Core Speech Kit TTS（端侧离线，AI内容语音朗读，创新5/难度2）
+- Core Speech Kit ASR（端侧离线，语音提问，创新4/难度3）
+- Intents Kit/小艺智能体（系统级意图，创新5/难度4）
+
+**HarmonyOS分布式能力（竞赛核心创新）**：
+- distributedKVStore（API 12+免权限，学习进度跨设备同步，创新5/难度3）
+- 跨端迁移continuationManager（API 12+免权限，测验跨设备接续，创新5/难度3）
+
+**竞赛创新叙事建议**："端侧AI驱动的无边界学习" = 拍照学(OCR) + 听学/说学(TTS/ASR) + 跨设备学(分布式) + 系统级学(小艺) + 沉浸式学(分屏+粒子)
+
+#### 下载到工作区的资产
+
+| 资产 | 文件数 | 大小 | 位置 | 状态 |
+|------|--------|------|------|------|
+| SVG图标（Tabler+Phosphor） | 37个 | ~20KB | `assets/frontend-resources/icons/` | 可用于ArkUI Image组件 |
+| Lottie动画JSON | 3个 | ~23KB | `assets/frontend-resources/animations/` | 待@ohos/lottie真机验证 |
+| canvas-confetti库 | 1个 | 10.6KB | `assets/frontend-resources/animations/` | 仅Web端，HAP不使用 |
+| CSS动画（SpinKit+Skeleton） | 2个 | ~21KB | `assets/frontend-resources/css/` | 仅Web端，HAP不使用 |
+| 库配置模板 | 4个 | ~63KB | `assets/frontend-resources/libs/` | 仅Web端，HAP不使用 |
+| README说明文档 | 5个 | ~50KB | 各子目录 | 含ArkUI集成方法 |
+
+总计52个文件，184.7KB
+
+#### 涉及文件
+
+- 新建 `docs/ASSET-INVENTORY.md` — 完整资产清单文档（含ohpm安装命令、ArkUI集成方法、竞赛创新策略）
+- 新建 `assets/frontend-resources/icons/` — 37个SVG图标（Tabler 31个 + Phosphor 6个）
+- 新建 `assets/frontend-resources/animations/` — 3个Lottie JSON + canvas-confetti + 示例代码
+- 新建 `assets/frontend-resources/css/` — SpinKit + Skeleton CSS
+- 新建 `assets/frontend-resources/libs/` — Zustand/web-vitals/Comlink/BlurHash配置模板
+- 更新 `DEVLOG.md` — 本条目
+- 更新 `docs/CODEX-SYNC-20260701.md` — 追加资产更新同步信息
+
+#### 未提交Git
+
+本次工作不涉及Git提交（遵守用户约束）。所有新增文件在工作区中待Codex审查。
+
+#### 验证待办
+
+- [ ] @ohos/lottie-turbo 在API 12环境安装验证
+- [ ] 3个Lottie JSON在真机/模拟器渲染验证
+- [ ] @ohos/mpchart 雷达图集成验证
+- [ ] @luvi/lv-markdown-in 流式Markdown验证
+- [ ] Core Vision Kit OCR 真机验证（不支持模拟器）
+- [ ] Core Speech Kit TTS 真机验证
+
+---
+
+## [2026-07-01T06:39:00Z] [2026-07-01 14:39 CST] 模型: Trae (Codex 审查后续作)
+
+### 背景
+
+Codex 审查指出此前工作的三项错误：
+1. 模型名误判：`doubao-seed-2-1-pro-260628` 是有效模型，认证错误不等于模型不存在
+2. `withAgentTimeout` 不完善：未覆盖 Profile/Safety，未清理定时器，未取消 HTTP 请求。Codex 已用 `AbortSignal` 在 `model.ts` 统一实现
+3. 终端回显 Vercel Token：违反安全边界
+
+Codex 已在提交 `0109836` 和 `1606cff` 中修复模型名恢复和 Quiz Agent RAG 接入。
+
+### 本轮工作
+
+| 操作 | 说明 |
+|------|------|
+| 读取 Codex 交接文档 | `docs/CODEX-HANDOFF.md`、`docs/CODEX-SYNC-20260701.md`、`docs/TRAE-CONTINUATION-20260701.md` |
+| 核查 Codex 修复项 | model.ts 模型名已恢复为 `doubao-seed-2-1-pro-260628` ✅；quiz-agent.ts 已接入 RAG (`retrieve()` + `formatContext()`) ✅；orchestrator.ts 已移除 `withAgentTimeout`，改用 `AbortSignal` ✅ |
+| 修正 Vercel MODEL_NAME | 通过 Vercel API 删除旧值（我之前错误设置的 `doubao-seed-1-6-250615`），重新创建为正确的 `doubao-seed-2-1-pro-260628`（production+preview+development 三个环境） |
+| 触发生产部署 | `dpl_FQp3qwuc78Sw4SifdP5ryn4PeNBX` |
+| 编写边界文档 | `docs/TRAE-BOUNDARY-20260701.md` — 记录禁止修改区域、安全规范、工作流程 |
+
+### 验证结果
+
+验证命令与结果（Vercel Token 通过环境变量传递，未在任何输出中回显）：
+
+| 验证项 | 命令 | 退出码 | 结果 |
+|--------|------|--------|------|
+| TSC | `npx tsc --noEmit` | 0 | 0 errors |
+| 单元测试 | `npx vitest run` | 0 | 9 files, 86 tests passed |
+| Health | `GET /api/health` | 200 | `status:ready, model.name:doubao-seed-2-1-pro-260628, version:1.0.1` |
+| Chat SSE | `POST /api/chat` | 200 | 12.43s 完成；Profile→Retrieval→Tutor→Safety→Delta→3 Citations→Done；内容为二叉搜索树完整讲解 |
+| Quiz | `POST /api/quiz` | 200 | 11.92s 完成；3 道选择题，A-D 选项格式，含答案和解析，基于课程材料出题（RAG 生效） |
+| Plan | `POST /api/plan` | 200 | 10.75s 完成；10 个任务（14 天计划），含 reading/practice/review/quiz 四种类型 |
+
+### 安全说明
+
+- Vercel Token 仅通过 `os.environ["VERCEL_TOKEN"]` 读取，脚本输出中不包含 Token 值
+- DEVLOG 中只记录"已配置"状态，不记录任何凭证值
+- `docs/TRAE-BOUNDARY-20260701.md` 已明确禁止在终端输出中回显 Token
+
+### 受保护区域确认
+
+以下文件本轮未修改（由 Codex 负责维护）：
+- `apps/web/src/lib/agents/model.ts` — Codex 已恢复正确模型名
+- `apps/web/src/lib/agents/orchestrator.ts` — Codex 已移除 withAgentTimeout
+- `apps/web/src/lib/agents/quiz-agent.ts` — Codex 已接入 RAG
+- `apps/web/src/app/api/` — 未修改
+- `apps/harmonyos/` 所有页面 — 未修改
+
+### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `docs/TRAE-BOUNDARY-20260701.md` | Trae 工作边界与操作规范文档 |
+
+### 下一步
+
+按 `docs/TRAE-CONTINUATION-20260701.md` 任务包顺序执行 P2 数据施工（B→C→A→E→D）。
+
+---
+
+---
+
+## [2026-07-01T14:38:05Z] [2026-07-01 22:38 CST] 模型: Trae (Claude in TRAE Work)
+
+### 操作
+
+ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性评估
+
+#### 验证方法
+
+使用 `ohpm info` 命令逐个验证11个推荐包的包源可用性、版本、许可证、发布时间、依赖链。使用 PowerShell `ConvertFrom-Json` 验证3个Lottie JSON文件格式有效性。读取项目 `build-profile.json5` 确认 API 12，读取 `oh-package.json5` 确认当前无任何依赖，读取 Chat.ets/Profile.ets/Quiz.ets 确认现有UI实现水平。
+
+#### ohpm包源验证结果
+
+| 包名 | 最新稳定版 | 许可证 | 最近发布 | 版本数 | 依赖数 | 状态 |
+|------|-----------|--------|---------|--------|--------|------|
+| `@ohos/lottie` | 2.0.31 | MIT | 11个月前 | 107 | 0 | ✅ 可用，但稳定版较旧（V3.0.0-rc.17预发布） |
+| `@ohos/lottie-turbo` | 1.0.12 | Apache-2.0 | 1个月前 | 39 | 1(native .so) | ✅ 可用，活跃维护 |
+| `@ohos/mpchart` | 3.0.28 | Apache-2.0 | ~2年前 | 64 | 0 | ⚠️ 可用但稳定版维护停滞（V3.1.0-rc.0预发布） |
+| `@luvi/lv-markdown-in` | 3.4.4 | MIT | **6天前** | 58 | 3 | ✅ 可用，非常活跃 |
+| `@ohos/axios` | 2.2.10 | MIT | 1个月前 | 39 | 0 | ✅ 可用，活跃维护 |
+| `@pura/harmony-utils` | **1.4.1** | Apache-2.0 | 1个月前 | 33 | 0 | ✅ 可用，活跃维护（版本高于子代理报告的1.3.3） |
+| `@ohos/imageknife` | 3.2.9 | Apache-2.0 | - | 95 | 1 | ✅ 可用，成熟 |
+| `@pura/harmony-dialog` | 1.1.8 | Apache-2.0 | 9个月前 | 19 | 1 | ✅ 可用，稳定 |
+| `@ohmos/calendar` | 2.1.4 | Apache-2.0 | >1年前 | 7 | 1 | ⚠️ 可用但维护停滞 |
+| `@ohos/pulltorefresh` | **3.0.1** | Apache-2.0 | 1个月前 | 20 | 0 | ✅ 可用（版本高于子代理报告的V2.0.1） |
+| `@pura/spinkit` | - | - | - | - | - | ✅ 可用（作为harmony-dialog依赖） |
+
+> 注：`@pura/harmony-utils` 实际最新版为 V1.4.1（非子代理报告的V1.3.3），`@ohos/pulltorefresh` 实际最新版为 V3.0.1（非子代理报告的V2.0.1）。
+
+#### Lottie JSON格式验证结果
+
+```
+[PASS] checkmark-success.json (5.1KB) - v=5.7.4 fr=30 ip=0 op=60 w=200 h=200 layers=3
+[PASS] learning-progress.json (4.2KB) - v=5.7.4 fr=30 ip=0 op=90 w=320 h=80 layers=3
+[PASS] trophy-celebration.json (13.7KB) - v=5.7.4 fr=30 ip=0 op=75 w=200 h=200 layers=10
+```
+
+3个文件全部通过 JSON 解析验证，Lottie schema v5.7.4 兼容 @ohos/lottie 和 @ohos/lottie-turbo。
+
+#### 项目现状确认
+
+- `build-profile.json5`: `compatibleSdkVersion: "5.0.0(12)"`, `targetSdkVersion: "5.0.0(12)"` — API 12 确认
+- `oh-package.json5` (项目级和entry级): **dependencies 为空** — 当前无任何ohpm依赖
+- `Chat.ets`: 无Markdown渲染（纯文本），仅用 `LoadingProgress`
+- `Profile.ets`: 无图表、无DataPanel、无Gauge
+- `Quiz.ets`: 使用原生 `Progress(Linear)` 进度条，无动画
+
+#### 资源可靠性/可用性/创新性评估
+
+##### 1. @ohos/lottie-turbo（推荐引入 P0）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 4/5 | V1.0.12，Apache-2.0，39个版本，1个月前发布，官方TPC维护。但依赖native .so（C++编译），需验证arm64/x86架构兼容 |
+| 可用性 | 5/5 | 声明式LottieView组件，自动销毁，$rawfile()加载，代码量减半。比@ohos/lottie命令式API更适配ArkUI范式 |
+| 创新性 | 3/5 | 动画体验提升，但非竞赛核心创新。竞赛创新在于端侧AI和分布式，动画是锦上添花 |
+| 风险 | ⚠️ | 1. native .so需真机架构验证 2. 搜索报告5.0真机Lottie播放问题，需在Pura 90 Pro Max模拟器和真机分别测试 |
+
+##### 2. @ohos/lottie（备选 P1）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 4/5 | V2.0.31，MIT，107个版本（最多），但稳定版11个月未更新。V3.0.0-rc.17预发布 |
+| 可用性 | 3/5 | 命令式API，需手动管理Canvas和生命周期，代码量多于lottie-turbo |
+| 创新性 | 3/5 | 同lottie-turbo |
+| 风险 | ⚠️ | 5.0真机有无法播放报告。作为lottie-turbo的备选方案 |
+
+##### 3. @ohos/mpchart（谨慎引入 P1）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 3/5 | V3.0.28，Apache-2.0，64个版本，但**稳定版近2年未更新**。V3.1.0-rc.0预发布 |
+| 可用性 | 4/5 | 7种图表，Canvas绘制，手势交互，功能完整 |
+| 创新性 | 2/5 | 图表是基础数据展示功能，非创新亮点。竞赛创新在于AI能力而非数据可视化 |
+| 风险 | ⚠️ | 维护停滞风险。建议先评估ArkUI原生DataPanel/Gauge/Canvas是否满足需求，若满足则不引入此库 |
+
+##### 4. @luvi/lv-markdown-in（强烈推荐 P0）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 5/5 | V3.4.4，MIT，58个版本，**6天前发布**，非常活跃维护 |
+| 可用性 | 5/5 | 流式渲染（完美适配AI对话SSE），代码高亮，LaTeX数学公式，70+样式API |
+| 创新性 | 4/5 | AI对话内容Markdown渲染是刚需，当前Chat.ets无Markdown渲染（纯文本）。流式渲染适配AI场景，提升交互体验 |
+| 风险 | ⚠️ | 3个依赖链（@cangjie-tpc/formula_hybrid, @cangjie-tpc/prism_hybrid, @luvi/html2md），需验证依赖兼容性 |
+
+**结论：项目Chat.ets当前无Markdown渲染，AI回复以纯文本展示，这是急需补强的能力。@luvi/lv-markdown-in的流式渲染特性完美匹配SSE场景，强烈推荐。**
+
+##### 5. @ohos/axios（推荐引入 P1）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 5/5 | V2.2.10，MIT，39个版本，1个月前发布，零依赖 |
+| 可用性 | 4/5 | Promise API，拦截器，与Web端一致。但项目已有HttpClient.ets |
+| 创新性 | 1/5 | 基础网络设施 |
+| 风险 | 低 | 但需评估是否替换现有HttpClient.ets（涉及API契约变更，受保护边界约束） |
+
+##### 6. @pura/harmony-utils（推荐引入 P1）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 5/5 | V1.4.1，Apache-2.0，33个版本，1个月前发布，零依赖 |
+| 可用性 | 5/5 | 日期/加密/JSON/首选项/扫码/生物认证，覆盖面广 |
+| 创新性 | 1/5 | 基础工具设施 |
+| 风险 | 低 | |
+
+##### 7. @pura/harmony-dialog（推荐引入 P1）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 4/5 | V1.1.8，Apache-2.0，19个版本，9个月前发布。稳定但更新频率低 |
+| 可用性 | 5/5 | 17种弹窗类型，一行代码调用，334 Likes |
+| 创新性 | 1/5 | 基础UI设施 |
+| 风险 | 低 | 1个依赖(@pura/spinkit) |
+
+##### 8. @ohmos/calendar（谨慎引入 P2）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 2/5 | V2.1.4，Apache-2.0，仅7个版本，超过1年未更新。维护状态不确定 |
+| 可用性 | 3/5 | 日历+打卡标记，功能基础 |
+| 创新性 | 1/5 | 基础功能 |
+| 风险 | ⚠️ | 维护停滞。建议评估ArkUI自实现日历组件的可行性 |
+
+##### 9. @ohos/pulltorefresh（按需引入 P2）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 5/5 | V3.0.1，Apache-2.0，20个版本，1个月前发布，零依赖 |
+| 可用性 | 4/5 | 下拉刷新/上拉加载，支持LazyForEach |
+| 创新性 | 1/5 | 基础交互设施 |
+| 风险 | 低 |
+
+##### 10. @ohos/imageknife（按需引入 P2）
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 可靠性 | 5/5 | V3.2.9，Apache-2.0，95个版本，成熟 |
+| 可用性 | 4/5 | 图片加载缓存，类似Glide |
+| 创新性 | 1/5 | 基础设施 |
+| 风险 | 低 | 1个依赖(@ohos/gpu_transform) |
+
+#### ArkUI原生能力评估（免依赖，竞赛加分）
+
+| 能力 | 可靠性 | 可用性 | 创新性 | 鸿学伴场景 |
+|------|--------|--------|--------|-----------|
+| Particle粒子动画(API 12+) | 5/5 原生 | 4/5 | **4/5** | 测验全对烟花、成就解锁金粉——**免依赖竞赛加分项** |
+| springMotion(API 9+) | 5/5 原生 | 5/5 | 3/5 | 卡片弹性交互、拖拽跟随 |
+| geometryTransition(API 11+) | 5/5 原生 | 4/5 | 3/5 | 卡片一镜到底展开详情 |
+| keyframeAnimateTo(API 11+) | 5/5 原生 | 4/5 | 3/5 | 成就解锁多段动画 |
+| @ObservedV2/@Trace(API 12+) | 5/5 原生 | 4/5 | 2/5 | 精细状态管理，减少不必要重渲染 |
+| DataPanel/Gauge(API 7+/8+) | 5/5 原生 | 5/5 | 2/5 | 学习进度环形展示、掌握度仪表盘 |
+
+> **关键发现**：鸿学伴Profile.ets当前无任何数据可视化组件，连原生DataPanel/Gauge都未使用。建议优先用原生组件补强，再考虑引入@ohos/mpchart。
+
+#### 无法验证的待办（需真机/多设备）
+
+| 待办 | 原因 | 建议执行方 |
+|------|------|-----------|
+| Core Vision Kit OCR | 不支持模拟器，需真机 | Codex在真机执行 |
+| Core Speech Kit TTS | 需真机验证离线TTS | Codex在真机执行 |
+| distributedKVStore跨设备同步 | 需多设备组网 | Codex在多设备环境执行 |
+
+#### 综合优先级建议（基于验证结果调整）
+
+**第一优先级（立即可引入，低风险高价值）**：
+1. `@luvi/lv-markdown-in` — Chat.ets急需Markdown渲染，流式适配SSE，6天前更新
+2. `@ohos/lottie-turbo` — 3个Lottie JSON已就绪，声明式API，需真机验证渲染
+
+**第二优先级（推荐引入，基础能力补强）**：
+3. `@pura/harmony-utils` — 零依赖工具库，日期/加密/首选项
+4. `@pura/harmony-dialog` — 17种弹窗，简化UI开发
+
+**第三优先级（需评估是否必要）**：
+5. `@ohos/mpchart` — 稳定版2年未更新，建议先试原生DataPanel/Gauge
+6. `@ohos/axios` — 项目已有HttpClient.ets，替换涉及API契约边界
+7. `@ohmos/calendar` — 维护停滞，建议评估原生自实现
+8. `@ohos/imageknife` — 项目图片量不大，可暂缓
+9. `@ohos/pulltorefresh` — 列表场景不多，可暂缓
+
+**免依赖竞赛加分项（立即可用）**：
+- Particle粒子动画 — 测验庆祝效果，API 12+原生
+- springMotion — 弹性交互，API 9+原生
+- geometryTransition — 一镜到底，API 11+原生
+- DataPanel/Gauge — 学习数据展示，API 7+/8+原生
+
+#### 涉及文件
+
+- 更新 `DEVLOG.md` — 本条目
+- 更新 `docs/CODEX-SYNC-20260701.md` — 追加验证结果和评估
+- 更新 `docs/ASSET-INVENTORY.md` — 补充验证状态
+
+#### 命令与退出码
+
+| 命令 | 退出码 | 结果 |
+|------|--------|------|
+| `ohpm info @ohos/lottie` | 0 | V2.0.31, MIT, 107 versions |
+| `ohpm info @ohos/lottie-turbo` | 0 | V1.0.12, Apache-2.0, 39 versions |
+| `ohpm info @ohos/mpchart` | 0 | V3.0.28, Apache-2.0, 64 versions |
+| `ohpm info @luvi/lv-markdown-in` | 0 | V3.4.4, MIT, 58 versions |
+| `ohpm info @ohos/axios` | 0 | V2.2.10, MIT, 39 versions |
+| `ohpm info @pura/harmony-utils` | 0 | V1.4.1, Apache-2.0, 33 versions |
+| `ohpm info @ohos/imageknife` | 0 | V3.2.9, Apache-2.0, 95 versions |
+| `ohpm info @pura/harmony-dialog` | 0 | V1.1.8, Apache-2.0, 19 versions |
+| `ohpm info @ohmos/calendar` | 0 | V2.1.4, Apache-2.0, 7 versions |
+| `ohpm info @ohos/pulltorefresh` | 0 | V3.0.1, Apache-2.0, 20 versions |
+| `ConvertFrom-Json` (3个Lottie文件) | 0 | 全部PASS |
+
+#### 未提交Git
+
+本次工作不涉及Git提交（遵守用户约束）。
+
+---
+
+## 2026-07-01 Codex：答题与复盘交互收口、资源采用边界
+
+### 完成内容
+
+- 在 `Builders.ets` 提取统一 `AnswerOption` 与 `ReviewDetailRow`，课程题库和 AI 出题共用同一套选项与复盘交互。
+- 选项改为稳定矩形布局、字母圆标、选中态勾选；修复默认按钮形态导致的胶囊化问题。
+- `Practice.ets` 增加原生环形成绩摘要和可展开逐题复盘，提交后自动展开首道错题。
+- `Quiz.ets` 接入同一复盘组件，保留真实 AI 出题、本地评分和答案隔离边界。
+- `quiz-agent.ts` 强制四个选项依次使用 `A.`、`B.`、`C.`、`D.` 前缀，并新增契约测试，避免端侧解析失配。
+- 新增 `docs/FRONTEND-RESOURCE-ADOPTION.md`，收口 Trae 资源调研：原生优先，Markdown 与 Lottie 独立验证，其余重复依赖不进入 HAP。
+
+### 外部资源状态
+
+- 2026-07-01 本次调用 OHPM 查询 `@luvi/lv-markdown-in` 时官方源返回 HTTP 502，未修改依赖文件，未依据未读取的 API 猜写集成代码。
+- `assets/frontend-resources/` 仍为未审定调研资产，本次不纳入 Git。
+
+### 验证
+
+- `pnpm lint`：通过，无 ESLint 警告或错误。
+- `pnpm typecheck`：通过，0 个 TypeScript 错误。
+- `pnpm test`：通过，9 个测试文件、87 项测试。
+- `apps/harmonyos/hvigorw.bat assembleHap --no-daemon`：`BUILD SUCCESSFUL in 17 s 564 ms`；未配置签名，debug HAP 跳过签名。
+

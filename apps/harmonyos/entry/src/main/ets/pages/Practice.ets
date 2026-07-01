@@ -1,4 +1,4 @@
-import { GradientHeader } from '../common/Builders';
+import { AnswerOption, GradientHeader, ReviewDetailRow } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -29,6 +29,7 @@ struct PracticePage {
   @State saving: boolean = false;
   @State correctCount: number = 0;
   @State details: QuizResultDetail[] = [];
+  @State expandedDetailId: string = '';
   @State message: string = '';
 
   aboutToAppear(): void {
@@ -95,6 +96,7 @@ struct PracticePage {
       await LocalLearningRepository.appendQuizResult(result);
       this.correctCount = totalCorrect;
       this.details = nextDetails;
+      this.expandedDetailId = nextDetails.find((detail: QuizResultDetail): boolean => !detail.isCorrect)?.questionId ?? '';
       this.submitted = true;
     } catch (error) {
       this.message = '答题记录保存失败，请重试';
@@ -138,15 +140,7 @@ struct PracticePage {
         .lineHeight(27)
       Column({ space: 10 }) {
         ForEach(this.activeQuestion.options, (option: string): void => {
-          Button(option)
-            .width('100%')
-            .height(56)
-            .fontSize(14)
-            .fontColor(this.activeAnswer === option ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PRIMARY)
-            .backgroundColor(this.activeAnswer === option ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_CARD)
-            .border({ width: 1, color: this.activeAnswer === option ? Constants.COLOR_BRAND : Constants.COLOR_BORDER })
-            .borderRadius(Constants.RADIUS_MD)
-            .onClick((): void => { this.choose(option); })
+          AnswerOption(option, this.activeAnswer === option, (): void => { this.choose(option); })
         })
       }
       .width('100%')
@@ -198,35 +192,56 @@ struct PracticePage {
   @Builder
   ResultView() {
     Column({ space: 16 }) {
-      Text(Math.round(this.correctCount / this.questions.length * 100).toString() + '%')
-        .fontSize(40)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(this.correctCount / this.questions.length >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-      Text(this.correctCount.toString() + ' / ' + this.questions.length.toString() + ' 题正确')
-        .fontSize(16)
-        .fontColor(Constants.COLOR_TEXT_PRIMARY)
-      ForEach(this.details, (detail: QuizResultDetail, index: number): void => {
-        Column({ space: 7 }) {
-          Text((index + 1).toString() + '. ' + detail.stem)
-            .width('100%')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
+      Row({ space: 18 }) {
+        Stack({ alignContent: Alignment.Center }) {
+          Progress({ value: this.correctCount, total: this.questions.length, type: ProgressType.Ring })
+            .width(86)
+            .height(86)
+            .color(this.correctCount / this.questions.length >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+          Text(Math.round(this.correctCount / this.questions.length * 100).toString() + '%')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(detail.isCorrect ? '回答正确' : '正确答案：' + detail.correctAnswer)
-            .width('100%')
-            .fontSize(12)
-            .fontColor(detail.isCorrect ? Constants.COLOR_SUCCESS : Constants.COLOR_ERROR)
-          Text(detail.explanation)
-            .width('100%')
-            .fontSize(12)
-            .lineHeight(20)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
+        Column({ space: 5 }) {
+          Text('本轮已完成')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.correctCount.toString() + ' / ' + this.questions.length.toString() + ' 题正确')
+            .fontSize(14)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.correctCount === this.questions.length ? '已全部掌握，可以继续新主题' : '先复盘错题，再进入下一组')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      .padding(18)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .borderRadius(Constants.RADIUS_LG)
+
+      Text('逐题复盘')
         .width('100%')
-        .padding(15)
-        .backgroundColor(Constants.COLOR_BG_CARD)
-        .borderRadius(Constants.RADIUS_MD)
-      })
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+
+      Column() {
+        ForEach(this.details, (detail: QuizResultDetail, index: number): void => {
+          ReviewDetailRow(detail, index, this.expandedDetailId === detail.questionId, (): void => {
+            this.expandedDetailId = this.expandedDetailId === detail.questionId ? '' : detail.questionId;
+          })
+          if (index < this.details.length - 1) {
+            Divider().color(Constants.COLOR_BORDER).margin({ left: 44 })
+          }
+        })
+      }
+      .width('100%')
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .borderRadius(Constants.RADIUS_LG)
       Button('返回课程')
         .width('100%')
         .height(48)

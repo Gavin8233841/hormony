@@ -60,7 +60,10 @@ function parseQuestions(raw: string, count: number): QuizQuestion[] {
         const answer = typeof q.answer === "string" ? q.answer.trim() : "";
         const explanation =
           typeof q.explanation === "string" ? q.explanation.trim() : "";
-        if (!stem || options.length !== 4 || !/^[A-D]$/i.test(answer) || !explanation) continue;
+        const validOptions = options.length === 4 && options.every((option, index) =>
+          option.toUpperCase().startsWith(`${String.fromCharCode(65 + index)}.`)
+        );
+        if (!stem || !validOptions || !/^[A-D]$/i.test(answer) || !explanation) continue;
         parsed.push({
           id: generateId("q"),
           type: "choice",

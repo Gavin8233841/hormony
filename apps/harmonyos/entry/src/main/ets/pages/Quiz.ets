@@ -2,7 +2,7 @@
  * 课程测验页 - 真实 AI 出题、本地评分与学习记录
  */
 
-import { GradientHeader } from '../common/Builders';
+import { AnswerOption, GradientHeader, ReviewDetailRow } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -34,6 +34,7 @@ struct QuizPage {
   @State resultCorrectCount: number = 0;
   @State resultTotalQuestions: number = 0;
   @State resultDetails: QuizResultDetail[] = [];
+  @State expandedResultId: string = '';
   @State evaluation: string = '';
   @State weakTopics: string[] = [];
   private grading: QuizGradingItem[] = [];
@@ -74,6 +75,7 @@ struct QuizPage {
     this.message = '';
     this.resultReady = false;
     this.resultDetails = [];
+    this.expandedResultId = '';
     this.evaluation = '';
     this.weakTopics = [];
     this.grading = [];
@@ -166,6 +168,7 @@ struct QuizPage {
       this.resultCorrectCount = result.correctCount;
       this.resultTotalQuestions = result.totalQuestions;
       this.resultDetails = result.details;
+      this.expandedResultId = result.details.find((detail: QuizResultDetail): boolean => !detail.isCorrect)?.questionId ?? '';
       this.evaluation = result.evaluation;
       this.weakTopics = result.weakTopics;
       this.resultReady = true;
@@ -295,18 +298,7 @@ struct QuizPage {
 
       Column({ space: 10 }) {
         ForEach(this.questions[this.currentIndex].options ?? [], (option: string): void => {
-          Button(option)
-            .width('100%')
-            .height(54)
-            .fontSize(14)
-            .fontColor(this.currentAnswer === option ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PRIMARY)
-            .backgroundColor(this.currentAnswer === option ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
-            .border({
-              width: this.currentAnswer === option ? 1 : 0,
-              color: Constants.COLOR_BRAND,
-            })
-            .borderRadius(Constants.RADIUS_MD)
-            .onClick(() => { this.chooseAnswer(option); })
+          AnswerOption(option, this.currentAnswer === option, (): void => { this.chooseAnswer(option); })
         })
       }
       .width('100%')
@@ -418,40 +410,19 @@ struct QuizPage {
         .fontWeight(FontWeight.Bold)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
-      ForEach(this.resultDetails, (detail: QuizResultDetail, index: number): void => {
-        Column({ space: 8 }) {
-          Row({ space: 8 }) {
-            SymbolGlyph($r(detail.isCorrect ? 'sys.symbol.checkmark_circle_fill' : 'sys.symbol.xmark_circle_fill'))
-              .fontSize(18)
-              .fontColor([detail.isCorrect ? Constants.COLOR_SUCCESS : Constants.COLOR_ERROR])
-            Text((index + 1).toString() + '. ' + detail.stem)
-              .layoutWeight(1)
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      Column() {
+        ForEach(this.resultDetails, (detail: QuizResultDetail, index: number): void => {
+          ReviewDetailRow(detail, index, this.expandedResultId === detail.questionId, (): void => {
+            this.expandedResultId = this.expandedResultId === detail.questionId ? '' : detail.questionId;
+          })
+          if (index < this.resultDetails.length - 1) {
+            Divider().color(Constants.COLOR_BORDER).margin({ left: 44 })
           }
-          .width('100%')
-          Text('你的答案：' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答'))
-            .width('100%')
-            .fontSize(12)
-            .fontColor(detail.isCorrect ? Constants.COLOR_SUCCESS : Constants.COLOR_ERROR)
-          if (!detail.isCorrect) {
-            Text('正确答案：' + detail.correctAnswer)
-              .width('100%')
-              .fontSize(12)
-              .fontColor(Constants.COLOR_SUCCESS)
-          }
-          Text(detail.explanation)
-            .width('100%')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .lineHeight(20)
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(Constants.COLOR_BG_CARD)
-        .borderRadius(Constants.RADIUS_MD)
-      })
+        })
+      }
+      .width('100%')
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .borderRadius(Constants.RADIUS_LG)
 
       Button('再练一组')
         .width('100%')
