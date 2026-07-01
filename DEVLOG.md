@@ -4638,3 +4638,13 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 卡片仍只读本地计划，不依赖公网模型服务展示；点击进入 App 后再使用真实 Agent。
 - HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 14 s 389 ms`。
 
+---
+
+## 2026-07-01 Codex：147 条端侧知识切片离线检索
+
+- `Knowledge.ets` 接入 `LearningContentRepository`，按当前课程在 147 条打包知识切片中执行确定性关键词筛选。
+- 云端 RAG 无结果或网络失败时最多返回 5 条本地资料，并明确显示“本地课程资料”；不生成文本、不冒充 AI。
+- 本地结果保留真实 `id/courseId/topic/source`，按 Topic、正文、来源命中权重排序。
+- 云端和本地均无结果时保持明确空态；只有两者均失败才显示错误态。
+- HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 14 s 954 ms`。
+

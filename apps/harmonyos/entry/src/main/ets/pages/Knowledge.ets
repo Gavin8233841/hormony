@@ -6,8 +6,14 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
-import { KnowledgeChunk, KnowledgeSearchRequest, KnowledgeSearchResponse } from '../model/DataModels';
+import { LearningContentRepository } from '../common/LearningContentRepository';
+import { CuratedKnowledgeChunk, KnowledgeChunk, KnowledgeSearchRequest, KnowledgeSearchResponse } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+
+interface LocalKnowledgeMatch {
+  chunk: CuratedKnowledgeChunk;
+  score: number;
+}
 
 @Entry
 @Component
@@ -25,6 +31,32 @@ struct KnowledgePage {
 
   get canSearch(): boolean {
     return !this.loading && this.query.trim().length > 0;
+  }
+
+  private searchLocal(query: string): KnowledgeChunk[] {
+    const matches: LocalKnowledgeMatch[] = [];
+    const chunks = LearningContentRepository.getKnowledge(this.courseId);
+    for (const chunk of chunks) {
+      const topic = chunk.topic.toLowerCase();
+      const text = chunk.text.toLowerCase();
+      const source = chunk.source.toLowerCase();
+      let score = 0;
+      if (topic.includes(query)) score += 1;
+      if (text.includes(query)) score += 0.8;
+      if (source.includes(query)) score += 0.3;
+      if (score > 0) matches.push({ chunk: chunk, score: Math.min(score, 1) });
+    }
+    matches.sort((left: LocalKnowledgeMatch, right: LocalKnowledgeMatch): number => right.score - left.score);
+    return matches.slice(0, 5).map((match: LocalKnowledgeMatch): KnowledgeChunk => {
+      return {
+        id: match.chunk.id,
+        text: match.chunk.text,
+        source: match.chunk.source,
+        courseId: match.chunk.courseId,
+        topic: match.chunk.topic,
+        score: match.score
+      };
+    });
   }
 
   private startTopicQuiz(): void {
@@ -282,14 +314,16 @@ struct KnowledgePage {
       const response = await HttpClient.post<KnowledgeSearchResponse>(Constants.API_KNOWLEDGE_SEARCH, JSON.stringify(request));
       this.results = response.chunks;
       if (this.results.length === 0) {
-        this.message = '未找到相关资料，试试更具体的关键词';
+        this.results = this.searchLocal(q);
+        this.message = this.results.length > 0 ? '云端未命中，以下来自本地课程资料' : '未找到相关资料，试试更具体的关键词';
       }
     } catch (e) {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage API failed: %{public}s', (e as Error).message);
-      this.results = [];
-      this.message = '云端检索暂不可用，请检查网络后重试';
-      this.hasError = true;
+      this.results = this.searchLocal(q);
+      this.message = this.results.length > 0 ? '云端检索暂不可用，以下来自本地课程资料' :
+        '云端检索暂不可用，本地课程资料也未命中';
+      this.hasError = this.results.length === 0;
     } finally {
       this.loading = false;
     }
