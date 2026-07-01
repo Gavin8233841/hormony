@@ -26,6 +26,7 @@ export struct ChatContent {
   @State messages: DisplayMessage[] = [];
   @State inputText: string = '';
   @State loading: boolean = false;
+  @State probing: boolean = false;
   @StorageLink('cloudAgentReady') cloudAgentReady: boolean = false;
   @State serviceMessage: string = '正在连接云端学伴';
   private scroller: Scroller = new Scroller();
@@ -91,6 +92,7 @@ export struct ChatContent {
   }
 
   private async probeCloudAgent(): Promise<void> {
+    this.probing = true;
     this.serviceMessage = '正在连接云端学伴';
     try {
       const health = await HttpClient.get<HealthResponse>(Constants.API_HEALTH);
@@ -99,6 +101,8 @@ export struct ChatContent {
     } catch (error) {
       this.cloudAgentReady = false;
       this.serviceMessage = '云端学伴暂不可用';
+    } finally {
+      this.probing = false;
     }
   }
 
@@ -172,6 +176,7 @@ export struct ChatContent {
                 .borderRadius(Constants.RADIUS_LG)
                 .height(44)
                 .padding({ left: 16, right: 16 })
+                .enabled(this.cloudAgentReady && !this.loading)
                 .onClick(() => {
                   this.inputText = s;
                   this.sendMessage();
@@ -202,29 +207,37 @@ export struct ChatContent {
       }
 
       // 输入栏
-      if (!this.cloudAgentReady) {
+      if (this.probing || !this.cloudAgentReady) {
         Row() {
           Text(this.serviceMessage)
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .layoutWeight(1)
-          Button('重试')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_BRAND)
-            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-            .height(32)
-            .onClick((): void => { this.probeCloudAgent(); })
+          if (this.probing) {
+            LoadingProgress().width(18).height(18).color(Constants.COLOR_BRAND)
+          } else {
+            Button('重试')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .height(32)
+              .onClick((): void => { this.probeCloudAgent(); })
+          }
         }
         .width('100%')
         .padding({ left: 18, right: 18, top: 8 })
       }
       Row({ space: 12 }) {
-        TextInput({ text: this.inputText, placeholder: '输入你的问题...' })
+        TextInput({
+          text: this.inputText,
+          placeholder: this.cloudAgentReady ? '输入你的问题...' : '云端学伴连接后可提问'
+        })
           .layoutWeight(1)
           .height(44)
           .fontSize(14)
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(Constants.RADIUS_MD)
+          .enabled(this.cloudAgentReady && !this.loading)
           .onChange((value: string) => {
             this.inputText = value;
           })
@@ -335,6 +348,7 @@ export struct ChatContent {
           last.citations.push(evt.source);
         } else if (evt.type === 'error') {
           last.failed = true;
+          this.cloudAgentReady = false;
           this.serviceMessage = evt.message ?? '云端学伴暂不可用';
         }
 

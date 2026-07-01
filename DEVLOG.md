@@ -4598,3 +4598,13 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前 `doubao-seed-2-1-pro-260628` 已完成四接口真实回归且免费额度充足，本轮不切换生产环境，避免无收益的回归风险。
 - 新增 `docs/MODEL-ROLLOUT-STRATEGY.md`：模型只通过 Vercel `MODEL_NAME` 切换，每次必须重跑 Health/Chat/Plan/Quiz 与端侧闭环，提交前使用通过验收的最高质量模型。
 
+---
+
+## 2026-07-01 Codex：端侧真实 Agent 状态机修正
+
+- `Chat.ets` 增加明确连接中状态：健康检查期间显示原生加载指示，不重复触发重试。
+- 云端未就绪或请求进行中时禁用输入框与推荐问题；占位文字明确说明连接后才能提问。
+- SSE 返回 `error` 事件时立即将 `cloudAgentReady` 置为 false，保证错误横幅与重试入口出现。
+- 失败请求仍删除空助手消息，不保存失败内容，不用本地文本伪装 AI。
+- HarmonyOS 增量构建通过：`BUILD SUCCESSFUL in 15 s 58 ms`。
+
