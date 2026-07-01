@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import type { ChatCompletionCreateParamsNonStreaming } from "openai/resources/chat/completions";
 
 const DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
-const DEFAULT_MODEL_NAME = "doubao-seed-2-1-pro-260628";
+const DEFAULT_MODEL_NAME = "doubao-seed-1-6-250615";
 const DEFAULT_TIMEOUT_MS = 45000;
 const MODEL_API_KEY_PLACEHOLDERS = new Set([
   "your-api-key-here",

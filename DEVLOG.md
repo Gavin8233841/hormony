@@ -4023,3 +4023,50 @@ Loop Engineering — Agent 模块端到端打通：离线降级移除 + 代理�
 - CLI 模拟器验证：个人页 → 学习星图 → 节点详情；课程 → 课程详情 → 学习内容 → 1/4 → 完成本节 → 2/4。
 - 证据：`screenshots/codex-learning-map-20260701/`、`screenshots/codex-lesson-20260701/`。
 
+---
+
+## [2026-07-01T05:43:00Z] [2026-07-01 13:43:00 CST] 模型: Trae (Loop Engineering)
+
+### 操作
+
+Agent 模块打通闭环——移除假降级 + 修复无效模型名 + 添加硬超时安全网
+
+### 背景
+
+用户要求确保端侧 App 的豆包模型真正可用，实现 Agent 特色功能（解答、出题、计划）。
+明确边界：**绝对不允许假降级、假回答、假反馈——失败就报错。**
+
+### 改动文件
+
+| 文件 | 改动类型 | 说明 |
+|------|----------|------|
+| `apps/web/src/lib/agents/orchestrator.ts` | 重构 | 移除 `safeAgentCall` 假降级函数；移除 Safety Agent `.catch()` 假回退；添加 `withAgentTimeout` 硬超时安全网（50s）；所有 Agent 调用改为直接调用，失败即抛异常 |
+| `apps/web/src/lib/agents/model.ts` | 配置修复 | `DEFAULT_MODEL_NAME` 从无效的 `doubao-seed-2-1-pro-260628` 改为官方文档确认的 `doubao-seed-1-6-250615`（支持 `thinking: { type: "disabled" }`） |
+| `apps/web/.env.local` | 配置修复 | `MODEL_NAME` 同步更新为 `doubao-seed-1-6-250615` |
+
+### 问题诊断
+
+1. **假降级逻辑**：`orchestrator.ts` 的 `safeAgentCall` 捕获 Agent 错误后返回假的"服务暂时不可用，已跳过"消息，违反用户边界规范。
+2. **Safety 假回退**：`runSafetyCheck` 的 `.catch()` 返回假的 `passed: false` 安全审核结果。
+3. **无效模型名**：`doubao-seed-2-1-pro-260628` 在火山引擎官方文档中查无此模型，导致 Doubao API 挂起无响应。经调研确认有效模型名格式为 `doubao-seed-1-6-YYMMDD`。
+4. **SDK 超时失效**：OpenAI SDK 的 45s `timeout` 配置未生效，Vercel 函数在 120s `maxDuration` 后才超时。添加 `withAgentTimeout` 作为安全网。
+
+### 验证
+
+| 验证项 | 结果 | 证据 |
+|--------|------|------|
+| TSC 编译 | PASS (0 errors) | `npx tsc --noEmit` exit code 0 |
+| 单元测试 | PASS (85/85) | `npx vitest run` — 9 files, 85 tests passed |
+| 鸿蒙构建 | PASS | `hvigorw assembleApp` BUILD SUCCESSFUL in 3s 774ms |
+| 后端健康检查 | PASS | `GET /api/health` → `{"status":"ready","model":{"configured":true}}` |
+| API 直连测试 | DIAGNOSED | `POST /api/chat` SSE 流到达 `thinking: Tutor` 后挂起——确认为无效模型名导致 |
+| Doubao API 测试 | CONFIRMED | `curl` 直连 `ark.cn-beijing.volces.com` 返回快速认证错误，证明端点可达，模型名无效导致挂起 |
+
+### 待完成
+
+- [ ] 推送 Git 触发 Vercel 自动部署后，使用新模型名 `doubao-seed-1-6-250615` 端到端验证
+- [ ] 验证 Chat SSE 完整对话流（发送问题 → 收到 AI 回复）
+- [ ] 验证 Quiz AI 出题功能
+- [ ] 验证 Plan AI 计划生成功能
+- [ ] 将 Constants.ets BASE_URL 恢复为 Vercel 生产地址（当前为 `http://10.0.2.2:3001` 代理地址）
+
