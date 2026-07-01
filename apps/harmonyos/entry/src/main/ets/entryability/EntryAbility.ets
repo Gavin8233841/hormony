@@ -9,6 +9,8 @@ import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { HttpClient } from '../common/HttpClient';
 import { HealthResponse } from '../model/DataModels';
+import { LearningContentRepository } from '../common/LearningContentRepository';
+import { Course } from '../model/DataModels';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -21,7 +23,7 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     console.info('EntryAbility onWindowStageCreate');
-    LocalLearningRepository.initialize(this.context).then((): void => {
+    this.initializeRepositories().then((): void => {
       this.loadMainPage(windowStage);
       this.probeCloudAgent();
     }).catch((error: Error): void => {
@@ -29,6 +31,27 @@ export default class EntryAbility extends UIAbility {
         'Local repository initialization failed: %{public}s', error.message);
       this.loadMainPage(windowStage);
     });
+  }
+
+  private async initializeRepositories(): Promise<void> {
+    await LearningContentRepository.initialize(this.context.resourceManager);
+    await LocalLearningRepository.initialize(this.context);
+    const catalog: Course[] = [
+      this.buildCourse('cs101', '数据结构'),
+      this.buildCourse('cs102', '操作系统'),
+      this.buildCourse('cs103', '计算机网络')
+    ];
+    await LocalLearningRepository.syncCourseCatalog(catalog);
+  }
+
+  private buildCourse(id: string, title: string): Course {
+    return {
+      id: id,
+      title: title,
+      progress: 0,
+      docCount: LearningContentRepository.getKnowledge(id).length,
+      topics: LearningContentRepository.getTopics(id)
+    };
   }
 
   private async probeCloudAgent(): Promise<void> {

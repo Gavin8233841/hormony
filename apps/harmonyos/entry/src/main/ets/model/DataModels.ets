@@ -119,6 +119,9 @@ export interface QuizResultDetail {
 export interface QuizResult {
   quizId: string;
   userId: string;
+  courseId: string;
+  topic: string;
+  source: string;
   totalQuestions: number;
   correctCount: number;
   accuracy: number;
@@ -126,6 +129,88 @@ export interface QuizResult {
   evaluation: string;
   weakTopics: string[];
   submittedAt: string;
+}
+
+export interface StudyEvent {
+  id: string;
+  type: string;
+  timestamp: string;
+  courseId?: string;
+  topic?: string;
+  taskId?: string;
+  totalQuestions?: number;
+  correctCount?: number;
+}
+
+export interface AchievementProgress {
+  id: string;
+  title: string;
+  description: string;
+  current: number;
+  target: number;
+  unlockedAt?: string;
+}
+
+export interface LessonProgress {
+  courseId: string;
+  topic: string;
+  completedChunkIds: string[];
+  completedAt?: string;
+  updatedAt: string;
+}
+
+export interface TopicMastery {
+  courseId: string;
+  topic: string;
+  attempts: number;
+  totalQuestions: number;
+  correctQuestions: number;
+  accuracy: number;
+  mastered: boolean;
+  lastPracticedAt?: string;
+}
+
+export interface ReviewItem {
+  id: string;
+  questionId: string;
+  courseId: string;
+  topic: string;
+  source: string;
+  stem: string;
+  userAnswer: string;
+  correctAnswer: string;
+  explanation: string;
+  attempts: number;
+  resolved: boolean;
+  updatedAt: string;
+}
+
+export interface CuratedKnowledgeChunk {
+  id: string;
+  text: string;
+  source: string;
+  courseId: string;
+  topic: string;
+}
+
+export interface CuratedQuestion {
+  id: string;
+  courseId: string;
+  topic: string;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+}
+
+export interface ExternalLearningResource {
+  id: string;
+  title: string;
+  type: string;
+  url: string;
+  description: string;
+  courseId: string;
+  tags: string[];
 }
 
 // SSE 流式事件

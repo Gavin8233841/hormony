@@ -3923,3 +3923,83 @@ GitHub 私密仓库创建 + 代码安全审查 + 推送 — 用户额外授权�
 
 在 Vercel Dashboard 中 Import GitHub 仓库 `Gavin8233841/hormony`，选择 `apps/web` 为 Root Directory，Vercel 将自动构建部署。
 
+---
+
+## [2026-06-30T22:54:02Z] [2026-07-01 06:54:02 CST] 模型: Claude (TRAE Work)
+
+### 操作
+
+Loop Engineering — Agent 模块端到端打通：离线降级移除 + 代理连通 + 后端性能优化
+
+#### 1. 移除离线假数据降级（遵循用户安全边界）
+- **Quiz.ets**: 移除 `LocalQuizItem` 接口、`loadLocalQuiz()` 方法、`usingLocalQuestions`/`cloudReady` 状态、catch 中本地题库降级逻辑、UI 中离线模式元素。catch 块现为：`this.message = '云端学伴暂不可用，请检查网络后重试'`
+- **Knowledge.ets**: 移除 `LocalKnowledgeChunk` 接口、`loadLocalChunks()` 方法、catch 中本地资料降级逻辑。catch 块现为：`this.message = '云端检索暂不可用，请检查网络后重试'`
+- **用户边界**: 绝对不做本地假回答假反馈，失败就报错
+
+#### 2. HttpClient.ets SSE 超时修复
+- `postSSE()` 超时从 `REQUEST_TIMEOUT`(30s) 改为 `SSE_TIMEOUT`(90s)
+- 添加 `cleanup()` 函数 + `cleanedUp` 标志，防止重复销毁
+- `Constants.ets`: 新增 `SSE_TIMEOUT = 90000`
+
+#### 3. 本地代理服务器（解决模拟器无法直连 Vercel）
+- 模拟器 ping hormony-ruddy.vercel.app 100% 丢包（GFW 封锁 Vercel IP 103.73.161.52）
+- 创建 `vercel-proxy.js`: HTTP 代理监听 0.0.0.0:3001，通过 `https-proxy-agent` 经 VPN(127.0.0.1:7697) 转发到 Vercel
+- 支持 SSE 流式转发 + 全量请求/响应日志
+- Constants.ets BASE_URL 临时改为 `http://10.0.2.2:3001`（仅测试用，提交前恢复）
+- 验证: 模拟器 health check 通过，SSE POST 请求成功转发
+
+#### 4. 后端性能优化（根因：Vercel 60s 函数超时）
+- **问题**: 4 个 Agent 串行调用 Doubao 模型（每个~15s），总计~60s，触发 Vercel `maxDuration=60` 超时
+- **orchestrator.ts**: `runPreAgents()` 改用 `Promise.all` 并行执行 Profile + Retrieval Agent（两者完全独立），减少前置延迟约 50%
+- **chat/quiz/plan route.ts**: `maxDuration` 从 60 增加到 120，留足多 Agent 编排时间
+- **验证**: TSC 0 errors，Git commit `f4f64f4` 已推送触发 Vercel 部署
+
+#### 5. Plan.ets 错误重试按钮
+- 添加 `hasError` 状态和重试按钮，失败时点击重试重新调用 API（无假数据）
+
+#### 验证结果
+- TSC: 0 errors
+- 代理 health check: 200 `{"status":"ready","model":{"configured":true}}`
+- 模拟器 health check 通过代理: 成功
+- SSE POST /api/chat 通过代理: 200 text/event-stream（但首次测试因 60s 超时未完成，已推送优化）
+- 构建成功: BUILD SUCCESSFUL
+
+#### 涉及文件
+- apps/harmonyos/entry/src/main/ets/common/Constants.ets (SSE_TIMEOUT + BASE_URL)
+- apps/harmonyos/entry/src/main/ets/common/HttpClient.ets (SSE 超时 + cleanup)
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets (移除离线降级)
+- apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets (移除离线降级)
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets (重试按钮)
+- apps/web/src/lib/agents/orchestrator.ts (并行化前置 Agent)
+- apps/web/src/app/api/chat/route.ts (maxDuration 120)
+- apps/web/src/app/api/quiz/route.ts (maxDuration 120)
+- apps/web/src/app/api/plan/route.ts (maxDuration 120)
+- vercel-proxy.js (临时代理，工作区不保存)
+
+---
+
+## [2026-07-01 07:20 CST] Codex：端侧真实学习闭环与领域边界
+
+### 核心实现
+
+- 新增 `LearningContentRepository.ets`，从 HAP `rawfile/learning` 强类型加载 147 条知识切片、60 道精选题和 36 条外部资源。
+- App 启动时同步真实课程 topic 与资料数量；首页和课程页进度只根据本地完成记录计算，不再使用 65%/42%/30% 演示值。
+- 新增 `CourseDetail.ets` 与 `Practice.ets`，打通课程详情、逐题作答、本地评分、答案解析、ArkData 持久化和重启恢复。
+- ArkData schema 升级至 v4，增加 `LessonProgress`、`TopicMastery`、`ReviewItem`、`StudyEvent` 与成就查询边界；迁移并清除旧版演示计划。
+- 错题、薄弱点、强项、正确率、学习天数和课程进度由答题与学习事件推导；重复任务和重复掌握不虚增成就。
+- 保留“精选题库”与“AI 出题”两个明确来源；精选题库是课程内容，不冒充 AI，AI 失败不生成助手结果。
+- 发布 `BASE_URL` 恢复为 Vercel 公网网关，本地代理仅作为诊断工具，不进入 HAP 配置或提交物。
+
+### CLI 验证
+
+- `hvigorw assembleHap ... --no-daemon`：BUILD SUCCESSFUL。
+- `hdc install -r`：安装成功；`aa start`：启动成功。
+- 使用 `uitest dumpLayout/uiInput/screenCap` 完成“课程 → 课程详情 → 精选练习 → 3 题作答 → 提交评分 → 解析”流程。
+- 模拟器结果为 2/3、67%，重启后旧演示任务消失，首页显示“制定今日学习计划”。
+- 证据目录：`screenshots/codex-core-flow-20260701/`。
+
+### 分工
+
+- 新增 `docs/TRAE-APP-IMPLEMENTATION-WORK-PACKAGE-2.md`：题库扩充、知识关系图数据、CLI 自动回归、设备适配审计和内容质量审计。
+- 视觉骨架、知识星图交互、导航、ArkData 核心和模型安全边界继续由 Codex 负责。
+

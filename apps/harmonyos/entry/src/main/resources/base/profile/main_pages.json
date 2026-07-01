@@ -3,6 +3,8 @@
     "pages/Index",
     "pages/Plan",
     "pages/Knowledge",
-    "pages/Quiz"
+    "pages/Quiz",
+    "pages/CourseDetail",
+    "pages/Practice"
   ]
 }

@@ -7,7 +7,6 @@ import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
-  Course,
   QuizGradingItem,
   QuizPackage,
   QuizQuestionView,
@@ -114,7 +113,9 @@ struct QuizPage {
         this.message = '当前主题暂时没有可用题目';
       }
     } catch (e) {
-      this.message = '云端学伴暂不可用，未生成任何题目';
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'QuizPage API failed: %{public}s', (e as Error).message);
+      this.message = '云端学伴暂不可用，请检查网络后重试';
     } finally {
       this.loading = false;
     }
@@ -147,6 +148,9 @@ struct QuizPage {
     const result: QuizResult = {
       quizId: this.quizId,
       userId: Constants.DEMO_USER_ID,
+      courseId: this.courseId,
+      topic: this.topic,
+      source: 'ai',
       totalQuestions: this.questions.length,
       correctCount: correctCount,
       accuracy: this.questions.length > 0 ? correctCount / this.questions.length : 0,
@@ -158,8 +162,6 @@ struct QuizPage {
     };
     try {
       await LocalLearningRepository.appendQuizResult(result);
-      await this.updateLocalProfile(result);
-      await this.updateCourseProgress();
       this.resultAccuracy = result.accuracy;
       this.resultCorrectCount = result.correctCount;
       this.resultTotalQuestions = result.totalQuestions;
@@ -192,37 +194,6 @@ struct QuizPage {
     const index = answer.trim().toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
     if (index >= 0 && index < options.length) return options[index];
     return answer;
-  }
-
-  private async updateLocalProfile(result: QuizResult): Promise<void> {
-    const profile = await LocalLearningRepository.getProfile();
-    if (profile === null) return;
-    const previousTotal = profile.stats.totalQuestions;
-    const previousCorrect = Math.round(previousTotal * profile.stats.accuracy);
-    const nextTotal = previousTotal + result.totalQuestions;
-    profile.stats.totalQuestions = nextTotal;
-    profile.stats.accuracy = nextTotal > 0 ?
-      (previousCorrect + result.correctCount) / nextTotal : 0;
-    for (const topic of result.weakTopics) {
-      if (!profile.weakTopics.includes(topic)) profile.weakTopics.push(topic);
-    }
-    await LocalLearningRepository.saveProfile(profile);
-  }
-
-  private async updateCourseProgress(): Promise<void> {
-    const courses = await LocalLearningRepository.getCourses();
-    if (courses === null) return;
-    const nextCourses: Course[] = courses.map((course: Course): Course => {
-      if (course.id !== this.courseId) return course;
-      return {
-        id: course.id,
-        title: course.title,
-        progress: Math.min(course.progress + 0.03, 1),
-        docCount: course.docCount,
-        topics: course.topics
-      };
-    });
-    await LocalLearningRepository.saveCourses(nextCourses);
   }
 
   @Builder

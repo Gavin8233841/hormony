@@ -28,11 +28,10 @@ export struct CourseContent {
     }
   }
 
-  private openKnowledge(course: Course): void {
+  private openCourse(course: Course): void {
     AppStorage.setOrCreate<string>('selectedCourseId', course.id);
     AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
-    AppStorage.setOrCreate<string>('knowledgePrefillQuery', '');
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/CourseDetail' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'CourseContent router.pushUrl failed: %{public}s', err.message);
     });
@@ -166,7 +165,7 @@ export struct CourseContent {
                 .margin({ top: 12 })
 
                 Row({ space: 10 }) {
-                  Button('课程资料')
+                  Button('进入课程')
                     .layoutWeight(1)
                     .height(42)
                     .fontSize(13)
@@ -174,9 +173,9 @@ export struct CourseContent {
                     .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                     .borderRadius(Constants.RADIUS_MD)
                     .onClick(() => {
-                      this.openKnowledge(c);
+                      this.openCourse(c);
                     })
-                  Button('开始测验')
+                  Button('AI 出题')
                     .layoutWeight(1)
                     .height(42)
                     .fontSize(13)

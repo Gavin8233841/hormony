@@ -6,7 +6,7 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
-import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
+import { StudyEvent, StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 @Entry
@@ -76,6 +76,15 @@ struct PlanPage {
       if (current === null) throw new Error('本地计划不存在');
       current.tasks = nextTasks;
       await LocalLearningRepository.savePlan(current);
+      if (nextDone) {
+        const event: StudyEvent = {
+          id: 'event_' + Date.now().toString(),
+          type: 'task_completed',
+          timestamp: new Date().toISOString(),
+          taskId: task.id
+        };
+        await LocalLearningRepository.appendStudyEvent(event);
+      }
       this.tasks = nextTasks;
       this.message = nextDone ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成';
       this.hasError = false;
@@ -197,8 +206,18 @@ struct PlanPage {
               .fontColor([Constants.COLOR_SUCCESS])
           }
           Text(this.message)
+            .layoutWeight(1)
             .fontSize(12)
             .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+          if (this.hasError) {
+            Button('重试')
+              .height(32)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_SM)
+              .onClick(() => { this.generate(); })
+          }
         }
         .width('100%')
         .padding({ left: 18, right: 18, bottom: 10 })

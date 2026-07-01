@@ -23,14 +23,6 @@ struct KnowledgePage {
   @State hasError: boolean = false;
   private suggestions: string[] = ['二叉搜索树', '图的遍历', '动态规划'];
 
-  private localCourseChunks: KnowledgeChunk[] = [
-    { text: '二叉搜索树（BST）是一种节点值满足左子树均小于根、右子树均大于根的二叉树。中序遍历 BST 可得到升序序列。', source: '数据结构.pdf', courseId: 'cs101' },
-    { text: '动态规划通过将复杂问题分解为重叠子问题并存储子问题解来避免重复计算。', source: '数据结构.pdf', courseId: 'cs101' },
-    { text: '进程调度算法包括 FCFS、SJF、时间片轮转、多级反馈队列等。', source: '操作系统.pdf', courseId: 'cs102' },
-    { text: 'TCP 三次握手：SYN → SYN+ACK → ACK，建立可靠连接。', source: '计算机网络.pdf', courseId: 'cs103' },
-    { text: '图的遍历分为 DFS 和 BFS，DFS 使用栈/递归，BFS 使用队列。', source: '数据结构.pdf', courseId: 'cs101' },
-  ];
-
   get canSearch(): boolean {
     return !this.loading && this.query.trim().length > 0;
   }
@@ -293,12 +285,11 @@ struct KnowledgePage {
         this.message = '未找到相关资料，试试更具体的关键词';
       }
     } catch (e) {
-      this.results = this.localCourseChunks.filter(
-        (c: KnowledgeChunk): boolean => c.courseId === this.courseId &&
-          (c.text.toLowerCase().includes(q) || c.source.toLowerCase().includes(q))
-      );
-      this.message = this.results.length > 0 ? '云端检索不可用，正在显示本机课程内容' : '本机课程内容中未找到相关结果';
-      this.hasError = this.results.length === 0;
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'KnowledgePage API failed: %{public}s', (e as Error).message);
+      this.results = [];
+      this.message = '云端检索暂不可用，请检查网络后重试';
+      this.hasError = true;
     } finally {
       this.loading = false;
     }

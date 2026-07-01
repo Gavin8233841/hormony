@@ -2,21 +2,29 @@ import { relationalStore } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import {
   ChatMessage,
+  AchievementProgress,
   Course,
+  LessonProgress,
   QuizResult,
+  ReviewItem,
   StudyPlan,
+  StudyEvent,
+  TopicMastery,
   UserProfile
 } from '../model/DataModels';
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 1;
+const SCHEMA_VERSION: number = 4;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
 const KEY_PLAN: string = 'plan';
 const KEY_QUIZ_RESULTS: string = 'quiz_results';
 const KEY_CHAT_HISTORY: string = 'chat_history';
+const KEY_STUDY_EVENTS: string = 'study_events';
+const KEY_LESSON_PROGRESS: string = 'lesson_progress';
+const KEY_REVIEW_ITEMS: string = 'review_items';
 
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
@@ -39,8 +47,48 @@ export class LocalLearningRepository {
       throw new Error('本地学习仓库初始化失败: ' + String(error));
     }
     LocalLearningRepository.store = store;
+    const previousVersion = await LocalLearningRepository.getValue<number>('schema_version') ?? 0;
+    await LocalLearningRepository.migrate(previousVersion);
     await LocalLearningRepository.putValue<number>('schema_version', SCHEMA_VERSION);
     await LocalLearningRepository.ensureDefaults();
+  }
+
+  private static async migrate(previousVersion: number): Promise<void> {
+    if (previousVersion < 2) {
+      const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
+      if (profile !== null && profile.stats.totalQuestions === 128 &&
+        Math.abs(profile.stats.accuracy - 0.76) < 0.001 && profile.stats.studyDays === 23) {
+        profile.stats = { totalQuestions: 0, accuracy: 0, studyDays: 0 };
+        profile.weakTopics = [];
+        profile.strongTopics = [];
+        await LocalLearningRepository.putValue<UserProfile>(KEY_PROFILE, profile);
+      }
+      const courses = await LocalLearningRepository.getValue<Course[]>(KEY_COURSES);
+      if (courses !== null) {
+        const resetCourses: Course[] = courses.map((course: Course): Course => {
+          return {
+            id: course.id,
+            title: course.title,
+            progress: 0,
+            docCount: course.docCount,
+            topics: course.topics
+          };
+        });
+        await LocalLearningRepository.putValue<Course[]>(KEY_COURSES, resetCourses);
+      }
+      await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, []);
+    }
+    if (previousVersion < 3) {
+      const plan = await LocalLearningRepository.getValue<StudyPlan>(KEY_PLAN);
+      if (plan !== null && plan.planId === 'local-plan' &&
+        plan.tasks.some((task): boolean => task.id === 't3' && task.title === '学习二叉树遍历')) {
+        await LocalLearningRepository.putValue<StudyPlan | null>(KEY_PLAN, null);
+      }
+    }
+    if (previousVersion < 4) {
+      await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, []);
+      await LocalLearningRepository.putValue<ReviewItem[]>(KEY_REVIEW_ITEMS, []);
+    }
   }
 
   private static async ensureDefaults(): Promise<void> {
@@ -49,18 +97,18 @@ export class LocalLearningRepository {
         userId: 'demo',
         name: '演示同学',
         stage: '本科二年级',
-        weakTopics: ['树与图', '动态规划', '操作系统调度'],
-        strongTopics: ['数组', '链表', '基础语法'],
+        weakTopics: [],
+        strongTopics: [],
         learningStyle: '视觉型',
-        stats: { totalQuestions: 128, accuracy: 0.76, studyDays: 23 }
+        stats: { totalQuestions: 0, accuracy: 0, studyDays: 0 }
       };
       await LocalLearningRepository.saveProfile(profile);
     }
     if ((await LocalLearningRepository.getCourses()) === null) {
       const courses: Course[] = [
-        { id: 'cs101', title: '数据结构', progress: 0.65, docCount: 52, topics: ['二叉树', '图的遍历', '动态规划'] },
-        { id: 'cs102', title: '操作系统', progress: 0.42, docCount: 48, topics: ['进程调度', '内存管理', '文件系统'] },
-        { id: 'cs103', title: '计算机网络', progress: 0.30, docCount: 47, topics: ['TCP/IP', 'HTTP', '路由协议'] }
+        { id: 'cs101', title: '数据结构', progress: 0, docCount: 52, topics: ['二叉树', '图的遍历', '动态规划'] },
+        { id: 'cs102', title: '操作系统', progress: 0, docCount: 48, topics: ['进程调度', '内存管理', '文件系统'] },
+        { id: 'cs103', title: '计算机网络', progress: 0, docCount: 47, topics: ['TCP/IP', 'HTTP', '路由协议'] }
       ];
       await LocalLearningRepository.saveCourses(courses);
     }
@@ -111,7 +159,29 @@ export class LocalLearningRepository {
   }
 
   static async getProfile(): Promise<UserProfile | null> {
-    return LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
+    const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
+    if (profile === null) return null;
+    const results = await LocalLearningRepository.getQuizResults();
+    let totalQuestions = 0;
+    let correctQuestions = 0;
+    const studyDates: string[] = [];
+    for (const result of results) {
+      totalQuestions += result.totalQuestions;
+      correctQuestions += result.correctCount;
+      const date = result.submittedAt.slice(0, 10);
+      if (!studyDates.includes(date)) studyDates.push(date);
+    }
+    const events = await LocalLearningRepository.getStudyEvents();
+    for (const event of events) {
+      const date = event.timestamp.slice(0, 10);
+      if (!studyDates.includes(date)) studyDates.push(date);
+    }
+    profile.stats = {
+      totalQuestions: totalQuestions,
+      accuracy: totalQuestions > 0 ? correctQuestions / totalQuestions : 0,
+      studyDays: studyDates.length
+    };
+    return profile;
   }
 
   static async saveProfile(profile: UserProfile): Promise<void> {
@@ -119,7 +189,39 @@ export class LocalLearningRepository {
   }
 
   static async getCourses(): Promise<Course[] | null> {
-    return LocalLearningRepository.getValue<Course[]>(KEY_COURSES);
+    const courses = await LocalLearningRepository.getValue<Course[]>(KEY_COURSES);
+    if (courses === null) return null;
+    const events = await LocalLearningRepository.getStudyEvents();
+    return courses.map((course: Course): Course => {
+      const completedTopics: string[] = [];
+      for (const event of events) {
+        if (event.courseId !== course.id || event.topic === undefined || !course.topics.includes(event.topic)) continue;
+        if (event.type !== 'lesson_completed' && event.type !== 'quiz_mastered') continue;
+        if (!completedTopics.includes(event.topic)) completedTopics.push(event.topic);
+      }
+      return {
+        id: course.id,
+        title: course.title,
+        progress: Math.min(completedTopics.length / Math.max(course.topics.length, 1), 1),
+        docCount: course.docCount,
+        topics: course.topics
+      };
+    });
+  }
+
+  static async syncCourseCatalog(catalog: Course[]): Promise<void> {
+    const stored = await LocalLearningRepository.getValue<Course[]>(KEY_COURSES) ?? [];
+    const merged: Course[] = catalog.map((item: Course): Course => {
+      const previous = stored.find((course: Course): boolean => course.id === item.id);
+      return {
+        id: item.id,
+        title: item.title,
+        progress: previous?.progress ?? 0,
+        docCount: item.docCount,
+        topics: item.topics
+      };
+    });
+    await LocalLearningRepository.putValue<Course[]>(KEY_COURSES, merged);
   }
 
   static async saveCourses(courses: Course[]): Promise<void> {
@@ -142,6 +244,130 @@ export class LocalLearningRepository {
     const results = await LocalLearningRepository.getQuizResults();
     results.unshift(result);
     await LocalLearningRepository.putValue<QuizResult[]>(KEY_QUIZ_RESULTS, results.slice(0, 20));
+    const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
+    if (profile !== null) {
+      for (const topic of result.weakTopics) {
+        if (!profile.weakTopics.includes(topic)) profile.weakTopics.push(topic);
+        const strongIndex = profile.strongTopics.indexOf(topic);
+        if (strongIndex >= 0) profile.strongTopics.splice(strongIndex, 1);
+      }
+      if (result.accuracy >= 0.8 && !profile.strongTopics.includes(result.topic)) {
+        profile.strongTopics.push(result.topic);
+        const weakIndex = profile.weakTopics.indexOf(result.topic);
+        if (weakIndex >= 0) profile.weakTopics.splice(weakIndex, 1);
+      }
+      await LocalLearningRepository.putValue<UserProfile>(KEY_PROFILE, profile);
+    }
+    await LocalLearningRepository.appendStudyEvent({
+      id: 'event_' + Date.now().toString(),
+      type: result.accuracy >= 0.8 ? 'quiz_mastered' : 'quiz_submitted',
+      timestamp: result.submittedAt,
+      courseId: result.courseId,
+      topic: result.topic,
+      totalQuestions: result.totalQuestions,
+      correctCount: result.correctCount
+    });
+    await LocalLearningRepository.updateReviewItems(result);
+  }
+
+  private static async updateReviewItems(result: QuizResult): Promise<void> {
+    const items = await LocalLearningRepository.getReviewItems(false);
+    for (const detail of result.details) {
+      const existingIndex = items.findIndex((item: ReviewItem): boolean => item.questionId === detail.questionId);
+      if (detail.isCorrect) {
+        if (existingIndex >= 0) {
+          items[existingIndex].resolved = true;
+          items[existingIndex].attempts += 1;
+          items[existingIndex].updatedAt = result.submittedAt;
+        }
+        continue;
+      }
+      const next: ReviewItem = {
+        id: existingIndex >= 0 ? items[existingIndex].id : 'review_' + detail.questionId,
+        questionId: detail.questionId,
+        courseId: result.courseId,
+        topic: result.topic,
+        source: result.source,
+        stem: detail.stem,
+        userAnswer: detail.userAnswer,
+        correctAnswer: detail.correctAnswer,
+        explanation: detail.explanation,
+        attempts: existingIndex >= 0 ? items[existingIndex].attempts + 1 : 1,
+        resolved: false,
+        updatedAt: result.submittedAt
+      };
+      if (existingIndex >= 0) items[existingIndex] = next;
+      else items.push(next);
+    }
+    await LocalLearningRepository.putValue<ReviewItem[]>(KEY_REVIEW_ITEMS, items.slice(-200));
+  }
+
+  static async getReviewItems(activeOnly: boolean = true): Promise<ReviewItem[]> {
+    const items = (await LocalLearningRepository.getValue<ReviewItem[]>(KEY_REVIEW_ITEMS)) ?? [];
+    return activeOnly ? items.filter((item: ReviewItem): boolean => !item.resolved) : items;
+  }
+
+  static async getLessonProgress(courseId?: string): Promise<LessonProgress[]> {
+    const items = (await LocalLearningRepository.getValue<LessonProgress[]>(KEY_LESSON_PROGRESS)) ?? [];
+    return courseId === undefined ? items : items.filter((item: LessonProgress): boolean => item.courseId === courseId);
+  }
+
+  static async completeLessonChunk(courseId: string, topic: string, chunkId: string,
+    topicChunkCount: number): Promise<void> {
+    const items = await LocalLearningRepository.getLessonProgress();
+    const index = items.findIndex((item: LessonProgress): boolean => item.courseId === courseId && item.topic === topic);
+    const now = new Date().toISOString();
+    const item: LessonProgress = index >= 0 ? items[index] : {
+      courseId: courseId,
+      topic: topic,
+      completedChunkIds: [],
+      updatedAt: now
+    };
+    const wasCompleted = item.completedAt !== undefined;
+    if (!item.completedChunkIds.includes(chunkId)) item.completedChunkIds.push(chunkId);
+    item.updatedAt = now;
+    if (topicChunkCount > 0 && item.completedChunkIds.length >= topicChunkCount) item.completedAt = now;
+    if (index >= 0) items[index] = item;
+    else items.push(item);
+    await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, items);
+    if (!wasCompleted && item.completedAt !== undefined) {
+      await LocalLearningRepository.appendStudyEvent({
+        id: 'lesson_' + courseId + '_' + topic,
+        type: 'lesson_completed',
+        timestamp: item.completedAt,
+        courseId: courseId,
+        topic: topic
+      });
+    }
+  }
+
+  static async getTopicMastery(courseId?: string): Promise<TopicMastery[]> {
+    const results = await LocalLearningRepository.getQuizResults();
+    const mastery: TopicMastery[] = [];
+    for (const result of results.slice().reverse()) {
+      if (courseId !== undefined && result.courseId !== courseId) continue;
+      let item = mastery.find((value: TopicMastery): boolean =>
+        value.courseId === result.courseId && value.topic === result.topic);
+      if (item === undefined) {
+        item = {
+          courseId: result.courseId,
+          topic: result.topic,
+          attempts: 0,
+          totalQuestions: 0,
+          correctQuestions: 0,
+          accuracy: 0,
+          mastered: false
+        };
+        mastery.push(item);
+      }
+      item.attempts += 1;
+      item.totalQuestions += result.totalQuestions;
+      item.correctQuestions += result.correctCount;
+      item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
+      item.mastered = item.accuracy >= 0.8;
+      item.lastPracticedAt = result.submittedAt;
+    }
+    return mastery;
   }
 
   static async getChatHistory(): Promise<ChatMessage[]> {
@@ -150,5 +376,56 @@ export class LocalLearningRepository {
 
   static async saveChatHistory(history: ChatMessage[]): Promise<void> {
     await LocalLearningRepository.putValue<ChatMessage[]>(KEY_CHAT_HISTORY, history.slice(-24));
+  }
+
+  static async getStudyEvents(): Promise<StudyEvent[]> {
+    return (await LocalLearningRepository.getValue<StudyEvent[]>(KEY_STUDY_EVENTS)) ?? [];
+  }
+
+  static async appendStudyEvent(event: StudyEvent): Promise<void> {
+    const events = await LocalLearningRepository.getStudyEvents();
+    events.push(event);
+    await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, events.slice(-500));
+  }
+
+  static async getAchievements(): Promise<AchievementProgress[]> {
+    const events = await LocalLearningRepository.getStudyEvents();
+    const results = await LocalLearningRepository.getQuizResults();
+    const completedTasks = LocalLearningRepository.uniqueEvents(events, 'task_completed', true);
+    const masteredTopics = LocalLearningRepository.uniqueEvents(events, 'quiz_mastered', false);
+    return [
+      LocalLearningRepository.achievement('first_quiz', '初次练习', '完成第一次练习', results.length, 1,
+        results.length > 0 ? results[results.length - 1].submittedAt : undefined),
+      LocalLearningRepository.achievement('task_5', '稳步前进', '完成 5 项学习任务', completedTasks.length, 5,
+        completedTasks.length >= 5 ? completedTasks[4].timestamp : undefined),
+      LocalLearningRepository.achievement('mastery_3', '掌握新知', '掌握 3 个知识点', masteredTopics.length, 3,
+        masteredTopics.length >= 3 ? masteredTopics[2].timestamp : undefined)
+    ];
+  }
+
+  private static uniqueEvents(events: StudyEvent[], type: string, byTask: boolean): StudyEvent[] {
+    const unique: StudyEvent[] = [];
+    const keys: string[] = [];
+    for (const event of events) {
+      if (event.type !== type) continue;
+      const key = byTask ? (event.taskId ?? event.id) : (event.courseId ?? '') + ':' + (event.topic ?? '');
+      if (!keys.includes(key)) {
+        keys.push(key);
+        unique.push(event);
+      }
+    }
+    return unique;
+  }
+
+  private static achievement(id: string, title: string, description: string, current: number,
+    target: number, unlockedAt?: string): AchievementProgress {
+    return {
+      id: id,
+      title: title,
+      description: description,
+      current: Math.min(current, target),
+      target: target,
+      unlockedAt: unlockedAt
+    };
   }
 }

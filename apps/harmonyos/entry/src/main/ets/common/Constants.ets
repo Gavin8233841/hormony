@@ -5,8 +5,7 @@
 
 export class Constants {
   // Web 后端地址
-  // 模拟器访问宿主机：http://10.0.2.2:3000
-  // 真机调试：http://<电脑局域网IP>:3000
+  // 发布配置必须指向公网无状态网关，不得依赖开发电脑或本地代理。
   static readonly BASE_URL: string = 'https://hormony-ruddy.vercel.app';
 
   // API 路径
@@ -26,6 +25,8 @@ export class Constants {
 
   // 请求超时（毫秒）
   static readonly REQUEST_TIMEOUT: number = 30000;
+  // SSE 流式请求超时（毫秒）——多 Agent 编排可能需要 30-40s，设 90s 留足余量
+  static readonly SSE_TIMEOUT: number = 90000;
 
   // 颜色常量（统一收口，禁止页面内硬编码颜色）
   // 文字色

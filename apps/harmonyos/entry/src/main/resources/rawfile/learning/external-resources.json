@@ -1,0 +1,532 @@
+[
+  {
+    "id": "res_01",
+    "title": "算法导论（CLRS）",
+    "type": "textbook",
+    "url": "https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/",
+    "description": "算法领域最权威的教材，涵盖从基础数据结构到高级算法设计的完整知识体系，被全球顶尖高校广泛采用。书中以严谨的数学分析阐述算法正确性与复杂度，是深入理解算法原理不可绕过的经典之作。",
+    "courseId": "cs101",
+    "tags": [
+      "算法",
+      "数据结构",
+      "教材",
+      "经典"
+    ]
+  },
+  {
+    "id": "res_02",
+    "title": "数据结构与算法分析（Mark Allen Weiss）",
+    "type": "textbook",
+    "url": "https://users.cs.fiu.edu/~weiss/",
+    "description": "Mark Allen Weiss 教授编写的经典教材，以 C/C++/Java 多语言版本覆盖数据结构与算法分析的核心内容。讲解清晰、习题丰富，适合作为本科数据结构课程的主要参考书，作者在 FIU 官方页面提供源码与勘误。",
+    "courseId": "cs101",
+    "tags": [
+      "数据结构",
+      "算法分析",
+      "教材",
+      "C++",
+      "Java"
+    ]
+  },
+  {
+    "id": "res_03",
+    "title": "算法（Robert Sedgewick）",
+    "type": "textbook",
+    "url": "https://algs4.cs.princeton.edu/home/",
+    "description": "Princeton 大学 Sedgewick 教授所著《Algorithms》第四版的官方配套网站，提供全书源码、可视化演示与练习数据。以图解方式讲解排序、查找、图论等核心算法，配合 Coursera 在线课程学习效果更佳。",
+    "courseId": "cs101",
+    "tags": [
+      "算法",
+      "数据结构",
+      "教材",
+      "可视化",
+      "Princeton"
+    ]
+  },
+  {
+    "id": "res_04",
+    "title": "数据结构（严蔚敏·C语言版）",
+    "type": "textbook",
+    "url": "https://www.tup.com.cn/wap/tsxqy.aspx?id=00236807",
+    "description": "清华大学出版社出版的国内数据结构课程标杆教材，由严蔚敏与吴伟民合著。以 C 语言描述各类数据结构与算法实现，体系完整、逻辑严密，是国内高校考研与教学使用最广泛的数据结构教材之一。",
+    "courseId": "cs101",
+    "tags": [
+      "数据结构",
+      "C语言",
+      "教材",
+      "国内经典",
+      "考研"
+    ]
+  },
+  {
+    "id": "res_05",
+    "title": "操作系统概念（Silberschatz）",
+    "type": "textbook",
+    "url": "https://www.os-book.com/",
+    "description": "Silberschatz 等人编写的《Operating System Concepts》官方配套网站，涵盖进程管理、内存管理、文件系统与安全等操作系统核心主题。内容权威且配有丰富案例与习题，是全球高校 OS 课程的标杆教材。",
+    "courseId": "cs102",
+    "tags": [
+      "操作系统",
+      "教材",
+      "经典",
+      "进程管理",
+      "文件系统"
+    ]
+  },
+  {
+    "id": "res_06",
+    "title": "现代操作系统（Tanenbaum）",
+    "type": "textbook",
+    "url": "https://www.cs.vu.nl/~ast/books/mos2/",
+    "description": "Andrew S. Tanenbaum 教授所著《Modern Operating Systems》官方书籍页面，提供完整目录与章节预览。Tanenbaum 同时是 MINIX 创始人，书中深入剖析操作系统设计原理与实现细节，涵盖单核与多核、分布式与多媒体等前沿主题。",
+    "courseId": "cs102",
+    "tags": [
+      "操作系统",
+      "教材",
+      "经典",
+      "MINIX",
+      "分布式系统"
+    ]
+  },
+  {
+    "id": "res_07",
+    "title": "操作系统导论（OSTEP）",
+    "type": "textbook",
+    "url": "https://pages.cs.wisc.edu/~remzi/OSTEP/",
+    "description": "威斯康星大学 Remzi 教授编写的免费在线操作系统教材，以虚拟化、并发与持久化三大概念组织全书。语言幽默、案例丰富，提供完整章节 PDF、课后作业与配套代码，被誉为最易入门的 OS 教材。",
+    "courseId": "cs102",
+    "tags": [
+      "操作系统",
+      "教材",
+      "免费",
+      "并发",
+      "虚拟化"
+    ]
+  },
+  {
+    "id": "res_08",
+    "title": "计算机网络：自顶向下方法（Kurose & Ross）",
+    "type": "textbook",
+    "url": "https://www.pearson.com/en-us/subject-catalog/p/computer-networking-a-top-down-approach/P200000013385",
+    "description": "Kurose 与 Ross 合著的网络经典教材，采用自顶向下方法从应用层逐层深入物理层讲解网络协议栈。以实际网络应用（HTTP、DNS、SMTP 等）为切入点，配合 Wireshark 实验帮助理解协议工作原理，是 Pearson 出版的高校核心教材。",
+    "courseId": "cs103",
+    "tags": [
+      "计算机网络",
+      "教材",
+      "自顶向下",
+      "协议栈",
+      "Pearson"
+    ]
+  },
+  {
+    "id": "res_09",
+    "title": "TCP/IP详解（W. Richard Stevens）",
+    "type": "textbook",
+    "url": "https://www.informit.com/store/tcp-ip-illustrated-volume-1-the-protocols-9780321336316",
+    "description": "W. Richard Stevens 所著《TCP/IP Illustrated》系列是网络协议领域的权威参考书，通过抓包实例逐字节解析 TCP/IP 协议族工作细节。由 Addison-Wesley Professional（InformIT）出版，适合需要深入理解网络协议底层机制的工程师与研究者。",
+    "courseId": "cs103",
+    "tags": [
+      "计算机网络",
+      "TCP/IP",
+      "教材",
+      "协议分析",
+      "Addison-Wesley"
+    ]
+  },
+  {
+    "id": "res_10",
+    "title": "计算机网络（谢希仁）",
+    "type": "textbook",
+    "url": "https://www.phei.com.cn/module/goods/wssd_content.jsp?bookid=70139",
+    "description": "电子工业出版社出版的国内计算机网络课程主流教材，由谢希仁编著。体系完整地覆盖物理层到应用层的网络体系结构，结合中国网络发展实际情况进行讲解，是国内高校计算机网络课程与考研复习使用最广泛的教材。",
+    "courseId": "cs103",
+    "tags": [
+      "计算机网络",
+      "教材",
+      "国内经典",
+      "考研",
+      "电子工业出版社"
+    ]
+  },
+  {
+    "id": "res_11",
+    "title": "MDN Web Docs",
+    "type": "documentation",
+    "url": "https://developer.mozilla.org/",
+    "description": "Mozilla 维护的 Web 技术权威文档库，涵盖 HTML、CSS、JavaScript、HTTP、Web API 等前端与网络技术参考。内容由社区与厂商共同维护，是前端开发者与全栈工程师日常查阅频率最高的技术文档之一。",
+    "tags": [
+      "Web",
+      "HTML",
+      "CSS",
+      "JavaScript",
+      "HTTP",
+      "文档"
+    ]
+  },
+  {
+    "id": "res_12",
+    "title": "Node.js 官方文档",
+    "type": "documentation",
+    "url": "https://nodejs.org/en/docs",
+    "description": "Node.js 官方技术文档，涵盖核心模块 API、事件循环机制、流处理、模块系统等后端运行时参考。提供各版本 API 差异对照与迁移指南，是 Node.js 后端开发与全栈开发不可或缺的权威参考文档。",
+    "tags": [
+      "Node.js",
+      "后端",
+      "API",
+      "文档",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "res_13",
+    "title": "HarmonyOS 官方开发文档",
+    "type": "documentation",
+    "url": "https://developer.huawei.com/consumer/cn/doc/",
+    "description": "华为 HarmonyOS 鸿蒙操作系统的官方开发者文档，涵盖系统能力、应用框架、分布式技术与 DevEco Studio 工具使用指南。提供从环境搭建到应用发布的完整开发流程文档，是鸿蒙生态开发者的核心参考资源。",
+    "tags": [
+      "HarmonyOS",
+      "鸿蒙",
+      "华为",
+      "移动开发",
+      "文档"
+    ]
+  },
+  {
+    "id": "res_14",
+    "title": "RFC 9110 — HTTP 语义",
+    "type": "documentation",
+    "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+    "description": "现行 HTTP 核心语义标准，统一定义请求方法、状态码、字段和资源表示等跨版本概念。学习 HTTP/1.1、HTTP/2 与 HTTP/3 时可用它核对共享语义，避免继续依赖已经废止的 RFC 2616。",
+    "courseId": "cs103",
+    "tags": [
+      "HTTP",
+      "RFC",
+      "网络协议",
+      "文档",
+      "Web"
+    ]
+  },
+  {
+    "id": "res_15",
+    "title": "RFC 9293 — TCP",
+    "type": "documentation",
+    "url": "https://www.rfc-editor.org/rfc/rfc9293.html",
+    "description": "当前 TCP 基础规范，整合并取代 RFC 793 及其多项更新，定义连接建立、可靠字节流、序号、确认与窗口等核心机制。适合在学习三次握手、可靠传输和流量控制时核对协议要求。",
+    "courseId": "cs103",
+    "tags": [
+      "TCP",
+      "RFC",
+      "传输层",
+      "网络协议",
+      "文档"
+    ]
+  },
+  {
+    "id": "res_16",
+    "title": "RFC 768 — UDP",
+    "type": "documentation",
+    "url": "https://www.rfc-editor.org/rfc/rfc768.html",
+    "description": "用户数据报协议（UDP）的规范文档（RFC 768），定义了无连接、不可靠但高效的传输层协议机制。UDP 是 DNS 查询、实时音视频与物联网通信的基础协议，文档简洁明了，是理解轻量级网络传输的入门必读。",
+    "courseId": "cs103",
+    "tags": [
+      "UDP",
+      "RFC",
+      "传输层",
+      "网络协议",
+      "文档"
+    ]
+  },
+  {
+    "id": "res_17",
+    "title": "TypeScript 官方文档",
+    "type": "documentation",
+    "url": "https://www.typescriptlang.org/docs/",
+    "description": "TypeScript 官方语言文档，涵盖类型系统、接口、泛型、装饰器、模块解析与编译配置等核心特性。提供从基础入门到高级类型体操的渐进式教程，是前端与 Node.js 全栈类型安全开发的权威参考。",
+    "tags": [
+      "TypeScript",
+      "类型系统",
+      "文档",
+      "前端",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "res_18",
+    "title": "ArkTS / ArkUI 开发指南",
+    "type": "documentation",
+    "url": "https://developer.huawei.com/consumer/cn/arkts/devstart/",
+    "description": "华为开发者平台提供的 ArkTS 官方入门资源。ArkTS 在 TypeScript 生态基础上扩展并强化静态检查，保持 TS 基本风格，同时支持与 TypeScript、JavaScript 互操作，是鸿蒙原生应用的主力开发语言。",
+    "tags": [
+      "ArkTS",
+      "ArkUI",
+      "HarmonyOS",
+      "声明式UI",
+      "文档"
+    ]
+  },
+  {
+    "id": "res_19",
+    "title": "MIT 6.006 — Introduction to Algorithms",
+    "type": "course",
+    "url": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/",
+    "description": "MIT 开放课程（OCW）算法导论，由 Erik Demaine 等教授主讲。涵盖数据结构基础、排序与查找、图算法与动态规划，提供完整授课视频、讲义、习题与考试题及答案，是全球最经典的免费算法课程之一。",
+    "courseId": "cs101",
+    "tags": [
+      "算法",
+      "MIT",
+      "OCW",
+      "免费课程",
+      "数据结构"
+    ]
+  },
+  {
+    "id": "res_20",
+    "title": "CS61B — Data Structures（UC Berkeley）",
+    "type": "course",
+    "url": "https://sp21.datastructur.es/",
+    "description": "加州大学伯克利分校数据结构课程（2021 春季），涵盖 Java 语言实现的核心数据结构与算法。课程以项目驱动方式教学，提供完整的实验、作业与项目代码，是学习数据结构实践应用的优质公开课程。",
+    "courseId": "cs101",
+    "tags": [
+      "数据结构",
+      "Berkeley",
+      "Java",
+      "免费课程",
+      "项目驱动"
+    ]
+  },
+  {
+    "id": "res_21",
+    "title": "MIT 6.1810（原 6.828）— Operating Systems",
+    "type": "course",
+    "url": "https://pdos.csail.mit.edu/6.828/",
+    "description": "MIT 操作系统工程课程，以 xv6 教学操作系统为核心，通过系列 Lab 实现系统调用、虚拟内存、文件系统与多线程等内核功能。课程强调动手实践，是深入理解操作系统内核实现的顶级公开课程。",
+    "courseId": "cs102",
+    "tags": [
+      "操作系统",
+      "MIT",
+      "xv6",
+      "内核",
+      "免费课程"
+    ]
+  },
+  {
+    "id": "res_22",
+    "title": "Stanford CS144 — Networking",
+    "type": "course",
+    "url": "https://cs144.stanford.edu/",
+    "description": "斯坦福大学计算机网络课程，以自顶向下方式讲解 TCP/IP 协议栈。课程核心亮点是通过系列编程 Lab 从零实现一个完整的 TCP 协议栈，帮助学生深入理解可靠传输、拥塞控制与路由机制。",
+    "courseId": "cs103",
+    "tags": [
+      "计算机网络",
+      "Stanford",
+      "TCP",
+      "协议栈",
+      "免费课程"
+    ]
+  },
+  {
+    "id": "res_23",
+    "title": "Harvard CS50 — Introduction to Computer Science",
+    "type": "course",
+    "url": "https://cs50.harvard.edu/",
+    "description": "哈佛大学计算机科学导论课程，覆盖 C、Python、SQL、HTML/CSS/JS 等多种语言与技术。以高制作水准的授课视频与丰富的编程作业著称，是全球最受欢迎的计算机科学入门公开课之一。",
+    "tags": [
+      "计算机科学",
+      "Harvard",
+      "入门",
+      "免费课程",
+      "编程"
+    ]
+  },
+  {
+    "id": "res_24",
+    "title": "Coursera — Algorithms Part I（Princeton）",
+    "type": "course",
+    "url": "https://www.coursera.org/learn/algorithms-part1",
+    "description": "Princeton 大学 Sedgewick 教授在 Coursera 开设的算法课程 Part I，配合《Algorithms》第四版教材使用。涵盖并查集、排序与查找基础算法，提供自动评测编程作业。Part II 需在 Coursera 平台单独搜索选课。",
+    "courseId": "cs101",
+    "tags": [
+      "算法",
+      "Coursera",
+      "Princeton",
+      "在线课程",
+      "Sedgewick"
+    ]
+  },
+  {
+    "id": "res_25",
+    "title": "中国大学MOOC — 数据结构",
+    "type": "course",
+    "url": "https://www.icourse163.org/course/detail.htm?cid=93001",
+    "description": "中国大学 MOOC 平台汇集国内多所高校（如浙江大学、武汉大学等）的数据结构在线课程。以中文授课为主，配合 PPT 课件与在线评测系统，适合国内学生进行系统化的数据结构学习与考研复习。",
+    "courseId": "cs101",
+    "tags": [
+      "数据结构",
+      "MOOC",
+      "中文课程",
+      "在线课程",
+      "考研"
+    ]
+  },
+  {
+    "id": "res_26",
+    "title": "极客时间 — 数据结构与算法之美",
+    "type": "course",
+    "url": "https://time.geekbang.org/column/intro/100017301",
+    "description": "极客时间平台王争主讲的付费专栏课程，以实战视角讲解数据结构与算法在工程中的应用。涵盖数组、链表、栈、队列、散列表、二叉树、图等核心数据结构与排序、查找等经典算法，配有 LeetCode 刷题指导。",
+    "courseId": "cs101",
+    "tags": [
+      "数据结构",
+      "算法",
+      "极客时间",
+      "付费课程",
+      "实战"
+    ]
+  },
+  {
+    "id": "res_27",
+    "title": "IEEE 802.3 — 以太网标准",
+    "type": "standard",
+    "url": "https://www.ieee802.org/3/",
+    "description": "IEEE 802.3 以太网工作组官方网站，制定和维护以太网物理层与数据链路层标准。涵盖从 10Mb/s 到 400Gb/s 及更高速率的以太网技术规范，是理解局域网底层通信原理与网络工程实践的核心标准参考。",
+    "courseId": "cs103",
+    "tags": [
+      "IEEE",
+      "以太网",
+      "标准",
+      "局域网",
+      "数据链路层"
+    ]
+  },
+  {
+    "id": "res_28",
+    "title": "RFC 9113 — HTTP/2",
+    "type": "standard",
+    "url": "https://www.rfc-editor.org/rfc/rfc9113.html",
+    "description": "现行 HTTP/2 协议规范，取代 RFC 7540，定义二进制分帧、并发流、字段压缩与连接管理等机制。理解该标准有助于分析 HTTP/2 的多路复用、流量控制和现代 Web 传输性能。",
+    "courseId": "cs103",
+    "tags": [
+      "HTTP/2",
+      "RFC",
+      "标准",
+      "Web",
+      "多路复用"
+    ]
+  },
+  {
+    "id": "res_29",
+    "title": "RFC 9114 — HTTP/3",
+    "type": "standard",
+    "url": "https://www.rfc-editor.org/rfc/rfc9114.html",
+    "description": "HTTP/3 协议规范，定义 HTTP 语义如何映射到 QUIC 传输。HTTP/3 利用 QUIC 的安全连接、流式多路复用和流量控制能力，适合与 RFC 9000 配合学习现代 Web 传输机制。",
+    "courseId": "cs103",
+    "tags": [
+      "HTTP/3",
+      "QUIC",
+      "RFC",
+      "标准",
+      "传输协议"
+    ]
+  },
+  {
+    "id": "res_30",
+    "title": "POSIX 标准",
+    "type": "standard",
+    "url": "https://pubs.opengroup.org/onlinepubs/9699919799/",
+    "description": "POSIX.1-2017（IEEE Std 1003.1-2017）可移植操作系统接口标准，定义了 Shell、系统调用、文件 I/O 与线程等操作系统接口规范。是 Linux/UNIX 系统编程与跨平台 C/C++ 开发的权威标准参考。",
+    "courseId": "cs102",
+    "tags": [
+      "POSIX",
+      "标准",
+      "系统编程",
+      "Shell",
+      "UNIX"
+    ]
+  },
+  {
+    "id": "res_31",
+    "title": "Unicode / UTF-8 编码标准",
+    "type": "standard",
+    "url": "https://www.unicode.org/",
+    "description": "Unicode 官方网站，提供 Unicode 字符编码标准与 UTF-8/UTF-16/UTF-32 编码方案的完整规范。Unicode 是全球文字统一编码的基础标准，理解其编码机制对于处理国际化文本、字符串处理与字符集问题至关重要。",
+    "tags": [
+      "Unicode",
+      "UTF-8",
+      "编码",
+      "标准",
+      "国际化"
+    ]
+  },
+  {
+    "id": "res_32",
+    "title": "Visual Studio Code",
+    "type": "tool",
+    "url": "https://code.visualstudio.com/",
+    "description": "微软开源的轻量级跨平台代码编辑器，支持 JavaScript/TypeScript、Python、C++ 等数十种语言。通过丰富的插件生态实现智能补全、调试、Git 集成与远程开发等功能，是全球开发者使用最广泛的编辑器之一。",
+    "tags": [
+      "编辑器",
+      "VS Code",
+      "微软",
+      "开发工具",
+      "跨平台"
+    ]
+  },
+  {
+    "id": "res_33",
+    "title": "Wireshark 网络协议分析工具",
+    "type": "tool",
+    "url": "https://www.wireshark.org/",
+    "description": "开源的网络协议分析器，能实时捕获并逐包解析以太网、IP、TCP、UDP、HTTP 等各层协议数据。是网络课程实验、协议调试与网络安全分析的核心工具，支持过滤器与着色规则帮助快速定位网络问题。",
+    "courseId": "cs103",
+    "tags": [
+      "Wireshark",
+      "网络分析",
+      "抓包",
+      "开源工具",
+      "协议调试"
+    ]
+  },
+  {
+    "id": "res_34",
+    "title": "GDB 调试器",
+    "type": "tool",
+    "url": "https://www.gnu.org/software/gdb/",
+    "description": "GNU 项目提供的开源程序调试器，支持 C/C++、Rust、Go 等编译型语言的断点调试、变量查看、堆栈追踪与核心转储分析。是 Linux/UNIX 环境下系统级编程与底层 Bug 排查的必备工具。",
+    "courseId": "cs102",
+    "tags": [
+      "GDB",
+      "调试器",
+      "GNU",
+      "C/C++",
+      "系统编程"
+    ]
+  },
+  {
+    "id": "res_35",
+    "title": "Git 版本控制",
+    "type": "tool",
+    "url": "https://git-scm.com/",
+    "description": "分布式版本控制系统 Git 的官方网站，提供 Git 安装包、完整文档与 Pro Git 在线书籍。Git 是现代软件开发协作的事实标准，掌握分支管理、合并冲突解决与远程仓库操作是每位开发者的必备技能。",
+    "tags": [
+      "Git",
+      "版本控制",
+      "分布式",
+      "开发工具",
+      "协作"
+    ]
+  },
+  {
+    "id": "res_36",
+    "title": "Postman API 测试工具",
+    "type": "tool",
+    "url": "https://www.postman.com/",
+    "description": "Postman 是流行的 API 开发与测试协作平台，支持 HTTP 请求构造、响应检查、环境变量管理、自动化测试脚本与 Mock 服务。是前后端分离开发与 API 接口联调测试的核心工具，显著提升接口开发与文档管理效率。",
+    "tags": [
+      "Postman",
+      "API测试",
+      "HTTP",
+      "开发工具",
+      "接口调试"
+    ]
+  }
+]

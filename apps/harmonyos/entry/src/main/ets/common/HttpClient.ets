@@ -123,8 +123,26 @@ export class HttpClient {
 
     const url = Constants.BASE_URL + path;
     let doneCalled: boolean = false;
+    let cleanedUp: boolean = false;
     let eventBuffer: string = '';
     const decoder = util.TextDecoder.create('utf-8');
+
+    const cleanup = (): void => {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
+      try {
+        httpRequest.off('dataReceive');
+      } catch (e) {
+        // 监听器可能已移除，忽略
+      }
+      try {
+        httpRequest.destroy();
+      } catch (e) {
+        // 可能已销毁，忽略
+      }
+    };
 
     const consumeText = (text: string): void => {
       eventBuffer += text;
@@ -164,12 +182,12 @@ export class HttpClient {
         'Accept': 'text/event-stream',
       },
       extraData: body,
-      connectTimeout: Constants.REQUEST_TIMEOUT,
-      readTimeout: Constants.REQUEST_TIMEOUT,
+      connectTimeout: Constants.SSE_TIMEOUT,
+      readTimeout: Constants.SSE_TIMEOUT,
     }).then((responseCode: number) => {
       if (responseCode !== 200) {
         onError(new Error('HTTP ' + responseCode));
-        httpRequest.destroy();
+        cleanup();
         return;
       }
       // 流结束但未收到 done 事件时，确保 onDone 被调用
@@ -177,10 +195,10 @@ export class HttpClient {
         doneCalled = true;
         onDone();
       }
-      httpRequest.destroy();
+      cleanup();
     }).catch((e: Error) => {
       onError(e);
-      httpRequest.destroy();
+      cleanup();
     });
   }
 }

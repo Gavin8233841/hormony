@@ -1,5 +1,5 @@
 import { Constants } from '../common/Constants';
-import { Course, PlanTask, StudyPlan } from '../model/DataModels';
+import { Course, PlanTask, StudyEvent, StudyPlan } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningReminder } from '../common/LearningReminder';
@@ -13,19 +13,15 @@ export struct HomeContent {
   @State currentCourse: Course = {
     id: 'cs101',
     title: '数据结构',
-    progress: 0.65,
-    docCount: 12,
+    progress: 0,
+    docCount: 52,
     topics: ['数组', '链表', '树', '图'],
   };
   @State quickAsk: string = '';
   @State notificationOpen: boolean = false;
   @State pressedTask: number = -1;
   @State notificationMessage: string = '学习计划已同步，完成任务会自动更新进度';
-  @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [
-    { id: 't1', title: '复习数组与链表基础', date: '2026-06-27', estimatedMin: 60, type: 'review', done: true },
-    { id: 't2', title: '练习栈与队列题目', date: '2026-06-28', estimatedMin: 90, type: 'practice', done: true },
-    { id: 't3', title: '学习二叉树遍历', date: '2026-06-29', estimatedMin: 75, type: 'reading', done: false },
-  ];
+  @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [];
 
   aboutToAppear(): void {
     this.loadCourses();
@@ -82,6 +78,16 @@ export struct HomeContent {
       };
       plan.tasks = nextTasks;
       await LocalLearningRepository.savePlan(plan);
+      const changedTask = nextTasks.find((item: PlanTask): boolean => item.id === task.id);
+      if (changedTask?.done === true) {
+        const event: StudyEvent = {
+          id: 'event_' + Date.now().toString(),
+          type: 'task_completed',
+          timestamp: new Date().toISOString(),
+          taskId: task.id
+        };
+        await LocalLearningRepository.appendStudyEvent(event);
+      }
       this.planTasks = nextTasks;
     } catch (e) {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
@@ -104,7 +110,7 @@ export struct HomeContent {
     for (const task of this.planTasks) {
       if (!task.done) return task.title;
     }
-    return '今日任务已完成';
+    return this.planTasks.length === 0 ? '制定今日学习计划' : '今日任务已完成';
   }
 
   private submitQuickAsk(): void {
@@ -421,14 +427,34 @@ export struct HomeContent {
       .margin({ bottom: 10 })
 
       Column() {
-        ForEach(this.planTasks.slice(0, 3), (task: PlanTask, index: number) => {
-          this.TaskRow(task, index)
-          if (index < Math.min(this.planTasks.length, 3) - 1) {
-            Divider()
-              .color(Constants.COLOR_BORDER)
-              .margin({ left: 46 })
+        if (this.planTasks.length === 0) {
+          Column({ space: 8 }) {
+            Text('还没有学习计划')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text('设定目标后，学伴会生成可打卡的任务')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Button('制定计划')
+              .height(36)
+              .fontSize(13)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(18)
+              .onClick(() => this.openPlan())
           }
-        })
+          .width('100%')
+          .padding({ top: 18, bottom: 18 })
+        } else {
+          ForEach(this.planTasks.slice(0, 3), (task: PlanTask, index: number) => {
+            this.TaskRow(task, index)
+            if (index < Math.min(this.planTasks.length, 3) - 1) {
+              Divider()
+                .color(Constants.COLOR_BORDER)
+                .margin({ left: 46 })
+            }
+          })
+        }
       }
       .width('100%')
       .padding({ left: 16, right: 16 })
