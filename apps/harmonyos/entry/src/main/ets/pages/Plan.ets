@@ -4,9 +4,10 @@
  */
 
 import { HttpClient } from '../common/HttpClient';
-import { GradientHeader, WorkStep } from '../common/Builders';
+import { GradientHeader, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -18,6 +19,12 @@ interface AgentPlanTask extends PlanTask {
 
 interface AgentStudyPlan extends StudyPlan {
   agentTrace?: string[];
+}
+
+interface PlanValidationResult {
+  valid: boolean;
+  message: string;
+  plan: AgentStudyPlan | null;
 }
 
 @Entry
@@ -193,6 +200,109 @@ struct PlanPage {
     return reason.trim().length > 0 ? reason.trim() : '学伴根据目标拆出的可执行下一步';
   }
 
+  private cleanText(value?: string): string {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private validCourseId(courseId: string): boolean {
+    return courseId === 'cs101' || courseId === 'cs102' || courseId === 'cs103';
+  }
+
+  private validTaskType(type: string): boolean {
+    return type === 'review' || type === 'practice' || type === 'reading' || type === 'quiz';
+  }
+
+  private validTaskAction(action: string): boolean {
+    return action === 'lesson' || action === 'practice' || action === 'quiz' || action === 'review';
+  }
+
+  private validDateText(date: string): boolean {
+    if (date.length !== 10) return false;
+    return date.charAt(4) === '-' && date.charAt(7) === '-' &&
+      !Number.isNaN(Number(date.slice(0, 4))) &&
+      !Number.isNaN(Number(date.slice(5, 7))) &&
+      !Number.isNaN(Number(date.slice(8, 10)));
+  }
+
+  private topicExists(courseId: string, topic: string): boolean {
+    return LearningContentRepository.getTopics(courseId).includes(topic);
+  }
+
+  private planTrace(agentTrace?: string[]): string[] {
+    const traces: string[] = [];
+    const source = Array.isArray(agentTrace) ? agentTrace : [];
+    for (const item of source) {
+      const text = this.cleanText(item);
+      if (text.length > 0 && !traces.includes(text)) {
+        traces.push(text.slice(0, 140));
+      }
+    }
+    return traces.slice(0, 6);
+  }
+
+  private validatePlanResponse(response: AgentStudyPlan | null): PlanValidationResult {
+    const invalid: PlanValidationResult = {
+      valid: false,
+      message: '云端返回的计划不完整，请重新生成',
+      plan: null
+    };
+    if (response === null) return invalid;
+    const planId = this.cleanText(response.planId);
+    const userId = this.cleanText(response.userId);
+    const goal = this.cleanText(response.goal);
+    if (planId.length === 0 || userId.length === 0 || goal.length === 0 || !Array.isArray(response.tasks) ||
+      response.tasks.length === 0) {
+      return invalid;
+    }
+
+    const taskIds: string[] = [];
+    const tasks: PlanTask[] = [];
+    for (const source of response.tasks) {
+      const id = this.cleanText(source.id);
+      const title = this.cleanText(source.title);
+      const date = this.cleanText(source.date);
+      const type = this.cleanText(source.type);
+      const courseId = this.cleanText(source.courseId);
+      const topic = this.cleanText(source.topic);
+      const action = this.cleanText(source.action);
+      const reason = this.cleanText((source as AgentPlanTask).reason);
+      const estimatedMin = Number(source.estimatedMin);
+      if (id.length === 0 || taskIds.includes(id) || title.length === 0 || !this.validDateText(date) ||
+        !this.validTaskType(type) || !this.validCourseId(courseId) || topic.length === 0 ||
+        !this.topicExists(courseId, topic) || !this.validTaskAction(action) ||
+        Number.isNaN(estimatedMin) || estimatedMin < 15 || estimatedMin > 180) {
+        return invalid;
+      }
+      taskIds.push(id);
+      const task: PlanTask = {
+        id: id,
+        title: title,
+        date: date,
+        estimatedMin: Math.round(estimatedMin),
+        type: type,
+        courseId: courseId,
+        topic: topic,
+        action: action,
+        reason: reason.length > 0 ? reason : '学伴根据目标拆出的可执行下一步',
+        done: source.done === true
+      } as AgentPlanTask;
+      tasks.push(task);
+    }
+
+    const plan: AgentStudyPlan = {
+      planId: planId,
+      userId: userId,
+      goal: goal,
+      tasks: tasks,
+      agentTrace: this.planTrace(response.agentTrace)
+    };
+    return {
+      valid: true,
+      message: '',
+      plan: plan
+    };
+  }
+
   private runLocalProgress(): void {
     this.progressStep = 0;
     setTimeout((): void => {
@@ -209,6 +319,16 @@ struct PlanPage {
 
   private currentPlanStepDescription(): string {
     return this.planSteps[this.currentPlanStepIndex()].description;
+  }
+
+  @Builder
+  PlanProgress() {
+    StagedProgress(
+      this.progressStep >= 3 ? '正在同步端侧计划' : 'AI 正在拆解学习路径',
+      this.currentPlanStepDescription() + '，生成后任务可直达学习、练习和测验',
+      this.currentPlanStepIndex(),
+      this.planSteps
+    )
   }
 
   @Builder
@@ -364,6 +484,11 @@ struct PlanPage {
       }
 
       if (this.loading) {
+        Column() {
+          this.PlanProgress()
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, bottom: 12 })
         this.PlanSkeleton()
       } else if (this.tasks.length > 0) {
         if (this.agentTrace.length > 0) {
@@ -540,8 +665,15 @@ struct PlanPage {
         dailyMinutes: 90,
         profile: (await LocalLearningRepository.getProfile()) ?? undefined
       };
-      const plan = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req));
+      const response = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req));
       this.progressStep = 3;
+      const validation = this.validatePlanResponse(response);
+      if (!validation.valid || validation.plan === null) {
+        this.message = validation.message;
+        this.hasError = true;
+        return;
+      }
+      const plan = validation.plan;
       await LocalLearningRepository.savePlan(plan);
       await LearningFormUpdater.refreshAll();
       this.tasks = plan.tasks;

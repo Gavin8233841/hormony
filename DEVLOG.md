@@ -5491,3 +5491,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次尚未执行模拟器 UI 树/截图验收，课程详情与精选练习到 AI 测验的点击流仍为构建通过，未标记模拟器通过。
 - 生产 Vercel 与 HarmonyOS 端真实 AI 出题在线链路未重新验收。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：增强端侧学习计划生成反馈与契约校验
+
+背景：用户指出规划和 AI 出题在模拟器中仍存在不可用感，且生成阶段不能像卡住。本批次聚焦 HarmonyOS 端 Plan 页，不做视觉换色，补齐生成中阶段反馈和端侧响应结构校验，避免云端异常计划被保存成本地可用计划。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+
+行为变化：
+- Plan 页生成期间新增与 Quiz 一致的 `StagedProgress` 阶段卡，明确展示“画像 → 选题 → 编排 → 同步”，同时保留任务 skeleton，减少等待空白感。
+- 端侧保存计划前新增 `validatePlanResponse`：校验 `planId`、`userId`、`goal`、非空任务、任务 ID 唯一、日期格式、任务类型、action、课程 ID、真实 Topic、预计时长和 agentTrace。
+- 只有能直达现有课程 Topic 的计划任务才会写入 `LocalLearningRepository`；不完整计划返回“云端返回的计划不完整，请重新生成”，不污染首页和服务卡片。
+- 规划任务继续保留 action 路由，合法任务可直达 Lesson、Practice、Quiz 或复盘流程。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 509 ms`；仍提示未配置 signingConfigs。
+
+未验证：
+- 本批次尚未安装到模拟器点击验证 Plan 生成与任务跳转，因此证据等级为构建通过。
+- 生产 Vercel `/api/plan` 线上响应未重新验收。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
