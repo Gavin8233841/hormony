@@ -50,3 +50,10 @@ export interface LearningCuratedQuestion extends CuratedQuestion {
   difficulty?: string;
   tags?: string[];
 }
+
+export interface LearningQuizStatsAggregate {
+  totalQuestions: number;
+  accuracy: number;
+  studyDates: string[];
+  updatedAt: string;
+}

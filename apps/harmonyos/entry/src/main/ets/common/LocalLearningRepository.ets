@@ -12,6 +12,7 @@ import {
 import {
   LearningQuizResult as QuizResult,
   LearningQuizResultDetail as QuizResultDetail,
+  LearningQuizStatsAggregate as QuizStatsAggregate,
   LearningReviewItem as ReviewItem,
   LearningStudyEvent as StudyEvent,
   LearningTagInsight as TagInsight
@@ -19,7 +20,7 @@ import {
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 6;
+const SCHEMA_VERSION: number = 7;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -30,6 +31,7 @@ const KEY_STUDY_EVENTS: string = 'study_events';
 const KEY_LESSON_PROGRESS: string = 'lesson_progress';
 const KEY_REVIEW_ITEMS: string = 'review_items';
 const KEY_TOPIC_MASTERY: string = 'topic_mastery';
+const KEY_QUIZ_STATS: string = 'quiz_stats';
 const KEY_FORM_IDS: string = 'form_ids';
 
 export class LocalLearningRepository {
@@ -109,6 +111,11 @@ export class LocalLearningRepository {
       const mastery = await LocalLearningRepository.rebuildTopicMasteryFromResults();
       await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, mastery);
     }
+    if (previousVersion < 7) {
+      const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
+      const stats = await LocalLearningRepository.rebuildQuizStatsAggregate(profile ?? undefined);
+      await LocalLearningRepository.putValue<QuizStatsAggregate>(KEY_QUIZ_STATS, stats);
+    }
   }
 
   private static async ensureDefaults(): Promise<void> {
@@ -181,25 +188,17 @@ export class LocalLearningRepository {
   static async getProfile(): Promise<UserProfile | null> {
     const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
     if (profile === null) return null;
-    const results = await LocalLearningRepository.getQuizResults();
-    let totalQuestions = 0;
-    let correctQuestions = 0;
-    const studyDates: string[] = [];
-    for (const result of results) {
-      totalQuestions += result.totalQuestions;
-      correctQuestions += result.correctCount;
-      const date = LocalLearningRepository.localDateKey(new Date(result.submittedAt));
-      if (!studyDates.includes(date)) studyDates.push(date);
-    }
+    const quizStats = await LocalLearningRepository.getQuizStatsAggregate(profile);
+    const studyDates: string[] = quizStats.studyDates.slice();
     const events = await LocalLearningRepository.getStudyEvents();
     for (const event of events) {
       const date = LocalLearningRepository.localDateKey(new Date(event.timestamp));
       if (!studyDates.includes(date)) studyDates.push(date);
     }
     profile.stats = {
-      totalQuestions: totalQuestions,
-      accuracy: totalQuestions > 0 ? correctQuestions / totalQuestions : 0,
-      studyDays: studyDates.length,
+      totalQuestions: quizStats.totalQuestions,
+      accuracy: quizStats.totalQuestions > 0 ? quizStats.accuracy : 0,
+      studyDays: Math.max(studyDates.length, profile.stats.studyDays),
       streakDays: LocalLearningRepository.calculateStreakDays(studyDates)
     };
     return profile;
@@ -283,6 +282,7 @@ export class LocalLearningRepository {
     const results = await LocalLearningRepository.getQuizResults();
     results.unshift(result);
     await LocalLearningRepository.putValue<QuizResult[]>(KEY_QUIZ_RESULTS, results.slice(0, 20));
+    await LocalLearningRepository.updateQuizStatsAggregate(result);
     const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
     if (profile !== null) {
       for (const topic of result.weakTopics) {
@@ -312,6 +312,49 @@ export class LocalLearningRepository {
     });
     await LocalLearningRepository.updateTopicMastery(result);
     await LocalLearningRepository.updateReviewItems(result);
+  }
+
+  private static async getQuizStatsAggregate(profile?: UserProfile): Promise<QuizStatsAggregate> {
+    let stats = await LocalLearningRepository.getValue<QuizStatsAggregate>(KEY_QUIZ_STATS);
+    if (stats === null) {
+      stats = await LocalLearningRepository.rebuildQuizStatsAggregate(profile);
+      await LocalLearningRepository.putValue<QuizStatsAggregate>(KEY_QUIZ_STATS, stats);
+    }
+    return stats;
+  }
+
+  private static async updateQuizStatsAggregate(result: QuizResult): Promise<void> {
+    const stats = await LocalLearningRepository.getQuizStatsAggregate();
+    LocalLearningRepository.applyResultToQuizStats(stats, result);
+    await LocalLearningRepository.putValue<QuizStatsAggregate>(KEY_QUIZ_STATS, stats);
+  }
+
+  private static async rebuildQuizStatsAggregate(profile?: UserProfile): Promise<QuizStatsAggregate> {
+    const stats: QuizStatsAggregate = {
+      totalQuestions: 0,
+      accuracy: 0,
+      studyDates: [],
+      updatedAt: ''
+    };
+    const results = await LocalLearningRepository.getQuizResults();
+    for (const result of results.slice().reverse()) {
+      LocalLearningRepository.applyResultToQuizStats(stats, result);
+    }
+    if (profile !== undefined && profile.stats.totalQuestions > stats.totalQuestions) {
+      stats.totalQuestions = profile.stats.totalQuestions;
+      stats.accuracy = Math.min(Math.max(profile.stats.accuracy, 0), 1);
+    }
+    return stats;
+  }
+
+  private static applyResultToQuizStats(stats: QuizStatsAggregate, result: QuizResult): void {
+    const previousCorrect = stats.totalQuestions * stats.accuracy;
+    const nextTotal = stats.totalQuestions + result.totalQuestions;
+    stats.totalQuestions = nextTotal;
+    stats.accuracy = nextTotal > 0 ? (previousCorrect + result.correctCount) / nextTotal : 0;
+    const date = LocalLearningRepository.localDateKey(new Date(result.submittedAt));
+    if (!stats.studyDates.includes(date)) stats.studyDates.push(date);
+    stats.updatedAt = result.submittedAt;
   }
 
   private static async updateReviewItems(result: QuizResult): Promise<void> {

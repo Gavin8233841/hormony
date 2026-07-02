@@ -5132,3 +5132,26 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - OCR、TTS、Lottie、distributedKVStore 仍未验证。
 - 生产 Vercel 尚未部署本地 Web 改动；本批次线上接口未重新验收。
 - 旧用户超出已保留本地结果的历史答题明细无法回填；新结果会持续写入 Topic 掌握聚合。
+
+---
+
+## 2026-07-02 Codex 鸿蒙1.13：端侧画像长期答题统计聚合
+
+背景：继续推进学习闭环复核。上一批次已经把 Topic 掌握状态做成持久聚合，但画像页的“累计答题/正确率”仍从最近 20 条 `quiz_results` 推导，长期使用后会丢历史统计。本批次把复盘列表和长期画像统计解耦。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/model/LearningMetadataModels.ets`
+
+行为变化：
+- `LocalLearningRepository` schema 升至 7，新增 `quiz_stats` 本地状态键。
+- `quiz_results` 继续只保留最近 20 次用于复盘；`quiz_stats` 保存累计答题数、累计正确率、已知练习日期和更新时间。
+- `appendQuizResult()` 每次提交后同步更新 `quiz_stats`，画像页 `getProfile()` 改为读取长期聚合，不再被最近 20 次结果截断。
+- 迁移时从现有最近结果重建聚合，并在存在更大历史画像统计时保留其累计题数和正确率；无法精确还原的历史练习日期不伪造。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 19 s 231 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未做模拟器页面截图；本批次为本地状态聚合逻辑，证据等级为构建通过。
+- 真机未验证。
