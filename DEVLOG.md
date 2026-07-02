@@ -5106,3 +5106,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 当前批次不修改 Web 端 Agent/API；Plan/Quiz 真实可用性由后续 Web handoff 线程继续推进。
 - 旧历史消息在本批次前未保存 `thinking` 的主 Agent 步骤时只能展示已有 `agentTrace`，不会伪造缺失步骤；新历史会保留 `thinking`。
+
+---
+
+## 2026-07-03 Codex：端侧前端资源扩展审计
+
+背景：继续为端侧前端补充可用资源和成熟产品资产参考，重点核验许可证、可访问性、ArkUI 落地边界和不进入 HAP 的风险项。本批次只新增审计文档，不修改端侧代码、依赖或资源目录。
+
+文件：
+- docs/FRONTEND-ASSET-EXPANSION-20260703.md
+
+行为变化：
+- 扩展审计 Heroicons、Bootstrap Icons、Fluent UI System Icons、Remix Icon、JetBrains Mono、Fira Code、Cascadia Code、IBM Plex Mono、IRA Design、DrawKit、Storyset、Lordicon、OpenMoji、Twemoji、Lottie web、Rive runtime、Shiki、highlight.js、PrismJS、markdown-it、Mermaid、Cytoscape.js、D3、Carbon、Atlassian Design Tokens、CodeCombat 和 LeetCode Study Plan。
+- 明确推荐下一轮只做 `.tmp/` 视觉比对的方向：Fluent/Heroicons/Bootstrap 三选一补图标、JetBrains Mono 单字重试验、IRA/DrawKit 少量空态插画。
+- 明确不推荐进入 HAP 的方向：Lordicon 免费图标、Storyset 免费插画、OpenMoji、Twemoji、Remix Icon、Rive runtime、Web 语法高亮库和 Web 图谱库 runtime。
+
+验证：
+- `git status --short` 初始无输出；`git log -5 --oneline` 已确认当前资源审计分支 HEAD。
+- `ohpm info @luvi/lv-markdown-in`、`ohpm info @ohos/lottie-turbo`、`ohpm info @ohos/lottie`、`ohpm info @ohos/mpchart`：均 exit 1，OHPM 返回 502 Bad Gateway；本批次不记录这些包为许可或版本通过。
+- `Invoke-WebRequest` 可访问性抽查：Heroicons、Bootstrap Icons、Fluent Icons、DrawKit、Storyset、Lordicon、Shiki、Cytoscape、Carbon、Atlassian Design Tokens、CodeCombat 等返回 HTTP 200；LottieFiles license 和 LeetCode Study Plan 本机返回 HTTP 403。
+- GitHub raw LICENSE/API 抽查：Heroicons、Bootstrap Icons、Fluent UI System Icons、JetBrains Mono、Fira Code、IRA Design、Shiki、highlight.js、PrismJS、markdown-it、Mermaid、Cytoscape.js、D3、Carbon、Rive runtime、lottie-web、dotlottie-web 等许可证文本或 API 成功读取。
+
+未验证：
+- 未下载任何 SVG、字体、插画、Lottie 或 Rive 文件；未进行 ArkUI 渲染、HAP 体积、模拟器或真机验证。
+- Web/JS 资源只作为模式参考，未作为 HarmonyOS 依赖验证。
