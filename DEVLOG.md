@@ -4738,6 +4738,79 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## [2026-07-01T08:08:00Z] [2026-07-01 16:08 CST] 模型: Trae (P1+P2+P3 全部完成汇总)
+
+### 背景
+
+按 `docs/TRAE-CONTINUATION-20260701.md` 任务包执行，本轮完成 P1（模型验证）、P2（数据施工 B→C→A→E→D）和 P3（前端资源收口）全部任务。
+
+### 完成清单
+
+| 任务 | 状态 | 关键产出 |
+|------|------|---------|
+| P1: Vercel MODEL_NAME 修正 | ✅ | 环境变量更新为 `doubao-seed-2-1-pro-260628`，部署 `dpl_FQp3qwuc78Sw4SifdP5ryn4PeNBX`，Health/Chat/Quiz/Plan 四端点验证通过 |
+| P2-B: 知识星图关系数据 | ✅ | `topic-relations.json`（33 节点），`scripts/validate-topic-relations.py`（6 项校验全通过），`docs/TOPIC-RELATION-AUDIT.md` |
+| P2-C: CLI 冒烟脚本 | ✅ | `scripts/harmonyos-app-smoke.ps1`（从 UI 树 bounds 计算点击中心，不写死坐标） |
+| P2-A: 精选题库扩充 | ✅ | `quizzes.ts` 25→33 block，60→165 道选择题，每 topic ≥ 5 道；`scripts/generate-quizzes-json.mjs`；`docs/QUIZ-CONTENT-AUDIT-2.md`；data-integrity.test.ts 新增 2 个测试 |
+| P2-E: 资源与内容质量审计 | ✅ | 147 条切片审计（1 个矛盾已修复：cs103_k17 TIME_WAIT 数学），36 条外部资源审计（0 问题），`docs/CONTENT-QUALITY-AUDIT.md` |
+| P2-D: 设备适配与可访问性审计 | ✅ | 13 个问题（3 P0 / 5 P1 / 5 P2），HAP 构建通过，`docs/HARMONYOS-LAYOUT-AUDIT-2.md` |
+| P3: 前端资源收口 | ✅ | 53 个文件分析，3 个 Lottie JSON 采用，8 个 Web 专用库拒绝，`docs/FRONTEND-RESOURCE-ADOPTION.md` |
+
+### 新增文件清单
+
+| 文件 | 类型 |
+|------|------|
+| `docs/TRAE-BOUNDARY-20260701.md` | 边界文档 |
+| `apps/harmonyos/.../rawfile/learning/topic-relations.json` | 知识星图数据 |
+| `scripts/validate-topic-relations.py` | 校验脚本 |
+| `docs/TOPIC-RELATION-AUDIT.md` | 审计文档 |
+| `scripts/harmonyos-app-smoke.ps1` | 冒烟测试脚本 |
+| `scripts/generate-quizzes-json.mjs` | 题库生成脚本 |
+| `docs/QUIZ-CONTENT-AUDIT-2.md` | 题库审计文档 |
+| `docs/CONTENT-QUALITY-AUDIT.md` | 内容质量审计文档 |
+| `docs/HARMONYOS-LAYOUT-AUDIT-2.md` | 布局审计文档 |
+| `docs/FRONTEND-RESOURCE-ADOPTION.md` | 前端资源收口文档 |
+
+### 修改文件清单
+
+| 文件 | 改动 |
+|------|------|
+| `apps/web/src/lib/data/quizzes.ts` | 25→33 block，60→165 选择题，9 个 topic 名修正，2 个拆分 |
+| `apps/web/src/lib/data/data-integrity.test.ts` | 新增 2 个测试用例 |
+| `apps/web/src/lib/data/index.ts` | 注释更新 |
+| `apps/web/src/lib/data/cs103-knowledge.ts` | 修复 cs103_k17 TIME_WAIT 数学矛盾 |
+| `apps/harmonyos/.../rawfile/learning/quizzes.json` | 重新生成（165 选择题） |
+| `apps/harmonyos/.../rawfile/learning/knowledge-chunks.json` | 修复 cs103_k17 |
+| `apps/web/src/app/api/health/route.ts` | 暴露 model.name + 版本号 1.0.1（P1 诊断改动） |
+| `apps/web/src/app/api/chat/route.ts` | SSE 错误按错误码分类展示（P1 改动） |
+
+### 最终验证
+
+| 验证项 | 命令 | 退出码 | 结果 |
+|--------|------|--------|------|
+| TSC | `npx tsc --noEmit` | 0 | 0 errors |
+| 单元测试 | `npx vitest run` | 0 | 9 files, 88 tests passed |
+| topic-relations 校验 | `python scripts/validate-topic-relations.py` | 0 | 6/6 PASS |
+| git diff --check | `git diff --check` | 0 | 无错误 |
+| 敏感信息扫描 | 暂存差异敏感关键词扫描 | 0 | 无泄露 |
+
+### 受保护区域确认
+
+以下文件本轮未修改：
+- `apps/web/src/lib/agents/` 目录（所有 Agent 文件）
+- `apps/web/src/app/api/` 目录（health/route.ts 和 chat/route.ts 是 P1 诊断改动，在 Codex 审查前已提交）
+- `apps/harmonyos/` 下所有 .ets 文件
+- `model.ts`, `orchestrator.ts`
+- 数据库迁移、Safety、模型调用
+
+### 安全说明
+
+- Vercel Token 仅通过环境变量传递，未在任何文件、日志或输出中回显
+- DEVLOG 中只记录"已配置"状态
+- `docs/TRAE-BOUNDARY-20260701.md` 已明确安全操作规范
+
+---
+
 ## 2026-07-01 Codex：复习到期队列、连续学习与卡片主动刷新
 
 ### 本地学习状态
@@ -4861,6 +4934,7 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Pura 90 Pro Max 模拟器安装、启动、返回导航、学习记录和成就页均通过。
 - 视觉证据：`screenshots/codex-growth-design-20260701/activity-records-final.jpeg`、`achievements.jpeg`。
 - 未改动 Trae 正在施工的 Web 页面和 `client-api` 文件。
+
 ---
 
 ## 2026-07-01 Codex：真实 AI 模拟器链路与主动学习环节
