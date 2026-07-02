@@ -5138,3 +5138,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未在设备上伪造 malformed AI 题包；坏包拦截本批次证据等级为源码确认与构建通过。
 - 未触发一次真实模型 AI 出题生成，避免本批次为端侧守卫改动额外消耗长模型请求；本机 Web `/api/health` 返回 200 且模型已配置，但未作为 Quiz 线上生成通过证据。
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex：AI 测验单题即时反馈
+
+背景：继续按成熟学习产品标准推进练习闭环；上一批次已保证 AI 题包坏数据不会入库，本批次把 AI Quiz 从“答完一组才知道结果”推进为“每题先选择、再查看反馈、锁定答案、最后提交总结”的练习节奏。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- DEVLOG.md
+
+行为变化：
+- Quiz 答题态新增“即时反馈”进度，显示已查看反馈题数，例如 `1 / 5 已查看`。
+- 用户选项后必须点击“查看本题反馈”才能进入下一题；最后提交前必须全部题目已答且全部反馈已查看。
+- 查看反馈后答案锁定，后续点击其他选项不会改写 `answers`。
+- AI Quiz 使用本页专用选项 Builder：反馈前保留选择态，反馈后正确选项显示成功色，错选项显示错误色，并用系统 Symbol 标记对错。
+- 单题反馈卡展示“判断正确 / 先标记这个薄弱点”“答案已锁定”、用户答案、必要时的正确答案和解析；错题文案收紧为“提交成功后会进入复盘链路”，避免提交前过度承诺。
+- 上一题/下一题切换复用 `Scroller.scrollTo` 回到题面顶部，减少长解析后进入下一题仍停在底部的割裂感。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，最终复跑 `BUILD SUCCESSFUL in 14 s 487 ms`；`CompileArkTS`、`PackageHap`、`SignHap` 均完成，仍为 unsigned HAP，签名未配置。
+- HAP 安装：`hdc install -r C:\Users\guo82\.codex\worktrees\5cef\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。真实 AI Quiz 生成成功进入第 1 题；UI 树确认“即时反馈”“0 / 5 已查看”“查看本题反馈”“下一题”存在。
+- 选择 A 后查看反馈，UI 树确认“1 / 5 已查看”“判断正确”“答案已锁定”“你的答案：A...”存在；截图显示 A 选项成功色、反馈卡和解析区域。
+- 反馈后点击 B，UI 树仍显示“你的答案：A...”，证明答案锁定后不会被改写。
+- 证据位于 `.tmp/codex-learning-loop-20260702/quiz-immediate-feedback/`，包括 `quiz-question-before-feedback.png`、`quiz-feedback-visible.png`、`full_dump_hormony_20260703000543612.json`、`full_dump_hormony_20260703000716476.json`、`full_dump_hormony_20260703000812343.json`，不提交仓库。
+
+未验证：
+- 本批次未完成整组 5 题提交到结果页；最终入库仍沿用既有 `submitQuiz()` 和 `LocalLearningRepository.appendQuizResult()`，但“全部反馈后提交”的完整设备流程未跑完。
+- 新增切题回顶行为为源码确认与构建通过，未取得切题前后滚动位置截图。
+- 真机未验证。
