@@ -1,7 +1,12 @@
 // Quiz Agent：测验题生成
 // 仅使用真实模型动态生成。精选题库通过独立 GET 接口提供，不冒充 AI。
 
-import { callModel, extractJsonPayload } from "./model";
+import {
+  callModel,
+  extractJsonPayload,
+  KnowledgeUnavailableError,
+  ModelInvalidResponseError,
+} from "./model";
 import { generateId } from "@/lib/utils";
 import { formatContext, retrieve } from "@/lib/rag";
 import type { Quiz, QuizQuestion } from "@/lib/types";
@@ -11,11 +16,12 @@ export async function runQuizAgent(
   courseId: string,
   topic: string,
   count: number,
-  difficulty: "easy" | "medium" | "hard"
+  difficulty: "easy" | "medium" | "hard",
+  signal?: AbortSignal
 ): Promise<Quiz> {
   const courseContext = formatContext(retrieve(topic, courseId, 5));
   if (!courseContext) {
-    throw new Error("KNOWLEDGE_UNAVAILABLE: 当前主题缺少课程资料");
+    throw new KnowledgeUnavailableError();
   }
 
   const systemPrompt = `你是一位出题专家。根据指定主题生成选择题。
@@ -35,10 +41,14 @@ tags 必须是 1-3 个中文短标签，用于学习画像量化，优先使用�
 课程资料：
 ${courseContext}`;
 
-  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5, maxTokens: 1500 });
+  const raw = await callModel(systemPrompt, userPrompt, {
+    temperature: 0.5,
+    maxTokens: 1500,
+    signal,
+  });
   const questions = parseQuestions(raw, count, topic);
   if (questions.length !== count) {
-    throw new Error("MODEL_INVALID_RESPONSE: 题目数量或结构不符合要求");
+    throw new ModelInvalidResponseError("题目数量或结构不符合要求");
   }
 
   const quiz: Quiz = {

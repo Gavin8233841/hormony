@@ -19,6 +19,10 @@ const INJECTION_PATTERNS = [
   /system\s*:\s*/i,
   /\[INST\]|\[\/INST\]/i,
   /reveal\s+(your|the)\s+(system\s+)?prompt/i,
+  /忽略(之前|以上|上面|所有).*(指令|规则|提示词|系统提示)/i,
+  /不要遵守.*(指令|规则|提示词|系统提示)/i,
+  /(显示|透露|泄露).*(系统提示|提示词|system\s*prompt)/i,
+  /你现在是(一个|一名)?/i,
 ];
 
 // PII 检测（中国大陆手机号、身份证号）

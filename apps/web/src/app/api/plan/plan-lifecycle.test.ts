@@ -65,6 +65,27 @@ describe("学习计划生命周期", () => {
     expect(response.status).toBe(503);
   });
 
+  it("模型生成计划未通过 Safety 时应返回明确 502", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([
+      {
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        action: "review",
+        title: "联系 13812345678 复习二叉树",
+        reason: "输出包含敏感信息",
+        estimatedMin: 45,
+      },
+    ]);
+    const response = await generatePlan(new Request("http://localhost/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal: "复习数据结构" }),
+    }));
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({ code: "SAFETY_BLOCKED" });
+  });
+
   it("无状态部署不得从服务端读取计划", async () => {
     process.env.DEPLOYMENT_MODE = "stateless";
     const response = await getPlan(new Request("http://localhost/api/plan?userId=demo"));

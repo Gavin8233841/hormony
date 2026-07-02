@@ -9,27 +9,31 @@
 import { NextRequest } from "next/server";
 import { orchestrateStream } from "@/lib/agents/orchestrator";
 import { sanitizeUserId } from "@/lib/utils";
-import type { ChatRequest, StreamEvent } from "@/lib/types";
+import type { ChatMessage, ChatRequest, StreamEvent } from "@/lib/types";
 import { getModelRuntimeInfo } from "@/lib/agents/model";
 import { validateUserInput } from "@/lib/agents/safety-agent";
-import type { LearningProfileSnapshot } from "@/lib/types";
 import { modelErrorResponse } from "@/lib/api-errors";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
+import { sanitizeLearningProfile, validationError } from "@/lib/api-validation";
+import { isCourseId } from "@/lib/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
-  const parsed = await readJsonObject<ChatRequest>(req);
+  const parsed = await readJsonObject<Record<string, unknown>>(req);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
 
-  if (!body.message) {
+  if (body.message === undefined) {
     return Response.json({ error: "缺少 message 字段", code: "MISSING_FIELD" }, { status: 400 });
   }
+  if (typeof body.message !== "string") {
+    return Response.json({ error: "message 必须是字符串", code: "INVALID_MESSAGE" }, { status: 400 });
+  }
 
-  const message = String(body.message).trim();
+  const message = body.message.trim();
   if (message.length === 0) {
     return Response.json({ error: "message 不能为空", code: "MISSING_FIELD" }, { status: 400 });
   }
@@ -46,27 +50,27 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = sanitizeUserId(body.userId);
-  body.profile = sanitizeProfile(body.profile);
-  if (body.context !== undefined && !isJsonObject(body.context)) {
+  const profile = sanitizeLearningProfile(body.profile);
+  if (!profile.ok) return profile.response;
+  const profileSafetyFlags = profile.value ? validateUserInput(profileSafetyText(profile.value)) : [];
+  if (profileSafetyFlags.length > 0) {
     return Response.json(
-      { error: "context 必须是对象", code: "INVALID_CONTEXT" },
+      { error: "画像内容不符合安全要求", code: "INPUT_REJECTED" },
       { status: 400 }
     );
   }
-  if (body.context) {
-    const courseId = String(body.context.courseId ?? "");
-    body.context = {
-      courseId: ["cs101", "cs102", "cs103"].includes(courseId) ? courseId : undefined,
-      sessionId: String(body.context.sessionId ?? "").slice(0, 100) || undefined,
-    };
-  }
 
-  if (
-    body.history !== undefined &&
-    (!Array.isArray(body.history) || !body.history.every(isJsonObject))
-  ) {
+  const context = sanitizeContext(body.context);
+  if (!context.ok) return context.response;
+
+  const history = sanitizeHistory(body.history);
+  if (!history.ok) return history.response;
+  const historySafetyFlags = validateUserInput(
+    (history.value ?? []).map((item) => item.content).join("\n")
+  );
+  if (historySafetyFlags.length > 0) {
     return Response.json(
-      { error: "history 必须是消息对象数组", code: "INVALID_HISTORY" },
+      { error: "历史消息不符合安全要求", code: "INPUT_REJECTED" },
       { status: 400 }
     );
   }
@@ -78,20 +82,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 限制对话历史大小（最多 12 条消息，每条最多 1000 字符，仅允许 user/assistant 角色）
-  if (body.history) {
-    body.history = body.history
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .slice(-12)
-      .map((m) => ({
-        role: m.role,
-        content: String(m.content ?? "").slice(0, 1000),
-      }));
-  }
+  const chatRequest: ChatRequest = {
+    userId,
+    message,
+    profile: profile.value,
+    context: context.value,
+    history: history.value,
+  };
 
   const encoder = new TextEncoder();
   const sse = (event: StreamEvent) =>
     encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+  const abortController = new AbortController();
 
   // 在建立 SSE 流之前，先探测编排是否能够正常产出首个事件：
   // - 首个事件到来：建立 200 流并回放已缓冲事件，后续事件实时推送；
@@ -127,7 +129,7 @@ export async function POST(req: NextRequest) {
   // 后台启动编排（不阻塞当前函数；错误在 catch 中捕获并触发 500 或流中错误事件）
   const orchestratePromise = (async () => {
     try {
-      await orchestrateStream({ ...body, userId }, emit);
+      await orchestrateStream(chatRequest, emit, abortController.signal);
     } catch (err) {
       orchestrateError = err;
       if (!primed) {
@@ -171,12 +173,16 @@ export async function POST(req: NextRequest) {
           const errDetail = orchestrateError instanceof Error
             ? orchestrateError.message
             : String(orchestrateError);
-          const errCode = (orchestrateError as { code?: string })?.code ?? "INTERNAL_ERROR";
+          const errCode = streamErrorCode(orchestrateError);
           // 对用户展示安全摘要，完整错误仅入日志
           const userMessage = errCode === "MODEL_UNAVAILABLE"
             ? "云端学伴暂不可用，请稍后重试"
+            : errCode === "MODEL_TIMEOUT"
+              ? "模型请求超时，请稍后重试"
             : errCode === "MODEL_INVALID_RESPONSE"
               ? "模型返回内容无效，请重新生成"
+              : errCode === "KNOWLEDGE_UNAVAILABLE"
+                ? "当前主题缺少课程资料，请换一个主题重试"
               : "服务处理异常，请稍后重试";
           controller.enqueue(
             sse({ type: "error", code: errCode, message: userMessage })
@@ -201,6 +207,7 @@ export async function POST(req: NextRequest) {
     },
     cancel() {
       // 客户端断开连接：停止向 controller 写入，避免在已取消的流上抛错
+      abortController.abort();
       controllerRef = null;
     },
   });
@@ -214,23 +221,86 @@ export async function POST(req: NextRequest) {
   });
 }
 
-function sanitizeProfile(profile?: LearningProfileSnapshot): LearningProfileSnapshot | undefined {
-  if (!profile) return undefined;
-  return {
-    stage: String(profile.stage ?? "").slice(0, 40),
-    weakTopics: Array.isArray(profile.weakTopics)
-      ? profile.weakTopics.slice(0, 10).map((item) => String(item).slice(0, 40))
-      : [],
-    strongTopics: Array.isArray(profile.strongTopics)
-      ? profile.strongTopics.slice(0, 10).map((item) => String(item).slice(0, 40))
-      : [],
-    learningStyle: String(profile.learningStyle ?? "").slice(0, 40),
-    stats: {
-      totalQuestions: Math.max(0, Number(profile.stats?.totalQuestions) || 0),
-      accuracy: Math.min(Math.max(Number(profile.stats?.accuracy) || 0, 0), 1),
-      studyDays: Math.max(0, Number(profile.stats?.studyDays) || 0),
-    },
-  };
+function profileSafetyText(profile: NonNullable<ChatRequest["profile"]>): string {
+  return [
+    profile.stage,
+    profile.learningStyle,
+    ...profile.weakTopics,
+    ...profile.strongTopics,
+  ].join("\n");
+}
+
+function sanitizeContext(value: unknown): ReturnType<typeof validationError> | {
+  ok: true;
+  value: ChatRequest["context"];
+} {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (!isJsonObject(value)) {
+    return validationError("context 必须是对象", "INVALID_CONTEXT");
+  }
+
+  let courseId: string | undefined;
+  if (value.courseId !== undefined) {
+    if (typeof value.courseId !== "string" || !isCourseId(value.courseId)) {
+      return validationError("context.courseId 不受支持", "INVALID_COURSE");
+    }
+    courseId = value.courseId;
+  }
+
+  let sessionId: string | undefined;
+  if (value.sessionId !== undefined) {
+    if (typeof value.sessionId !== "string") {
+      return validationError("context.sessionId 必须是字符串", "INVALID_CONTEXT");
+    }
+    const trimmed = value.sessionId.trim().slice(0, 100);
+    sessionId = trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  return { ok: true, value: { courseId, sessionId } };
+}
+
+function sanitizeHistory(value: unknown): ReturnType<typeof validationError> | {
+  ok: true;
+  value: ChatMessage[] | undefined;
+} {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (!Array.isArray(value) || !value.every(isJsonObject)) {
+    return validationError("history 必须是消息对象数组", "INVALID_HISTORY");
+  }
+  const messages: ChatMessage[] = [];
+  for (const item of value) {
+    if (item.role !== "user" && item.role !== "assistant") {
+      return validationError("history.role 仅支持 user 或 assistant", "INVALID_HISTORY");
+    }
+    if (typeof item.content !== "string") {
+      return validationError("history.content 必须是字符串", "INVALID_HISTORY");
+    }
+    if (item.content.trim().length > 0) {
+      messages.push({
+        role: item.role,
+        content: item.content.slice(0, 1000),
+      });
+    }
+  }
+  return { ok: true, value: messages.slice(-12) };
+}
+
+function streamErrorCode(error: unknown): string {
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof (error as { code?: unknown }).code === "string"
+  ) {
+    return (error as { code: string }).code;
+  }
+  if (error instanceof Error && error.message.startsWith("MODEL_INVALID_RESPONSE:")) {
+    return "MODEL_INVALID_RESPONSE";
+  }
+  if (error instanceof Error && error.message.startsWith("KNOWLEDGE_UNAVAILABLE:")) {
+    return "KNOWLEDGE_UNAVAILABLE";
+  }
+  return "INTERNAL_ERROR";
 }
 
 export async function OPTIONS() {

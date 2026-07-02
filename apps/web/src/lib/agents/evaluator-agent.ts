@@ -14,19 +14,24 @@ interface AnswerRecord {
 export async function runEvaluatorAgent(
   userId: string,
   answers: AnswerRecord[],
-  profile?: LearningProfileSnapshot
+  profile?: LearningProfileSnapshot,
+  signal?: AbortSignal
 ): Promise<AgentResult> {
   // 模式 1：有答题记录 → 详细错题分析
   if (answers.length > 0) {
-    return analyzeAnswers(userId, answers);
+    return analyzeAnswers(userId, answers, signal);
   }
 
   // 模式 2：无答题记录 → 基于画像的薄弱点分析
-  return analyzeProfile(profile);
+  return analyzeProfile(profile, signal);
 }
 
 // 基于答题记录的详细分析
-async function analyzeAnswers(userId: string, answers: AnswerRecord[]): Promise<AgentResult> {
+async function analyzeAnswers(
+  userId: string,
+  answers: AnswerRecord[],
+  signal?: AbortSignal
+): Promise<AgentResult> {
   const correct = answers.filter((a) => a.userAnswer.trim().toUpperCase() === a.correctAnswer.trim().toUpperCase()).length;
   const accuracy = answers.length > 0 ? correct / answers.length : 0;
   const wrongAnswers = answers.filter((a) => a.userAnswer.trim().toUpperCase() !== a.correctAnswer.trim().toUpperCase());
@@ -78,7 +83,11 @@ ${answers.map((a, i) => {
 
 ${relatedKnowledge ? `相关参考资料：\n${relatedKnowledge}` : ""}`;
 
-  const content = await callModel(systemPrompt, userPrompt, { temperature: 0.3, maxTokens: 2048 });
+  const content = await callModel(systemPrompt, userPrompt, {
+    temperature: 0.3,
+    maxTokens: 2048,
+    signal,
+  });
 
   return {
     agent: "Evaluator",
@@ -88,7 +97,10 @@ ${relatedKnowledge ? `相关参考资料：\n${relatedKnowledge}` : ""}`;
 }
 
 // 基于用户画像的薄弱点分析（无答题记录时）
-async function analyzeProfile(profile?: LearningProfileSnapshot): Promise<AgentResult> {
+async function analyzeProfile(
+  profile?: LearningProfileSnapshot,
+  signal?: AbortSignal
+): Promise<AgentResult> {
   if (!profile) {
     return {
       agent: "Evaluator",
@@ -124,7 +136,11 @@ async function analyzeProfile(profile?: LearningProfileSnapshot): Promise<AgentR
 - 薄弱知识点：${profile.weakTopics.join("、") || "暂无"}
 - 已掌握知识点：${profile.strongTopics.join("、") || "暂无"}`;
 
-  const content = await callModel(systemPrompt, userPrompt, { temperature: 0.4, maxTokens: 1536 });
+  const content = await callModel(systemPrompt, userPrompt, {
+    temperature: 0.4,
+    maxTokens: 1536,
+    signal,
+  });
 
   return {
     agent: "Evaluator",

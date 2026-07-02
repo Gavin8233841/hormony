@@ -20,6 +20,12 @@ export async function POST(req: Request) {
 
   const userId = sanitizeUserId(body.userId);
   const goal = String(body.goal ?? "").trim();
+  if (body.tasks !== undefined && !Array.isArray(body.tasks)) {
+    return Response.json(
+      { error: "任务列表必须是数组", code: "INVALID_TASKS" },
+      { status: 400 }
+    );
+  }
   const tasks = Array.isArray(body.tasks) ? body.tasks : [];
 
   if (!goal) {
@@ -43,16 +49,8 @@ export async function POST(req: Request) {
   const taskObjects = tasks as unknown as Record<string, unknown>[];
 
   for (const task of taskObjects) {
-    if (task.courseId !== undefined && !isCourseId(String(task.courseId))) {
-      return Response.json({ error: "任务包含不支持的课程", code: "INVALID_COURSE" }, { status: 400 });
-    }
-    const topic = task.topic === undefined ? undefined : String(task.topic).trim();
-    if (topic !== undefined && (topic.length === 0 || topic.length > 100)) {
-      return Response.json({ error: "任务主题长度必须为 1-100 字符", code: "INVALID_TOPIC" }, { status: 400 });
-    }
-    if (task.action !== undefined && !isPlanAction(String(task.action))) {
-      return Response.json({ error: "任务包含不支持的动作", code: "INVALID_ACTION" }, { status: 400 });
-    }
+    const taskValidation = validateTask(task);
+    if (taskValidation) return taskValidation;
   }
 
   const plan: StudyPlan = {
@@ -74,6 +72,49 @@ export async function POST(req: Request) {
   return Response.json(plan);
 }
 
+function validateTask(task: Record<string, unknown>): Response | null {
+  if (task.type !== undefined && !isPlanType(String(task.type))) {
+    return Response.json({ error: "任务包含不支持的类型", code: "INVALID_TASK_TYPE" }, { status: 400 });
+  }
+  if (task.title !== undefined && (typeof task.title !== "string" || task.title.trim().length === 0 || task.title.length > 200)) {
+    return Response.json({ error: "任务标题长度必须为 1-200 字符", code: "INVALID_TASK_TITLE" }, { status: 400 });
+  }
+  if (task.date !== undefined && (typeof task.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(task.date))) {
+    return Response.json({ error: "任务日期必须为 YYYY-MM-DD", code: "INVALID_TASK_DATE" }, { status: 400 });
+  }
+  if (task.estimatedMin !== undefined) {
+    if (typeof task.estimatedMin !== "number" || !Number.isFinite(task.estimatedMin) || !Number.isInteger(task.estimatedMin) || task.estimatedMin < 5 || task.estimatedMin > 480) {
+      return Response.json({ error: "任务时长必须为 5-480 分钟整数", code: "INVALID_ESTIMATED_MIN" }, { status: 400 });
+    }
+  }
+  if (task.done !== undefined && typeof task.done !== "boolean") {
+    return Response.json({ error: "任务完成状态必须是布尔值", code: "INVALID_DONE" }, { status: 400 });
+  }
+  if (task.reason !== undefined && typeof task.reason !== "string") {
+    return Response.json({ error: "任务原因必须是字符串", code: "INVALID_REASON" }, { status: 400 });
+  }
+  if (task.courseId !== undefined) {
+    if (typeof task.courseId !== "string" || !isCourseId(task.courseId)) {
+      return Response.json({ error: "任务包含不支持的课程", code: "INVALID_COURSE" }, { status: 400 });
+    }
+  }
+  if (task.topic !== undefined) {
+    if (typeof task.topic !== "string") {
+      return Response.json({ error: "任务主题必须是字符串", code: "INVALID_TOPIC" }, { status: 400 });
+    }
+    const topic = task.topic.trim();
+    if (topic.length === 0 || topic.length > 100) {
+      return Response.json({ error: "任务主题长度必须为 1-100 字符", code: "INVALID_TOPIC" }, { status: 400 });
+    }
+  }
+  if (task.action !== undefined) {
+    if (typeof task.action !== "string" || !isPlanAction(task.action)) {
+      return Response.json({ error: "任务包含不支持的动作", code: "INVALID_ACTION" }, { status: 400 });
+    }
+  }
+  return null;
+}
+
 // 更新任务打卡状态
 export async function PATCH(req: Request) {
   const parsed = await readJsonObject<{
@@ -86,18 +127,23 @@ export async function PATCH(req: Request) {
 
   const userId = sanitizeUserId(body.userId);
   const taskId = String(body.taskId ?? "").trim();
-  const done = Boolean(body.done);
 
   if (!taskId) {
     return Response.json({ error: "缺少 taskId", code: "MISSING_FIELD" }, { status: 400 });
   }
+  if (body.done === undefined) {
+    return Response.json({ error: "缺少 done", code: "MISSING_FIELD" }, { status: 400 });
+  }
+  if (typeof body.done !== "boolean") {
+    return Response.json({ error: "done 必须是布尔值", code: "INVALID_DONE" }, { status: 400 });
+  }
 
-  const plan = store.updatePlanTask(userId, taskId, done);
+  const plan = store.updatePlanTask(userId, taskId, body.done);
   if (!plan) {
     return Response.json({ error: "计划或任务不存在", code: "NOT_FOUND" }, { status: 404 });
   }
 
-  if (done) {
+  if (body.done) {
     const task = plan.tasks.find((item) => item.id === taskId);
     if (task) {
       store.logActivity({

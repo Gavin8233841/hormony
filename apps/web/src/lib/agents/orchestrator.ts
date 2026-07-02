@@ -85,7 +85,8 @@ async function routeMainAgent(
   req: ChatRequest,
   retrievalResult: AgentResult,
   history: ChatMessage[],
-  emit?: (event: StreamEvent) => void
+  emit?: (event: StreamEvent) => void,
+  signal?: AbortSignal
 ): Promise<AgentResult> {
   // 是否为流式模式（由是否传入 emit 决定）：影响 plan/quiz 的内容格式化方式
   const isStream = !!emit;
@@ -94,7 +95,7 @@ async function routeMainAgent(
     case "plan":
       emit?.({ type: "thinking", agent: "Planner" });
       mainResult = await (async () => {
-        const plan = await runPlannerAgent(req.userId, req.message, 14, 90, req.profile);
+        const plan = await runPlannerAgent(req.userId, req.message, 14, 90, req.profile, signal);
         return {
           agent: "Planner" as const,
           content: isStream
@@ -113,7 +114,8 @@ async function routeMainAgent(
           req.context?.courseId ?? "cs101",
           req.message,
           5,
-          "medium"
+          "medium",
+          signal
         );
         return {
           agent: "Quiz" as const,
@@ -130,7 +132,7 @@ async function routeMainAgent(
       break;
     case "evaluate":
       emit?.({ type: "thinking", agent: "Evaluator" });
-      mainResult = await runEvaluatorAgent(req.userId, [], req.profile);
+      mainResult = await runEvaluatorAgent(req.userId, [], req.profile, signal);
       break;
     case "tutor":
     case "general":
@@ -142,7 +144,8 @@ async function routeMainAgent(
           retrievalResult.content,
           retrievalResult.citations ?? [],
           history,
-          req.profile
+          req.profile,
+          signal
         );
       break;
   }
@@ -216,7 +219,8 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
 // 流式编排：通过回调推送 SSE 事件
 export async function orchestrateStream(
   req: ChatRequest,
-  emit: (event: StreamEvent) => void
+  emit: (event: StreamEvent) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const { intent, sessionId, history } = prepareContext(req);
 
@@ -224,7 +228,7 @@ export async function orchestrateStream(
   const { retrievalResult } = await runPreAgents(req, emit);
 
   // 2. 按意图路由到主 Agent
-  const mainResult = await routeMainAgent(intent, req, retrievalResult, history, emit);
+  const mainResult = await routeMainAgent(intent, req, retrievalResult, history, emit, signal);
 
   // 3. 安全审核必须先于任何正文输出。
   const { safety } = await runSafetyCheck(

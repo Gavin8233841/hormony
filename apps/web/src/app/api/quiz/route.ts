@@ -6,15 +6,19 @@ import { runQuizAgent } from "@/lib/agents/quiz-agent";
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
 import type { Quiz, QuizCatalogItem } from "@/lib/types";
-import { getQuizzesByCourse as getSeedQuizzesByCourse } from "@/lib/data";
+import { getQuizzesByCourse as getSeedQuizzesByCourse, isCourseId } from "@/lib/data";
 import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
-import { modelErrorResponse } from "@/lib/api-errors";
+import { modelErrorResponse, SafetyBlockedError } from "@/lib/api-errors";
 import type { QuizPackage } from "@/lib/types";
-import { validateUserInput } from "@/lib/agents/safety-agent";
+import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
 import { readJsonObject } from "@/lib/request-json";
+import { readBoundedInteger } from "@/lib/api-validation";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+
+type QuizDifficulty = "easy" | "medium" | "hard";
+const QUIZ_DIFFICULTIES: QuizDifficulty[] = ["easy", "medium", "hard"];
 
 export async function GET(req: Request) {
   try {
@@ -23,6 +27,9 @@ export async function GET(req: Request) {
 
     // 按课程获取题库
     if (courseId) {
+      if (!isCourseId(courseId)) {
+        return Response.json({ error: "不支持的课程", code: "INVALID_COURSE" }, { status: 400 });
+      }
       const quizzes = getSeedQuizzesByCourse(courseId);
       const catalog: QuizCatalogItem[] = quizzes.map((quiz) => ({
         quizId: quiz.quizId,
@@ -51,29 +58,30 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const parsed = await readJsonObject<{
-    userId?: string;
-    courseId?: string;
-    topic?: string;
-    count?: number;
-    difficulty?: "easy" | "medium" | "hard";
-  }>(req);
+  const parsed = await readJsonObject<Record<string, unknown>>(req);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
 
   const userId = sanitizeUserId(body.userId);
   const courseId = body.courseId ?? "cs101";
-  const topic = String(body.topic ?? "综合").trim();
-  const count = Math.min(Math.max(Number(body.count) || 5, 1), 20);
-  const difficulty = body.difficulty ?? "medium";
-
-  if (!["cs101", "cs102", "cs103"].includes(courseId)) {
+  if (typeof courseId !== "string" || !isCourseId(courseId)) {
     return Response.json({ error: "不支持的课程", code: "INVALID_COURSE" }, { status: 400 });
   }
+  if (body.topic !== undefined && typeof body.topic !== "string") {
+    return Response.json({ error: "主题必须是字符串", code: "INVALID_TOPIC" }, { status: 400 });
+  }
+  const topic = (body.topic ?? "综合").trim();
+  const count = readBoundedInteger(body.count, 5, 1, 20, "INVALID_COUNT", "count");
+  if (!count.ok) return count.response;
+  const difficulty = body.difficulty ?? "medium";
+  if (typeof difficulty !== "string") {
+    return Response.json({ error: "不支持的难度", code: "INVALID_DIFFICULTY" }, { status: 400 });
+  }
+
   if (topic.length === 0 || topic.length > 100) {
     return Response.json({ error: "主题长度必须为 1-100 字符", code: "INVALID_TOPIC" }, { status: 400 });
   }
-  if (!(["easy", "medium", "hard"] as const).includes(difficulty)) {
+  if (!isQuizDifficulty(difficulty)) {
     return Response.json({ error: "不支持的难度", code: "INVALID_DIFFICULTY" }, { status: 400 });
   }
   if (validateUserInput(topic).length > 0) {
@@ -88,7 +96,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    const quiz = await runQuizAgent(userId, courseId, topic, count, difficulty);
+    const quiz = await runQuizAgent(userId, courseId, topic, count.value, difficulty);
+    await assertSafeQuiz(quiz);
+    store.saveQuiz(quiz);
     return Response.json(toQuizPackage(quiz));
   } catch (err) {
     console.error("[quiz] error:", err instanceof Error ? err.message : String(err));
@@ -121,6 +131,23 @@ function questionTags(tags: string[] | undefined, topic: string): string[] {
   return tags && tags.length > 0 ? tags : [topic.slice(0, 12)];
 }
 
+function isQuizDifficulty(value: string): value is QuizDifficulty {
+  return QUIZ_DIFFICULTIES.some((difficulty) => difficulty === value);
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204 });
+}
+
+async function assertSafeQuiz(quiz: Quiz): Promise<void> {
+  const outputText = quiz.questions.flatMap((question) => [
+    question.stem,
+    ...(question.options ?? []),
+    question.explanation,
+    ...(question.tags ?? []),
+  ]).join("\n");
+  const safety = await runSafetyAgent(outputText, []);
+  if (!safety.passed) {
+    throw new SafetyBlockedError();
+  }
 }

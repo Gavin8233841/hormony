@@ -34,6 +34,20 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    for (const answer of answers) {
+      if (typeof answer.questionId !== "string" || answer.questionId.trim().length === 0) {
+        return Response.json(
+          { error: "答案缺少 questionId", code: "INVALID_ANSWERS" },
+          { status: 400 }
+        );
+      }
+      if (typeof answer.userAnswer !== "string" || answer.userAnswer.length > 200) {
+        return Response.json(
+          { error: "答案内容必须是 200 字符以内字符串", code: "INVALID_ANSWERS" },
+          { status: 400 }
+        );
+      }
+    }
 
     const quiz = store.getQuiz(quizId);
     if (!quiz) {
