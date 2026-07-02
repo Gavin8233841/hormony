@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { retrieve, formatContext } from "@/lib/rag";
+import { retrieve, formatContext, invalidateRagCache } from "@/lib/rag";
 import { store } from "@/lib/store/db";
 
 describe("RAG TF-IDF 检索引擎", () => {
   beforeEach(() => {
     // store 是 globalThis 单例，种子数据已在首次加载时初始化
     // 这里只验证检索功能正常工作
+    invalidateRagCache();
   });
 
   describe("retrieve() 基本检索", () => {
@@ -118,6 +119,42 @@ describe("RAG TF-IDF 检索引擎", () => {
     it("topK=10 应最多返回 10 条结果", () => {
       const results = retrieve("算法", undefined, 10);
       expect(results.length).toBeLessThanOrEqual(10);
+    });
+  });
+
+  describe("检索缓存", () => {
+    it("命中缓存时应返回拷贝，避免调用方修改缓存内容", () => {
+      const first = retrieve("二叉搜索树", undefined, 1);
+      expect(first.length).toBe(1);
+      const originalText = first[0].text;
+
+      first[0].text = "调用方局部修改";
+
+      const second = retrieve("二叉搜索树", undefined, 1);
+      expect(second.length).toBe(1);
+      expect(second[0].text).toBe(originalText);
+    });
+
+    it("知识库变更并显式失效后应读取新增内容", () => {
+      const courseId = "cache-test-course";
+      const query = "cacheuniquealpha";
+
+      expect(retrieve(query, courseId, 3)).toEqual([]);
+
+      store.addKnowledgeBatch([
+        {
+          id: "cache-test-knowledge-001",
+          courseId,
+          source: "cache-test",
+          text: "cacheuniquealpha describes a newly uploaded topic",
+        },
+      ]);
+      invalidateRagCache();
+
+      const results = retrieve(query, courseId, 3);
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe("cache-test-knowledge-001");
+      expect(results[0].courseId).toBe(courseId);
     });
   });
 });

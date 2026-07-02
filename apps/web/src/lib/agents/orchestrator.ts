@@ -51,21 +51,26 @@ function prepareContext(req: ChatRequest): {
   return { intent, sessionId, history };
 }
 
-// 执行前置 Agent：Profile + Retrieval。
-// 两个 Agent 完全独立，并行执行以减少总延迟。
+// 执行前置 Agent：Profile + 按需 Retrieval。
+// 只有 Tutor / General 需要把检索上下文交给主 Agent；Plan / Evaluate 不消费
+// 前置检索结果，Quiz Agent 会按主题自行检索课程资料。
 // 任何 Agent 失败均向上抛出异常，不提供假降级。
 // 传入 emit 时按流式协议推送 thinking / trace 事件。
 async function runPreAgents(
+  intent: Intent,
   req: ChatRequest,
   emit?: (event: StreamEvent) => void
 ): Promise<{ profileResult: AgentResult; retrievalResult: AgentResult }> {
+  const shouldRetrieve = intent === "tutor" || intent === "general";
   emit?.({ type: "thinking", agent: "Profile" });
-  emit?.({ type: "thinking", agent: "Retrieval" });
+  if (shouldRetrieve) emit?.({ type: "thinking", agent: "Retrieval" });
 
-  const [profileResult, retrievalResult] = await Promise.all([
-    runProfileAgent(req.profile),
-    runRetrievalAgent(req.message, req.context?.courseId),
-  ]);
+  const [profileResult, retrievalResult] = shouldRetrieve
+    ? await Promise.all([
+        runProfileAgent(req.profile),
+        runRetrievalAgent(req.message, req.context?.courseId),
+      ])
+    : [await runProfileAgent(req.profile), skippedRetrievalResult(intent)];
 
   emit?.({ type: "trace", agent: "Profile", content: profileResult.content });
   emit?.({
@@ -75,6 +80,18 @@ async function runPreAgents(
   });
 
   return { profileResult, retrievalResult };
+}
+
+function skippedRetrievalResult(intent: Intent): AgentResult {
+  const content = intent === "quiz"
+    ? "已跳过通用前置检索；Quiz Agent 将按指定课程和主题检索出题资料。"
+    : "已跳过通用前置检索；当前意图不消费课程检索上下文。";
+  return {
+    agent: "Retrieval",
+    content,
+    citations: [],
+    metadata: { skipped: true, intent },
+  };
 }
 
 // 按意图路由到主 Agent。
@@ -187,7 +204,7 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
   const agentResults: AgentResult[] = [];
 
   // 1. 前置 Agent：Profile + Retrieval
-  const { profileResult, retrievalResult } = await runPreAgents(req);
+  const { profileResult, retrievalResult } = await runPreAgents(intent, req);
   agentResults.push(profileResult, retrievalResult);
 
   // 2. 按意图路由到主 Agent
@@ -225,7 +242,7 @@ export async function orchestrateStream(
   const { intent, sessionId, history } = prepareContext(req);
 
   // 1. 前置 Agent：Profile + Retrieval（流式推送 trace）
-  const { retrievalResult } = await runPreAgents(req, emit);
+  const { retrievalResult } = await runPreAgents(intent, req, emit);
 
   // 2. 按意图路由到主 Agent
   const mainResult = await routeMainAgent(intent, req, retrievalResult, history, emit, signal);
