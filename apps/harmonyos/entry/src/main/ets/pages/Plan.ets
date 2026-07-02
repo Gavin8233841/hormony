@@ -6,6 +6,7 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -515,7 +516,7 @@ struct PlanPage {
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
-        .padding({ left: 28, right: 28, bottom: 24 })
+        .padding({ left: 28, right: 28, bottom: 24 + SafeAreaInsets.bottomVp() })
       }
     }
     .width('100%')

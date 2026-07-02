@@ -5,6 +5,7 @@
 
 import { Constants } from './Constants';
 import { LearningQuizResultDetail as QuizResultDetail } from '../model/LearningMetadataModels';
+import { SafeAreaInsets } from './SafeArea';
 
 export interface WorkStep {
   title: string;
@@ -45,7 +46,7 @@ export function TitleBar(title: string, subtitle: string, onBack: () => void) {
     .margin({ left: 4 })
   }
   .width('100%')
-  .padding({ left: 8, right: 20, top: 16, bottom: 14 })
+  .padding({ left: 8, right: 20, top: 16 + SafeAreaInsets.topVp(), bottom: 14 })
 }
 
 /**
@@ -82,7 +83,7 @@ export function GradientHeader(title: string, subtitle: string, onBack: () => vo
     .margin({ left: 4 })
   }
   .width('100%')
-  .padding({ left: 8, right: 20, top: 16, bottom: 14 })
+  .padding({ left: 8, right: 20, top: 16 + SafeAreaInsets.topVp(), bottom: 14 })
   .backgroundColor(Constants.COLOR_BG_PAGE)
 }
 

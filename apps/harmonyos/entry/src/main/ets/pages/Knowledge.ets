@@ -6,6 +6,7 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { CuratedKnowledgeChunk, KnowledgeChunk, KnowledgeSearchRequest, KnowledgeSearchResponse } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -137,7 +138,7 @@ struct KnowledgePage {
           .onClick(() => { this.search(); })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 16 })
+      .padding({ left: 16, right: 16, bottom: 16 + SafeAreaInsets.bottomVp() })
 
       if (this.message.length > 0) {
         Row({ space: 8 }) {

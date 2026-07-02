@@ -4,6 +4,7 @@
 
 import { AnswerOption, GradientHeader, ReviewDetailRow, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
@@ -601,7 +602,7 @@ struct QuizPage {
           }
         }
         .width('100%')
-        .padding({ left: 16, right: 16, bottom: 28 })
+        .padding({ left: 16, right: 16, bottom: 28 + SafeAreaInsets.bottomVp() })
       }
       .width('100%')
       .layoutWeight(1)

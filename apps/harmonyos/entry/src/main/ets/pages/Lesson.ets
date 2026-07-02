@@ -1,5 +1,6 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { CuratedKnowledgeChunk, LearningActivity, LessonExperience, LessonProgress } from '../model/DataModels';
@@ -873,7 +874,7 @@ struct LessonPage {
           .width('100%')
           .constraintSize({ minHeight: '100%' })
           .justifyContent(FlexAlign.Start)
-          .padding({ left: 18, right: 18, top: 4, bottom: 24 })
+          .padding({ left: 18, right: 18, top: 4, bottom: 24 + SafeAreaInsets.bottomVp() })
         }
         .width('100%')
         .layoutWeight(1)
@@ -909,7 +910,7 @@ struct LessonPage {
             .onClick((): void => { this.completeCurrent(); })
         }
         .width('100%')
-        .padding({ left: 16, right: 16, top: 12, bottom: 20 })
+        .padding({ left: 16, right: 16, top: 12, bottom: 20 + SafeAreaInsets.bottomVp() })
       }
     }
     .width('100%')

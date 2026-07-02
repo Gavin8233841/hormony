@@ -16,6 +16,24 @@ struct Index {
   @State quickQuestion: string = '';
   @State contentOpacity: number = 1;
   @State contentOffset: number = 0;
+  @StorageProp('safeAreaTopVp') safeAreaTopVpValue: number = 0;
+  @StorageProp('safeAreaBottomVp') safeAreaBottomVpValue: number = 0;
+
+  private safeAreaTopVp(): number {
+    return Math.max(0, this.safeAreaTopVpValue);
+  }
+
+  private safeAreaBottomVp(): number {
+    return Math.max(0, this.safeAreaBottomVpValue);
+  }
+
+  private contentBottomPadding(): number {
+    return 88 + this.safeAreaBottomVp();
+  }
+
+  private navigationBottomPadding(): number {
+    return 12 + this.safeAreaBottomVp();
+  }
 
   private selectTab(index: number): void {
     if (this.currentIndex === index) {
@@ -60,6 +78,7 @@ struct Index {
       this.TabItem('我的', $r('sys.symbol.person'), $r('sys.symbol.person_2_fill'), 3)
     }
     .width('90%')
+    .constraintSize({ maxWidth: 520 })
     .height(72)
     .backgroundColor(Constants.COLOR_NAV_SURFACE)
     .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
@@ -72,35 +91,41 @@ struct Index {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         if (this.currentIndex === 0) {
-          HomeContent({
-            selectedTab: $currentIndex,
-            quickQuestion: $quickQuestion,
-          })
+          Column() {
+            HomeContent({
+              selectedTab: $currentIndex,
+              quickQuestion: $quickQuestion,
+            })
+          }
+          .width('100%')
+          .height('100%')
+          .padding({ bottom: this.contentBottomPadding() })
         } else if (this.currentIndex === 1) {
           Column() {
             CourseContent()
           }
           .width('100%')
           .height('100%')
-          .padding({ bottom: 88 })
+          .padding({ bottom: this.contentBottomPadding() })
         } else if (this.currentIndex === 2) {
           Column() {
             ChatContent({ quickQuestion: this.quickQuestion })
           }
           .width('100%')
           .height('100%')
-          .padding({ bottom: 88 })
+          .padding({ bottom: this.contentBottomPadding() })
         } else {
           Column() {
             ProfileContent()
           }
           .width('100%')
           .height('100%')
-          .padding({ bottom: 88 })
+          .padding({ bottom: this.contentBottomPadding() })
         }
       }
       .width('100%')
       .height('100%')
+      .padding({ top: this.safeAreaTopVp() })
       .opacity(this.contentOpacity)
       .translate({ y: this.contentOffset })
 
@@ -110,7 +135,7 @@ struct Index {
       }
       .width('100%')
       .height('100%')
-      .padding({ bottom: 12 })
+      .padding({ bottom: this.navigationBottomPadding() })
       .hitTestBehavior(HitTestMode.Transparent)
       .zIndex(2)
     }

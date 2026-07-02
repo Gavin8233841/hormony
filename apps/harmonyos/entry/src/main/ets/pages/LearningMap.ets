@@ -1,5 +1,6 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { Course, LessonProgress, TopicMastery, TopicRelation } from '../model/DataModels';
@@ -568,7 +569,7 @@ struct LearningMapPage {
         }
         .width('100%')
         .justifyContent(FlexAlign.Start)
-        .padding({ left: 16, right: 16, bottom: 28 })
+        .padding({ left: 16, right: 16, bottom: 28 + SafeAreaInsets.bottomVp() })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)

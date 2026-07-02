@@ -5423,3 +5423,42 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - OCR、TTS、Lottie、distributedKVStore 仍未验证。
 - 生产 Vercel 尚未部署本地 Web 改动；本批次线上接口未重新验收。
 - 旧用户超出已保留本地结果的历史答题明细无法回填；新结果会持续写入 Topic 掌握聚合。
+
+---
+
+## 2026-07-03 Codex：HarmonyOS 全局安全区底层适配
+
+背景：用户指出端侧文字 UI 与系统安全区存在遮挡风险。本批次不做浅层换色，改为在 Ability 层统一读取窗口避让区，并让顶部标题、底部导航和各主页面滚动内容按真实安全区补偿。
+
+文件：
+- DEVLOG.md
+- apps/harmonyos/entry/src/main/ets/common/SafeArea.ets
+- apps/harmonyos/entry/src/main/ets/common/Builders.ets
+- apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets
+- apps/harmonyos/entry/src/main/ets/pages/Index.ets
+- apps/harmonyos/entry/src/main/ets/pages/Achievements.ets
+- apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets
+- apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets
+- apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets
+- apps/harmonyos/entry/src/main/ets/pages/Lesson.ets
+- apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets
+- apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- apps/harmonyos/entry/src/main/ets/pages/Practice.ets
+- apps/harmonyos/entry/src/main/ets/pages/Profile.ets
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+
+行为变化：
+- 新增 `SafeAreaInsets`，Ability 侧读取 `TYPE_SYSTEM`、`TYPE_CUTOUT`、`TYPE_SYSTEM_GESTURE`、`TYPE_NAVIGATION_INDICATOR` 的 px 避让区并写入 `AppStorage`，页面侧统一转换为 vp。
+- `TitleBar`、`GradientHeader` 顶部 padding 叠加顶部安全区，避免标题贴近状态栏或刘海区域。
+- 首页底部导航和 Home/Course/Chat/Profile 主内容叠加底部安全区，减少导航条、手势条与内容互相遮挡。
+- 成就、记录、课程详情、知识库、学习星图、错题本、计划、练习、画像、测验等滚动页底部 padding 叠加底部安全区，避免最后一屏按钮/文字被系统手势区域遮住。
+- Lesson 内容区和底部“完成本节”操作区叠加底部安全区，避免学习页最关键的操作按钮贴近手势区域。
+- `EntryAbility.onWindowStageDestroy` 释放 `avoidAreaChange` 监听，避免窗口生命周期内监听泄漏。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 803 ms`；仍提示未配置 signingConfigs。
+
+未验证：
+- 未进行模拟器 UI 树/截图验收，无法标记为模拟器通过；本批次证据等级为构建通过。
+- 横屏、平板、折叠屏、真机刘海和手势导航仍需后续 UI 证据。

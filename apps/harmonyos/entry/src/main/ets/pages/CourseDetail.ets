@@ -1,5 +1,6 @@
 import { GradientHeader } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { Course } from '../model/DataModels';
@@ -168,7 +169,7 @@ struct CourseDetailPage {
           .width('100%')
         }
         .width('100%')
-        .padding({ left: 16, right: 16, bottom: 28 })
+        .padding({ left: 16, right: 16, bottom: 28 + SafeAreaInsets.bottomVp() })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)

@@ -4,6 +4,7 @@
  */
 
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { UserProfile } from '../model/DataModels';
 import { LearningTagInsight as TagInsight } from '../model/LearningMetadataModels';
@@ -368,7 +369,7 @@ export struct ProfileContent {
             .alignItems(HorizontalAlign.Start)
           }
           .width('100%')
-          .padding({ left: 16, right: 16, bottom: 12 })
+          .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
         }
         .width('100%')
         .layoutWeight(1)

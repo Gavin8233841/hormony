@@ -1,5 +1,6 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { SafeAreaInsets } from '../common/SafeArea';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { AchievementProgress } from '../model/DataModels';
 
@@ -177,7 +178,7 @@ struct AchievementsPage {
         .width('100%')
         .height('100%')
         .layoutWeight(1)
-        .padding({ left: 16, right: 16, bottom: 24 })
+        .padding({ left: 16, right: 16, bottom: 24 + SafeAreaInsets.bottomVp() })
         .scrollBar(BarState.Off)
       }
     }
