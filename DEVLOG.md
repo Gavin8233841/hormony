@@ -5158,6 +5158,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-03 Codex 鸿蒙1.13：综合练习错题按真实主题归因
+
+背景：继续自审“真实答题记录 -> 薄弱点 -> 下一步练习”链路。画像页标签洞察已能跳练习后，发现课程综合精选练习中 `Practice` 会把提交结果显示为“综合”，但错题弱项仍使用空 `selectedPracticeTopic`，导致画像弱项可能出现空主题，复习项和标签洞察也无法指向题目真实 Topic。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/model/LearningMetadataModels.ets`
+
+行为变化：
+- `LearningQuizResultDetail` 增加可选 `topic`，用于保存精选题自身真实主题；AI 题未提供该字段时仍沿用整场测验主题。
+- `Practice` 提交精选练习时把每道题的 `topic` 写入答题明细，并按答错题目的真实主题生成 `weakTopics`，不再把课程综合练习写成空弱项。
+- 错题复习项优先使用 `detail.topic`，综合精选练习中的错题会落到具体 Topic，旧复习项在后续答题时也可随题目主题校正。
+- 标签洞察聚合优先使用 `detail.topic` 更新 `lastTopic`，让“去练习”更容易跳到具体主题；AI 综合测验没有题目主题时仍由 Profile 的本地题兜底进入课程综合练习。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 21 s 253 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未做模拟器页面截图；本批次为记录归因和本地聚合逻辑，证据等级为构建通过。
+- 真机未验证。
+
+---
+
 ## 2026-07-03 Codex 鸿蒙1.13：标签洞察直达练习
 
 背景：继续按外部学习产品和行业 UX 标准自查。NN/g 对 dashboard 的定义强调信息应能快速指导行动；Khan Academy 与 Duolingo 的掌握/强度设计也都把技能状态连接到复习和个性化练习。本批次把画像页标签洞察从“看到薄弱点”推进到“立刻进入关联主题练习”。

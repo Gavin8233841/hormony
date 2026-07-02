@@ -375,7 +375,7 @@ export class LocalLearningRepository {
             id: previous.id,
             questionId: previous.questionId,
             courseId: previous.courseId,
-            topic: previous.topic,
+            topic: detail.topic ?? previous.topic,
             source: previous.source,
             stem: detail.stem,
             userAnswer: detail.userAnswer,
@@ -393,11 +393,12 @@ export class LocalLearningRepository {
         }
         continue;
       }
+      const detailTopic = detail.topic ?? result.topic;
       const next: ReviewItem = {
         id: existingIndex >= 0 ? items[existingIndex].id : 'review_' + detail.questionId,
         questionId: detail.questionId,
         courseId: result.courseId,
-        topic: result.topic,
+        topic: detailTopic,
         source: result.source,
         stem: detail.stem,
         userAnswer: detail.userAnswer,
@@ -549,6 +550,7 @@ export class LocalLearningRepository {
   private static applyResultToTagInsights(insights: TagInsight[], result: QuizResult): void {
     for (const detail of result.details) {
       const tags = detail.tags ?? [];
+      const detailTopic = detail.topic ?? result.topic;
       for (const tag of tags) {
         const normalized = tag.trim();
         if (normalized.length === 0) continue;
@@ -566,7 +568,7 @@ export class LocalLearningRepository {
             hardQuestions: 0,
             lastDifficulty: detail.difficulty ?? result.difficulty ?? 'medium',
             lastCourseId: result.courseId,
-            lastTopic: result.topic,
+            lastTopic: detailTopic,
             weakReason: '',
             nextStep: ''
           };
@@ -583,7 +585,7 @@ export class LocalLearningRepository {
         item.lastPracticedAt = result.submittedAt;
         item.lastDifficulty = difficulty;
         item.lastCourseId = result.courseId;
-        item.lastTopic = result.topic;
+        item.lastTopic = detailTopic;
         item.weakReason = LocalLearningRepository.tagWeakReason(item);
         item.nextStep = LocalLearningRepository.tagNextStep(item);
       }

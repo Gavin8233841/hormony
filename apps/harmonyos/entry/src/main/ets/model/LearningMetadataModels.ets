@@ -29,6 +29,7 @@ export interface LearningQuizGradingItem extends QuizGradingItem {
 }
 
 export interface LearningQuizResultDetail extends QuizResultDetail {
+  topic?: string;
   difficulty?: string;
 }
 

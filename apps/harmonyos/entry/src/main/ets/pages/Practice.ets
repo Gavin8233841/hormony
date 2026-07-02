@@ -108,14 +108,17 @@ struct PracticePage {
     if (this.saving || !this.allAnswered()) return;
     this.saving = true;
     const nextDetails: QuizResultDetail[] = [];
+    const weakTopics: string[] = [];
     let totalCorrect = 0;
     for (let index = 0; index < this.questions.length; index++) {
       const question = this.questions[index];
       const userAnswer = this.answers[index] ?? '';
       const correct = this.answerLetter(userAnswer) === question.answer.trim().toUpperCase();
       if (correct) totalCorrect += 1;
+      else if (!weakTopics.includes(question.topic)) weakTopics.push(question.topic);
       nextDetails.push({
         questionId: question.id,
+        topic: question.topic,
         stem: question.question,
         userAnswer: userAnswer,
         correctAnswer: this.findCorrectOption(question),
@@ -137,7 +140,7 @@ struct PracticePage {
       accuracy: totalCorrect / this.questions.length,
       details: nextDetails,
       evaluation: totalCorrect === this.questions.length ? '本组精选练习全部答对。' : '已记录错题，可根据解析继续巩固。',
-      weakTopics: totalCorrect < this.questions.length ? [this.topic] : [],
+      weakTopics: weakTopics,
       submittedAt: new Date().toISOString()
     };
     try {
