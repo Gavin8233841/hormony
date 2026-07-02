@@ -5288,3 +5288,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未部署到 Vercel，线上 Health、Chat SSE、Plan、Quiz 未回归，证据等级不能标记为线上通过。
 - 未修改 HarmonyOS 文件，未运行 HAP 构建或模拟器流程；端侧非 200 精确错误码保留、`PlanTask.reason` 基础接口同步和 Quiz 端侧深校验需主线程协调。
 - 真机能力仍未验证：Lottie、OCR、TTS、distributedKVStore。
+
+---
+
+## 2026-07-02 Codex：鸿蒙1.12 端侧核心效率优化
+
+背景：用户明确要求不把精力放在 Web UI / admin 等非竞赛交付面，本批次聚焦服务 HarmonyOS 端侧 App 的核心性能与效率：端侧课程内容查询、Chat/Quiz 依赖的 RAG 检索、以及聊天编排中无用前置检索。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/LearningContentRepository.ets
+- apps/web/src/lib/agents/orchestrator.ts
+- apps/web/src/lib/agents/orchestrator.test.ts
+- apps/web/src/lib/rag/index.ts
+- apps/web/src/lib/rag/index.test.ts
+
+行为变化：
+- HarmonyOS 课程内容仓库在 rawfile 初始化后一次性构建 `courseId`、`courseId + topic`、课程 Topic、资源、关系和 Lesson Experience 索引；`getKnowledge`、`getQuestions`、`getResources`、`getTopics`、`getTopicRelations`、`getLessonExperience` 保持原接口但不再每次全量扫描。
+- Web RAG 增加小容量检索结果缓存，命中时跳过知识池过滤、文档指纹、相似度评分与排序；`invalidateRagCache()` 同时清除索引缓存和检索结果缓存。
+- RAG 缓存返回结果拷贝，避免调用方修改缓存对象；知识上传后仍通过显式失效读取新增内容。
+- Chat 编排先识别意图，只对 `tutor` / `general` 执行通用前置 Retrieval；`plan` / `evaluate` 跳过不消费的前置检索，`quiz` 交给 Quiz Agent 按课程和主题检索出题资料，避免重复 RAG。
+- 新增 orchestrator 单测锁定 plan/evaluate 0 次通用检索、quiz 1 次主题检索；新增 RAG 单测锁定缓存拷贝与失效行为。
+
+验证：
+- `cd apps/web; pnpm test src/lib/rag/index.test.ts`：exit 0，1 file / 17 tests passed。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 22 s 792 ms`；仍提示未配置 signingConfigs。
+- `cd apps/web; pnpm test src/lib/agents/orchestrator.test.ts src/lib/rag/index.test.ts`：exit 0，2 files / 20 tests passed。
+- `cd apps/web; pnpm lint`：exit 0，No ESLint warnings or errors。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，12 files / 137 tests passed。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 通过。
+
+未验证：
+- 未跑模拟器 UI 流程、性能 trace 或真机；本批次运行证据等级为静态诊断通过与构建通过，性能收益数值未验证。
+- 仍未处理更高风险的 LocalLearningRepository 读缓存、Chat delta 合批、请求体字节级上限、store 持久化写放大和脚本层增量优化；这些已有只读审计证据，但需要单独批次与更细测试保护。

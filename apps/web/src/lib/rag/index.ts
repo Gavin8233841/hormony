@@ -116,6 +116,28 @@ interface RagIndexCache {
 
 const RAG_CACHE_MAX = 8;
 const ragCacheMap = new Map<string, RagIndexCache>();
+const RAG_RETRIEVE_CACHE_MAX = 128;
+const ragRetrieveCacheMap = new Map<string, KnowledgeChunk[]>();
+
+function normalizeRetrieveQuery(query: string): string {
+  return query.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function retrieveCacheKey(query: string, courseId: string | undefined, topK: number): string {
+  return `${courseId ?? "__all__"}|${topK}|${query}`;
+}
+
+function cloneResults(results: KnowledgeChunk[]): KnowledgeChunk[] {
+  return results.map((chunk) => ({ ...chunk }));
+}
+
+function setRetrieveCache(key: string, results: KnowledgeChunk[]): void {
+  if (ragRetrieveCacheMap.size >= RAG_RETRIEVE_CACHE_MAX) {
+    const firstKey = ragRetrieveCacheMap.keys().next().value;
+    if (firstKey !== undefined) ragRetrieveCacheMap.delete(firstKey);
+  }
+  ragRetrieveCacheMap.set(key, cloneResults(results));
+}
 
 // 文档列表指纹（djb2 变体哈希）：覆盖参与检索的完整内容，确保原位编辑也会使缓存失效。
 function hashDocuments(docs: KnowledgeChunk[]): string {
@@ -155,16 +177,27 @@ function getRagIndex(docs: KnowledgeChunk[]): RagIndexCache | null {
 // 清除全部 RAG 索引缓存（文档变更时调用，如上传 / 删除知识后）
 export function invalidateRagCache(): void {
   ragCacheMap.clear();
+  ragRetrieveCacheMap.clear();
 }
 
 // ========== 检索主逻辑 ==========
 
 export function retrieve(query: string, courseId?: string, topK = 3): KnowledgeChunk[] {
-  const knowledgePool = store.getKnowledge(courseId);
-  if (knowledgePool.length === 0) return [];
-
   const queryTokens = tokenize(query);
   if (queryTokens.length === 0) return [];
+
+  // 端侧 Chat / Plan 会在同一主题上反复询问相近问题；显式失效由知识上传后调用
+  // invalidateRagCache() 负责，命中时跳过知识池过滤、文档指纹和相似度评分。
+  const normalizedQuery = normalizeRetrieveQuery(query);
+  const cachedResults = ragRetrieveCacheMap.get(retrieveCacheKey(normalizedQuery, courseId, topK));
+  if (cachedResults !== undefined) return cloneResults(cachedResults);
+
+  const knowledgePool = store.getKnowledge(courseId);
+  const cacheKey = retrieveCacheKey(normalizedQuery, courseId, topK);
+  if (knowledgePool.length === 0) {
+    setRetrieveCache(cacheKey, []);
+    return [];
+  }
 
   // 1. 获取（或构建并缓存）文档集的 TF-IDF 索引：
   //    文档 tokenization、IDF、各文档向量仅依赖文档集，缓存后避免每次检索全量重算。
@@ -216,7 +249,8 @@ export function retrieve(query: string, courseId?: string, topK = 3): KnowledgeC
       .map((x) => ({ ...x.chunk, score: x.s }));
   }
 
-  return results;
+  setRetrieveCache(cacheKey, results);
+  return cloneResults(results);
 }
 
 // 从查询中提取关键名词片段（用于回退匹配）
