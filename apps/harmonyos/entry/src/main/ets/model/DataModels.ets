@@ -19,6 +19,15 @@ export interface UserStats {
   streakDays: number;
 }
 
+export interface TagInsight {
+  tag: string;
+  totalQuestions: number;
+  correctQuestions: number;
+  accuracy: number;
+  wrongQuestions: number;
+  lastPracticedAt: string;
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -200,6 +209,7 @@ export interface ReviewItem {
   intervalDays: number;
   nextReviewAt: string;
   updatedAt: string;
+  tags?: string[];
 }
 
 export interface CuratedKnowledgeChunk {

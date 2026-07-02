@@ -9,6 +9,7 @@ import {
   ReviewItem,
   StudyPlan,
   StudyEvent,
+  TagInsight,
   TopicMastery,
   UserProfile
 } from '../model/DataModels';
@@ -323,7 +324,8 @@ export class LocalLearningRepository {
             intervalDays: nextInterval === 0 ? previous.intervalDays : nextInterval,
             nextReviewAt: nextInterval === 0 ? result.submittedAt :
               LocalLearningRepository.addDays(result.submittedAt, nextInterval),
-            updatedAt: result.submittedAt
+            updatedAt: result.submittedAt,
+            tags: detail.tags ?? previous.tags ?? []
           };
         }
         continue;
@@ -342,7 +344,8 @@ export class LocalLearningRepository {
         resolved: false,
         intervalDays: 1,
         nextReviewAt: LocalLearningRepository.addDays(result.submittedAt, 1),
-        updatedAt: result.submittedAt
+        updatedAt: result.submittedAt,
+        tags: detail.tags ?? []
       };
       if (existingIndex >= 0) items[existingIndex] = next;
       else items.push(next);
@@ -431,6 +434,44 @@ export class LocalLearningRepository {
       item.lastPracticedAt = result.submittedAt;
     }
     return mastery;
+  }
+
+  static async getTagInsights(limit: number = 6): Promise<TagInsight[]> {
+    const results = await LocalLearningRepository.getQuizResults();
+    const insights: TagInsight[] = [];
+    for (const result of results.slice().reverse()) {
+      for (const detail of result.details) {
+        const tags = detail.tags ?? [];
+        for (const tag of tags) {
+          const normalized = tag.trim();
+          if (normalized.length === 0) continue;
+          let item = insights.find((value: TagInsight): boolean => value.tag === normalized);
+          if (item === undefined) {
+            item = {
+              tag: normalized,
+              totalQuestions: 0,
+              correctQuestions: 0,
+              accuracy: 0,
+              wrongQuestions: 0,
+              lastPracticedAt: result.submittedAt
+            };
+            insights.push(item);
+          }
+          item.totalQuestions += 1;
+          if (detail.isCorrect) item.correctQuestions += 1;
+          item.wrongQuestions = item.totalQuestions - item.correctQuestions;
+          item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
+          item.lastPracticedAt = result.submittedAt;
+        }
+      }
+    }
+    return insights.sort((left: TagInsight, right: TagInsight): number => {
+      const wrongDelta = right.wrongQuestions - left.wrongQuestions;
+      if (wrongDelta !== 0) return wrongDelta;
+      const totalDelta = right.totalQuestions - left.totalQuestions;
+      if (totalDelta !== 0) return totalDelta;
+      return left.accuracy - right.accuracy;
+    }).slice(0, limit);
   }
 
   static async getChatHistory(): Promise<ChatMessage[]> {

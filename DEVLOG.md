@@ -4979,3 +4979,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 - Web：`pnpm lint` 退出码 0；`pnpm typecheck` 退出码 0；`pnpm test -- --runInBand` 退出码 0，12 files / 137 tests passed；`pnpm build` 退出码 0。
 - HarmonyOS：`apps/harmonyos/hvigorw.bat assembleHap --no-daemon` 退出码 0，`BUILD SUCCESSFUL in 11 s 818 ms`；仍为 unsigned HAP，签名未配置。
+
+## 2026-07-02 Codex：标签洞察与长任务反馈闭环
+
+背景：用户指出前端浅层换色无意义，真实可用问题优先于先锋视觉；本批次聚焦 AI 出题/评分反馈、题目标签可见性、记录页与画像页的量化洞察。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/model/DataModels.ets
+- apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets
+- apps/harmonyos/entry/src/main/ets/common/Builders.ets
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- apps/harmonyos/entry/src/main/ets/pages/Profile.ets
+- apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets
+- apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets
+
+行为变化：
+- 新增端侧 TagInsight 聚合模型，按标签统计总题数、正确数、正确率、错题数和最近练习时间。
+- ReviewItem 保留题目 tags，错题本可直接显示错因/能力标签。
+- LocalLearningRepository 新增 getTagInsights()，从真实 QuizResult.details 汇总标签洞察，不使用静态演示数据。
+- Quiz 页复用 StagedProgress，AI 出题期间显示检索、生成、标注阶段；提交评分期间显示核对、归因、记录阶段，避免空白卡顿感。
+- Quiz 当前题直接展示题目标签，结果页逐题解析继续展示标签。
+- Profile 页新增“标签洞察”，按错题数排序展示标签级正确率和复盘建议。
+- ActivityRecords 页顶部新增“最近薄弱标签”，把学习记录从时间流水账推进到可复盘洞察。
+
+验证：
+- 误执行仓库根目录 apps/harmonyos/hvigorw.bat assembleHap --no-daemon：exit 0 但 hvigor 报错，原因是工作目录不在 apps/harmonyos；未产生有效构建证据。
+- cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon：exit 0，BUILD SUCCESSFUL in 13 s 856 ms。
+- git diff --check：exit 0。
+
+未验证：
+- 未进行模拟器 UI 树/截图验收；本批次证据等级为构建通过。
+- Trae 的题库难度/标签审计文档仍未复核采用。

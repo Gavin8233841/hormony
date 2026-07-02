@@ -1,13 +1,14 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { StudyEvent } from '../model/DataModels';
+import { StudyEvent, TagInsight } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Entry
 @Component
 struct ActivityRecordsPage {
   @State events: StudyEvent[] = [];
+  @State tagInsights: TagInsight[] = [];
   @State loading: boolean = true;
   @State message: string = '';
 
@@ -18,6 +19,7 @@ struct ActivityRecordsPage {
   private async loadEvents(): Promise<void> {
     try {
       this.events = (await LocalLearningRepository.getStudyEvents()).slice().reverse();
+      this.tagInsights = await LocalLearningRepository.getTagInsights(4);
     } catch (error) {
       this.message = '学习记录读取失败';
     } finally {
@@ -107,6 +109,46 @@ struct ActivityRecordsPage {
         .justifyContent(FlexAlign.Center)
       } else {
         List({ space: 10 }) {
+          if (this.tagInsights.length > 0) {
+            ListItem() {
+              Column({ space: 12 }) {
+                Row() {
+                  Text('最近薄弱标签')
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  Text('用于安排下一次复习')
+                    .fontSize(11)
+                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.SpaceBetween)
+                ForEach(this.tagInsights, (item: TagInsight): void => {
+                  Row({ space: 10 }) {
+                    Text(item.tag)
+                      .fontSize(12)
+                      .fontColor(Constants.COLOR_BRAND)
+                      .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                      .borderRadius(Constants.RADIUS_SM)
+                    Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
+                      .layoutWeight(1)
+                      .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                      .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+                      .borderRadius(4)
+                    Text(Math.round(item.accuracy * 100).toString() + '%')
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  }
+                  .width('100%')
+                })
+              }
+              .width('100%')
+              .padding(16)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .borderRadius(Constants.RADIUS_LG)
+            }
+          }
           ForEach(this.events, (event: StudyEvent, index: number): void => {
             ListItem() {
               Column() {

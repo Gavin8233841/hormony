@@ -5,12 +5,13 @@
 
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { UserProfile } from '../model/DataModels';
+import { TagInsight, UserProfile } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct ProfileContent {
   @State profile: UserProfile | null = null;
+  @State tagInsights: TagInsight[] = [];
   @State loading: boolean = false;
   @State message: string = '';
 
@@ -22,6 +23,7 @@ export struct ProfileContent {
   async loadProfile() {
     try {
       this.profile = await LocalLearningRepository.getProfile();
+      this.tagInsights = await LocalLearningRepository.getTagInsights(5);
     } catch (e) {
       this.message = '本地学习画像加载失败，请重新打开应用';
     } finally {
@@ -76,6 +78,33 @@ export struct ProfileContent {
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  TagInsightRow(item: TagInsight) {
+    Column({ space: 8 }) {
+      Row() {
+        Text(item.tag)
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(item.correctQuestions.toString() + '/' + item.totalQuestions.toString())
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
+        .width('100%')
+        .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : (item.accuracy >= 0.6 ? Constants.COLOR_WARNING :
+          Constants.COLOR_ERROR))
+        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+        .borderRadius(4)
+      Text(item.wrongQuestions > 0 ? '错题 ' + item.wrongQuestions.toString() + ' 道，建议优先复盘' : '当前表现稳定')
+        .fontSize(11)
+        .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_SUCCESS)
+    }
+    .width('100%')
   }
 
   @Builder
@@ -237,6 +266,38 @@ export struct ProfileContent {
             }
             .width('100%')
             .padding({ top: 16, bottom: 16 })
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(Constants.RADIUS_LG)
+            .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+
+            Column({ space: 12 }) {
+              Row() {
+                Text('标签洞察')
+                  .fontSize(15)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                Text('按错题数排序')
+                  .fontSize(11)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.SpaceBetween)
+              if (this.tagInsights.length === 0) {
+                Text('完成带标签的练习后，这里会显示能力短板和复习优先级')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  .lineHeight(20)
+              } else {
+                ForEach(this.tagInsights, (item: TagInsight, index: number): void => {
+                  this.TagInsightRow(item)
+                  if (index < this.tagInsights.length - 1) {
+                    Divider().color(Constants.COLOR_BORDER)
+                  }
+                })
+              }
+            }
+            .width('100%')
+            .padding(16)
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
             .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })

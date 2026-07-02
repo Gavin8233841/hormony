@@ -86,6 +86,20 @@ struct MistakeBookPage {
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
+                if ((item.tags ?? []).length > 0) {
+                  Flex({ wrap: FlexWrap.Wrap }) {
+                    ForEach(item.tags ?? [], (tag: string): void => {
+                      Text(tag)
+                        .fontSize(10)
+                        .fontColor(Constants.COLOR_BRAND)
+                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                        .borderRadius(9)
+                        .margin({ right: 6, bottom: 2 })
+                    })
+                  }
+                  .width('100%')
+                }
                 Text(item.stem)
                   .width('100%')
                   .fontSize(15)

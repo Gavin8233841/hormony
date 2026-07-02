@@ -6,6 +6,11 @@
 import { Constants } from './Constants';
 import { QuizResultDetail } from '../model/DataModels';
 
+export interface WorkStep {
+  title: string;
+  description: string;
+}
+
 /**
  * 统一标题栏（带返回按钮）
  * @param title       主标题
@@ -111,6 +116,57 @@ export function LoadingState() {
   .width('100%')
   .layoutWeight(1)
   .justifyContent(FlexAlign.Center)
+}
+
+@Builder
+export function StagedProgress(title: string, subtitle: string, activeIndex: number, steps: WorkStep[]) {
+  Column({ space: 12 }) {
+    Row({ space: 9 }) {
+      LoadingProgress()
+        .width(22)
+        .height(22)
+        .color(Constants.COLOR_BRAND)
+      Column({ space: 3 }) {
+        Text(title)
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(subtitle)
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    Progress({ value: Math.min((activeIndex + 1) * 100 / Math.max(steps.length, 1), 90), total: 100,
+      type: ProgressType.Linear })
+      .width('100%')
+      .color(Constants.COLOR_BRAND)
+      .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+      .borderRadius(4)
+    Row() {
+      ForEach(steps, (step: WorkStep, index: number): void => {
+        Column({ space: 3 }) {
+          Column()
+            .width(8)
+            .height(8)
+            .backgroundColor(index <= activeIndex ? Constants.COLOR_BRAND : Constants.COLOR_BG_PROGRESS_TRACK)
+            .borderRadius(4)
+          Text(step.title)
+            .fontSize(10)
+            .fontColor(index <= activeIndex ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_TEXT_PLACEHOLDER)
+        }
+        .layoutWeight(1)
+        .alignItems(index === 0 ? HorizontalAlign.Start : (index === steps.length - 1 ? HorizontalAlign.End :
+          HorizontalAlign.Center))
+      })
+    }
+    .width('100%')
+  }
+  .width('100%')
+  .padding(14)
+  .backgroundColor(Constants.COLOR_SURFACE_TINT)
+  .borderRadius(Constants.RADIUS_MD)
 }
 
 @Builder

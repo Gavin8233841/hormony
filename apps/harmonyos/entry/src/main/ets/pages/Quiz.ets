@@ -2,7 +2,7 @@
  * 课程测验页 - 真实 AI 出题、本地评分与学习记录
  */
 
-import { AnswerOption, GradientHeader, ReviewDetailRow } from '../common/Builders';
+import { AnswerOption, GradientHeader, ReviewDetailRow, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -51,6 +51,16 @@ struct QuizPage {
     { value: 'easy', label: '基础', description: '概念识别' },
     { value: 'medium', label: '进阶', description: '场景判断' },
     { value: 'hard', label: '挑战', description: '多步推理' }
+  ];
+  private generationSteps: WorkStep[] = [
+    { title: '检索', description: '匹配课程资料' },
+    { title: '生成', description: '控制难度与题型' },
+    { title: '标注', description: '整理标签与解析' }
+  ];
+  private scoringSteps: WorkStep[] = [
+    { title: '核对', description: '比对 A-D 答案' },
+    { title: '归因', description: '统计错因标签' },
+    { title: '记录', description: '写入本地画像' }
   ];
 
   aboutToAppear(): void {
@@ -132,7 +142,7 @@ struct QuizPage {
         Constants.API_QUIZ,
         JSON.stringify(request)
       );
-      this.progressStep = 3;
+      this.progressStep = 2;
       if (!Array.isArray(response.questions) || !Array.isArray(response.grading) ||
         response.questions.length === 0 || response.questions.length !== response.grading.length) {
         throw new Error('Invalid quiz response');
@@ -158,6 +168,7 @@ struct QuizPage {
   async submitQuiz(): Promise<void> {
     if (this.submitting || this.quizId.length === 0) return;
     this.submitting = true;
+    this.progressStep = 1;
     this.message = '';
     const details: QuizResultDetail[] = [];
     let correctCount = 0;
@@ -197,6 +208,7 @@ struct QuizPage {
     };
     try {
       await LocalLearningRepository.appendQuizResult(result);
+      this.progressStep = 2;
       this.resultAccuracy = result.accuracy;
       this.resultCorrectCount = result.correctCount;
       this.resultTotalQuestions = result.totalQuestions;
@@ -242,11 +254,11 @@ struct QuizPage {
   @Builder
   LoadingState() {
     Column({ space: 14 }) {
-      Column().width('36%').height(18).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(6)
-      Column().width('100%').height(86).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(14)
-      Column().width('100%').height(52).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
-      Column().width('100%').height(52).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
-      Column().width('100%').height(52).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      this.GenerationProgress()
+      Column().width('100%').height(72).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(14)
+      Column().width('100%').height(48).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('100%').height(48).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('100%').height(48).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
     }
     .width('100%')
     .padding(18)
@@ -344,47 +356,17 @@ struct QuizPage {
 
   @Builder
   GenerationProgress() {
-    Column({ space: 12 }) {
-      Row({ space: 8 }) {
-        LoadingProgress()
-          .width(22)
-          .height(22)
-          .color(Constants.COLOR_BRAND)
-        Column({ space: 3 }) {
-          Text(this.progressStep >= 3 ? '正在整理题目标签' : 'AI 正在生成题目')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(this.progressStep >= 3 ? '校验 A-D 选项、解析和能力标签' : '检索课程资料、匹配难度、生成可评分题组')
-            .fontSize(11)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-      }
-      Progress({ value: this.progressStep >= 3 ? 85 : 45, total: 100, type: ProgressType.Linear })
-        .width('100%')
-        .color(Constants.COLOR_BRAND)
-        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-        .borderRadius(4)
-      Row() {
-        Text('资料检索')
-          .fontSize(10)
-          .fontColor(Constants.COLOR_TEXT_TERTIARY)
-        Text('难度控制')
-          .fontSize(10)
-          .fontColor(Constants.COLOR_TEXT_TERTIARY)
-        Text('标签化')
-          .fontSize(10)
-          .fontColor(Constants.COLOR_TEXT_TERTIARY)
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-    }
-    .width('100%')
-    .padding(14)
-    .backgroundColor(Constants.COLOR_SURFACE_TINT)
-    .borderRadius(Constants.RADIUS_MD)
+    StagedProgress(
+      this.progressStep >= 2 ? '正在整理题目标签' : 'AI 正在生成题目',
+      this.progressStep >= 2 ? '校验 A-D 选项、解析和能力标签' : '检索课程资料、匹配难度、生成可评分题组',
+      this.progressStep,
+      this.generationSteps
+    )
+  }
+
+  @Builder
+  ScoringProgress() {
+    StagedProgress('正在生成学习反馈', '评分、错因标签和本地画像同步中', this.progressStep, this.scoringSteps)
   }
 
   @Builder
@@ -414,6 +396,21 @@ struct QuizPage {
         .fontWeight(FontWeight.Bold)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
         .lineHeight(27)
+
+      if ((this.questions[this.currentIndex].tags ?? []).length > 0) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.questions[this.currentIndex].tags ?? [], (tag: string): void => {
+            Text(tag)
+              .fontSize(10)
+              .fontColor(Constants.COLOR_BRAND)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(9)
+              .margin({ right: 6, bottom: 6 })
+          })
+        }
+        .width('100%')
+      }
 
       Column({ space: 10 }) {
         ForEach(this.questions[this.currentIndex].options ?? [], (option: string): void => {
@@ -456,6 +453,9 @@ struct QuizPage {
         }
       }
       .width('100%')
+      if (this.submitting) {
+        this.ScoringProgress()
+      }
     }
     .width('100%')
     .padding(18)
