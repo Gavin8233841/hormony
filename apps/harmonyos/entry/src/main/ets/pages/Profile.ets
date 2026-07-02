@@ -22,8 +22,9 @@ export struct ProfileContent {
 
   async loadProfile() {
     try {
-      this.profile = await LocalLearningRepository.getProfile();
-      this.tagInsights = await LocalLearningRepository.getTagInsights(5);
+      const snapshot = await LocalLearningRepository.getProfileSnapshot(5);
+      this.profile = snapshot.profile;
+      this.tagInsights = snapshot.tagInsights;
     } catch (e) {
       this.message = '本地学习画像加载失败，请重新打开应用';
     } finally {

@@ -10,6 +10,7 @@ import { Citation, StreamEvent, ChatRequest, ChatMessage, HealthResponse } from 
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 interface DisplayMessage {
+  id: string;
   role: string;
   content: string;
   citations: Citation[];
@@ -38,6 +39,9 @@ export struct ChatContent {
   private currentRequest: http.HttpRequest | null = null;
   private isCancelled: boolean = false;
   private scrollScheduled: boolean = false;
+  private deltaChunks: string[] = [];
+  private messageRefreshScheduled: boolean = false;
+  private messageSerial: number = 0;
 
   // 推荐问题
   private suggestions: string[] = [
@@ -58,6 +62,7 @@ export struct ChatContent {
 
   aboutToDisappear() {
     this.isCancelled = true;
+    this.deltaChunks = [];
     if (this.currentRequest) {
       try {
         this.currentRequest.off('dataReceive');
@@ -114,12 +119,18 @@ export struct ChatContent {
     return blocks;
   }
 
+  private createMessageId(prefix: string): string {
+    this.messageSerial += 1;
+    return prefix + '_' + Date.now().toString() + '_' + this.messageSerial.toString();
+  }
+
   private async loadLocalHistory(): Promise<void> {
     try {
       const history = await LocalLearningRepository.getChatHistory();
       const restored: DisplayMessage[] = [];
       for (const item of history) {
         const message: DisplayMessage = {
+          id: this.createMessageId('local'),
           role: item.role,
           content: item.content,
           citations: item.citations ?? [],
@@ -138,15 +149,26 @@ export struct ChatContent {
   }
 
   private async probeCloudAgent(): Promise<void> {
+    const checkedAt = AppStorage.get<number>('cloudAgentCheckedAt') ?? 0;
+    const cachedReady = AppStorage.get<boolean>('cloudAgentReady') ?? false;
+    if (cachedReady && Date.now() - checkedAt <= Constants.HEALTH_CACHE_MS) {
+      this.cloudAgentReady = true;
+      this.probing = false;
+      this.serviceMessage = '';
+      return;
+    }
+
     this.probing = true;
     this.serviceMessage = '正在连接云端学伴';
     try {
       const health = await HttpClient.get<HealthResponse>(Constants.API_HEALTH);
       this.cloudAgentReady = health.status === 'ready';
       this.serviceMessage = this.cloudAgentReady ? '' : '云端学伴尚未就绪';
+      AppStorage.setOrCreate<number>('cloudAgentCheckedAt', Date.now());
     } catch (error) {
       this.cloudAgentReady = false;
       this.serviceMessage = '云端学伴暂不可用';
+      AppStorage.setOrCreate<number>('cloudAgentCheckedAt', Date.now());
     } finally {
       this.probing = false;
     }
@@ -163,6 +185,32 @@ export struct ChatContent {
         this.scroller.scrollToIndex(this.messages.length - 1, true, ScrollAlign.END);
       }
     }, 50);
+  }
+
+  private refreshMessageList(): void {
+    this.messages = this.messages.slice();
+    this.scrollToBottom();
+  }
+
+  private flushPendingDelta(): void {
+    if (this.deltaChunks.length === 0 || this.messages.length === 0) return;
+    const last = this.messages[this.messages.length - 1];
+    last.content += this.deltaChunks.join('');
+    this.deltaChunks = [];
+  }
+
+  private scheduleDeltaRefresh(): void {
+    if (this.messageRefreshScheduled) return;
+    this.messageRefreshScheduled = true;
+    setTimeout(() => {
+      this.messageRefreshScheduled = false;
+      if (this.isCancelled) {
+        this.deltaChunks = [];
+        return;
+      }
+      this.flushPendingDelta();
+      this.refreshMessageList();
+    }, 80);
   }
 
   build() {
@@ -242,7 +290,7 @@ export struct ChatContent {
             ListItem() {
               this.MessageBubble(msg)
             }
-          })
+          }, (msg: DisplayMessage): string => msg.id)
         }
         .width('100%')
         .height('100%')
@@ -320,6 +368,7 @@ export struct ChatContent {
     }
 
     const userMsg: DisplayMessage = {
+      id: this.createMessageId('user'),
       role: 'user',
       content: content,
       citations: [],
@@ -332,6 +381,7 @@ export struct ChatContent {
     this.messages.push(userMsg);
 
     const assistantMsg: DisplayMessage = {
+      id: this.createMessageId('assistant'),
       role: 'assistant',
       content: '',
       citations: [],
@@ -347,6 +397,7 @@ export struct ChatContent {
     this.inputText = '';
     this.loading = true;
     this.isCancelled = false;
+    this.deltaChunks = [];
     this.scrollToBottom();
 
     const requestHistory: ChatMessage[] = [];
@@ -383,13 +434,18 @@ export struct ChatContent {
         }
         const last = this.messages[this.messages.length - 1];
 
+        if (evt.type === 'delta' && evt.content) {
+          this.deltaChunks.push(evt.content);
+          this.scheduleDeltaRefresh();
+          return;
+        }
+
+        this.flushPendingDelta();
         if (evt.type === 'thinking' && evt.agent) {
           last.thinking.push(evt.agent);
         } else if (evt.type === 'trace' && evt.agent && evt.content) {
           const traceText = evt.agent + ': ' + evt.content.slice(0, 100);
           last.agentTrace.push(traceText);
-        } else if (evt.type === 'delta' && evt.content) {
-          last.content += evt.content;
         } else if (evt.type === 'citation' && evt.source) {
           last.citations.push(evt.source);
         } else if (evt.type === 'error') {
@@ -398,13 +454,13 @@ export struct ChatContent {
           this.serviceMessage = evt.message ?? '云端学伴暂不可用';
         }
 
-        this.messages = this.messages.slice();
-        this.scrollToBottom();
+        this.refreshMessageList();
       },
       () => {
         if (this.isCancelled) {
           return;
         }
+        this.flushPendingDelta();
         this.loading = false;
         this.currentRequest = null;
         const last = this.messages[this.messages.length - 1];
@@ -413,17 +469,19 @@ export struct ChatContent {
         } else {
           this.saveLocalHistory();
         }
+        this.refreshMessageList();
       },
       (_err: Error) => {
         if (this.isCancelled) {
           return;
         }
+        this.flushPendingDelta();
         this.messages = this.messages.slice(0, this.messages.length - 1);
         this.serviceMessage = '云端学伴暂不可用，请稍后重试';
         this.cloudAgentReady = false;
         this.loading = false;
         this.currentRequest = null;
-        this.messages = this.messages.slice();
+        this.refreshMessageList();
       },
       (reqInstance: http.HttpRequest) => {
         this.currentRequest = reqInstance;

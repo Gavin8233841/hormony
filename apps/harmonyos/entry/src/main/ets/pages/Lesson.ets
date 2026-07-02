@@ -22,12 +22,14 @@ struct LessonPage {
   @State topic: string = '';
   @State chunks: CuratedKnowledgeChunk[] = [];
   @State activeChunk: CuratedKnowledgeChunk = EMPTY_CHUNK;
+  @State activeBeats: string[] = [];
   @State completedChunkIds: string[] = [];
   @State currentIndex: number = 0;
   @State saving: boolean = false;
   @State message: string = '';
   @State experience: LessonExperience | null = null;
   @State activeActivityIndex: number = 0;
+  @State activeActivityItem: LearningActivity | null = null;
   @State selectedIndexes: number[] = [];
   @State responseText: string = '';
   @State feedbackVisible: boolean = false;
@@ -41,6 +43,9 @@ struct LessonPage {
     this.experience = LearningContentRepository.getLessonExperience(this.courseId, this.topic);
     this.chunks = content;
     this.activeChunk = content.length > 0 ? content[0] : EMPTY_CHUNK;
+    this.activeBeats = this.buildContentBeats(this.activeChunk);
+    this.activeActivityIndex = 0;
+    this.activeActivityItem = this.resolveActiveActivity();
     this.loadProgress();
   }
 
@@ -54,6 +59,7 @@ struct LessonPage {
           !this.completedChunkIds.includes(chunk.id));
         this.currentIndex = nextIndex >= 0 ? nextIndex : 0;
         this.activeChunk = this.chunks[this.currentIndex];
+        this.activeBeats = this.buildContentBeats(this.activeChunk);
       }
     } catch (error) {
       this.message = '学习进度读取失败，但课程内容仍可查看';
@@ -64,11 +70,16 @@ struct LessonPage {
     if (index < 0 || index >= this.chunks.length) return;
     this.currentIndex = index;
     this.activeChunk = this.chunks[index];
+    this.activeBeats = this.buildContentBeats(this.activeChunk);
     this.message = '';
     this.contentScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
   }
 
   private activeActivity(): LearningActivity | null {
+    return this.activeActivityItem;
+  }
+
+  private resolveActiveActivity(): LearningActivity | null {
     if (this.experience === null || this.experience.activities.length === 0) return null;
     return this.experience.activities[this.activeActivityIndex] ?? null;
   }
@@ -146,6 +157,7 @@ struct LessonPage {
   private goToActivity(index: number): void {
     if (this.experience === null || index < 0 || index >= this.experience.activities.length) return;
     this.activeActivityIndex = index;
+    this.activeActivityItem = this.resolveActiveActivity();
     this.resetActivityInput();
     this.message = '';
     this.contentScroller.scrollPage({ next: false });
@@ -158,13 +170,17 @@ struct LessonPage {
     return '完成主题并练习';
   }
 
-  private contentBeats(): string[] {
-    return this.activeChunk.text
+  private buildContentBeats(chunk: CuratedKnowledgeChunk): string[] {
+    return chunk.text
       .replace(/；/g, '。')
       .split('。')
       .map((sentence: string): string => sentence.trim())
       .filter((sentence: string): boolean => sentence.length > 0)
       .map((sentence: string): string => sentence + '。');
+  }
+
+  private contentBeats(): string[] {
+    return this.activeBeats;
   }
 
   private masteryGoal(): string {

@@ -19,8 +19,9 @@ struct MistakeBookPage {
 
   private async loadItems(): Promise<void> {
     try {
-      const dueItems = await LocalLearningRepository.getDueReviewItems();
-      const activeItems = await LocalLearningRepository.getReviewItems();
+      const queues = await LocalLearningRepository.getReviewQueues();
+      const dueItems = queues.dueItems;
+      const activeItems = queues.activeItems;
       const dueIds = dueItems.map((item: ReviewItem): string => item.id);
       this.items = dueItems.concat(activeItems.filter((item: ReviewItem): boolean => !dueIds.includes(item.id)));
       this.reviewSummary = this.items.length.toString() + ' 道待巩固 · ' +

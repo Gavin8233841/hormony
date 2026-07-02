@@ -11,7 +11,8 @@ import {
   StudyEvent,
   TagInsight,
   TopicMastery,
-  UserProfile
+  UserProfile,
+  UserStats
 } from '../model/DataModels';
 
 const STORE_NAME: string = 'hongxueban_learning.db';
@@ -28,8 +29,29 @@ const KEY_LESSON_PROGRESS: string = 'lesson_progress';
 const KEY_REVIEW_ITEMS: string = 'review_items';
 const KEY_FORM_IDS: string = 'form_ids';
 
+interface CachedStatePayload {
+  key: string;
+  payload: string;
+}
+
+export interface ReviewQueues {
+  dueItems: ReviewItem[];
+  activeItems: ReviewItem[];
+}
+
+export interface ProfileSnapshot {
+  profile: UserProfile | null;
+  tagInsights: TagInsight[];
+}
+
+interface CourseTopicProgress {
+  courseId: string;
+  topics: string[];
+}
+
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
+  private static valueCache: CachedStatePayload[] = [];
 
   static async initialize(context: common.Context): Promise<void> {
     if (LocalLearningRepository.store !== null) return;
@@ -134,6 +156,12 @@ export class LocalLearningRepository {
   }
 
   private static async getValue<T>(key: string): Promise<T | null> {
+    const cached = LocalLearningRepository.valueCache.find((item: CachedStatePayload): boolean => item.key === key);
+    if (cached !== undefined) {
+      const cachedValue: T = JSON.parse(cached.payload);
+      return cachedValue;
+    }
+
     const store = LocalLearningRepository.requireStore();
     let resultSet: relationalStore.ResultSet | null = null;
     try {
@@ -143,6 +171,7 @@ export class LocalLearningRepository {
       );
       if (!resultSet.goToFirstRow()) return null;
       const payload = resultSet.getString(0);
+      LocalLearningRepository.setCachedPayload(key, payload);
       const value: T = JSON.parse(payload);
       return value;
     } catch (error) {
@@ -160,20 +189,50 @@ export class LocalLearningRepository {
   private static async putValue<T>(key: string, value: T): Promise<void> {
     const store = LocalLearningRepository.requireStore();
     try {
+      const payload = JSON.stringify(value);
       await store.executeSql(
         'INSERT OR REPLACE INTO ' + TABLE_NAME +
         ' (state_key, payload, updated_at) VALUES (?, ?, ?)',
-        [key, JSON.stringify(value), Date.now()]
+        [key, payload, Date.now()]
       );
+      LocalLearningRepository.setCachedPayload(key, payload);
     } catch (error) {
       throw new Error('保存本地学习状态失败: ' + String(error));
     }
+  }
+
+  private static setCachedPayload(key: string, payload: string): void {
+    const index = LocalLearningRepository.valueCache.findIndex((item: CachedStatePayload): boolean => item.key === key);
+    if (index >= 0) {
+      LocalLearningRepository.valueCache[index] = { key: key, payload: payload };
+      return;
+    }
+    LocalLearningRepository.valueCache.push({ key: key, payload: payload });
   }
 
   static async getProfile(): Promise<UserProfile | null> {
     const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
     if (profile === null) return null;
     const results = await LocalLearningRepository.getQuizResults();
+    const events = await LocalLearningRepository.getStudyEvents();
+    profile.stats = LocalLearningRepository.calculateProfileStats(results, events);
+    return profile;
+  }
+
+  static async getProfileSnapshot(tagLimit: number = 6): Promise<ProfileSnapshot> {
+    const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
+    const results = await LocalLearningRepository.getQuizResults();
+    const events = await LocalLearningRepository.getStudyEvents();
+    if (profile !== null) {
+      profile.stats = LocalLearningRepository.calculateProfileStats(results, events);
+    }
+    return {
+      profile: profile,
+      tagInsights: LocalLearningRepository.buildTagInsights(results, tagLimit)
+    };
+  }
+
+  private static calculateProfileStats(results: QuizResult[], events: StudyEvent[]): UserStats {
     let totalQuestions = 0;
     let correctQuestions = 0;
     const studyDates: string[] = [];
@@ -183,18 +242,16 @@ export class LocalLearningRepository {
       const date = LocalLearningRepository.localDateKey(new Date(result.submittedAt));
       if (!studyDates.includes(date)) studyDates.push(date);
     }
-    const events = await LocalLearningRepository.getStudyEvents();
     for (const event of events) {
       const date = LocalLearningRepository.localDateKey(new Date(event.timestamp));
       if (!studyDates.includes(date)) studyDates.push(date);
     }
-    profile.stats = {
+    return {
       totalQuestions: totalQuestions,
       accuracy: totalQuestions > 0 ? correctQuestions / totalQuestions : 0,
       studyDays: studyDates.length,
       streakDays: LocalLearningRepository.calculateStreakDays(studyDates)
     };
-    return profile;
   }
 
   static async saveProfile(profile: UserProfile): Promise<void> {
@@ -205,13 +262,9 @@ export class LocalLearningRepository {
     const courses = await LocalLearningRepository.getValue<Course[]>(KEY_COURSES);
     if (courses === null) return null;
     const events = await LocalLearningRepository.getStudyEvents();
+    const completedByCourse = LocalLearningRepository.buildCompletedTopicsByCourse(events);
     return courses.map((course: Course): Course => {
-      const completedTopics: string[] = [];
-      for (const event of events) {
-        if (event.courseId !== course.id || event.topic === undefined || !course.topics.includes(event.topic)) continue;
-        if (event.type !== 'lesson_completed' && event.type !== 'quiz_mastered') continue;
-        if (!completedTopics.includes(event.topic)) completedTopics.push(event.topic);
-      }
+      const completedTopics = LocalLearningRepository.findCompletedCourseTopics(completedByCourse, course.id, course.topics);
       return {
         id: course.id,
         title: course.title,
@@ -220,6 +273,27 @@ export class LocalLearningRepository {
         topics: course.topics
       };
     });
+  }
+
+  private static buildCompletedTopicsByCourse(events: StudyEvent[]): CourseTopicProgress[] {
+    const progress: CourseTopicProgress[] = [];
+    for (const event of events) {
+      if (event.topic === undefined || event.courseId === undefined) continue;
+      if (event.type !== 'lesson_completed' && event.type !== 'quiz_mastered') continue;
+      let bucket = progress.find((item: CourseTopicProgress): boolean => item.courseId === event.courseId);
+      if (bucket === undefined) {
+        bucket = { courseId: event.courseId, topics: [] };
+        progress.push(bucket);
+      }
+      if (!bucket.topics.includes(event.topic)) bucket.topics.push(event.topic);
+    }
+    return progress;
+  }
+
+  private static findCompletedCourseTopics(progress: CourseTopicProgress[], courseId: string, courseTopics: string[]): string[] {
+    const bucket = progress.find((item: CourseTopicProgress): boolean => item.courseId === courseId);
+    if (bucket === undefined) return [];
+    return bucket.topics.filter((topic: string): boolean => courseTopics.includes(topic));
   }
 
   static async syncCourseCatalog(catalog: Course[]): Promise<void> {
@@ -367,10 +441,17 @@ export class LocalLearningRepository {
   }
 
   static async getDueReviewItems(now: Date = new Date()): Promise<ReviewItem[]> {
-    const items = await LocalLearningRepository.getReviewItems(true);
-    const due = items.filter((item: ReviewItem): boolean => new Date(item.nextReviewAt).getTime() <= now.getTime());
-    return due.sort((left: ReviewItem, right: ReviewItem): number =>
-      new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime());
+    const queues = await LocalLearningRepository.getReviewQueues(now);
+    return queues.dueItems;
+  }
+
+  static async getReviewQueues(now: Date = new Date()): Promise<ReviewQueues> {
+    const activeItems = await LocalLearningRepository.getReviewItems(true);
+    const dueItems = activeItems
+      .filter((item: ReviewItem): boolean => new Date(item.nextReviewAt).getTime() <= now.getTime())
+      .sort((left: ReviewItem, right: ReviewItem): number =>
+        new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime());
+    return { dueItems: dueItems, activeItems: activeItems };
   }
 
   static async getLessonProgress(courseId?: string): Promise<LessonProgress[]> {
@@ -438,6 +519,10 @@ export class LocalLearningRepository {
 
   static async getTagInsights(limit: number = 6): Promise<TagInsight[]> {
     const results = await LocalLearningRepository.getQuizResults();
+    return LocalLearningRepository.buildTagInsights(results, limit);
+  }
+
+  private static buildTagInsights(results: QuizResult[], limit: number): TagInsight[] {
     const insights: TagInsight[] = [];
     for (const result of results.slice().reverse()) {
       for (const detail of result.details) {

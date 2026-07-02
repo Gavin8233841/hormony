@@ -5157,3 +5157,40 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未跑模拟器 UI 流程、性能 trace 或真机；本批次运行证据等级为静态诊断通过与构建通过，性能收益数值未验证。
 - 仍未处理更高风险的 LocalLearningRepository 读缓存、Chat delta 合批、请求体字节级上限、store 持久化写放大和脚本层增量优化；这些已有只读审计证据，但需要单独批次与更细测试保护。
+
+---
+
+## 2026-07-02 Codex：鸿蒙1.12 端侧运行时效率收紧
+
+背景：继续按“只服务评委看到的 HarmonyOS 端侧 App”推进，本批次不碰 Web UI / admin，聚焦本地状态读取、画像/错题聚合、Chat 流式刷新、Lesson 页面 build 重复计算和云端健康探测重复请求。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/Constants.ets
+- apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets
+- apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets
+- apps/harmonyos/entry/src/main/ets/pages/Lesson.ets
+- apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets
+- apps/harmonyos/entry/src/main/ets/pages/Profile.ets
+
+行为变化：
+- `LocalLearningRepository` 增加 key 级 JSON payload 缓存：`getValue` 命中时跳过 SQLite 查询，仍重新 `JSON.parse` 返回新对象，避免调用方共享可变引用；`putValue` 成功写库后同步更新缓存。
+- 新增 `getProfileSnapshot(tagLimit)`，画像页一次读取 profile、quiz results、study events 后同时产出画像统计与标签洞察，避免 `getProfile()` 与 `getTagInsights()` 重复扫描。
+- `getCourses()` 先一次扫描 study events 生成每门课完成 Topic 列表，再映射课程进度，减少多课程页面重复遍历事件。
+- 新增 `getReviewQueues()`，错题本一次读取 active review items 后派生 due 队列，页面不再连续读取 due 与 active 两套数据。
+- Chat SSE delta 改为 80ms 合批刷新，delta 片段先进入数组，flush 时 `join` 后追加；消息增加本地稳定 `id`，List `ForEach` 使用稳定 key，减少流式回复期间列表重建抖动。
+- Lesson 缓存当前 chunk 的分句结果 `activeBeats` 和当前互动练习 `activeActivityItem`，切换 chunk / activity 时更新，build 中不再重复拆分正文。
+- 启动健康探测写入 `cloudAgentCheckedAt`，Chat 页在 60 秒内复用 ready 结果，减少启动后马上进入学伴页的重复 `/api/health` 请求。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：第一次 exit 1，ArkTS 不支持 `UserProfile['stats']` 索引访问类型；已改为显式 `UserStats`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 20 s 712 ms`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：追加 Chat 稳定 key 后 exit 0，`BUILD SUCCESSFUL in 18 s 911 ms`。
+- `powershell -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1，Windows PowerShell 按非 UTF-8 解析无 BOM 脚本，中文字符串变乱码导致脚本解析失败；未进入 App 验证。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；构建、安装、启动、首页、课程列表、课程详情、练习页和前 4 题通过；第 5 题脚本未找到可见 `A.` 选项后退出。截图证据位于 `screenshots/trae-smoke-20260702-234638/`，不提交。
+- 通过 hdc UI 树 bounds 做窄路径验证：画像页出现“你的学习节奏与成长记录 / 学习星图 / 错题本”；点击错题本并返回成功；点击学伴页后出现“基于课程资料，为每个问题给出依据”。该命令 exit 0，输出 `TARGETED_UI_SMOKE_OK`。
+
+未验证：
+- 未做真机验证和 DevEco Profiler 性能采样；本批次性能收益数值仍未验证。
+- 全量冒烟脚本未完成到最后，练习第 5 题可见性问题需单独排查脚本鲁棒性或本地练习状态影响。
+- Chat 长回答的掉帧、最终文本一致性、引用展开和真实 SSE 线上链路未做端到端测量。

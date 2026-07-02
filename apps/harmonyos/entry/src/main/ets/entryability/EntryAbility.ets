@@ -59,8 +59,10 @@ export default class EntryAbility extends UIAbility {
     try {
       const health = await HttpClient.get<HealthResponse>(Constants.API_HEALTH);
       AppStorage.setOrCreate<boolean>('cloudAgentReady', health.status === 'ready');
+      AppStorage.setOrCreate<number>('cloudAgentCheckedAt', Date.now());
     } catch (error) {
       AppStorage.setOrCreate<boolean>('cloudAgentReady', false);
+      AppStorage.setOrCreate<number>('cloudAgentCheckedAt', Date.now());
     }
   }
 
