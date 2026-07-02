@@ -5169,3 +5169,26 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未完成整组 5 题提交到结果页；最终入库仍沿用既有 `submitQuiz()` 和 `LocalLearningRepository.appendQuizResult()`，但“全部反馈后提交”的完整设备流程未跑完。
 - 新增切题回顶行为为源码确认与构建通过，未取得切题前后滚动位置截图。
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex：AI 测验长反馈继续动作可达性
+
+背景：单题反馈截图显示，长解析会把底部“下一题/提交评分”推到首屏外；本批次在不改变评分契约和持久化结构的前提下，让反馈卡自身提供继续动作，降低长解析后的操作成本。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- DEVLOG.md
+
+行为变化：
+- 单题反馈卡新增主按钮：非最后一题显示“进入下一题”，最后一题显示“提交本组总结”。
+- 反馈卡按钮复用既有 `goToQuestion()` 与 `submitQuiz()`，继续遵守“全部题目已答且全部反馈已查看后才可提交”。
+- 底部原有上一题/下一题/提交评分按钮保留，避免改变熟悉的导航结构。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 16 s 486 ms`；`CompileArkTS`、`PackageHap`、`SignHap` 均完成，仍为 unsigned HAP，签名未配置。
+- HAP 安装：`hdc install -r C:\Users\guo82\.codex\worktrees\5cef\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+
+未验证：
+- 未重新跑完整真实 AI 出题流程截图；本批次证据等级为源码确认、构建通过和 HAP 安装通过。
+- 真机未验证。

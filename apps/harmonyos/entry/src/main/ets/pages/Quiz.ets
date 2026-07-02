@@ -556,6 +556,26 @@ struct QuizPage {
     return Constants.COLOR_BRAND;
   }
 
+  private feedbackActionLabel(): string {
+    if (this.currentIndex < this.questions.length - 1) return '进入下一题';
+    return this.submitting ? '评分中...' : '提交本组总结';
+  }
+
+  private feedbackActionEnabled(): boolean {
+    if (this.submitting) return false;
+    if (this.currentIndex < this.questions.length - 1) return true;
+    return this.allQuestionsAnswered() && this.allFeedbackChecked();
+  }
+
+  private handleFeedbackAction(): void {
+    if (!this.feedbackActionEnabled()) return;
+    if (this.currentIndex < this.questions.length - 1) {
+      this.goToQuestion(this.currentIndex + 1);
+      return;
+    }
+    this.submitQuiz();
+  }
+
   private answerLetter(answer: string): string {
     const trimmed = answer.trim().toUpperCase();
     if (trimmed.length === 0) return '';
@@ -887,6 +907,19 @@ struct QuizPage {
         .fontSize(13)
         .lineHeight(21)
         .fontColor(Constants.COLOR_TEXT_TERTIARY)
+
+      Button(this.feedbackActionLabel())
+        .width('100%')
+        .height(42)
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.feedbackActionEnabled() ? Constants.COLOR_TEXT_ON_GRADIENT :
+          Constants.COLOR_BUTTON_DISABLED_TEXT)
+        .backgroundColor(this.feedbackActionEnabled() ? Constants.COLOR_BRAND :
+          Constants.COLOR_BUTTON_DISABLED_BG)
+        .borderRadius(Constants.RADIUS_MD)
+        .enabled(this.feedbackActionEnabled())
+        .onClick((): void => { this.handleFeedbackAction(); })
 
       Text('你的答案：' + this.currentAnswerText())
         .width('100%')
