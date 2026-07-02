@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as getQuizData, POST as generateQuiz } from "./route";
+import { POST as submitQuiz } from "./submit/route";
 import { GET as getResources } from "../resources/route";
 import type { QuizPackage } from "@/lib/types";
 
@@ -53,6 +54,47 @@ describe("题库与资源 API 闭环", () => {
     expect(quiz.questions[0].tags).toEqual(["概念理解"]);
     expect(quiz.grading).toHaveLength(5);
     expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["概念理解"] });
+  });
+
+  it("Web 生成测验后应可立即提交服务端评分", async () => {
+    const generateResponse = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "api_submit_user",
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 5,
+          difficulty: "medium",
+        }),
+      })
+    );
+    const quiz = (await generateResponse.json()) as QuizPackage;
+    const submitResponse = await submitQuiz(
+      new Request("http://localhost/api/quiz/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "api_submit_user",
+          quizId: quiz.quizId,
+          answers: quiz.questions.map((question) => ({
+            questionId: question.id,
+            userAnswer: question.options?.[0] ?? "",
+          })),
+        }),
+      })
+    );
+    const result = await submitResponse.json();
+
+    expect(submitResponse.status).toBe(200);
+    expect(result).toMatchObject({
+      quizId: quiz.quizId,
+      userId: "api_submit_user",
+      totalQuestions: 5,
+      correctCount: 5,
+    });
+    expect(result.details[0]).toMatchObject({ tags: ["概念理解"] });
   });
 
   it("模型未配置时应返回明确 503", async () => {
@@ -119,6 +161,50 @@ describe("题库与资源 API 闭环", () => {
 
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
+  it("模型生成题目未通过 Safety 时应返回明确 502", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([{
+      type: "choice",
+      stem: "联系 13812345678 判断二叉树性质",
+      options: ["A. 选项一", "B. 选项二", "C. 选项三", "D. 选项四"],
+      answer: "A",
+      explanation: "输出包含敏感信息。",
+      tags: ["概念理解"],
+    }]);
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 1,
+          difficulty: "medium",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({ code: "SAFETY_BLOCKED" });
+  });
+
+  it("缺少课程资料时应返回明确 404", async () => {
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "zzzznohit",
+          count: 1,
+          difficulty: "medium",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "KNOWLEDGE_UNAVAILABLE" });
   });
 
   it("课程题库目录不应返回题目答案", async () => {

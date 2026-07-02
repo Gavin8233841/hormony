@@ -1,6 +1,6 @@
 // Planner Agent：学习计划生成与任务拆解
 
-import { callModel, extractJsonPayload } from "./model";
+import { callModel, extractJsonPayload, ModelInvalidResponseError } from "./model";
 import { getProfileContext } from "./profile-agent";
 import { allQuizzes } from "@/lib/data";
 import { generateId } from "@/lib/utils";
@@ -51,7 +51,8 @@ export async function runPlannerAgent(
   goal: string,
   durationDays: number,
   dailyMinutes: number,
-  profileSnapshot?: LearningProfileSnapshot
+  profileSnapshot?: LearningProfileSnapshot,
+  signal?: AbortSignal
 ): Promise<StudyPlan> {
   const profile = getProfileContext(profileSnapshot);
   const startDate = new Date().toISOString().slice(0, 10);
@@ -75,11 +76,15 @@ ${topicCatalog}`;
 每日可用时间：${dailyMinutes} 分钟
 请生成 ${Math.min(durationDays, 10)} 个关键任务。`;
 
-  const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.4, maxTokens: 1200 });
+  const raw = await callModel(systemPrompt, userPrompt, {
+    temperature: 0.4,
+    maxTokens: 1200,
+    signal,
+  });
 
   const tasks = parseTasks(raw, startDate, durationDays, topicOptions);
   if (tasks.length === 0) {
-    throw new Error("MODEL_INVALID_RESPONSE: 学习计划不是有效 JSON");
+    throw new ModelInvalidResponseError("学习计划不是有效 JSON");
   }
 
   const plan: StudyPlan = {

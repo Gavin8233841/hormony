@@ -38,6 +38,33 @@ export class ModelInvalidResponseError extends Error {
   }
 }
 
+export class ModelTimeoutError extends Error {
+  readonly code = "MODEL_TIMEOUT";
+
+  constructor(message = "模型请求超时") {
+    super(message);
+    this.name = "ModelTimeoutError";
+  }
+}
+
+export class KnowledgeUnavailableError extends Error {
+  readonly code = "KNOWLEDGE_UNAVAILABLE";
+
+  constructor(message = "当前主题缺少课程资料") {
+    super(message);
+    this.name = "KnowledgeUnavailableError";
+  }
+}
+
+export class ModelCancelledError extends Error {
+  readonly code = "MODEL_CANCELLED";
+
+  constructor(message = "模型请求已取消") {
+    super(message);
+    this.name = "ModelCancelledError";
+  }
+}
+
 interface ModelConfig extends ModelRuntimeInfo {
   apiKey: string;
 }
@@ -123,14 +150,49 @@ function getModelClient(config: ModelConfig): OpenAI | null {
 async function createChatCompletion(
   client: OpenAI,
   request: ArkChatCompletionRequest,
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let abortListener: (() => void) | undefined;
+  let cancelListener: (() => void) | undefined;
   try {
-    return await client.chat.completions.create(request, { signal: controller.signal });
+    if (signal?.aborted) {
+      throw new ModelCancelledError();
+    }
+    if (signal) {
+      abortListener = () => controller.abort();
+      signal.addEventListener("abort", abortListener, { once: true });
+    }
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new ModelTimeoutError(`模型请求超过 ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+    const cancelPromise = signal
+      ? new Promise<never>((_, reject) => {
+          cancelListener = () => reject(new ModelCancelledError());
+          signal.addEventListener("abort", cancelListener, { once: true });
+        })
+      : undefined;
+    try {
+      return await Promise.race([
+        client.chat.completions.create(request, { signal: controller.signal }),
+        timeoutPromise,
+        ...(cancelPromise ? [cancelPromise] : []),
+      ]);
+    } catch (error) {
+      if (signal?.aborted) {
+        throw new ModelCancelledError();
+      }
+      throw error;
+    }
   } finally {
-    clearTimeout(timer);
+    if (timer !== undefined) clearTimeout(timer);
+    if (signal && abortListener) signal.removeEventListener("abort", abortListener);
+    if (signal && cancelListener) signal.removeEventListener("abort", cancelListener);
   }
 }
 
@@ -150,6 +212,7 @@ export function getModelRuntimeInfo(): ModelRuntimeInfo {
 export interface ModelCallOptions {
   temperature?: number;
   maxTokens?: number;
+  signal?: AbortSignal;
 }
 
 // 统一调用入口：返回纯文本
@@ -179,7 +242,7 @@ export async function callModel(
       max_tokens: Math.min(Math.max(opts?.maxTokens ?? 1024, 128), 2048),
       thinking: { type: "disabled" },
     };
-    const res = await createChatCompletion(client, request, config.timeoutMs);
+    const res = await createChatCompletion(client, request, config.timeoutMs, opts?.signal);
 
     const content = res.choices[0]?.message?.content;
     if (typeof content === "string" && content.trim().length > 0) {
@@ -189,6 +252,12 @@ export async function callModel(
     throw new ModelInvalidResponseError("模型返回为空");
   } catch (error) {
     if (error instanceof ModelInvalidResponseError) throw error;
+    if (error instanceof ModelCancelledError) throw error;
+    if (error instanceof ModelTimeoutError || isTimeoutLikeError(error)) {
+      throw new ModelTimeoutError(
+        error instanceof Error ? error.message : "模型请求超时"
+      );
+    }
     throw new ModelUnavailableError(
       error instanceof Error ? `模型请求失败：${error.message}` : "模型请求失败"
     );
@@ -230,7 +299,7 @@ export async function callModelWithHistory(
       max_tokens: Math.min(Math.max(opts?.maxTokens ?? 1024, 128), 2048),
       thinking: { type: "disabled" },
     };
-    const res = await createChatCompletion(client, request, config.timeoutMs);
+    const res = await createChatCompletion(client, request, config.timeoutMs, opts?.signal);
 
     const content = res.choices[0]?.message?.content;
     if (typeof content === "string" && content.trim().length > 0) {
@@ -240,10 +309,23 @@ export async function callModelWithHistory(
     throw new ModelInvalidResponseError("模型返回为空");
   } catch (error) {
     if (error instanceof ModelInvalidResponseError) throw error;
+    if (error instanceof ModelCancelledError) throw error;
+    if (error instanceof ModelTimeoutError || isTimeoutLikeError(error)) {
+      throw new ModelTimeoutError(
+        error instanceof Error ? error.message : "模型请求超时"
+      );
+    }
     throw new ModelUnavailableError(
       error instanceof Error ? `模型请求失败：${error.message}` : "模型请求失败"
     );
   }
+}
+
+function isTimeoutLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === "AbortError"
+    || error.name === "APIConnectionTimeoutError"
+    || /timeout|timed out|aborted/i.test(error.message);
 }
 
 // 从模型文本中提取 JSON，兼容纯 JSON、Markdown 代码块和前后带说明文字的输出。

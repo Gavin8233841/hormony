@@ -5075,3 +5075,52 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 本批次未新增代码真实运行沙盒，互动练习仍为阅读、预测、选择和自评。
 - Trae 的题库、内容审计和资源文档仍需逐项复核后再采用提交。
+
+---
+
+## 2026-07-02 Codex：鸿蒙1.12 Web AI/API 可靠性收紧
+
+背景：接力线程「鸿蒙1.12」聚焦 Web 后端 AI/API 真实可用性，修复端侧 Plan/Quiz/Chat 依赖的输入边界、模型错误码、输出 Safety 和 Web Quiz 提交流程不一致问题。
+
+文件：
+- apps/web/src/lib/api-validation.ts
+- apps/web/src/lib/api-errors.ts
+- apps/web/src/lib/agents/model.ts
+- apps/web/src/lib/agents/orchestrator.ts
+- apps/web/src/lib/agents/planner-agent.ts
+- apps/web/src/lib/agents/quiz-agent.ts
+- apps/web/src/lib/agents/tutor-agent.ts
+- apps/web/src/lib/agents/evaluator-agent.ts
+- apps/web/src/lib/agents/safety-agent.ts
+- apps/web/src/app/api/chat/route.ts
+- apps/web/src/app/api/plan/route.ts
+- apps/web/src/app/api/plan/save/route.ts
+- apps/web/src/app/api/quiz/route.ts
+- apps/web/src/app/api/quiz/submit/route.ts
+- apps/web/src/app/api/request-validation.test.ts
+- apps/web/src/app/api/stateless-agent.test.ts
+- apps/web/src/app/api/plan/plan-lifecycle.test.ts
+- apps/web/src/app/api/quiz/quiz-flow.test.ts
+- apps/web/src/lib/agents/safety-agent.test.ts
+- docs/HARMONY-1.12-WEB-AI-RELIABILITY.md
+
+行为变化：
+- Chat、Plan、Quiz 外部输入改为运行时精确校验；非字符串消息、未知课程、非法 history/profile、非整数时长/题量、非布尔 done、未知任务类型等返回明确 4xx `{ error, code }`。
+- Chat 将 `history` 和 `profile` 文本纳入输入 Safety，并补充中文 Prompt 注入规则。
+- 模型调用新增 `MODEL_TIMEOUT`、`MODEL_CANCELLED`、`KNOWLEDGE_UNAVAILABLE` 和显式 `MODEL_INVALID_RESPONSE` 错误类型；Chat SSE 流中错误保留结构化 code。
+- Chat SSE 客户端取消时通过 `AbortSignal` 传到模型调用，避免服务端继续跑到超时。
+- Plan 和 Quiz 生成结果进入输出 Safety；不安全模型输出返回 502 `SAFETY_BLOCKED`，不伪造成成功响应。
+- Quiz 生成接口保存 AI 生成测验，Web 后台可用同一 `quizId` 调用 `/api/quiz/submit` 完成服务端评分；HarmonyOS 端仍使用 `grading` 本地评分。
+- 新增文档记录 1.12 Web AI/API 契约、错误码、证据等级和端侧同步事项。
+
+验证：
+- `cd apps/web; pnpm test`：首次新增资料缺失测试使用中文主题，因 RAG bigram 命中真实资料导致断言不成立；已改为无命中的英文测试主题。
+- `cd apps/web; pnpm test`：exit 0，11 files / 132 tests passed。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm lint`：exit 0，No ESLint warnings or errors。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 通过。
+
+未验证：
+- 本批次未部署到 Vercel，线上 Health、Chat SSE、Plan、Quiz 未回归，证据等级不能标记为线上通过。
+- 未修改 HarmonyOS 文件，未运行 HAP 构建或模拟器流程；端侧非 200 精确错误码保留、`PlanTask.reason` 基础接口同步和 Quiz 端侧深校验需主线程协调。
+- 真机能力仍未验证：Lottie、OCR、TTS、distributedKVStore。

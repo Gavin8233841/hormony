@@ -5,10 +5,14 @@ import { runPlannerAgent } from "@/lib/agents/planner-agent";
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
 import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
-import { modelErrorResponse } from "@/lib/api-errors";
-import type { LearningProfileSnapshot } from "@/lib/types";
-import { validateUserInput } from "@/lib/agents/safety-agent";
+import { modelErrorResponse, SafetyBlockedError } from "@/lib/api-errors";
+import type { LearningProfileSnapshot, StudyPlan } from "@/lib/types";
+import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
 import { readJsonObject } from "@/lib/request-json";
+import {
+  readBoundedInteger,
+  sanitizeLearningProfile,
+} from "@/lib/api-validation";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -35,20 +39,45 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const parsed = await readJsonObject<{
-    userId?: string;
-    goal?: string;
-    durationDays?: number;
-    dailyMinutes?: number;
-    profile?: LearningProfileSnapshot;
-  }>(req);
+  const parsed = await readJsonObject<Record<string, unknown>>(req);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
 
   const userId = sanitizeUserId(body.userId);
-  const goal = String(body.goal ?? "").trim();
-  const durationDays = Math.min(Math.max(Number(body.durationDays) || 14, 1), 30);
-  const dailyMinutes = Math.min(Math.max(Number(body.dailyMinutes) || 90, 15), 480);
+  if (body.goal === undefined) {
+    return Response.json({ error: "缺少 goal 字段", code: "MISSING_FIELD" }, { status: 400 });
+  }
+  if (typeof body.goal !== "string") {
+    return Response.json({ error: "goal 必须是字符串", code: "INVALID_GOAL" }, { status: 400 });
+  }
+  const goal = body.goal.trim();
+  const durationDays = readBoundedInteger(
+    body.durationDays,
+    14,
+    1,
+    30,
+    "INVALID_DURATION",
+    "durationDays"
+  );
+  if (!durationDays.ok) return durationDays.response;
+  const dailyMinutes = readBoundedInteger(
+    body.dailyMinutes,
+    90,
+    15,
+    480,
+    "INVALID_DAILY_MINUTES",
+    "dailyMinutes"
+  );
+  if (!dailyMinutes.ok) return dailyMinutes.response;
+  const profile = sanitizeLearningProfile(body.profile);
+  if (!profile.ok) return profile.response;
+  const profileSafetyFlags = profile.value ? validateUserInput(profileSafetyText(profile.value)) : [];
+  if (profileSafetyFlags.length > 0) {
+    return Response.json(
+      { error: "画像内容不符合安全要求", code: "INPUT_REJECTED" },
+      { status: 400 }
+    );
+  }
 
   if (goal.length === 0) {
     return Response.json({ error: "缺少 goal 字段", code: "MISSING_FIELD" }, { status: 400 });
@@ -70,7 +99,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const plan = await runPlannerAgent(userId, goal, durationDays, dailyMinutes, body.profile);
+    const plan = await runPlannerAgent(
+      userId,
+      goal,
+      durationDays.value,
+      dailyMinutes.value,
+      profile.value as LearningProfileSnapshot | undefined
+    );
+    await assertSafePlan(plan);
     return Response.json(plan);
   } catch (err) {
     console.error("[plan/POST] error:", err instanceof Error ? err.message : String(err));
@@ -80,4 +116,29 @@ export async function POST(req: Request) {
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 });
+}
+
+function profileSafetyText(profile: LearningProfileSnapshot): string {
+  return [
+    profile.stage,
+    profile.learningStyle,
+    ...profile.weakTopics,
+    ...profile.strongTopics,
+  ].join("\n");
+}
+
+async function assertSafePlan(plan: StudyPlan): Promise<void> {
+  const outputText = [
+    plan.goal,
+    ...(plan.agentTrace ?? []),
+    ...plan.tasks.flatMap((task) => [
+      task.title,
+      task.topic ?? "",
+      task.reason ?? "",
+    ]),
+  ].join("\n");
+  const safety = await runSafetyAgent(outputText, []);
+  if (!safety.passed) {
+    throw new SafetyBlockedError();
+  }
 }

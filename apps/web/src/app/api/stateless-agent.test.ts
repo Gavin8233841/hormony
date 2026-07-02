@@ -39,4 +39,29 @@ describe("无状态真实 Agent 边界", () => {
     expect(body).toContain("SAFETY_BLOCKED");
     expect(body).not.toContain('"type":"delta"');
   });
+
+  it("流中模型解析失败应保留结构化错误码", async () => {
+    delete process.env.MODEL_API_KEY;
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([{
+      type: "choice",
+      stem: "格式错误题目",
+      options: ["选项一", "选项二", "选项三", "选项四"],
+      answer: "A",
+      explanation: "测试解析。",
+    }]);
+    const response = await chat(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "demo",
+        message: "请围绕二叉树与BST出题",
+        context: { courseId: "cs101" },
+      }),
+    }) as never);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("MODEL_INVALID_RESPONSE");
+    expect(body).toContain('"type":"done"');
+  });
 });

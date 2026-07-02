@@ -11,7 +11,8 @@ export async function runTutorAgent(
   ragContext: string,
   citations: Citation[],
   history?: ChatMessage[],
-  profileSnapshot?: LearningProfileSnapshot
+  profileSnapshot?: LearningProfileSnapshot,
+  signal?: AbortSignal
 ): Promise<AgentResult> {
   const profile = getProfileContext(profileSnapshot);
 
@@ -42,10 +43,12 @@ ${ragContext || "（无相关资料）"}
     ? await callModelWithHistory(systemPrompt, userPrompt, recentHistory, {
         temperature: 0.3,
         maxTokens: 1024,
+        signal,
       })
     : await callModel(systemPrompt, userPrompt, {
         temperature: 0.3,
         maxTokens: 1024,
+        signal,
       });
 
   return {
