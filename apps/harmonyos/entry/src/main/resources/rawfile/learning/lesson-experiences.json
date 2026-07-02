@@ -1,100 +1,1884 @@
 [
   {
+    "schemaVersion": 2,
     "courseId": "cs101",
     "topic": "数组与线性表",
     "visualTitle": "连续内存中的访问路径",
-    "visualSteps": ["下标 0", "下标 1", "下标 2", "O(1) 访问"],
+    "visualSteps": [
+      "下标 0",
+      "下标 1",
+      "下标 2",
+      "O(1) 访问"
+    ],
     "caseTitle": "现实案例：电影院座位表",
     "caseBody": "座位编号连续时，可以直接由编号定位座位；但中间插入一排座位，需要整体移动后续编号。这正是顺序表随机访问快、插入成本高的原因。",
-    "language": "C++",
-    "code": "vector<int> score = {72, 85, 91};\nscore[1] += 5;\ncout << score[1];",
-    "prompt": "这段代码运行后输出什么？",
-    "options": ["72", "85", "90", "91"],
-    "answerIndex": 2,
-    "explanation": "score[1] 是第二个元素 85，加 5 后变为 90。数组下标从 0 开始。"
+    "workedExampleTitle": "先读代码，再预测结果",
+    "workedExampleSteps": [
+      "vector<int> score = {72, 85, 91};",
+      "score[1] += 5;",
+      "cout << score[1];"
+    ],
+    "activities": [
+      {
+        "id": "cs101-数组与线性表-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "这段代码运行后输出什么？",
+        "content": "vector<int> score = {72, 85, 91};\nscore[1] += 5;\ncout << score[1];",
+        "language": "C++",
+        "interactionMode": "single_choice",
+        "options": [
+          "72",
+          "85",
+          "90",
+          "91"
+        ],
+        "answerIndexes": [
+          2
+        ],
+        "answer": "90",
+        "feedback": "score[1] 是第二个元素 85，加 5 后变为 90。数组下标从 0 开始。",
+        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+      }
+    ]
   },
   {
+    "schemaVersion": 2,
     "courseId": "cs101",
     "topic": "链表",
     "visualTitle": "节点通过指针串联",
-    "visualSteps": ["head", "节点 A", "节点 B", "nullptr"],
+    "visualSteps": [
+      "head",
+      "节点 A",
+      "节点 B",
+      "nullptr"
+    ],
     "caseTitle": "现实案例：寻宝线索",
     "caseBody": "每张线索只告诉你下一张在哪里，不要求所有线索连续存放。插入新线索只需改动相邻指向，但寻找第 10 张必须从头逐步前进。",
-    "language": "C++",
-    "code": "Node* p = head;\nwhile (p != nullptr) {\n  cout << p->value;\n  p = p->next;\n}",
-    "prompt": "循环在什么条件下结束？",
-    "options": ["p 回到 head", "p 指向 nullptr", "value 等于 0", "输出一次后"],
-    "answerIndex": 1,
-    "explanation": "尾节点的 next 为 nullptr，指针越过尾节点后循环结束。"
+    "workedExampleTitle": "先读代码，再预测结果",
+    "workedExampleSteps": [
+      "Node* p = head;",
+      "while (p != nullptr) {",
+      "  cout << p->value;",
+      "  p = p->next;",
+      "}"
+    ],
+    "activities": [
+      {
+        "id": "cs101-链表-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "循环在什么条件下结束？",
+        "content": "Node* p = head;\nwhile (p != nullptr) {\n  cout << p->value;\n  p = p->next;\n}",
+        "language": "C++",
+        "interactionMode": "single_choice",
+        "options": [
+          "p 回到 head",
+          "p 指向 nullptr",
+          "value 等于 0",
+          "输出一次后"
+        ],
+        "answerIndexes": [
+          1
+        ],
+        "answer": "p 指向 nullptr",
+        "feedback": "尾节点的 next 为 nullptr，指针越过尾节点后循环结束。",
+        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+      }
+    ]
   },
   {
+    "schemaVersion": 2,
     "courseId": "cs101",
     "topic": "栈与队列",
     "visualTitle": "两种受限访问顺序",
-    "visualSteps": ["栈：后进", "栈：先出", "队列：先进", "队列：先出"],
+    "visualSteps": [
+      "栈：后进",
+      "栈：先出",
+      "队列：先进",
+      "队列：先出"
+    ],
     "caseTitle": "现实案例：撤销与排队",
     "caseBody": "编辑器撤销总是先撤销最近操作，适合栈；打印任务按到达顺序处理，适合队列。选择结构前先判断业务顺序。",
-    "language": "C++",
-    "code": "stack<int> s;\ns.push(2);\ns.push(7);\ncout << s.top();",
-    "prompt": "top() 返回哪个值？",
-    "options": ["2", "7", "9", "空"],
-    "answerIndex": 1,
-    "explanation": "栈后进先出，最后压入的 7 位于栈顶。"
+    "workedExampleTitle": "先读代码，再预测结果",
+    "workedExampleSteps": [
+      "stack<int> s;",
+      "s.push(2);",
+      "s.push(7);",
+      "cout << s.top();"
+    ],
+    "activities": [
+      {
+        "id": "cs101-栈与队列-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "top() 返回哪个值？",
+        "content": "stack<int> s;\ns.push(2);\ns.push(7);\ncout << s.top();",
+        "language": "C++",
+        "interactionMode": "single_choice",
+        "options": [
+          "2",
+          "7",
+          "9",
+          "空"
+        ],
+        "answerIndexes": [
+          1
+        ],
+        "answer": "7",
+        "feedback": "栈后进先出，最后压入的 7 位于栈顶。",
+        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+      }
+    ]
   },
   {
+    "schemaVersion": 2,
     "courseId": "cs102",
     "topic": "进程与线程",
     "visualTitle": "资源与执行流的关系",
-    "visualSteps": ["进程资源", "线程 A", "线程 B", "共享地址空间"],
+    "visualSteps": [
+      "进程资源",
+      "线程 A",
+      "线程 B",
+      "共享地址空间"
+    ],
     "caseTitle": "现实案例：浏览器标签页",
     "caseBody": "进程隔离能限制单个页面崩溃的影响，线程共享进程资源则便于协作。隔离性和通信成本需要一起权衡。",
-    "language": "C++",
-    "code": "int counter = 0;\n// 两个线程各执行一次\ncounter = counter + 1;",
-    "prompt": "若没有同步，最终结果一定是 2 吗？",
-    "options": ["一定是", "不一定", "一定是 0", "代码无法编译"],
-    "answerIndex": 1,
-    "explanation": "读、改、写不是原子操作，两个线程可能覆盖彼此结果，必须用锁或原子变量同步。"
+    "workedExampleTitle": "先读代码，再预测结果",
+    "workedExampleSteps": [
+      "int counter = 0;",
+      "// 两个线程各执行一次",
+      "counter = counter + 1;"
+    ],
+    "activities": [
+      {
+        "id": "cs102-进程与线程-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "若没有同步，最终结果一定是 2 吗？",
+        "content": "int counter = 0;\n// 两个线程各执行一次\ncounter = counter + 1;",
+        "language": "C++",
+        "interactionMode": "single_choice",
+        "options": [
+          "一定是",
+          "不一定",
+          "一定是 0",
+          "代码无法编译"
+        ],
+        "answerIndexes": [
+          1
+        ],
+        "answer": "不一定",
+        "feedback": "读、改、写不是原子操作，两个线程可能覆盖彼此结果，必须用锁或原子变量同步。",
+        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+      }
+    ]
   },
   {
+    "schemaVersion": 2,
     "courseId": "cs102",
     "topic": "虚拟内存与分页",
     "visualTitle": "虚拟地址翻译路径",
-    "visualSteps": ["虚拟页号", "页表", "物理页框", "页内偏移"],
+    "visualSteps": [
+      "虚拟页号",
+      "页表",
+      "物理页框",
+      "页内偏移"
+    ],
     "caseTitle": "现实案例：酒店房号映射",
     "caseBody": "客人记住的是稳定房号，后台可以把房间调配到不同楼层。页表承担类似映射，让进程看到连续空间而无需占用连续物理内存。",
-    "language": "地址推演",
-    "code": "页大小 = 4 KB\n虚拟地址 = 8196\n页号 = 8196 / 4096\n偏移 = 8196 % 4096",
-    "prompt": "该地址的页内偏移是多少？",
-    "options": ["0", "4", "4096", "8192"],
-    "answerIndex": 1,
-    "explanation": "8196 = 2 × 4096 + 4，因此位于第 2 页，页内偏移为 4。"
+    "workedExampleTitle": "先读代码，再预测结果",
+    "workedExampleSteps": [
+      "页大小 = 4 KB",
+      "虚拟地址 = 8196",
+      "页号 = 8196 / 4096",
+      "偏移 = 8196 % 4096"
+    ],
+    "activities": [
+      {
+        "id": "cs102-虚拟内存与分页-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "该地址的页内偏移是多少？",
+        "content": "页大小 = 4 KB\n虚拟地址 = 8196\n页号 = 8196 / 4096\n偏移 = 8196 % 4096",
+        "language": "地址推演",
+        "interactionMode": "single_choice",
+        "options": [
+          "0",
+          "4",
+          "4096",
+          "8192"
+        ],
+        "answerIndexes": [
+          1
+        ],
+        "answer": "4",
+        "feedback": "8196 = 2 × 4096 + 4，因此位于第 2 页，页内偏移为 4。",
+        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+      }
+    ]
   },
   {
+    "schemaVersion": 2,
     "courseId": "cs103",
     "topic": "TCP握手与挥手",
     "visualTitle": "建立连接的三次确认",
-    "visualSteps": ["SYN", "SYN + ACK", "ACK", "可传输数据"],
+    "visualSteps": [
+      "SYN",
+      "SYN + ACK",
+      "ACK",
+      "可传输数据"
+    ],
     "caseTitle": "现实案例：双方确认通话线路",
     "caseBody": "第一次说明客户端能发送，第二次说明服务端能接收并发送，第三次让服务端确认客户端也能接收。双方收发能力都被验证后才传数据。",
-    "language": "网络时序",
-    "code": "Client -> Server : SYN seq=100\nServer -> Client : SYN ACK seq=300 ack=101\nClient -> Server : ACK ack=301",
-    "prompt": "第三次 ACK 的核心作用是什么？",
-    "options": ["传输业务数据", "确认客户端能收到服务端响应", "关闭连接", "重新分配 IP"],
-    "answerIndex": 1,
-    "explanation": "服务端收到第三次 ACK 后，才确认自己的响应已被客户端收到，双方收发链路均可用。"
+    "workedExampleTitle": "先读代码，再预测结果",
+    "workedExampleSteps": [
+      "Client -> Server : SYN seq=100",
+      "Server -> Client : SYN ACK seq=300 ack=101",
+      "Client -> Server : ACK ack=301"
+    ],
+    "activities": [
+      {
+        "id": "cs103-TCP握手与挥手-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "第三次 ACK 的核心作用是什么？",
+        "content": "Client -> Server : SYN seq=100\nServer -> Client : SYN ACK seq=300 ack=101\nClient -> Server : ACK ack=301",
+        "language": "网络时序",
+        "interactionMode": "single_choice",
+        "options": [
+          "传输业务数据",
+          "确认客户端能收到服务端响应",
+          "关闭连接",
+          "重新分配 IP"
+        ],
+        "answerIndexes": [
+          1
+        ],
+        "answer": "确认客户端能收到服务端响应",
+        "feedback": "服务端收到第三次 ACK 后，才确认自己的响应已被客户端收到，双方收发链路均可用。",
+        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+      }
+    ]
   },
   {
+    "schemaVersion": 2,
     "courseId": "cs103",
     "topic": "HTTP协议",
     "visualTitle": "一次请求响应的组成",
-    "visualSteps": ["请求行", "请求头", "响应状态", "响应体"],
+    "visualSteps": [
+      "请求行",
+      "请求头",
+      "响应状态",
+      "响应体"
+    ],
     "caseTitle": "现实案例：餐厅点单",
     "caseBody": "方法和路径像点单内容，请求头携带偏好与身份，状态码说明是否成功，响应体才是最终返回的数据。",
-    "language": "HTTP",
-    "code": "GET /courses HTTP/1.1\nAccept: application/json\n\nHTTP/1.1 200 OK\nContent-Type: application/json",
-    "prompt": "哪一部分表达请求希望接收 JSON？",
-    "options": ["GET", "/courses", "Accept 请求头", "200 OK"],
-    "answerIndex": 2,
-    "explanation": "Accept 请求头描述客户端期望接收的媒体类型；Content-Type 描述实际发送内容的类型。"
+    "workedExampleTitle": "先读代码，再预测结果",
+    "workedExampleSteps": [
+      "GET /courses HTTP/1.1",
+      "Accept: application/json",
+      "",
+      "HTTP/1.1 200 OK",
+      "Content-Type: application/json"
+    ],
+    "activities": [
+      {
+        "id": "cs103-HTTP协议-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "哪一部分表达请求希望接收 JSON？",
+        "content": "GET /courses HTTP/1.1\nAccept: application/json\n\nHTTP/1.1 200 OK\nContent-Type: application/json",
+        "language": "HTTP",
+        "interactionMode": "single_choice",
+        "options": [
+          "GET",
+          "/courses",
+          "Accept 请求头",
+          "200 OK"
+        ],
+        "answerIndexes": [
+          2
+        ],
+        "answer": "Accept 请求头",
+        "feedback": "Accept 请求头描述客户端期望接收的媒体类型；Content-Type 描述实际发送内容的类型。",
+        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "二叉树与BST",
+    "visualTitle": "在 BST 中依次插入 50, 30, 70, 40, 60 并查找 60",
+    "visualSteps": [
+      "插入 50",
+      "插入 30",
+      "插入 70",
+      "插入 40"
+    ],
+    "caseTitle": "现实案例：组织架构树与人员查找",
+    "caseBody": "公司组织架构像一棵二叉树：CEO 是根节点，直接下属是左右子节点，层层向下展开。在 BST 式的组织架构中，每个管理者左边的下属工号都比自己小，右边的都比自己大。找某位员工时从 CEO 开始，比当前管理者工号小就往左走，大就往右走。如果管理层级平衡（接近 log n 层），查找很快；如果公司变成线性链条（每人只管一人），查找退化为逐级遍历。这正是 BST 平衡性决定查找效率 O(h) 的直观体现。",
+    "workedExampleTitle": "在 BST 中依次插入 50, 30, 70, 40, 60 并查找 60",
+    "workedExampleSteps": [
+      "插入 50 → 50 作为根节点，此时树中仅有 {50}",
+      "插入 30 → 30 < 50，进入左子树，左子树为空，30 成为 50 的左孩子。树结构：50(左:30)",
+      "插入 70 → 70 > 50，进入右子树，右子树为空，70 成为 50 的右孩子。树结构：50(左:30, 右:70)",
+      "插入 40 → 40 < 50 进入左子树到达 30；40 > 30 进入右子树为空，40 成为 30 的右孩子。树结构：50(左:30(右:40), 右:70)",
+      "插入 60 → 60 > 50 进入右子树到达 70；60 < 70 进入左子树为空，60 成为 70 的左孩子。树结构：50(左:30(右:40), 右:70(左:60))",
+      "查找 60 → 60 > 50 进右子树到 70；60 < 70 进左子树到 60，匹配成功。共比较 3 次，体现了 BST 查找路径长度等于目标节点深度加 1"
+    ],
+    "activities": [
+      {
+        "id": "cs101-二叉树与BST-1",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下是在 BST 中递归插入节点的 C++ 代码，请填写空缺部分使插入逻辑正确",
+        "content": "代码：\nstruct TreeNode {\n    int val;\n    TreeNode* left;\n    TreeNode* right;\n};\n\nTreeNode* insert(TreeNode* root, int val) {\n    if (root == nullptr) {\n        return new TreeNode{val, nullptr, nullptr};\n    }\n    if (val < root->val) {\n        root->left = ________;  // 填空1\n    } else if (val > root->val) {\n        root->right = ________;  // 填空2\n    }\n    return root;\n}",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "填空1 为 insert(root->left, val)；填空2 为 insert(root->right, val)",
+        "feedback": "BST 插入的核心是沿搜索路径递归向下定位空位。当 val 小于当前节点值时递归插入左子树并重新链接左指针，大于时递归插入右子树并重新链接右指针。若先修改 root->left 再递归会导致原子树丢失。注意相等时不插入（保持 BST 无重复节点），这是与知识切片 cs101_k16 中\"插入类似查找定位后新建叶节点\"一致的行为",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k16"
+      },
+      {
+        "id": "cs101-二叉树与BST-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "给定如下 BST，请将对它进行中序遍历的步骤排列为正确执行顺序\n        50\n       /  \\\n      30   70\n       \\   /\n       40 60",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "访问根节点 50",
+          "递归遍历 50 的右子树（以 70 为根）",
+          "递归遍历 70 的左子树（以 60 为根）",
+          "递归遍历 50 的左子树（以 30 为根）",
+          "访问节点 40",
+          "访问节点 30",
+          "递归遍历 30 的右子树（以 40 为根）",
+          "访问节点 60",
+          "访问节点 70"
+        ],
+        "answerIndexes": [
+          3,
+          5,
+          6,
+          4,
+          0,
+          1,
+          2,
+          7,
+          8
+        ],
+        "answer": "D → F → G → E → A → B → C → H → I",
+        "feedback": "中序遍历的顺序是\"左子树 → 根 → 右子树\"。先递归遍历 50 的左子树（D），在左子树中以 30 为根：先访问 30（F），再遍历 30 的右子树（G）访问 40（E）。回到根访问 50（A）。然后递归遍历 50 的右子树（B），在右子树中以 70 为根：先遍历 70 的左子树（C）访问 60（H），再访问 70（I）。最终输出序列为 30, 40, 50, 60, 70，是严格递增的，验证了知识切片 cs101_k17 所述 BST 中序遍历得到有序序列的性质",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k15、cs101_k17\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "AVL树与红黑树",
+    "visualTitle": "AVL 树插入 25 导致 LR 型失衡的双旋调整过程\n初始状态（AVL 树，所有节点平衡）：\n       40\n      /  \\\n    20    50\n   /  \\\n  10   30",
+    "visualSteps": [
+      "插入 25",
+      "计算平衡因子",
+      "确定失衡类型",
+      "第一次旋转（左旋 20）"
+    ],
+    "caseTitle": "现实案例：图书馆书架的两种整理策略",
+    "caseBody": "图书馆频繁从入口侧添加新书，如果不整理，书架会逐渐向一侧倾斜，找书越来越慢。AVL 树就像一个严格的管理员，每放一本书就检查两侧高度差是否超过 1 层，超过立即旋转重排，书架始终保持近乎完美平衡，找书最快但整理动作多。红黑树像一个宽松的管理员，只保证最长一侧不超过最短一侧的两倍，虽然不如 AVL 整齐，但每次添书后的调整次数少（最多 3 次旋转）。频繁添书的图书馆选红黑树策略更省力，查书为主的图书馆选 AVL 策略更快。",
+    "workedExampleTitle": "AVL 树插入 25 导致 LR 型失衡的双旋调整过程\n初始状态（AVL 树，所有节点平衡）：\n       40\n      /  \\\n    20    50\n   /  \\\n  10   30",
+    "workedExampleSteps": [
+      "插入 25 → 25 < 40 进左子树到 20；25 > 20 进右子树到 30；25 < 30 进左子树为空，25 成为 30 的左孩子\n       40\n      /  \\\n    20    50\n   /  \\\n  10   30\n      /\n     25",
+      "计算平衡因子 → BF(30) = 左高1 - 右高0 = 1（正常）；BF(20) = 左高1 - 右高2 = -1（正常）；BF(40) = 左高3 - 右高1 = 2，失衡！",
+      "确定失衡类型 → 失衡节点是 40，新节点 25 插入在 40 的左孩子 20 的右子树中，属于 LR 型",
+      "第一次旋转（左旋 20）→ 以 20 为支点左旋：20 的右孩子 30 上提，20 成为 30 的左孩子，30 的原左子树（25）成为 20 的右孩子\n       40\n      /  \\\n    30    50\n   /\n  20\n /  \\\n10   25",
+      "第二次旋转（右旋 40）→ 以 40 为支点右旋：40 的左孩子 30 上提为新子树根，30 的原右子树（空）成为 40 的左子树，40 成为 30 的右孩子\n       30\n      /  \\\n    20    40\n   /  \\     \\\n  10   25   50",
+      "验证平衡 → BF(20)=0, BF(40)=-1, BF(30)=0, 所有节点 |BF| <= 1，恢复平衡。中序遍历 10,20,25,30,40,50 仍为升序，旋转未破坏 BST 有序性"
+    ],
+    "activities": [
+      {
+        "id": "cs101-AVL树与红黑树-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "给定如下 AVL 树（所有节点当前平衡），依次执行操作：插入 55。请推演插入后的平衡因子变化并给出最终树结构\n       40\n      /  \\\n    20    50\n   /  \\     \\\n  10   30    60",
+        "content": "操作内容：\n初始树中节点 40 为根，左子树 {20,10,30} 高 2，右子树 {50,60} 高 2，BF(40)=0\n操作：插入 55",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "1. 55 > 40 进右子树到 50；55 > 50 进右子树到 60；55 < 60 进左子树为空，55 成为 60 的左孩子\n  2. 插入后：BF(60) = 左高1 - 右高0 = 1；BF(50) = 左高0 - 右高2 = -2，失衡！\n  3. 失衡节点 50，新节点插入在 50 的右孩子 60 的左子树，属于 RL 型\n  4. 对 60 右旋：55 上提，60 成为 55 的右孩子\n  5. 对 50 左旋：55 上提，50 成为 55 的左孩子\n  6. 最终树结构：\n       40\n      /  \\\n    20    55\n   /  \\  /  \\\n  10  30 50  60",
+        "feedback": "RL 型失衡需要先右旋再左旋。注意判断失衡类型的关键是看新节点插入在失衡节点的哪个方向：50 的右子树（R）中 60 的左子树（L），所以是 RL 型。最终 BF(40)=0，整棵树恢复平衡。这与知识切片 cs101_k19 中\"RL 型先右旋再左旋\"的描述一致",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k19、cs101_k22"
+      },
+      {
+        "id": "cs101-AVL树与红黑树-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "在红黑树中插入一个新红色节点后，若其父节点也为红色（违反\"红节点的子节点必为黑\"性质），请将修复操作的步骤排列为正确顺序（假设叔节点为红色的情况）",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "将新节点的祖父节点设为红色",
+          "检查新节点的父节点和叔节点是否均为红色",
+          "将新节点插入并初始着色为红色",
+          "将\"当前节点\"上移到祖父节点，继续向上检查是否仍有连续红节点",
+          "将父节点和叔节点均重新着色为黑色"
+        ],
+        "answerIndexes": [
+          2,
+          1,
+          4,
+          0,
+          3
+        ],
+        "answer": "C → B → E → A → D",
+        "feedback": "红黑树插入修复的典型流程：先将新节点着红色（C），检查是否违反红色节点不能连续的性质（B）。当父节点和叔节点均为红色时，进行重新着色：将父和叔变黑（E），将祖父变红（A），然后把\"当前节点\"移到祖父位置继续向上检查（D），因为祖父变红可能与其父节点形成新的连续红节点冲突。这一过程体现了知识切片 cs101_k20 中\"通过变色和旋转恢复平衡\"的描述，变色优先于旋转以减少旋转次数",
+        "source": "算法导论（CLRS）；知识切片 cs101_k20\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "图的表示与遍历",
+    "visualTitle": "对以下无向图从顶点 0 执行 BFS 遍历的过程\n图结构（无向图）：\n顶点: 0, 1, 2, 3, 4\n边:   0-1, 0-2, 1-3, 2-4\n邻接表:\n0: [1, 2]\n1: [0, 3]\n2: [0, 4]\n3: [1]\n4: [2]",
+    "visualSteps": [
+      "初始化",
+      "弹出队首 0",
+      "弹出队首 1",
+      "弹出队首 2"
+    ],
+    "caseTitle": "现实案例：地铁线路与社交网络",
+    "caseBody": "地铁线路图就是一个图：站点是顶点，相邻站之间的轨道是边。如果你想知道从 A 站到 B 站最少经过几站，BFS 从 A 站出发逐站扩展，第一层是直达站，第二层是换乘一次能到的站，最先到达 B 站时的层数就是最少站数。如果用 DFS，你会沿一条线一路坐到终点再回头，找到的路径不一定最短。选择邻接表存储地铁图（稀疏图）比邻接矩阵节省空间，因为大部分站之间没有直达线路。",
+    "workedExampleTitle": "对以下无向图从顶点 0 执行 BFS 遍历的过程\n图结构（无向图）：\n顶点: 0, 1, 2, 3, 4\n边:   0-1, 0-2, 1-3, 2-4\n邻接表:\n0: [1, 2]\n1: [0, 3]\n2: [0, 4]\n3: [1]\n4: [2]",
+    "workedExampleSteps": [
+      "初始化 → 访问起点 0，标记 visited[0]=true，将 0 入队。队列: [0]，访问序列: [0]",
+      "弹出队首 0 → 遍历 0 的邻接表 [1, 2]。1 未访问，访问 1 并入队；2 未访问，访问 2 并入队。队列: [1, 2]，访问序列: [0, 1, 2]",
+      "弹出队首 1 → 遍历 1 的邻接表 [0, 3]。0 已访问跳过；3 未访问，访问 3 并入队。队列: [2, 3]，访问序列: [0, 1, 2, 3]",
+      "弹出队首 2 → 遍历 2 的邻接表 [0, 4]。0 已访问跳过；4 未访问，访问 4 并入队。队列: [3, 4]，访问序列: [0, 1, 2, 3, 4]",
+      "弹出队首 3 → 遍历 3 的邻接表 [1]。1 已访问跳过。队列: [4]，访问序列不变",
+      "弹出队首 4 → 遍历 4 的邻接表 [2]。2 已访问跳过。队列为空，BFS 结束。最终访问序列: 0, 1, 2, 3, 4。每个顶点距源点 0 的层数：0 在第 0 层，1 和 2 在第 1 层，3 和 4 在第 2 层，体现了 BFS 的分层特性"
+    ],
+    "activities": [
+      {
+        "id": "cs101-图的表示与遍历-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "给定如下无向图和 DFS 递归代码，预测程序从顶点 0 开始遍历的输出序列\n图结构（无向图）：\n顶点: 0, 1, 2, 3, 4\n邻接表（按升序排列邻接顶点）:\n0: [1, 3]\n1: [0, 2, 4]\n2: [1, 3]\n3: [0, 2, 4]\n4: [1, 3]\nbool visited[5] = {false};\nvoid dfs(int v) {\n    visited[v] = true;\n    cout << v << \" \";\n    for (int u : adj[v]) {\n        if (!visited[u]) {\n            dfs(u);\n        }\n    }\n}\n// 调用: dfs(0)",
+        "content": "",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "输出序列为 0 1 2 3 4",
+        "feedback": "从 0 出发，先访问 0 输出 0。遍历 0 的邻接表 [1,3]，1 未访问递归到 1 输出 1。1 的邻接表 [0,2,4]，0 已访问跳过，2 未访问递归到 2 输出 2。2 的邻接表 [1,3]，1 已访问跳过，3 未访问递归到 3 输出 3。3 的邻接表 [0,2,4]，0 和 2 已访问，4 未访问递归到 4 输出 4。4 的邻接表 [1,3] 均已访问，回溯结束。DFS 沿一条路径深入到底再回溯，与 BFS 的分层扩展不同，这体现了知识切片 cs101_k25 中\"沿一条路径尽可能深地探索，遇到死胡同则回溯\"的特性",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k25"
+      },
+      {
+        "id": "cs101-图的表示与遍历-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是对有向图执行 BFS 遍历的通用步骤，请排列为正确的执行顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "将起始顶点标记为已访问并入队",
+          "取出队首顶点 v，遍历 v 的所有邻接顶点",
+          "初始化 visited 数组全为 false，创建空队列",
+          "对每个未访问的邻接顶点 u，标记已访问并将 u 入队",
+          "检查队列是否为空，若非空回到取队首步骤",
+          "队列为空时算法结束"
+        ],
+        "answerIndexes": [
+          2,
+          0,
+          1,
+          3,
+          4,
+          5
+        ],
+        "answer": "C → A → B → D → E → F",
+        "feedback": "BFS 的标准流程：先初始化标记数组和队列（C），将起点标记并入队（A）。然后循环执行：取队首顶点（B），遍历其邻接顶点将未访问者标记并入队（D），检查队列是否为空决定是否继续（E）。队列为空表示所有可达顶点已访问，算法结束（F）。这一流程体现了知识切片 cs101_k26 中\"借助队列实现\"\"先访问所有邻接顶点，再逐层向外扩展\"的描述",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k26\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "最短路径算法",
+    "visualTitle": "Dijkstra 算法求源点 A 到各顶点的最短路径\n有向带权图：\nA → B (权 4),  A → C (权 2)\nC → B (权 1),  C → D (权 5)\nB → D (权 3)\nD → E (权 1)\n源点: A",
+    "visualSteps": [
+      "初始化",
+      "选最小 dist 顶点 A(0)",
+      "选最小 dist 顶点 C(2)",
+      "选最小 dist 顶点 B(3)"
+    ],
+    "caseTitle": "现实案例：导航软件的路线规划",
+    "caseBody": "导航软件从家到公司有多条路线，每条路有不同拥堵时间（边权）。Dijkstra 算法就像导航的核心逻辑：从家出发，每次选当前已知耗时最短的目的地扩展，用该目的地更新其邻居的预估时间（松弛操作），逐步确定到每个地点的最短时间。但如果某条路有\"负时间\"（比如经过会奖励时间），Dijkstra 的贪心假设就失效了——已确定的最短路径可能被负权边推翻，此时需改用 Bellman-Ford 算法。若要同时计算所有地点两两之间的最短路径（如全国公路网），Floyd 算法用三重循环一次性求解。",
+    "workedExampleTitle": "Dijkstra 算法求源点 A 到各顶点的最短路径\n有向带权图：\nA → B (权 4),  A → C (权 2)\nC → B (权 1),  C → D (权 5)\nB → D (权 3)\nD → E (权 1)\n源点: A",
+    "workedExampleSteps": [
+      "初始化 → dist[A]=0, dist[B/C/D/E]=∞，已确定集合 S={}，候选集 {A,B,C,D,E}",
+      "选最小 dist 顶点 A(0) → 加入 S。松弛 A 的出边：dist[B]=min(∞, 0+4)=4, dist[C]=min(∞, 0+2)=2。S={A}",
+      "选最小 dist 顶点 C(2) → 加入 S。松弛 C 的出边：dist[B]=min(4, 2+1)=3（被更新！），dist[D]=min(∞, 2+5)=7。S={A,C}",
+      "选最小 dist 顶点 B(3) → 加入 S。松弛 B 的出边：dist[D]=min(7, 3+3)=6（被更新！）。S={A,C,B}",
+      "选最小 dist 顶点 D(6) → 加入 S。松弛 D 的出边：dist[E]=min(∞, 6+1)=7。S={A,C,B,D}",
+      "选最小 dist 顶点 E(7) → 加入 S。E 无出边。S={A,C,B,D,E}。最终最短距离：A=0, C=2, B=3, D=6, E=7。注意 B 的最短路径是 A→C→B(权3) 而非 A→B(权4)，体现了松弛操作修正初始估计值的核心机制"
+    ],
+    "activities": [
+      {
+        "id": "cs101-最短路径算法-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "给定如下有向带权图，从源点 S 执行 Dijkstra 算法。请推演每轮选择顶点后的 dist 数组变化并给出最终各顶点最短距离\n有向带权图：\nS → A (权 10),  S → B (权 3)\nB → A (权 4),   B → C (权 2)\nA → C (权 1)\n源点: S",
+        "content": "操作内容：\n初始 dist: S=0, A=∞, B=∞, C=∞\n操作1：选 S(0) 加入 S，松弛 S 的出边\n操作2：选当前最小 dist 顶点加入 S，松弛其出边\n操作3：选当前最小 dist 顶点加入 S，松弛其出边\n操作4：选当前最小 dist 顶点加入 S，松弛其出边",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "1. 选 S(0)：dist[A]=min(∞,0+10)=10, dist[B]=min(∞,0+3)=3。S={S}\n  2. 选 B(3)：dist[A]=min(10,3+4)=7, dist[C]=min(∞,3+2)=5。S={S,B}\n  3. 选 C(5)：dist[A]=min(7,5+1)=6。S={S,B,C}\n  4. 选 A(6)：A 无出边。S={S,B,C,A}\n  5. 最终：S=0, B=3, C=5, A=6",
+        "feedback": "关键在第 3 步，C 通过 A→C 边（权 1）松弛了 A 的距离：dist[A] 从 7 更新为 6，因为路径 S→B→C→A 的总权为 3+2+1=6，比 S→B→A 的 3+4=7 更短。这体现了 Dijkstra 每轮选最小 dist 顶点后松弛邻居的核心逻辑。注意 Dijkstra 要求所有边权非负（cs101_k27），否则已确定顶点的距离可能被负权边进一步减小，破坏贪心正确性",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k27、cs101_k30"
+      },
+      {
+        "id": "cs101-最短路径算法-2",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下是 Floyd-Warshall 算法的核心代码，请填写状态转移的关键空缺\n// dist[i][j] 初始化为邻接矩阵，dist[i][i]=0，无边为 INF\nvoid floyd(int dist[][N], int n) {\n    for (int k = 0; k < n; k++) {\n        for (int i = 0; i < n; i++) {\n            for (int j = 0; j < n; j++) {\n                if (dist[i][k] != INF && dist[k][j] != INF) {\n                    dist[i][j] = min(dist[i][j], ________);  // 填空\n                }\n            }\n        }\n    }\n}",
+        "content": "",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "dist[i][k] + dist[k][j]",
+        "feedback": "Floyd 的核心转移方程为 d[k][i][j] = min(d[k-1][i][j], d[k-1][i][k] + d[k-1][k][j])，表示只经过前 k 个顶点中转时 i 到 j 的最短距离。空间优化后用二维数组原地更新，填空处就是\"经过顶点 k 中转\"的路径长度 dist[i][k]+dist[k][j]。注意 k 必须是最外层循环，因为每轮 k 表示允许经过的新中转顶点，这与知识切片 cs101_k28 中\"状态 d[k][i][j] 表示只经过前 k 个顶点中转\"的描述一致",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k28\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "排序算法",
+    "visualTitle": "对数组 [5, 2, 8, 3, 1, 4] 执行快速排序 Lomuto 分区过程",
+    "visualSteps": [
+      "选取基准",
+      "j=0，元素 5",
+      "j=1，元素 2",
+      "j=2，元素 8"
+    ],
+    "caseTitle": "现实案例：整理手中的扑克牌",
+    "caseBody": "打扑克牌时，插入排序就像每次摸一张新牌，在已排好的牌中从右向左找到合适位置插入，手中牌少时几乎一摸就到位。快速排序像先抽出一张牌做基准，比它小的堆左边、大的堆右边，再对两堆分别重复，分到每堆只剩一张就排好了。归并排序像把牌先分成两半各自排好，然后双指比较两堆顶部取较小者合并。选择排序策略不对：每轮找最小牌放到最前，虽然简单但交换动作多且不稳定。手中牌近乎有序时插入排序最快，接近 O(n)；完全乱序时归并和快排更可靠。",
+    "workedExampleTitle": "对数组 [5, 2, 8, 3, 1, 4] 执行快速排序 Lomuto 分区过程",
+    "workedExampleSteps": [
+      "选取基准 → 取末元素 pivot = arr[5] = 4，设指针 i = -1（指向小于区的右边界）",
+      "j=0，元素 5 → 5 >= 4，不操作。数组不变：[5, 2, 8, 3, 1, 4]",
+      "j=1，元素 2 → 2 < 4，i 增至 0，swap(arr[0], arr[1]) → [2, 5, 8, 3, 1, 4]",
+      "j=2，元素 8 → 8 >= 4，不操作。j=3，元素 3 → 3 < 4，i 增至 1，swap(arr[1], arr[3]) → [2, 3, 8, 5, 1, 4]",
+      "j=4，元素 1 → 1 < 4，i 增至 2，swap(arr[2], arr[4]) → [2, 3, 1, 5, 8, 4]",
+      "放置基准 → swap(arr[i+1], arr[5]) = swap(arr[3], arr[5]) → [2, 3, 1, 4, 8, 5]。pivot=4 到达最终位置 3，左侧 [2,3,1] 均 < 4，右侧 [8,5] 均 > 4，分区完成。后续对左右子数组递归执行同样分区"
+    ],
+    "activities": [
+      {
+        "id": "cs101-排序算法-1",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下是归并排序中合并两个有序子数组的 merge 函数，请填写空缺部分。注意此实现需要保证排序稳定性\nvoid merge(int arr[], int left, int mid, int right) {\n    int n1 = mid - left + 1;\n    int n2 = right - mid;\n    int L[n1], R[n2];\n    for (int i = 0; i < n1; i++) L[i] = arr[left + i];\n    for (int j = 0; j < n2; j++) R[j] = arr[mid + 1 + j];\n    int i = 0, j = 0, k = left;\n    while (i < n1 && j < n2) {\n        if (L[i] <= R[j]) {\n            ________;  // 填空：两行代码\n            ________;\n        } else {\n            arr[k] = R[j]; j++;\n        }\n        k++;\n    }\n    while (i < n1) { arr[k] = L[i]; i++; k++; }\n    while (j < n2) { arr[k] = R[j]; j++; k++; }\n}",
+        "content": "",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "填空1：arr[k] = L[i];\n填空2：i++;",
+        "feedback": "合并时用双指针比较两子数组头部元素，取较小者放入结果。关键是使用 <= 而非 <：当 L[i] 与 R[j] 相等时优先取左侧（L[i]），保证相等元素的原始相对顺序不被打乱，这正是归并排序稳定性的来源。若用 < 则相等时取右侧，会破坏稳定性。这与知识切片 cs101_k34 中\"归并排序是稳定排序（合并时相等元素保持原序）\"的描述一致。填空后 k++ 在 if-else 外部统一递增",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k32、cs101_k34"
+      },
+      {
+        "id": "cs101-排序算法-2",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "对数组 [7, 2, 5, 1, 8, 3] 执行一次快速排序 Lomuto 分区（取末元素为 pivot）。请推演分区完成后的数组状态及 pivot 的最终位置",
+        "content": "操作内容：\n初始数组：[7, 2, 5, 1, 8, 3]\npivot = 3（末元素），i = -1\n依次扫描 j = 0 到 4，遇到小于 pivot 的元素时 i++ 并交换 arr[i] 与 arr[j]\n最后交换 arr[i+1] 与 arr[high]",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "1. j=0: 7 >= 3，跳过。i=-1\n  2. j=1: 2 < 3，i=0，swap(arr[0],arr[1]) → [2, 7, 5, 1, 8, 3]\n  3. j=2: 5 >= 3，跳过。i=0\n  4. j=3: 1 < 3，i=1，swap(arr[1],arr[3]) → [2, 1, 5, 7, 8, 3]\n  5. j=4: 8 >= 3，跳过。i=1\n  6. 最终交换：swap(arr[2], arr[5]) → [2, 1, 3, 7, 8, 5]\n  7. pivot=3 位于下标 2，左侧 [2,1] 均 < 3，右侧 [7,8,5] 均 > 3",
+        "feedback": "Lomuto 分区通过维护指针 i 划分小于区和大于等于区。每次遇到小于 pivot 的元素就扩展小于区（i++ 并交换），最终将 pivot 放到 i+1 位置。分区后数组被划分为 [2,1] | 3 | [7,8,5]，pivot 到达最终排序位置 2。此后对左右子数组 [2,1] 和 [7,8,5] 递归分区。这与知识切片 cs101_k31 中\"Lomuto 分区取末元素为基准，单指针扫描\"的描述一致",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k31\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "动态规划",
+    "visualTitle": "0-1 背包问题的 DP 表填充过程\n物品：\n  物品1: w=1, v=15\n  物品2: w=3, v=20\n  物品3: w=4, v=30\n背包容量 W=4\n状态定义: dp[i][j] = 前 i 件物品在容量 j 下的最大价值\n转移方程: dp[i][j] = max(dp[i-1][j], dp[i-1][j-w[i]] + v[i])  (当 j >= w[i])",
+    "visualSteps": [
+      "初始化",
+      "处理物品1 (w=1, v=15)",
+      "处理物品2 (w=3, v=20)",
+      "处理物品3 (w=4, v=30)"
+    ],
+    "caseTitle": "现实案例：背包旅行与版本比对",
+    "caseBody": "背包旅行时，3 件装备各有不同重量和价值，背包容量有限，每件只能带或不带，如何在容量内让总价值最大？这就是 0-1 背包问题。暴力枚举所有组合是 2^n 种，装备一多就爆炸。DP 的思路是记录\"前 i 件装备在容量 j 下的最大价值\"这一状态表格，逐步从少到多填充，每个状态只需看\"不选第 i 件\"和\"选第 i 件\"两种决策取较大值，避免了重复计算。版本控制工具比对两段代码的差异时，找最长公共子序列（LCS）也是同样的思路：填一张二维表，逐步推导两段文本的最长公共部分。",
+    "workedExampleTitle": "0-1 背包问题的 DP 表填充过程\n物品：\n  物品1: w=1, v=15\n  物品2: w=3, v=20\n  物品3: w=4, v=30\n背包容量 W=4\n状态定义: dp[i][j] = 前 i 件物品在容量 j 下的最大价值\n转移方程: dp[i][j] = max(dp[i-1][j], dp[i-1][j-w[i]] + v[i])  (当 j >= w[i])",
+    "workedExampleSteps": [
+      "初始化 → dp[0][j] = 0 (j=0..4)，dp[i][0] = 0 (i=0..3)，表示 0 件物品或 0 容量时价值为 0",
+      "处理物品1 (w=1, v=15) → j=1: max(dp[0][1], dp[0][0]+15)=max(0,15)=15；j=2: max(0,15)=15；j=3: 15；j=4: 15。dp[1] = [0, 15, 15, 15, 15]",
+      "处理物品2 (w=3, v=20) → j=1: max(15, 不选)=15 (j<w)；j=2: 15；j=3: max(15, dp[1][0]+20)=max(15,20)=20；j=4: max(15, dp[1][1]+20)=max(15,35)=35。dp[2] = [0, 15, 15, 20, 35]",
+      "处理物品3 (w=4, v=30) → j=1..3: j<w，同 dp[2]；j=4: max(35, dp[2][0]+30)=max(35,30)=35。dp[3] = [0, 15, 15, 20, 35]",
+      "读取结果 → dp[3][4]=35，即容量 4 下最大价值为 35。回溯决策：物品3 未选（dp[3][4]=dp[2][4]=35），物品2 已选（dp[2][4]=35 ≠ dp[1][4]=15），物品1 已选。最优方案为选物品1+物品2，总重 1+3=4，总价值 15+20=35"
+    ],
+    "activities": [
+      {
+        "id": "cs101-动态规划-1",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下是最长公共子序列（LCS）的动态规划实现，请填写状态转移的关键空缺\nint lcs(string& X, string& Y) {\n    int m = X.size(), n = Y.size();\n    int dp[m+1][n+1];\n    for (int i = 0; i <= m; i++) dp[i][0] = 0;\n    for (int j = 0; j <= n; j++) dp[0][j] = 0;\n    for (int i = 1; i <= m; i++) {\n        for (int j = 1; j <= n; j++) {\n            if (X[i-1] == Y[j-1]) {\n                ________;  // 填空\n            } else {\n                dp[i][j] = max(dp[i-1][j], dp[i][j-1]);\n            }\n        }\n    }\n    return dp[m][n];\n}",
+        "content": "",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "dp[i][j] = dp[i-1][j-1] + 1",
+        "feedback": "当 X[i-1] 与 Y[j-1] 字符相等时，LCS 长度等于同时去掉这两个字符后的 LCS 长度加 1，即 dp[i-1][j-1]+1。当字符不等时，LCS 取去掉 X 最后一个字符或去掉 Y 最后一个字符两种情况的较大值。这与知识切片 cs101_k38 中\"若 X[i]==Y[j] 则 dp[i][j]=dp[i-1][j-1]+1；否则 dp[i][j]=max(dp[i-1][j], dp[i][j-1])\"的转移方程完全一致。注意数组下标偏移：dp 表从 1 开始而字符串从 0 开始，所以比较的是 X[i-1] 和 Y[j-1]",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k38"
+      },
+      {
+        "id": "cs101-动态规划-2",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "给定字符串 X=\"ABCB\"，Y=\"BDCB\"，使用 LCS 动态规划填表。初始 dp 表全为 0（dp[0][*]=0, dp[*][0]=0）。请推演 dp[3][3] 和 dp[4][4] 的值",
+        "content": "操作内容：\nX = \"ABCB\"（下标 1-4 对应 A,B,C,B）\nY = \"BDCB\"（下标 1-4 对应 B,D,C,B）\n转移规则：X[i-1]==Y[j-1] 则 dp[i][j]=dp[i-1][j-1]+1；否则 dp[i][j]=max(dp[i-1][j], dp[i][j-1])\n推演目标：dp[3][3]（X 前 3 字符 \"ABC\" vs Y 前 3 字符 \"BDC\"）和 dp[4][4]（完整 LCS）",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "1. 先推演 dp[2][1]：X[1]='B', Y[0]='B'，相等，dp[2][1]=dp[1][0]+1=1\n  2. 推演 dp[3][3]：X[2]='C', Y[2]='C'，相等，dp[3][3]=dp[2][2]+1。而 dp[2][2]：X[1]='B' ≠ Y[1]='D'，dp[2][2]=max(dp[1][2], dp[2][1])=max(0,1)=1。因此 dp[3][3]=1+1=2\n  3. 推演 dp[4][4]：X[3]='B', Y[3]='B'，相等，dp[4][4]=dp[3][3]+1=2+1=3\n  4. LCS 长度 = dp[4][4] = 3，最长公共子序列为 \"BCB\"",
+        "feedback": "dp[3][3] 对比 \"ABC\" 与 \"BDC\"，公共子序列 \"BC\" 长度为 2，此时 C 与 C 匹配，在 \"AB\" 与 \"BD\" 的 LCS（长度 1，即 \"B\"）基础上加 1。dp[4][4] 对比完整串，末尾 B 与 B 匹配，在前 3 字符 \"ABC\" 与 \"BDC\" 的 LCS 长度 2 基础上加 1 得 3。整个推演过程体现了知识切片 cs101_k38 中 LCS 的状态转移和知识切片 cs101_k40 中自底向上填表的方式",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k38、cs101_k40\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "贪心算法与分治",
+    "visualTitle": "Kruskal 算法构建最小生成树的过程\n连通无向图：\n顶点: A, B, C, D\n边（已按权值升序排列）:\n  A-B (权1),  B-D (权2),  A-C (权3),  C-D (权4),  B-C (权5)\n并查集初始: {A}, {B}, {C}, {D}",
+    "visualSteps": [
+      "选 A-B(1)",
+      "选 B-D(2)",
+      "选 A-C(3)",
+      "选 C-D(4)"
+    ],
+    "caseTitle": "现实案例：活动安排与快递分拣",
+    "caseBody": "一天有多个活动候选，每个有开始和结束时间，一个人最多能参加多少个不冲突的活动？贪心策略是按结束时间排序，每次选结束最早且不与已选活动冲突的——这样给后面留出最多时间。这就像快递分拣站用分治法处理海量包裹：把包裹分成两堆各自分拣，再合并结果。贪心不回头，一旦选定就不撤销；分治则递归拆解再合并。0-1 背包不能用贪心（选了高价值物品可能占满容量错过更优组合），必须用 DP；但部分背包可以按单位价值贪心求解，因为物品可分割，贪心选择性质成立。",
+    "workedExampleTitle": "Kruskal 算法构建最小生成树的过程\n连通无向图：\n顶点: A, B, C, D\n边（已按权值升序排列）:\n  A-B (权1),  B-D (权2),  A-C (权3),  C-D (权4),  B-C (权5)\n并查集初始: {A}, {B}, {C}, {D}",
+    "workedExampleSteps": [
+      "选 A-B(1) → A 和 B 不在同一集合，加入 MST。MST={A-B}，并查集合并：{A,B}, {C}, {D}",
+      "选 B-D(2) → B 和 D 不在同一集合，加入 MST。MST={A-B, B-D}，并查集合并：{A,B,D}, {C}",
+      "选 A-C(3) → A 和 C 不在同一集合，加入 MST。MST={A-B, B-D, A-C}，并查集合并：{A,B,C,D}",
+      "选 C-D(4) → C 和 D 已在同一集合 {A,B,C,D} 中，加入会形成环 A-C-D-B-A，跳过",
+      "选 B-C(5) → B 和 C 已在同一集合，加入会形成环，跳过",
+      "完成 → 已选 3 条边（n-1=3），MST 构建完成。总权值 = 1+2+3 = 6。Kruskal 的贪心策略是每次选最小权边且不构成环，借助并查集 O(α(n)) 判环，总复杂度 O(e log e)（排序主导）"
+    ],
+    "activities": [
+      {
+        "id": "cs101-贪心算法与分治-1",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是归并排序基于分治法的递归执行流程，请将步骤排列为正确顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "递归对右半子数组执行归并排序",
+          "合并两个已排序的子数组为一个完整有序数组",
+          "检查子数组长度是否 <= 1，若是则直接返回（基准情形）",
+          "将数组从中间对半划分为左子数组和右子数组",
+          "递归对左半子数组执行归并排序"
+        ],
+        "answerIndexes": [
+          2,
+          3,
+          4,
+          0,
+          1
+        ],
+        "answer": "C → D → E → A → B",
+        "feedback": "归并排序严格遵循分治三步骤（cs101_k43）：先判断基准情形避免无限递归（C），然后分解为两个子问题（D），递归解决左半（E）和右半（A），最后合并子问题的解（B）。这一流程体现了知识切片 cs101_k43 中\"分解、解决、合并\"三步骤。注意合并是归并排序的关键步骤，时间 O(n)，使得总递推 T(n)=2T(n/2)+O(n)，由主定理得 O(n log n)",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k43、cs101_k44"
+      },
+      {
+        "id": "cs101-贪心算法与分治-2",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "以下是贪心法求解活动选择问题的代码，活动已按结束时间升序排列。预测程序的输出\n// activities 已按结束时间升序排列\n// activities = { {1,3}, {2,5}, {4,6}, {5,7}, {6,9} }\n// 每个元素 {start, end}\nint greedySelect(vector<pair<int,int>>& act) {\n    int count = 1;              // 选第一个活动\n    int lastEnd = act[0].second; // 记录已选活动的最晚结束时间\n    for (int i = 1; i < act.size(); i++) {\n        if (act[i].first >= lastEnd) {  // 不冲突\n            count++;\n            lastEnd = act[i].second;\n        }\n    }\n    return count;\n}\n// 调用: greedySelect(activities)",
+        "content": "",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "输出 3",
+        "feedback": "贪心过程：选活动 {1,3}，lastEnd=3。活动 {2,5} 的 start=2 < 3 冲突跳过。活动 {4,6} 的 start=4 >= 3，选，lastEnd=6。活动 {5,7} 的 start=5 < 6 冲突跳过。活动 {6,9} 的 start=6 >= 6，选，lastEnd=9。共选 3 个活动：{1,3}, {4,6}, {6,9}。每次选结束最早的活动为后续留出最大空间，这是贪心选择性质的体现（cs101_k41）。注意活动选择问题有贪心选择性质所以贪心可得最优解，而 0-1 背包不具备此性质",
+        "source": "算法导论（CLRS）；知识切片 cs101_k41\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "哈希表",
+    "visualTitle": "使用线性探测法解决哈希冲突的插入过程\n哈希表容量 m=7\n哈希函数: h(key) = key mod 7\n初始状态: 空表 [_, _, _, _, _, _, _]\n依次插入: 10, 24, 17",
+    "visualSteps": [
+      "插入 10",
+      "插入 24",
+      "插入 17",
+      "观察聚集现象"
+    ],
+    "caseTitle": "现实案例：图书馆的编号存取系统",
+    "caseBody": "图书馆用哈希表管理图书位置：通过书号计算一个存储位置（哈希函数 h(key)=key mod m），直接定位书架。如果两本书算到同一个位置（冲突），用拉链法就在该位置挂一个小书架（链表）存放多本；用开放地址法就找下一个空位放（线性探测）。负载因子就像书架装满程度：装太满找空位越来越难，探测序列越来越长，需要扩容搬到更大的书架并重新计算所有位置（rehash）。理想情况下放书取书都是 O(1)，但如果哈希函数差导致大量书挤到同一位置，找书就退化为逐本翻看 O(n)。",
+    "workedExampleTitle": "使用线性探测法解决哈希冲突的插入过程\n哈希表容量 m=7\n哈希函数: h(key) = key mod 7\n初始状态: 空表 [_, _, _, _, _, _, _]\n依次插入: 10, 24, 17",
+    "workedExampleSteps": [
+      "插入 10 → h(10)=10 mod 7=3，位置 3 为空，放入位置 3。表: [_, _, _, 10, _, _, _]",
+      "插入 24 → h(24)=24 mod 7=3，位置 3 已被 10 占据，线性探测下一位置 4，位置 4 为空，放入位置 4。表: [_, _, _, 10, 24, _, _]",
+      "插入 17 → h(17)=17 mod 7=3，位置 3 被 10 占据，探测位置 4 被 24 占据，探测位置 5 为空，放入位置 5。表: [_, _, _, 10, 24, 17, _]",
+      "观察聚集现象 → 三个关键字哈希值均为 3，连续占据位置 3、4、5，形成长度为 3 的聚集区。这是线性探测的主要缺陷（cs101_k46）：冲突元素堆积在一起，后续插入的探测路径越来越长",
+      "计算负载因子 → α = 元素数/容量 = 3/7 ≈ 0.43，低于阈值 0.7，无需扩容。若继续插入使 α 超过 0.7，需执行 rehash 分配 2 倍容量并重新哈希所有元素"
+    ],
+    "activities": [
+      {
+        "id": "cs101-哈希表-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "给定如下使用线性探测法的哈希表（容量 m=7，h(key)=key mod 7），依次执行插入操作。请推演每次插入后的表状态\n当前表状态:\n索引:  0    1    2    3    4    5    6\n值:   null null null  10   24   17  null\n\n操作1: 插入 3\n操作2: 插入 7",
+        "content": "操作内容：\n线性探测：冲突时从 h(key) 开始顺序向后探测 (idx+1) mod m，直到找到空位\n请给出每次操作后哈希表的状态",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "1. 插入 3：h(3)=3，位置 3 被 10 占据 → 探测 4 被 24 占据 → 探测 5 被 17 占据 → 探测 6 为空，放入位置 6。表: [null, null, null, 10, 24, 17, 3]\n  2. 插入 7：h(7)=0，位置 0 为空，放入位置 0。表: [7, null, null, 10, 24, 17, 3]\n  3. 最终表: [7, null, null, 10, 24, 17, 3]，负载因子 α = 5/7 ≈ 0.71，接近阈值",
+        "feedback": "插入 3 时需要探测 4 次才能找到空位（从位置 3 到位置 6），这正是聚集现象导致的性能下降。如果使用二次探测或双重哈希，探测序列不再是连续的，可缓解聚集。插入 7 哈希到位置 0 无冲突，直接放入。注意开放地址法要求 α < 1（cs101_k47），当前 α ≈ 0.71 尚可，但若再插入应考虑扩容 rehash",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k46、cs101_k47"
+      },
+      {
+        "id": "cs101-哈希表-2",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "给定如下使用线性探测法的哈希表，预测查找函数对 search(17) 和 search(31) 的返回值\n哈希表（线性探测，容量 m=7，h(key) = key mod 7）:\n索引:  0    1    2    3    4    5    6\n值:   null null null  10   24   17  null\nint search(int table[], int key) {\n    int idx = key % 7;\n    while (table[idx] != -1) {  // -1 表示空位\n        if (table[idx] == key) return idx;\n        idx = (idx + 1) % 7;\n    }\n    return -1;  // 未找到\n}\n// 调用1: search(table, 17)\n// 调用2: search(table, 31)",
+        "content": "",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "search(17) 返回 5；search(31) 返回 -1",
+        "feedback": "search(17)：h(17)=3，table[3]=10 ≠ 17，探测到 table[4]=24 ≠ 17，探测到 table[5]=17 == 17，返回 5。查找路径与插入时的探测路径一致。search(31)：h(31)=3，table[3]=10 ≠ 31，table[4]=24 ≠ 31，table[5]=17 ≠ 31，table[6]=-1（空位），说明 31 不在表中，返回 -1。遇到空位即停止是正确的：线性探测插入时遇到空位就会放入，所以空位之后的元素不可能与当前键冲突。这也说明了开放地址法删除困难的原因——直接删除会留下空位打断查找链，需用软删除标记",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k46、cs101_k48\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs101",
+    "topic": "堆与优先队列",
+    "visualTitle": "从数组 [3, 1, 4, 1, 5, 9, 2] 建立大顶堆的过程\n初始数组: [3, 1, 4, 1, 5, 9, 2]  (下标 0-6)\n对应完全二叉树:\n          3(0)\n        /      \\\n      1(1)      4(2)\n     /   \\     /   \\\n   1(3) 5(4) 9(5)  2(6)\n\n建堆方法: 从最后一个非叶节点 (下标2) 到根 (下标0) 逐个下沉调整",
+    "visualSteps": [
+      "下沉节点 2（值 4）",
+      "下沉节点 1（值 1）",
+      "下沉节点 0（值 3）",
+      "继续下沉节点 2（值 3）"
+    ],
+    "caseTitle": "现实案例：医院急诊分诊与热搜榜单",
+    "caseBody": "医院急诊室用优先队列分诊：患者按病情严重程度而非到达顺序就诊，病情最重的优先。这就像一个大顶堆，堆顶永远是当前最紧急的患者。新患者来了插入堆中上浮到合适位置，处理完堆顶患者后取下一个最紧急的（堆顶弹出后下沉调整）。热搜榜单用 TopK 问题思路：每天数亿条搜索中实时找出最热的 k 个，用容量 k 的小顶堆——堆顶是当前第 k 热的，新搜索量超过堆顶就替换并下沉，最终堆中就是 Top-K。这比把所有搜索排序后取前 k 快得多，时间 O(n log k) 而非 O(n log n)，尤其是数据无法全部载入内存时优势显著。",
+    "workedExampleTitle": "从数组 [3, 1, 4, 1, 5, 9, 2] 建立大顶堆的过程\n初始数组: [3, 1, 4, 1, 5, 9, 2]  (下标 0-6)\n对应完全二叉树:\n          3(0)\n        /      \\\n      1(1)      4(2)\n     /   \\     /   \\\n   1(3) 5(4) 9(5)  2(6)\n\n建堆方法: 从最后一个非叶节点 (下标2) 到根 (下标0) 逐个下沉调整",
+    "workedExampleSteps": [
+      "下沉节点 2（值 4）→ 左子 5（值 9）、右子 6（值 2）。9 是较大子节点且 9 > 4，交换 4 与 9。数组: [3, 1, 9, 1, 5, 4, 2]。节点 2 移至下标 5，为叶子，停止",
+      "下沉节点 1（值 1）→ 左子 3（值 1）、右子 4（值 5）。5 是较大子节点且 5 > 1，交换 1 与 5。数组: [3, 5, 9, 1, 1, 4, 2]。节点 1 移至下标 4，为叶子，停止",
+      "下沉节点 0（值 3）→ 左子 1（值 5）、右子 2（值 9）。9 是较大子节点且 9 > 3，交换 3 与 9。数组: [9, 5, 3, 1, 1, 4, 2]。节点 0 移至下标 2",
+      "继续下沉节点 2（值 3）→ 左子 5（值 4）、右子 6（值 2）。4 是较大子节点且 4 > 3，交换 3 与 4。数组: [9, 5, 4, 1, 1, 3, 2]。节点 2 移至下标 5，为叶子，停止",
+      "验证大顶堆 → 9 > 5,4 ✓；5 > 1,1 ✓；4 > 3,2 ✓。最终大顶堆: [9, 5, 4, 1, 1, 3, 2]。建堆总复杂度 O(n) 而非 O(n log n)，因为底层节点多但下沉距离短（cs101_k50）"
+    ],
+    "activities": [
+      {
+        "id": "cs101-堆与优先队列-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "给定如下大顶堆（数组表示），执行插入操作 7。请推演上浮过程并给出最终堆状态\n当前大顶堆数组: [9, 5, 4, 1, 1, 3, 2]\n对应完全二叉树:\n          9\n        /   \\\n       5     4\n      / \\   / \\\n     1   1 3   2\n操作: 插入 7",
+        "content": "操作内容：\n插入 7 放在数组末尾，然后执行上浮（sift up）：与父节点比较，若大于父节点则交换，直到满足堆序或到达根\n父节点下标公式: parent(i) = (i-1) / 2",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "1. 7 放在末尾下标 7，数组: [9, 5, 4, 1, 1, 3, 2, 7]\n  2. 上浮: parent(7) = (7-1)/2 = 3，arr[3]=1。7 > 1，交换 → [9, 5, 4, 7, 1, 3, 2, 1]\n  3. 继续: parent(3) = (3-1)/2 = 1，arr[1]=5。7 > 5，交换 → [9, 7, 4, 5, 1, 3, 2, 1]\n  4. 继续: parent(1) = (1-1)/2 = 0，arr[0]=9。7 < 9，停止\n  5. 最终堆: [9, 7, 4, 5, 1, 3, 2, 1]\n最终完全二叉树:\n          9\n        /   \\\n       7     4\n      / \\   / \\\n     5   1 3   2\n    /\n   1",
+        "feedback": "上浮操作从插入位置开始逐层与父节点比较交换，最多移动到根，路径长度为 O(log n)。7 从叶子层上浮两层到达节点 1 的位置（下标 1），因为 7 大于原父 5 但小于根 9。上浮和下沉是堆维护的两种基本操作（cs101_k50）：上浮用于插入，下沉用于删除堆顶。每次操作 O(log n) 保证优先队列的高效性",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k49、cs101_k50"
+      },
+      {
+        "id": "cs101-堆与优先队列-2",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下是从 n 个元素中找出最大 k 个元素的 TopK 解法（使用小顶堆），请填写空缺部分\n#include <queue>\n#include <vector>\nusing namespace std;\n\nvector<int> topK(vector<int>& nums, int k) {\n    // 小顶堆：堆顶是当前 k 个元素中的最小值\n    priority_queue<int, vector<int>, greater<int>> minHeap;\n    for (int num : nums) {\n        if ((int)minHeap.size() < k) {\n            minHeap.push(num);\n        } else if (________) {  // 填空\n            minHeap.pop();       // 弹出堆顶最小值\n            minHeap.push(num);   // 插入新元素\n        }\n    }\n    vector<int> result;\n    while (!minHeap.empty()) {\n        result.push_back(minHeap.top());\n        minHeap.pop();\n    }\n    return result;\n}",
+        "content": "",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "num > minHeap.top()",
+        "feedback": "TopK 问题用容量 k 的小顶堆：堆顶是当前 k 个元素中的最小值（第 k 大）。当新元素 num 大于堆顶时，说明堆顶不可能是 Top-K，弹出堆顶并插入 num；否则 num 不可能进入 Top-K，直接跳过。最终堆中 k 个元素即为最大的 k 个，时间 O(n log k) 远优于排序的 O(n log n)（cs101_k52）。注意此处用小顶堆而非大顶堆：求最大 k 个用小顶堆（堆顶是门槛），求最小 k 个用大顶堆，这是 TopK 问题的关键技巧",
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k51、cs101_k52\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "CPU调度算法",
+    "visualTitle": "SRTF（抢占式短作业优先）调度过程与平均等待时间计算",
+    "visualSteps": [
+      "t=0，仅 P1 到达",
+      "t=2，P2 到达",
+      "t=4，P3 到达",
+      "t=5，P3 完成"
+    ],
+    "caseTitle": "现实案例：医院急诊分诊台",
+    "caseBody": "医院急诊分诊台是CPU调度的真实写照。普通患者按挂号顺序就诊，像FCFS，但一位重症患者长时间占用医生会让后面小病患者苦等（护航效应）。如果优先处理预计诊疗时间短的患者，整体等待减少，类似SJF。若每位患者限看5分钟轮换，像时间片轮转（RR），保证公平响应。实际医院采用多级分诊：危急患者进最高优先级、快速处理；普通患者按顺序等待——这正是多级反馈队列（MLFQ）的思路，自适应不同类型患者并防止低优先级患者无限等待。",
+    "workedExampleTitle": "SRTF（抢占式短作业优先）调度过程与平均等待时间计算",
+    "workedExampleSteps": [
+      "t=0，仅 P1 到达 → P1 开始执行，剩余时间 7",
+      "t=2，P2 到达 → P1 剩余 5，P2 剩余 4。4 < 5，P2 抢占 P1，P2 开始执行",
+      "t=4，P3 到达 → P2 剩余 2，P3 剩余 1。1 < 2，P3 抢占 P2，P3 开始执行",
+      "t=5，P3 完成 → 就绪队列：P1(剩余5)、P2(剩余2)、P4(剩余4)。P2 剩余最短，P2 恢复执行",
+      "t=7，P2 完成 → 就绪队列：P1(剩余5)、P4(剩余4)。P4 剩余最短，P4 开始执行；t=11 P4 完成，P1 恢复执行至 t=16 完成",
+      "计算等待时间 → P1 等待 = 完成时间16 - 到达0 - 运行7 = 9；P2 = 7-2-4 = 1；P3 = 5-4-1 = 0；P4 = 11-5-4 = 2。平均等待时间 = (9+1+0+2)/4 = 3.0"
+    ],
+    "activities": [
+      {
+        "id": "cs102-CPU调度算法-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "三个进程 P1、P2、P3 同时到达（t=0），运行时间分别为 5、3、1。采用时间片轮转（RR）调度，时间片大小为 2。请推演完整的执行过程并给出最终完成顺序",
+        "content": "初始状态：\n就绪队列 [P1, P2, P3]，时间片 = 2\n\n操作序列：\n轮次1：P1 执行 2 个单位，P1 剩余 3 → 队列变为 [P2, P3, P1]\n轮次2：P2 执行 2 个单位，P2 剩余 1 → 队列变为 [P3, P1, P2]\n轮次3：P3 执行 1 个单位，P3 完成 → 队列变为 [P1, P2]\n轮次4：P1 执行 2 个单位，P1 剩余 1 → 队列变为 [P2, P1]\n轮次5：P2 执行 1 个单位，P2 完成 → 队列变为 [P1]\n轮次6：P1 执行 1 个单位，P1 完成 → 队列空",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "执行序列为 P1(0-2) → P2(2-4) → P3(4-5) → P1(5-7) → P2(7-8) → P1(8-9)。完成顺序为 P3 → P2 → P1。总完成时间为 9 个时间单位",
+        "feedback": "RR 调度按 FIFO 队列轮流执行，每个进程最多执行一个时间片后被抢占加入队尾。P3 运行时间仅 1，在第一轮中不足一个时间片即完成。注意 RR 中时间片大小的选择至关重要（知识切片 cs102_k08）：时间片过大退化为 FCFS，过小则上下文切换开销过大。此处时间片 2 使 P3 只执行 1 个单位就完成，不需额外等待第二轮",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k08"
+      },
+      {
+        "id": "cs102-CPU调度算法-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "在多级反馈队列（MLFQ）调度中，一个 CPU 密集型进程从进入系统到被定期提升优先级的完整流程。请将以下步骤排列为正确顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "进程在 Q2（最低优先级队列，时间片最长）中执行",
+          "新进程进入最高优先级队列 Q0（时间片最短）",
+          "Q0 时间片用完，进程未完成，被降级到 Q1（时间片更长）",
+          "定期执行优先级提升（priority boost），将所有进程移回 Q0",
+          "Q1 时间片用完，进程仍未完成，被降级到 Q2"
+        ],
+        "answerIndexes": [
+          1,
+          2,
+          4,
+          0,
+          3
+        ],
+        "answer": "B → C → E → A → D",
+        "feedback": "MLFQ 的核心机制是：新进程进入最高优先级队列 Q0（步骤 B），I/O 密集型进程通常在短时间片内完成或阻塞，留在高优先级队列获得快速响应；CPU 密集型进程在 Q0 时间片用完后降级到 Q1（步骤 C），再降级到 Q2（步骤 E），在 Q2 中以更长的时间片执行（步骤 A）。为防止低优先级进程饥饿，系统定期执行优先级提升（步骤 D），将所有进程移回 Q0。这与知识切片 cs102_k09 中\"通过定期提升所有进程优先级可防止低优先级进程饥饿\"的描述一致",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k09\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "内存管理基础",
+    "visualTitle": "首次适应（FF）与最佳适应（BF）在相同请求序列下的分配对比\n初始空闲分区表（按地址升序）：分区1=30K，分区2=20K，分区3=40K，分区4=10K",
+    "visualSteps": [
+      "FF 分配 15K",
+      "FF 分配 10K",
+      "BF 分配 15K",
+      "BF 分配 10K"
+    ],
+    "caseTitle": "现实案例：停车场车位分配策略",
+    "caseBody": "停车场管理是内存分配的直观类比。固定分区像划定的标准车位：一辆小车停进大车位，多出的空间浪费就是内部碎片。可变分区像灵活调整的车位隔板，按车辆大小动态划分，但反复进出后留下许多零散小空间无法停车，就是外部碎片。首次适应（FF）策略是从入口开始找第一个能停的车位，简单快速；最佳适应（BF）是找刚好能停的最小车位，省空间但留下大量太小碎片；最坏适应（WF）是找最大的车位停，减少小碎片但大车可能无处停。碎片太多时需要全部车辆挪动重新排列，对应紧凑技术。",
+    "workedExampleTitle": "首次适应（FF）与最佳适应（BF）在相同请求序列下的分配对比\n初始空闲分区表（按地址升序）：分区1=30K，分区2=20K，分区3=40K，分区4=10K",
+    "workedExampleSteps": [
+      "FF 分配 15K → 从表头查找，分区1(30K) >= 15K，分配。分区1 剩余 30-15=15K。空闲表：[15K, 20K, 40K, 10K]",
+      "FF 分配 10K → 从表头查找，分区1(15K) >= 10K，分配。分区1 剩余 15-10=5K。空闲表：[5K, 20K, 40K, 10K]",
+      "BF 分配 15K → 查找所有满足的分区：30K、20K、40K 均满足。选最小 20K，分配。分区2 剩余 20-15=5K。空闲表：[30K, 5K, 40K, 10K]",
+      "BF 分配 10K → 查找所有满足的分区：30K、40K、10K 均满足。选最小 10K（分区4），分配。分区4 剩余 0，移除。空闲表：[30K, 5K, 40K]",
+      "对比分析 → FF 后空闲表 [5K, 20K, 40K, 10K]，BF 后空闲表 [30K, 5K, 40K]。FF 在低址空间产生小碎片 5K；BF 保留了较大的 30K 分区但产生了无法利用的 5K 小碎片。知识切片 cs102_k12 指出 BF \"产生大量小碎片\"，FF \"倾向于使用低址空间\""
+    ],
+    "activities": [
+      {
+        "id": "cs102-内存管理基础-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "使用首次适应（FF）算法，给定初始空闲分区表和分配/释放请求序列，推演最终内存空闲状态\n初始空闲表（按地址升序）：[100K, 50K, 30K, 20K]",
+        "content": "操作序列：\n操作1：分配 60K\n操作2：分配 25K\n操作3：分配 15K\n\n推演过程：\n分配 60K：FF 从表头查找，100K >= 60K，分配。剩余 40K。空闲表：[40K, 50K, 30K, 20K]\n分配 25K：FF 从表头查找，40K >= 25K，分配。剩余 15K。空闲表：[15K, 50K, 30K, 20K]\n分配 15K：FF 从表头查找，15K >= 15K，正好分配。移除该分区。空闲表：[50K, 30K, 20K]",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "最终空闲分区表为 [50K, 30K, 20K]，总剩余空间 100K",
+        "feedback": "首次适应算法每次从链表头部开始顺序查找第一个满足大小的分区（知识切片 cs102_k12）。注意第三次分配 15K 时，第一个分区恰好等于请求大小，分配后剩余为 0，该分区从空闲链表中移除。如果使用最佳适应算法，第三次分配 15K 会选择 20K 分区而非 15K 分区，结果不同",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k12"
+      },
+      {
+        "id": "cs102-内存管理基础-2",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下是用 C 语言实现的首次适应（First-Fit）内存分配算法，请填写空缺部分使分配逻辑正确",
+        "content": "代码：\n// 首次适应算法：从空闲分区数组头部查找第一个足够大的分区\n// free_list: 空闲分区大小数组，n: 分区数量，request: 请求大小\n// 返回分配的分区索引，-1 表示分配失败\nint first_fit(int free_list[], int n, int request) {\n    for (int i = 0; i < n; i++) {\n        if (free_list[i] >= request) {\n            int remaining = free_list[i] - request;\n            free_list[i] = ________;  // 填空：更新分区剩余大小\n            return i;\n        }\n    }\n    return -1;\n}",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "remaining",
+        "feedback": "首次适应算法找到第一个满足大小要求的分区后，将分区大小减去请求大小作为剩余空间。填入 remaining（即 free_list[i] - request）正确更新了分区剩余大小。若分区大小正好等于请求大小，remaining 为 0，表示该分区被完全占用。知识切片 cs102_k12 描述 FF \"从链表头部开始查找第一个足够大的空闲分区\"，代码中的 for 循环从头遍历体现了这一策略。注意最佳适应（BF）需要遍历所有分区选最小满足者，最坏适应（WF）选最大满足者",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k12\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "分段与段页式",
+    "visualTitle": "段页式存储管理中的地址转换（三次访存）",
+    "visualSteps": [
+      "第一次访存（查段表）",
+      "第二次访存（查页表）",
+      "计算物理地址",
+      "验证越界检查"
+    ],
+    "caseTitle": "现实案例：图书馆的两种书架管理方式",
+    "caseBody": "图书馆管理书籍有两种思路。分段管理像按学科分区：文学区、历史区、科技区各自独立，每个区有起始位置和大小，读者按\"区名+区内位置\"找书。好处是逻辑清晰、方便整区共享或限制权限，但各区大小不固定，反复增减后书架间出现无法利用的零散空隙（外部碎片）。段页式管理则是在每个学科区内再划分等高书架格（页）：先按学科找到区（段），再在区内按格号定位（页）。这样既保留学科分区的逻辑性和共享便利，又因格大小固定消除了区间的外部碎片，代价是找书需要查两次目录（段表+页表）。",
+    "workedExampleTitle": "段页式存储管理中的地址转换（三次访存）",
+    "workedExampleSteps": [
+      "第一次访存（查段表）→ 用段号 S=1 查段表，段表基址寄存器指向段表起始地址。段表[1] 记录该段的页表起始地址，假设为 0x5000",
+      "第二次访存（查页表）→ 用段内页号 P=2 查该段的页表。访问地址 = 页表起始地址 0x5000 + P × 页表项大小。页表[2] 记录物理页框号，假设为 15",
+      "计算物理地址 → 物理地址 = 物理页框号 × 页大小 + 页内偏移 = 15 × 4096 + 10 = 61440 + 10 = 61450",
+      "验证越界检查 → 段表项还包含段限长，需检查段内偏移（P × 页大小 + D = 2 × 4096 + 10 = 8202）是否超过段限长。若段限长 >= 8202 则地址合法",
+      "TLB 加速分析 → 知识切片 cs102_k21 指出段页式\"地址转换开销较大，通常通过TLB加速\"。若 TLB 缓存了段1页2的映射，则可直接得到页框号 15，省去两次访存，仅需一次访存获取数据"
+    ],
+    "activities": [
+      {
+        "id": "cs102-分段与段页式-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "在纯分页系统中（非段页式），页大小为 4KB。给定虚拟地址 0x1005（十进制 4101），页表内容如下。请预测物理地址的十进制值",
+        "content": "页表内容：\n页号 0 → 物理页框号 3\n页号 1 → 物理页框号 7\n页号 2 → 物理页框号 5\n\n代码/计算：\n页大小 = 4096 字节\n虚拟地址 = 4101\n页号 = 虚拟地址 / 页大小 = 4101 / 4096 = ?\n页内偏移 = 虚拟地址 % 页大小 = 4101 % 4096 = ?\n物理地址 = 物理页框号 × 页大小 + 页内偏移",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "页号 = 1，页内偏移 = 5，物理页框号 = 7，物理地址 = 7 × 4096 + 5 = 28677",
+        "feedback": "虚拟地址 4101 分解为页号 1（4101 / 4096 = 1 余 5），页内偏移 5。查页表得页号 1 对应物理页框号 7。物理地址 = 7 × 4096 + 5 = 28677。知识切片 cs102_k22 描述\"MMU将虚拟地址分为页号和页内偏移，通过页号查页表得到物理页框号，与偏移拼接形成物理地址\"。注意此题是纯分页（非段页式），地址转换仅需一次查页表，而段页式需要三次访存",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k22"
+      },
+      {
+        "id": "cs102-分段与段页式-2",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "在纯分段存储管理中，给定段表和逻辑地址，推演地址转换过程并判断是否越界",
+        "content": "段表内容：\n段号 0：段基址 = 1000，段限长 = 400\n段号 1：段基址 = 3000，段限长 = 600\n段号 2：段基址 = 5000，段限长 = 500\n\n逻辑地址：\n段号 = 2，段内偏移 = 100\n\n推演步骤：\n步骤1：用段号 2 查段表 → 段表[2]: 段基址 = 5000，段限长 = 500\n步骤2：越界检查 → 段内偏移 100 < 段限长 500，未越界，地址合法\n步骤3：计算物理地址 → 物理地址 = 段基址 + 段内偏移 = 5000 + 100 = 5100",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "物理地址 = 5100，地址合法（未越界）",
+        "feedback": "分段管理中逻辑地址由段号和段内偏移组成（知识切片 cs102_k20）。地址转换时先用段号查段表得到段基址和段限长，再检查段内偏移是否越界，最后将段基址与段内偏移相加得到物理地址。若段内偏移超过段限长则触发越界异常（保护违例）。段表项中包含段基址和段限长是分段区别于分页的重要特征（知识切片 cs102_k22），分段便于实现段的共享和保护",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k20、cs102_k23\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "文件系统",
+    "visualTitle": "inode 多级索引结构计算文件最大容量",
+    "visualSteps": [
+      "计算直接块容量",
+      "计算一级间接块容量",
+      "计算二级间接块容量",
+      "计算三级间接块容量"
+    ],
+    "caseTitle": "现实案例：档案室的三种文件存放策略",
+    "caseBody": "档案室管理卷宗有三种方式，对应文件系统的三种磁盘块分配策略。连续分配像按编号将一卷档案存放在连续货架上，取档快、支持直接跳到中间页，但档案增长时无法扩展、撤档后留下不连续空架（外部碎片）。链接分配像每份档案标注下一份的位置，灵活扩展不需连续空间，但想跳到第50页必须从头逐份翻找，随机访问效率低。索引分配像每卷档案配一张目录卡，卡片上记录所有分册位置，支持随机访问且可动态增长，现代文件系统普遍采用此方案。inode 的多级索引则是索引分配的精妙升级：小文件直接用卡片上的指针定位，大文件用卡片指向二级目录册再查。",
+    "workedExampleTitle": "inode 多级索引结构计算文件最大容量",
+    "workedExampleSteps": [
+      "计算直接块容量 → 12 个直接块指针各指向一个数据块。直接块容量 = 12 × 4KB = 48KB",
+      "计算一级间接块容量 → 一级间接块是一个索引块，存储块指针。每个索引块可存 4096 / 4 = 1024 个指针。一级间接块容量 = 1024 × 4KB = 4MB",
+      "计算二级间接块容量 → 二级间接块指向 1024 个一级间接块，每个一级间接块再指向 1024 个数据块。二级间接块容量 = 1024 × 1024 × 4KB = 4GB",
+      "计算三级间接块容量 → 三级间接块指向 1024 个二级间接块。三级间接块容量 = 1024 × 1024 × 1024 × 4KB = 4TB",
+      "计算总容量 → 总最大文件大小 = 48KB + 4MB + 4GB + 4TB ≈ 4TB。知识切片 cs102_k26 指出 inode \"使小文件直接索引快速访问，大文件通过间接索引支持大容量\"",
+      "分析设计合理性 → 小文件（<= 48KB）仅需访问 inode 本身即可获取所有数据块地址，无需额外磁盘 I/O；大文件通过多级间接索引支持 TB 级存储，兼顾了访问效率和容量扩展"
+    ],
+    "activities": [
+      {
+        "id": "cs102-文件系统-1",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "FAT 文件系统使用链式分配，以下代码模拟通过 FAT 表读取文件第 n 个数据块的过程，请填写空缺部分",
+        "content": "代码：\n// FAT 表：fat[i] 存储簇 i 的下一个簇号，0xFFFF 表示文件结束\n// start_cluster: 文件起始簇号，n: 要读取的逻辑块号（从0开始）\n// 返回第 n 个数据块的物理簇号\nint read_fat_block(unsigned short fat[], int start_cluster, int n) {\n    int current = start_cluster;\n    for (int i = 0; i < n; i++) {\n        if (current == 0xFFFF) {\n            return -1;  // 文件结束，块号超出范围\n        }\n        current = ________;  // 填空：沿 FAT 链前进到下一个簇\n    }\n    return current;\n}",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "fat[current]",
+        "feedback": "FAT 文件系统采用链式分配（知识切片 cs102_k27），每个簇的 FAT 表项记录下一个簇号。读取第 n 个数据块需要从起始簇开始，沿 FAT 链逐跳前进 n 次。填入 fat[current] 即获取当前簇的下一个簇号。FAT 表存储在磁盘固定位置，包含每个簇的链接信息。链接分配的缺点是随机访问效率低——读取第 n 块需要 n 次链表遍历，而索引分配（如 inode）可直接定位",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k24、cs102_k27"
+      },
+      {
+        "id": "cs102-文件系统-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "日志文件系统（如 ext3/ext4）在执行一次文件写操作时，为保证崩溃一致性，需按特定顺序执行步骤。请将以下步骤排列为正确顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "文件系统将数据实际写入磁盘对应的数据块位置（checkpoint 阶段）",
+          "应用程序发起文件写操作请求",
+          "系统崩溃后重启，重放日志中已提交但未 checkpoint 的操作以恢复一致性",
+          "文件系统将元数据修改记录写入磁盘日志区域（预写日志 WAL）",
+          "日志记录写入完成并提交（journal commit）",
+          "标记已 checkpoint 的日志记录为已完成，允许回收日志空间"
+        ],
+        "answerIndexes": [
+          1,
+          3,
+          4,
+          0,
+          5,
+          2
+        ],
+        "answer": "B → D → E → A → F → C",
+        "feedback": "日志文件系统的核心是预写日志（WAL）原则（知识切片 cs102_k28）：元数据修改必须先写入日志区域并提交（步骤 D → E），然后才能写入实际位置（步骤 A），最后标记日志记录可回收（步骤 F）。如果系统在步骤 A 之前崩溃，重启时重放已提交的日志（步骤 C）恢复到一致状态。这保证了\"要么操作完全完成，要么完全未执行\"的原子性。ext3/ext4 支持 journal、ordered、writeback 三种日志模式，权衡性能与可靠性",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k28\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "I/O系统与磁盘调度",
+    "visualTitle": "SCAN 与 LOOK 磁盘调度算法的寻道序列与距离计算",
+    "visualSteps": [
+      "SCAN 排序向高方向请求",
+      "SCAN 向高移动",
+      "SCAN 反向移动",
+      "SCAN 总寻道距离"
+    ],
+    "caseTitle": "现实案例：电梯运行模式与磁盘调度",
+    "caseBody": "电梯运行方式完美对应磁盘调度算法。FCFS 像按呼叫顺序服务，谁先按谁先坐，但电梯频繁上下穿梭效率极低。SSTF（最短寻道时间优先）像总是去最近的楼层接人，效率高但远端的乘客可能永远等不到电梯（饥饿）。SCAN 像电梯单向运行到顶层再反向，沿途楼层顺路服务，类似真实电梯运行，各楼层等待时间较均衡。C-SCAN 像电梯只上行服务，到顶层后空降到一楼再开始上行，所有上行乘客等待时间更均匀。LOOK 是 SCAN 的改进：电梯不会傻傻跑到顶楼再折返，而是当前方向没有请求时立即反向。中断处理则像电梯到站铃响通知乘客，DMA 像快递员一次性搬完整个包裹无需收件人逐件确认。",
+    "workedExampleTitle": "SCAN 与 LOOK 磁盘调度算法的寻道序列与距离计算",
+    "workedExampleSteps": [
+      "SCAN 排序向高方向请求 → 当前方向（向高）的请求按磁道号升序：65, 67, 98, 122, 124, 183",
+      "SCAN 向高移动 → 53 → 65(寻道12) → 67(2) → 98(31) → 122(24) → 124(2) → 183(59) → 到达边缘 199(16)",
+      "SCAN 反向移动 → 199 → 37(寻道162) → 14(23)。向低方向请求按降序：37, 14",
+      "SCAN 总寻道距离 → 12+2+31+24+2+59+16+162+23 = 331",
+      "LOOK 变体计算 → LOOK 不走到边缘 199，183 后直接反向。序列：53→65→67→98→122→124→183→37→14。总寻道距离 = (183-53) + (183-14) = 130 + 169 = 299",
+      "对比分析 → LOOK 比 SCAN 少走 331-299=32 个磁道。知识切片 cs102_k32 指出 LOOK \"在当前方向无请求时即反转，无需到达磁盘边缘\"。SCAN 到达边缘 199 后才折返，多走了 199-183=16 个磁道的空行程"
+    ],
+    "activities": [
+      {
+        "id": "cs102-I/O系统与磁盘调度-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "磁头当前位置 = 50，移动方向 = 向高磁道。请求队列：25, 80, 120, 10, 180。采用 C-SCAN（循环扫描）算法，磁道范围 0-199。请推演磁头移动序列并计算总寻道距离",
+        "content": "推演过程：\n向高方向服务（按升序）：50 → 80(30) → 120(40) → 180(60)\n到达最高请求 180 后，C-SCAN 继续到边缘 199(19)，然后快速返回到起始端 0(199)\n从 0 继续向高方向服务剩余请求（按升序）：0 → 10(10) → 25(15)",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "磁头移动序列 = 50 → 80 → 120 → 180 → 199 → 0 → 10 → 25。总寻道距离 = 30+40+60+19+199+10+15 = 373",
+        "feedback": "C-SCAN 只在向高方向服务请求，到达边缘后快速返回起始端不服务沿途请求（知识切片 cs102_k33）。注意 199→0 的折返距离 199 不服务任何请求。C-LOOK 变体则不走到边缘 199，到最高请求 180 后直接跳回最低请求 10，距离 = 30+40+60+(180-10)+15 = 315。C-SCAN 的优势是各请求等待时间更均匀，因为所有请求都在同一方向被服务",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k33"
+      },
+      {
+        "id": "cs102-I/O系统与磁盘调度-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "DMA（直接存储器访问）方式完成一次磁盘数据传输的完整流程。请将以下步骤排列为正确顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "DMA 控制器在设备与内存之间直接传输数据块，CPU 同时执行其他任务",
+          "CPU 向 DMA 控制器初始化传输参数（源地址、目的地址、传输长度）",
+          "数据块传输完成",
+          "CPU 响应中断，执行传输完成后的处理（如通知等待进程数据就绪）",
+          "CPU 向设备发出 I/O 命令，DMA 控制器接管总线控制权",
+          "DMA 控制器通过中断信号通知 CPU 传输结束"
+        ],
+        "answerIndexes": [
+          1,
+          4,
+          0,
+          2,
+          5,
+          3
+        ],
+        "answer": "B → E → A → C → F → D",
+        "feedback": "DMA 传输流程（知识切片 cs102_k31）：CPU 先初始化 DMA 参数（步骤 B），包括源地址、目的地址和传输长度，然后发出 I/O 命令让 DMA 控制器接管总线（步骤 E）。DMA 控制器在设备与内存间直接传输数据，CPU 无需逐字节参与可执行其他任务（步骤 A）。传输完成后（步骤 C），DMA 控制器通过中断通知 CPU（步骤 F），CPU 响应中断处理后续逻辑（步骤 D）。与中断驱动 I/O 每传输一个字节中断一次相比，DMA 以块为单位传输，大幅减少中断次数和 CPU 开销",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k31\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "死锁",
+    "visualTitle": "银行家算法安全性检查",
+    "visualSteps": [
+      "检查 P0",
+      "检查 P1",
+      "检查 P2",
+      "回到 P0"
+    ],
+    "caseTitle": "现实案例：十字路口的交通死锁",
+    "caseBody": "四辆车分别从东、南、西、北方向驶入一个没有红绿灯的十字路口，每辆车都占据了自己前方的车道（互斥条件），同时等待右前方那辆车让出车道（占有并等待），但没有车愿意倒车让路（不可抢占），四辆车形成\"我等你、你等他、他等我\"的循环等待链。四个必要条件同时成立，死锁发生，谁也动不了。解决办法有几种：安装红绿灯按序放行（破坏循环等待，对应资源有序分配）；要求车辆一次通过路口不许半途停留（破坏占有并等待）；设置交警强制指挥某车倒车（破坏不可抢占）。银行家算法则像银行贷款前审核：只有确认所有客户都能按序还清贷款才放贷，否则拒绝。",
+    "workedExampleTitle": "银行家算法安全性检查",
+    "workedExampleSteps": [
+      "检查 P0 → Need(P0)=[2,2]，Available=[1,2]。2 <= 1？否，P0 暂时无法完成，跳过",
+      "检查 P1 → Need(P1)=[2,1]，Available=[1,2]。2 <= 1？否，P1 暂时无法完成，跳过",
+      "检查 P2 → Need(P2)=[1,2]，Available=[1,2]。1<=1 且 2<=2？是！P2 可完成。P2 完成后释放已分配资源，Available = [1,2] + [1,0] = [2,2]。安全序列暂定 <P2>",
+      "回到 P0 → Need(P0)=[2,2]，Available=[2,2]。2<=2 且 2<=2？是！P0 可完成。Available = [2,2] + [3,1] = [5,3]。安全序列 <P2, P0>",
+      "检查 P1 → Need(P1)=[2,1]，Available=[5,3]。2<=5 且 1<=3？是！P1 可完成。Available = [5,3] + [1,1] = [6,4]。安全序列 <P2, P0, P1>",
+      "结论 → 存在安全序列 <P2, P0, P1>，系统当前处于安全状态，不会发生死锁。知识切片 cs102_k35 指出银行家算法\"检查分配后系统是否处于安全状态：存在一个安全序列使所有进程能按某种顺序获得资源并完成执行\""
+    ],
+    "activities": [
+      {
+        "id": "cs102-死锁-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "基于上述银行家算法示例的初始状态，进程 P1 发起资源请求 Request(P1) = [1, 0]。请推演分配后的安全性检查结果，判断是否允许分配",
+        "content": "初始状态：\nAvailable = [1, 2]，Allocation(P1) = [1, 1]，Need(P1) = [2, 1]\n\n推演步骤：\n步骤1：检查 Request <= Need(P1) → [1,0] <= [2,1]？是，请求合法\n步骤2：检查 Request <= Available → [1,0] <= [1,2]？是，资源充足\n步骤3：试探性分配 → Available = [1,2]-[1,0] = [0,2]；Allocation(P1) = [1,1]+[1,0] = [2,1]；Need(P1) = [2,1]-[1,0] = [1,1]\n步骤4：安全性检查 → Available=[0,2]。P0 Need=[2,2]：2<=0？否。P1 Need=[1,1]：1<=0？否。P2 Need=[1,2]：1<=0？否。没有任何进程能完成！",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "不安全状态！试探分配后无法找到安全序列，系统拒绝分配，P1 必须等待",
+        "feedback": "银行家算法在每次分配前进行安全性检查（知识切片 cs102_k35、cs102_k37）。虽然 Request <= Need 且 Request <= Available，但试探分配后 Available 变为 [0,2]，没有任何进程的 Need 能被满足，进入不安全状态。因此系统回滚试探分配，让 P1 等待。死锁避免的核心是\"确保不进入不安全状态\"（知识切片 cs102_k37），而非直接检测死锁。注意不安全状态不等于死锁，但有可能导致死锁",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k35、cs102_k37"
+      },
+      {
+        "id": "cs102-死锁-2",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下代码用深度优先搜索（DFS）检测资源分配图中是否存在环路（即循环等待条件），从而判断是否可能死锁。请填写空缺部分",
+        "content": "代码：\n// graph[N][N]: 邻接矩阵，graph[i][j]=1 表示进程 i 等待进程 j 持有的资源\n// visited[N]: 全局访问标记，rec_stack[N]: 当前递归路径栈\nbool dfs_cycle(int graph[N][N], int v, bool visited[], bool rec_stack[]) {\n    visited[v] = true;\n    rec_stack[v] = true;  // 将当前节点压入递归栈\n\n    for (int i = 0; i < N; i++) {\n        if (graph[v][i]) {\n            if (!visited[i]) {\n                if (dfs_cycle(graph, i, visited, ________))  // 填空：递归检测\n                    return true;\n            } else if (________) {  // 填空：节点已在当前路径上，发现环\n                return true;\n            }\n        }\n    }\n    rec_stack[v] = false;  // 回溯，将当前节点移出递归栈\n    return false;\n}",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "填空1 为 rec_stack；填空2 为 rec_stack[i]",
+        "feedback": "检测环路是死锁检测的核心方法（知识切片 cs102_k38）。填空1 递归调用时传入 rec_stack 维护当前路径。填空2 检查邻接节点 i 是否已在当前递归路径上（rec_stack[i]==true），若是则存在从 i 到 v 再回 i 的环路，即循环等待条件成立。注意区分 visited（是否曾访问过）和 rec_stack（是否在当前路径上）：一个节点可能被访问过但不在当前路径中，此时不构成环。死锁四条件中循环等待是图论判定依据（知识切片 cs102_k34），资源分配图无环路则一定无死锁",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k34、cs102_k38\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "同步与互斥",
+    "visualTitle": "生产者-消费者问题信号量执行过程推演",
+    "visualSteps": [
+      "生产者生产",
+      "生产者生产",
+      "消费者消费",
+      "生产者生产"
+    ],
+    "caseTitle": "现实案例：停车场入口闸机与空位显示屏",
+    "caseBody": "停车场管理是同步与互斥的经典场景。入口闸机每次只允许一辆车通过，就像互斥锁保护临界区：车辆到达时若闸机空闲则进入（P操作/加锁），通过后闸机释放（V操作/解锁），同一时刻只有一辆车在闸机通道中。空位显示屏显示剩余车位数，就像计数信号量：每辆车进入时空位数减一（P操作），每辆车离开时空位数加一（V操作），空位为 0 时入口车辆阻塞等待。停车场还有入口和出口两个方向的显示屏需要同步更新，就像生产者消费者问题中的 empty 和 full 信号量：入口是\"消费者\"消耗空位，出口是\"生产者\"释放空位。如果显示屏数据被并发修改而不加保护，就会出现计数错误，这正是竞态条件。",
+    "workedExampleTitle": "生产者-消费者问题信号量执行过程推演",
+    "workedExampleSteps": [
+      "生产者生产 → P(empty): empty=2-1=1 → P(mutex): mutex=1-1=0 → 写入数据 → V(mutex): mutex=0+1=1 → V(full): full=0+1=1。状态：{mutex:1, empty:1, full:1}",
+      "生产者生产 → P(empty): empty=1-1=0 → P(mutex): mutex=1-1=0 → 写入数据 → V(mutex): mutex=0+1=1 → V(full): full=1+1=2。状态：{mutex:1, empty:0, full:2}，缓冲区已满",
+      "消费者消费 → P(full): full=2-1=1 → P(mutex): mutex=1-1=0 → 读取数据 → V(mutex): mutex=0+1=1 → V(empty): empty=0+1=1。状态：{mutex:1, empty:1, full:1}",
+      "生产者生产 → P(empty): empty=1-1=0 → P(mutex): mutex=1-1=0 → 写入数据 → V(mutex): mutex=0+1=1 → V(full): full=1+1=2。状态：{mutex:1, empty:0, full:2}",
+      "消费者消费 → P(full): full=2-1=1 → P(mutex): mutex=1-1=0 → 读取数据 → V(mutex): mutex=0+1=1 → V(empty): empty=0+1=1。状态：{mutex:1, empty:1, full:1}",
+      "验证关键约束 → 知识切片 cs102_k42 指出 P 操作顺序\"先获取资源信号量再获取互斥锁\"。若生产者先 P(mutex) 再 P(empty)，当缓冲区满时（empty=0）生产者持有 mutex 后阻塞在 P(empty)，而消费者需要 P(mutex) 才能消费释放空位，导致死锁"
+    ],
+    "activities": [
+      {
+        "id": "cs102-同步与互斥-1",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "以下生产者代码存在 P 操作顺序错误。当缓冲区已满（empty=0, full=N）时，预测程序运行结果",
+        "content": "代码：\n// 缓冲区大小 N=2，初始 mutex=1, empty=2, full=0\n// 生产者代码（存在错误）\nvoid producer() {\n    while (true) {\n        produce_item();\n        P(mutex);    // 错误：先获取互斥锁\n        P(empty);    // 再获取空位信号量\n        put_item();\n        V(mutex);\n        V(full);\n    }\n}",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "程序将死锁。当缓冲区满时（empty=0），生产者先 P(mutex) 成功（mutex=0），然后 P(empty) 阻塞等待空位。但消费者需要先 P(mutex) 才能消费释放空位，而 mutex 已被生产者持有，消费者也阻塞。生产者和消费者互相等待，系统死锁",
+        "feedback": "正确的 P 操作顺序是先获取资源信号量（empty/full）再获取互斥锁（mutex）（知识切片 cs102_k42）。错误代码中生产者先 P(mutex) 再 P(empty)，当 empty=0 时生产者持有 mutex 却阻塞在 P(empty)，消费者无法获取 mutex 消费数据，形成死锁。这与死锁的\"占有并等待\"条件一致（知识切片 cs102_k34）：生产者占有 mutex 等待 empty，消费者等待 mutex。修复方法：交换 P(mutex) 和 P(empty) 的顺序，V 操作顺序不影响正确性",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k42"
+      },
+      {
+        "id": "cs102-同步与互斥-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "条件变量配合互斥锁实现\"等待条件成立\"的正确流程。请将以下步骤排列为正确顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "线程被唤醒后重新获取互斥锁",
+          "线程获取互斥锁",
+          "线程再次检查条件是否满足（防止虚假唤醒）",
+          "条件不满足，线程调用 wait 操作（自动释放互斥锁并阻塞）",
+          "另一线程修改共享状态后调用 signal/broadcast 唤醒等待线程",
+          "线程在持有锁的状态下检查条件",
+          "条件满足，线程执行后续逻辑并最终释放互斥锁"
+        ],
+        "answerIndexes": [
+          1,
+          5,
+          3,
+          4,
+          0,
+          2,
+          6
+        ],
+        "answer": "B → F → D → E → A → C → G",
+        "feedback": "条件变量的标准使用模式（知识切片 cs102_k41）：线程先获取互斥锁（步骤 B），在持有锁的状态下检查条件（步骤 F）。若条件不满足则调用 wait 操作释放锁并阻塞（步骤 D）。另一线程修改共享状态后调用 signal/broadcast 唤醒等待者（步骤 E）。被唤醒的线程重新获取互斥锁（步骤 A），再次检查条件防止虚假唤醒（步骤 C）。条件满足后执行后续逻辑并释放锁（步骤 G）。知识切片 cs102_k41 强调\"wait操作通常放在while循环中\"以处理虚假唤醒——即使被唤醒，条件也可能已被其他线程改变，必须重新检查",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k41\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs102",
+    "topic": "进程间通信",
+    "visualTitle": "共享内存配合信号量实现进程间数据交换的完整流程",
+    "visualSteps": [
+      "创建共享内存",
+      "映射共享内存",
+      "初始化同步信号量",
+      "进程 A 写入数据"
+    ],
+    "caseTitle": "现实案例：公司内部的五种沟通方式",
+    "caseBody": "公司不同部门间的沟通方式恰好对应五种进程间通信机制。管道像两人之间的传话筒：单向传递、缓冲区有限，只能用于关系密切的同事（父子进程）。消息队列像公司邮件系统：每封邮件有类型和正文，收件人可按类型筛选，发送者离开后邮件仍保存。共享内存像办公室的公共公告板：所有人直接看同一块板子，速度最快但需要排队规则（同步机制）防止同时涂改。信号像公司的警报铃：简单快速但信息量有限，只能通知\"发生了什么事\"（如火灾、下班），无法传递详细内容。Socket像跨地域的视频电话：既能用于同一楼层也能跨城市沟通，是分布式协作的基础，但需经过网络协议栈开销较大。",
+    "workedExampleTitle": "共享内存配合信号量实现进程间数据交换的完整流程",
+    "workedExampleSteps": [
+      "创建共享内存 → 进程 A 调用 shmget(IPC_KEY, 4096, IPC_CREAT|0666) 创建 4KB 共享内存段，内核返回标识符 shmid",
+      "映射共享内存 → 进程 A 调用 shmat(shmid, NULL, 0) 将共享段映射到自己的虚拟地址空间，得到指针 shm_addr_A。进程 B 同样调用 shmat 映射同一共享段，得到指针 shm_addr_B。两指针指向同一物理内存",
+      "初始化同步信号量 → 创建互斥信号量 sem=1（初值1），用于保护共享内存的互斥访问",
+      "进程 A 写入数据 → A 执行 P(sem) 获取互斥（sem=0）→ 通过 shm_addr_A 写入数据 → V(sem) 释放互斥（sem=1）",
+      "进程 B 读取数据 → B 执行 P(sem) 获取互斥（sem=0）→ 通过 shm_addr_B 读取数据 → V(sem) 释放互斥（sem=1）",
+      "清理资源 → 通信完成后，两进程分别调用 shmdt(shm_addr) 解除映射。进程 A 调用 shmctl(shmid, IPC_RMID, NULL) 删除共享内存段。知识切片 cs102_k46 指出共享内存\"多个进程将同一物理内存区域映射到各自虚拟地址空间，可直接读写共享数据无需内核拷贝\"，但\"需同步机制保证数据一致性\""
+    ],
+    "activities": [
+      {
+        "id": "cs102-进程间通信-1",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下代码实现父子进程通过匿名管道通信：子进程写入消息，父进程读取消息。请填写空缺部分",
+        "content": "代码：\n#include <unistd.h>\nint fd[2];\npipe(fd);  // fd[0] = 读端, fd[1] = 写端\n\nif (fork() == 0) {\n    // 子进程：写入数据\n    close(fd[0]);  // 关闭不使用的读端\n    char msg[] = \"hello parent\";\n    ________;  // 填空：通过管道写端写入消息\n    close(fd[1]);\n} else {\n    // 父进程：读取数据\n    close(fd[1]);  // 关闭不使用的写端\n    char buf[64];\n    read(fd[0], buf, sizeof(buf));\n    printf(\"received: %s\\n\", buf);\n    close(fd[0]);\n}",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "write(fd[1], msg, sizeof(msg))",
+        "feedback": "管道是半双工通信机制（知识切片 cs102_k44），fd[0] 为读端、fd[1] 为写端。子进程写入数据使用 write(fd[1], msg, sizeof(msg)) 通过写端发送。父进程通过 read(fd[0], buf, sizeof(buf)) 从读端接收。注意每个进程应关闭不使用的端：子进程关闭读端 fd[0]，父进程关闭写端 fd[1]。如果父进程不关闭写端，当子进程写完关闭后，父进程的 read 会一直阻塞（因为写端未全部关闭，read 不会返回 EOF）。管道缓冲区有限（通常 64KB），写满时写入端阻塞，读空时读取端阻塞",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k44"
+      },
+      {
+        "id": "cs102-进程间通信-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "Socket 网络通信中服务器端从创建套接字到关闭连接的完整流程。请将以下步骤排列为正确顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "服务器调用 accept() 等待并接受客户端连接（阻塞直到连接到达）",
+          "服务器调用 socket() 创建套接字",
+          "服务器调用 bind() 绑定 IP 地址和端口号",
+          "通信结束，双方调用 close() 关闭套接字",
+          "服务器调用 listen() 开始监听端口",
+          "连接建立后，服务器通过新套接字与客户端进行 send/recv 数据通信",
+          "客户端调用 connect() 向服务器发起连接请求"
+        ],
+        "answerIndexes": [
+          1,
+          2,
+          4,
+          0,
+          6,
+          5,
+          3
+        ],
+        "answer": "B → C → E → A → G → F → D",
+        "feedback": "Socket 服务器端通信流程（知识切片 cs102_k48）：先创建套接字（步骤 B），再绑定地址和端口（步骤 C），然后开始监听（步骤 E），接着调用 accept 等待客户端连接（步骤 A）。客户端调用 connect 发起连接（步骤 G），accept 返回后连接建立。双方通过新套接字进行数据通信（步骤 F），通信结束后关闭套接字（步骤 D）。知识切片 cs102_k48 指出 Socket \"通过IP地址和端口号标识通信端点，支持TCP（面向连接、可靠传输）和UDP（无连接、不可靠但高效）\"。Socket 是唯一支持跨网络通信的 IPC 机制，而管道、消息队列、共享内存仅限同一主机",
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k48\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "OSI与TCP/IP模型",
+    "visualTitle": "HTTP GET请求从应用层到物理层的完整封装过程",
+    "visualSteps": [
+      "应用层生成消息",
+      "传输层添加TCP首部",
+      "网络层添加IP首部",
+      "数据链路层添加帧首部和帧尾"
+    ],
+    "caseTitle": "现实案例：邮政系统分层投递",
+    "caseBody": "寄一封信时，你只需写好信纸装信封贴邮票投入邮箱，邮政内部按分拣、运输、投递等环节分层处理，每层只完成自己的职责。网络分层也是如此：应用层像写信人，传输层像装信封并标注收发人，网络层像分拣中心选择运输路线，数据链路层像运输车在相邻站点间搬运，物理层像公路本身。每层只与相邻层交互，互不干扰，只要接口不变就能独立演进——这正是分层架构模块化的优势。",
+    "workedExampleTitle": "HTTP GET请求从应用层到物理层的完整封装过程",
+    "workedExampleSteps": [
+      "应用层生成消息 → 浏览器构造\"GET /index.html HTTP/1.1\"请求行和首部字段，形成应用层消息（Message），PDU类型为Message",
+      "传输层添加TCP首部 → TCP在该消息前添加20字节首部（含源端口、目的端口80、序列号、确认号等），形成报文段（Segment），PDU变为Segment",
+      "网络层添加IP首部 → IP在报文段前添加20字节首部（含源IP、目的IP、TTL=64、协议号6等），形成数据报（Datagram），PDU变为Datagram",
+      "数据链路层添加帧首部和帧尾 → 以太网驱动添加14字节帧首部（含源MAC、目的MAC、类型0x0800）和4字节FCS校验尾，形成数据帧（Frame），PDU变为Frame",
+      "物理层转换为比特流 → 网卡将帧转换为电信号在线缆上传输，PDU变为比特流（Bit），接收端逐层向上解封装还原原始消息"
+    ],
+    "activities": [
+      {
+        "id": "cs103-OSI与TCP/IP模型-1",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是在TCP/IP模型中，发送端从应用层数据到物理层比特流的封装过程。请将打乱的步骤排列为正确的封装顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "网络层添加IP首部（源IP、目的IP、TTL等）形成数据报",
+          "物理层将帧转换为比特流在线路上传输",
+          "应用层生成HTTP请求消息",
+          "数据链路层添加帧首部（源MAC、目的MAC）和FCS帧尾形成数据帧",
+          "传输层添加TCP首部（源端口、目的端口、序列号等）形成报文段"
+        ],
+        "answerIndexes": [
+          2,
+          4,
+          0,
+          3,
+          1
+        ],
+        "answer": "C → E → A → D → B",
+        "feedback": "封装过程严格按从上到下的层次顺序进行：应用层先产生消息，传输层加TCP首部变报文段，网络层加IP首部变数据报，数据链路层加帧头帧尾变数据帧，最后物理层转为比特流。每一层的首部包含该层协议的控制信息（端口号、IP地址、MAC地址等），接收端逐层向上剥离首部完成解封装。这与知识切片 cs103_k03 所述\"发送端从应用层向下逐层添加协议首部\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k03"
+      },
+      {
+        "id": "cs103-OSI与TCP/IP模型-2",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "一个DNS查询消息从应用层发出，依次经过TCP/IP模型的各层。请推演该消息在每一层的协议数据单元（PDU）类型变化",
+        "content": "初始状态：\n应用层已生成DNS查询消息，PDU为Message\n\n操作序列：\n1. 传输层处理：添加UDP首部（8字节，含源端口、目的端口53）\n  2. 网络层处理：添加IP首部（20字节，含源IP、目的IP）\n  3. 数据链路层处理：添加以太网帧首部和FCS帧尾\n  4. 物理层处理：转换为比特流在线路上传输\n\n推演过程：\n操作1后：PDU从 Message 变为 Segment（报文段）\n操作2后：PDU从 Segment 变为 Datagram（数据报）\n操作3后：PDU从 Datagram 变为 Frame（数据帧）\n操作4后：PDU从 Frame 变为 Bit（比特流）\n\n最终状态：\n到达物理层时PDU为Bit（比特流），接收端将逆向从Bit逐层还原为Message",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "",
+        "feedback": "OSI各层PDU依次为：物理层-Bit、数据链路层-Frame、网络层-Packet(Datagram)、传输层-Segment、应用层-Message。DNS使用UDP而非TCP，因此传输层PDU虽为报文段但承载的是UDP报文。注意TCP/IP模型将OSI上三层合并为应用层，但PDU名称仍沿用OSI定义。这与知识切片 cs103_k03 和 cs103_k04 中PDU通过封装保持独立性的描述一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k03、cs103_k04\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "物理层与数据链路层",
+    "visualTitle": "交换机MAC地址学习与帧转发过程",
+    "visualSteps": [
+      "初始状态",
+      "主机A发送帧给主机C",
+      "查找目的MAC=CC:CC",
+      "主机C收到帧并回复"
+    ],
+    "caseTitle": "现实案例：办公楼门禁登记系统",
+    "caseBody": "办公楼的门禁卡上有唯一卡号（类比MAC地址48位唯一标识），前台登记卡号与办公室的对应关系（类比交换机MAC地址表）。访客刷卡时前台查表放行（类比交换机查表单播转发）；遇到未登记的卡号则广播通知所有楼层（类比泛洪）。不同部门可划分独立门禁区域互不干扰（类比VLAN隔离广播域），跨部门通行需经过前台转接（类比不同VLAN间需三层路由）。登记表有过期时间，长期未用的记录会自动删除（类比MAC地址老化机制）。",
+    "workedExampleTitle": "交换机MAC地址学习与帧转发过程",
+    "workedExampleSteps": [
+      "初始状态 → 交换机MAC地址表为空。端口1连接主机A（MAC=AA:AA），端口2连接主机B（MAC=BB:BB），端口3连接主机C（MAC=CC:CC）",
+      "主机A发送帧给主机C → 交换机从端口1收到帧，源MAC=AA:AA。将(AA:AA, 端口1)写入MAC地址表，完成地址学习",
+      "查找目的MAC=CC:CC → MAC地址表中无CC:CC的记录，交换机向除端口1外的所有端口（端口2、端口3）泛洪该帧",
+      "主机C收到帧并回复 → 主机C从端口3发送回复帧给主机A，源MAC=CC:CC。交换机将(CC:CC, 端口3)写入MAC地址表",
+      "查找目的MAC=AA:AA → 表中存在(AA:AA, 端口1)且不同于入端口3，交换机从端口1单播转发，不再泛洪。此后A与C之间的通信均通过查表精确转发"
+    ],
+    "activities": [
+      {
+        "id": "cs103-物理层与数据链路层-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "一台交换机有3个端口，初始MAC地址表为空。端口1连PC1(MAC=11)，端口2连PC2(MAC=22)，端口3连PC3(MAC=33)。请推演以下操作序列后交换机MAC地址表的内容",
+        "content": "初始状态：\nMAC地址表为空\n\n操作序列：\n1. PC1发送帧给PC3 → 交换机从端口1收帧，学习(11, 端口1)；表中无33，泛洪到端口2和端口3\n  2. PC3回复帧给PC1 → 交换机从端口3收帧，学习(33, 端口3)；表中有11(端口1)，从端口1单播转发\n  3. PC2发送帧给PC1 → 交换机从端口2收帧，学习(22, 端口2)；表中有11(端口1)，从端口1单播转发\n\n最终状态：\nMAC地址表包含3条记录：(11, 端口1)、(33, 端口3)、(22, 端口2)。此时三台主机互相通信均可查表单播转发，无需泛洪",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "",
+        "feedback": "交换机每次收到帧都执行两个动作：先学习源MAC与入端口的映射，再查表转发目的MAC。第一次通信时目的MAC不在表中，触发泛洪使帧到达所有端口；目标主机回复后其MAC也被学习，后续通信即可精确转发。交换机每个端口是独立冲突域，全双工模式下无冲突。这与知识切片 cs103_k07 所述\"地址学习\"和\"查表转发\"机制一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k07"
+      },
+      {
+        "id": "cs103-物理层与数据链路层-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是以太网CSMA/CD协议在节点发送数据时的工作流程。请将打乱的步骤排列为正确的执行顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "边发边听——发送过程中持续检测信道上是否有冲突信号",
+          "随机重发——采用二进制指数退避算法，等待随机时间槽后重新尝试发送",
+          "先听后发——发送前先监听信道，信道空闲才开始发送",
+          "冲突停发——检测到冲突立即停止发送，并发送Jam拥塞信号强化冲突"
+        ],
+        "answerIndexes": [
+          2,
+          0,
+          3,
+          1
+        ],
+        "answer": "C → A → D → B",
+        "feedback": "CSMA/CD的四个阶段按时间顺序为：先听后发（载波监听）→ 边发边听（冲突检测）→ 冲突停发（发送Jam信号）→ 随机重发（二进制指数退避）。第n次冲突后从0到2^k-1中随机选择等待时间（k=min(n,10)）。冲突检测要求帧发送时间大于信号往返传播时间，因此以太网规定最小帧长64字节。现代交换式以太网全双工模式下不存在冲突，CSMA/CD已不再需要。这与知识切片 cs103_k06 所述工作流程一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；IEEE 802.3标准；知识切片 cs103_k06\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "网络层与IP协议",
+    "visualTitle": "将C类网络192.168.1.0/24划分为/26子网",
+    "visualSteps": [
+      "确定原始网络",
+      "选择子网掩码",
+      "计算子网数量",
+      "计算每个子网的主机容量"
+    ],
+    "caseTitle": "现实案例：公司分机号系统",
+    "caseBody": "公司总机号码类比网络号，分机号类比主机号。行政部将8000-8099分给技术组、8100-8199分给市场组，相当于用子网掩码把一个大网分成多个子网。拨打分机时总机根据号段判断转接到哪个部门，就像路由器用子网掩码判断数据报属于哪个子网。若号码不够用还可以灵活调整号段边界，不再固守\"技术组必须4位、市场组必须4位\"的规则——这正是CIDR无类别划分的思路，打破了A/B/C类的固定边界。",
+    "workedExampleTitle": "将C类网络192.168.1.0/24划分为/26子网",
+    "workedExampleSteps": [
+      "确定原始网络 → C类网络192.168.1.0/24，子网掩码255.255.255.0，主机号8位，可容纳254台主机（主机号全0为网络地址、全1为广播地址不可分配）",
+      "选择子网掩码 → 使用/26即255.255.255.192，从主机号8位中借用2位作为子网号，剩余6位为主机号",
+      "计算子网数量 → 借用2位，可划分2^2=4个子网",
+      "计算每个子网的主机容量 → 剩余主机号6位，每个子网可分配2^6-2=62台主机（减去网络地址和广播地址）",
+      "确定各子网地址范围 → 子网0：192.168.1.0~63（网络地址.0，广播地址.63）；子网1：192.168.1.64~127（网络地址.64，广播地址.127）；子网2：192.168.1.128~191（网络地址.128，广播地址.191）；子网3：192.168.1.192~255（网络地址.192，广播地址.255）"
+    ],
+    "activities": [
+      {
+        "id": "cs103-网络层与IP协议-1",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下Python代码通过IP地址和子网掩码计算网络地址。请填空使计算正确",
+        "content": "代码：\nip = [192, 168, 1, 130]\nmask = [255, 255, 255, 192]\nnetwork = []\nfor i in range(4):\n    network.append(__________)  # 填入计算网络地址的表达式\nprint(\"网络地址:\", \".\".join(map(str, network)))",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "ip[i] & mask[i]",
+        "feedback": "网络地址通过IP地址与子网掩码按位与运算得到。Python中&是按位与运算符。逐字节计算：192&255=192, 168&255=168, 1&255=1, 130&192=128（130的二进制10000010与192的二进制11000000按位与得10000000即128）。因此网络地址为192.168.1.128，对应/26子网划分中的子网2。这与知识切片 cs103_k10 所述\"子网掩码与IP地址按位与运算后得到网络地址\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k10"
+      },
+      {
+        "id": "cs103-网络层与IP协议-2",
+        "type": "output_predict",
+        "title": "输出预测",
+        "prompt": "路由器的路由表中有以下4条路由条目，目的地址为10.1.2.5的IP数据报到达后，路由器将选择哪个下一跳转发？请预测结果",
+        "content": "路由表内容：\n目的网络          前缀长度  下一跳\n10.0.0.0/8       /8       R1\n10.1.0.0/16      /16      R2\n10.1.2.0/24      /24      R3\n0.0.0.0/0        /0       R4（默认路由）\n\n预测内容：\n目的地址10.1.2.5同时匹配4条路由（/8、/16、/24、/0），路由器按最长前缀匹配原则选择前缀最长的条目",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "选择R3（10.1.2.0/24），因为/24前缀长度最长（最具体），匹配最精确",
+        "feedback": "最长前缀匹配原则要求当多条路由都匹配目标地址时，选择前缀最长（最具体）的路由条目。10.1.2.5匹配/8（10.x.x.x）、/16（10.1.x.x）、/24（10.1.2.x）和/0（任意），其中/24前缀长度24最长，因此选R3。默认路由0.0.0.0/0前缀长度为0，是最后兜底选择。CIDR通过最长前缀匹配实现了路由聚合与精确路由的共存。这与知识切片 cs103_k11 所述\"路由器选择前缀最长（最具体）的路由\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 4632（CIDR）；知识切片 cs103_k11\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "TCP流量控制与拥塞控制",
+    "visualTitle": "TCP拥塞窗口从慢启动到快恢复的变化过程",
+    "visualSteps": [
+      "慢启动阶段",
+      "进入拥塞避免",
+      "触发快重传",
+      "快恢复后继续拥塞避免"
+    ],
+    "caseTitle": "现实案例：水库调度系统",
+    "caseBody": "水库向下游供水时，闸门开度类比拥塞窗口（cwnd）。刚开始小开度试探（慢启动），确认河道能承受后逐步加大开度（指数增长）；到达警戒水位线（ssthresh）后改为缓慢增加（拥塞避免线性增长）。若发现下游严重溢洪（超时），立即关小闸门到最小重来；若只是局部波动（3个重复ACK），则只减半开度而非全关（快恢复）。下游水厂蓄水池容量类比接收窗口（rwnd），实际放水量取闸门开度和水厂容量的较小值——同时不淹没下游网络和不让水厂溢出。",
+    "workedExampleTitle": "TCP拥塞窗口从慢启动到快恢复的变化过程",
+    "workedExampleSteps": [
+      "慢启动阶段 → cwnd=1，ssthresh=16。每收到一个ACK，cwnd加1，每经过一个RTT翻倍：1→2→4→8→16（4个RTT完成指数增长）",
+      "进入拥塞避免 → cwnd=16达到ssthresh，切换为线性增长。每经过一个RTT，cwnd增加1个MSS：16→17→18→...→24（8个RTT）",
+      "触发快重传 → cwnd=24时收到3个重复ACK，判定报文段丢失。ssthresh=24/2=12，cwnd=ssthresh=12（快恢复，cwnd不重置为1）",
+      "快恢复后继续拥塞避免 → cwnd=12，以线性方式增长：12→13→14→...，温和探测网络带宽",
+      "对比超时场景 → 若cwnd=24时不是收到3个重复ACK而是RTO超时，则ssthresh=24/2=12，cwnd重置为1，重新进入慢启动阶段（与快恢复的区别在于cwnd是否归1）"
+    ],
+    "activities": [
+      {
+        "id": "cs103-TCP流量控制与拥塞控制-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "一个TCP连接初始cwnd=1，ssthresh=16。请推演以下操作序列后cwnd和ssthresh的最终值",
+        "content": "初始状态：\ncwnd=1, ssthresh=16\n\n操作序列：\n1. 经过4个RTT的慢启动（cwnd每RTT翻倍）→ cwnd从1经2、4、8变为16，达到ssthresh\n  2. 进入拥塞避免，经过2个RTT线性增长 → cwnd从16变为17，再变为18\n  3. 收到3个重复ACK，触发快重传和快恢复 → ssthresh=floor(18/2)=9，cwnd=ssthresh=9\n  4. 继续拥塞避免1个RTT → cwnd从9变为10\n\n推演过程：\n操作1后：cwnd=16, ssthresh=16（慢启动阶段指数增长，4个RTT：1→2→4→8→16）\n操作2后：cwnd=18, ssthresh=16（拥塞避免线性增长，每RTT加1）\n操作3后：cwnd=9, ssthresh=9（快恢复：ssthresh=cwnd/2=9，cwnd=ssthresh=9，不归1）\n操作4后：cwnd=10, ssthresh=9（拥塞避免线性增长1个RTT）\n\n最终状态：\ncwnd=10, ssthresh=9",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "",
+        "feedback": "慢启动阶段cwnd每RTT翻倍（指数增长），4个RTT后从1增长到16。达到ssthresh后切换为拥塞避免，每RTT仅加1（线性增长）。收到3个重复ACK触发快重传：ssthresh降为当前cwnd的一半（9），cwnd也设为ssthresh值（9），不重置为1——这是因为3个重复ACK说明网络仍能传输报文段，丢包可能只是偶然。这与知识切片 cs103_k20、cs103_k23 所述慢启动、快恢复机制一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k23"
+      },
+      {
+        "id": "cs103-TCP流量控制与拥塞控制-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是TCP Reno拥塞控制从连接建立到遇到3个重复ACK的各阶段。请将打乱的步骤排列为正确的时间顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "收到3个重复ACK，ssthresh设为当前cwnd的一半，cwnd设为ssthresh值（快恢复）",
+          "cwnd从1开始，每经过一个RTT翻倍（慢启动指数增长）",
+          "cwnd达到ssthresh后，每经过一个RTT增加1个MSS（拥塞避免线性增长）",
+          "快恢复后，cwnd以线性方式继续增长探测网络带宽"
+        ],
+        "answerIndexes": [
+          1,
+          2,
+          0,
+          3
+        ],
+        "answer": "B → C → A → D",
+        "feedback": "TCP Reno拥塞控制的时间线为：连接建立时cwnd=1进入慢启动（B），指数增长快速探测带宽；cwnd达到ssthresh后切换到拥塞避免（C），线性增长温和试探；收到3个重复ACK触发快重传和快恢复（A），ssthresh减半但cwnd不归1；快恢复后继续拥塞避免的线性增长（D）。若发生超时而非3个重复ACK，则cwnd重置为1重新慢启动，这是TCP Tahoe与Reno的关键区别。这与知识切片 cs103_k20、cs103_k21、cs103_k23 所述四阶段算法一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k21、cs103_k23\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "UDP协议",
+    "visualTitle": "UDP校验和伪首部的构造与计算过程",
+    "visualSteps": [
+      "构造伪首部",
+      "组装待校验数据",
+      "按16位字分组",
+      "反码求和"
+    ],
+    "caseTitle": "现实案例：明信片投递",
+    "caseBody": "寄明信片不需要提前和邮局建立联系（无连接），写好地址直接投递，丢了邮局不负责你自己重寄（不可靠）。明信片轻便快捷（首部开销小仅8字节），适合寄简短通知如\"图书馆几点开门\"（DNS查询）。相比之下寄挂号信（TCP）要登记签收、保证送达，安全但繁琐耗时。如果只是问一句话，明信片足够了；但寄重要文件还得用挂号信。实时视频通话更像明信片——偶尔丢几帧无所谓，但延迟太大对方就听不清了，所以选UDP而非TCP。",
+    "workedExampleTitle": "UDP校验和伪首部的构造与计算过程",
+    "workedExampleSteps": [
+      "构造伪首部 → 伪首部共12字节，包含源IP地址（4字节）、目的IP地址（4字节）、协议号（1字节，值为17，补零到2字节）、UDP长度（2字节，含首部和数据）。伪首部不实际传输，仅用于校验和计算",
+      "组装待校验数据 → 将伪首部（12字节）+ UDP首部（8字节，校验和字段先置零）+ UDP数据按顺序拼接",
+      "按16位字分组 → 将拼接后的数据按每16位（2字节）为一组进行划分。若数据长度为奇数字节，末尾补零凑齐16位",
+      "反码求和 → 对所有16位字进行二进制反码求和。计算中将所有16位字相加，若有进位则回卷（将进位加回低位）",
+      "取反填入校验和字段 → 将求和结果取反码，填入UDP首部的校验和字段。接收方用相同方法计算后验证，若全1则正确，否则丢弃数据报"
+    ],
+    "activities": [
+      {
+        "id": "cs103-UDP协议-1",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下Python代码解析接收到的UDP报文首部并验证长度字段。请填空使长度验证逻辑正确",
+        "content": "代码：\nimport struct\n\n# udp_packet为接收到的完整UDP报文（首部+数据）\nudp_header = udp_packet[:8]   # 提取前8字节首部\nudp_data = udp_packet[8:]     # 提取数据部分\n\n# 解包首部4个字段（均为2字节无符号整数，网络字节序）\nsrc_port, dst_port, length, checksum = struct.unpack('!HHHH', udp_header)\n\n# 验证长度字段：应等于首部长度与数据长度之和\nexpected_length = ____________  # 填入正确的长度计算表达式\nif length != expected_length:\n    print(\"UDP长度校验失败: 声明={}, 实际={}\".format(length, expected_length))\nelse:\n    print(\"UDP长度校验通过, 目的端口={}\".format(dst_port))",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "8 + len(udp_data)（或 len(udp_packet)）",
+        "feedback": "UDP首部的长度字段表示整个UDP报文（首部+数据）的字节数。首部固定8字节，因此expected_length = 8 + len(udp_data) = len(udp_packet)。struct.unpack的'!HHHH'表示4个网络字节序的2字节无符号整数，分别对应源端口、目的端口、长度、校验和。若声明长度与实际不符，说明报文在传输中损坏。这与知识切片 cs103_k24 所述\"长度（2字节，含首部和数据）\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 768（UDP）；知识切片 cs103_k24"
+      },
+      {
+        "id": "cs103-UDP协议-2",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "发送方依次通过UDP发送3个数据报D1、D2、D3，接收方无序号确认和重传机制。请推演以下网络传输操作后接收方的最终状态",
+        "content": "初始状态：\n发送方队列中有D1、D2、D3三个UDP数据报待发送，接收方缓存为空\n\n操作序列：\n1. D1正常到达接收方 → 接收方收到D1，缓存中有[D1]\n  2. D2在网络中因拥塞被丢弃 → 接收方未收到D2，发送方不知道丢包（UDP无确认和重传机制）\n  3. D3经过不同路径先到达 → 接收方收到D3，缓存中有[D1, D3]（乱序到达，UDP不保证有序）\n  4. 等待超时，D2始终未到达 → 接收方最终持有D1和D3，D2永久丢失\n\n推演过程：\n操作1后：接收方缓存 = [D1]（正常到达）\n操作2后：接收方缓存 = [D1]（D2丢失，无反馈机制）\n操作3后：接收方缓存 = [D1, D3]（D3乱序到达，无排序机制）\n操作4后：接收方缓存 = [D1, D3]（D2永久丢失，应用层需自行处理）\n\n最终状态：\n接收方持有D1和D3，缺失D2，且到达顺序为D1→D3（乱序）。与TCP不同，UDP不保证可靠交付、不保证顺序、不重传丢失数据",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "",
+        "feedback": "UDP不提供流量控制、拥塞控制、重传和序号机制，数据报可能丢失、重复或乱序到达。D2丢失后发送方无感知，D3乱序到达后接收方不重排——可靠性需由应用层自行保障。例如QUIC协议在UDP之上实现了可靠传输和前向纠错。这与知识切片 cs103_k24 所述\"数据报可能丢失、重复或乱序到达，可靠性需要由应用层自行保障\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 768（UDP）；知识切片 cs103_k24、cs103_k27\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "HTTPS与TLS",
+    "visualTitle": "TLS 1.2握手完整过程（使用ECDHE密钥交换）",
+    "visualSteps": [
+      "ClientHello",
+      "步骤 2",
+      "客户端验证证书",
+      "步骤 4"
+    ],
+    "caseTitle": "现实案例：身份证签发与银行验证",
+    "caseBody": "你去银行办业务，出示身份证。身份证由公安局（根CA）授权的派出所（中间CA）签发。银行柜员验证身份证真伪（验证证书签名）、检查是否过期（有效期）、核对照片是否是你本人（域名匹配SAN/CN）、查询是否被挂失（OCSP/CRL吊销检查）。验证通过后双方约定一个临时暗号（会话密钥）交流业务，用完即弃。即使日后公安局的签发章被盗（长期私钥泄露），以前用临时暗号办过的业务仍无法被还原——因为临时暗号用后即销，这正是前向安全性的含义。",
+    "workedExampleTitle": "TLS 1.2握手完整过程（使用ECDHE密钥交换）",
+    "workedExampleSteps": [
+      "ClientHello → 客户端发送支持的TLS版本（如1.2）、密码套件列表（如TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256）和客户端随机数（Client Random，32字节）",
+      "ServerHello + 证书 + 密钥交换 → 服务器回复选定的TLS版本和密码套件，发送服务器随机数（Server Random，32字节）、数字证书（含服务器公钥）和ServerKeyExchange（携带ECDHE临时公钥参数）",
+      "客户端验证证书 → 客户端逐级验证证书签名链（终端→中间CA→根CA）、检查有效期、验证域名匹配SAN字段、查询OCSP/CRL确认未吊销",
+      "ClientKeyExchange + CCS + Finished → 客户端发送自己的ECDHE临时公钥，发送ChangeCipherSpec（通知后续使用加密）和Finished（加密验证握手完整性）",
+      "Server CCS + Finished → 服务器发送ChangeCipherSpec和Finished，握手完成",
+      "对称加密通信 → 双方利用Client Random、Server Random和ECDHE协商出的预主密钥，通过PRF函数计算主密钥和会话密钥，后续应用数据用对称加密（如AES-GCM）保护"
+    ],
+    "activities": [
+      {
+        "id": "cs103-HTTPS与TLS-1",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是TLS 1.2握手建立加密通道的主要步骤。请将打乱的步骤排列为正确的时间顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "服务器发送ServerHello、服务器随机数、数字证书和ServerKeyExchange",
+          "客户端发送ClientHello、客户端随机数和密码套件列表",
+          "服务器发送ChangeCipherSpec和Finished，握手完成",
+          "客户端验证证书后发送ClientKeyExchange、ChangeCipherSpec和Finished"
+        ],
+        "answerIndexes": [
+          1,
+          0,
+          3,
+          2
+        ],
+        "answer": "B → A → D → C",
+        "feedback": "TLS 1.2握手的时序为：客户端先发起ClientHello携带随机数和密码套件列表（B），服务器回复ServerHello选定参数并发送证书和密钥交换材料（A），客户端验证证书后发送自己的密钥交换材料并通知开始加密（D），服务器最后通知开始加密并完成握手（C）。握手后双方利用两个随机数和预主密钥通过PRF计算会话密钥。TLS 1.3简化了这一过程为1-RTT甚至0-RTT。这与知识切片 cs103_k32 所述握手过程一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5246（TLS 1.2）；知识切片 cs103_k32"
+      },
+      {
+        "id": "cs103-HTTPS与TLS-2",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "客户端访问https://shop.example.com，服务器返回的证书链包含：终端证书（shop.example.com）→ 中间CA证书 → 根CA证书。请推演证书链验证的全过程及最终结果",
+        "content": "初始状态：\n客户端收到3级证书链，本地信任库中预装有根CA证书\n\n操作序列：\n1. 验证终端证书签名 → 用中间CA证书中的公钥验证终端证书的签名，签名验证通过\n  2. 验证中间CA证书签名 → 用根CA证书中的公钥验证中间CA证书的签名，签名验证通过\n  3. 验证根CA证书 → 根CA证书是自签名的，且已预装在本地信任库中（信任锚），验证通过\n  4. 检查域名匹配 → 终端证书的SAN（Subject Alternative Name）字段包含shop.example.com，与访问域名匹配\n  5. 检查有效期和吊销状态 → 所有证书均在有效期内，OCSP查询未发现任何证书被吊销\n\n推演过程：\n操作1-3后：签名链验证全部通过，信任链从终端证书经中间CA到达根CA信任锚\n操作4后：域名匹配验证通过，确认证书属于目标服务器\n操作5后：有效期和吊销状态均正常\n\n最终状态：\n证书链验证全部通过，客户端信任服务器身份，继续进行密钥交换。若任何一步失败（签名不匹配、域名不匹配、过期或被吊销），客户端将中止连接并警告用户",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "",
+        "feedback": "证书链验证从终端证书开始逐级向上验证签名，直到到达预装在信任库中的根CA。验证内容包括：签名正确性（上级CA私钥签发）、有效期、域名匹配（SAN/CN字段）和吊销状态（CRL/OCSP）。根CA自签名且预装在系统或浏览器中，不需要在网络中传输。这与知识切片 cs103_k33 所述\"从终端证书开始逐级向上验证签名，直到到达信任的根CA\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5280（X.509证书）；知识切片 cs103_k33\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "DNS系统",
+    "visualTitle": "www.example.com的完整DNS解析过程",
+    "visualSteps": [
+      "查本地缓存",
+      "递归查询本地DNS",
+      "迭代查询根服务器",
+      "迭代查询顶级域服务器"
+    ],
+    "caseTitle": "现实案例：企业组织架构查号",
+    "caseBody": "要找某公司技术部张工的电话，你先查公司总机（根DNS服务器），总机说\"转技术部分机\"（顶级域.com），技术部前台说\"找张工拨209\"（权威服务器）。如果你之前查过并记在通讯录里（DNS缓存），下次直接拨号不用再问总机。通讯录记录有保质期（TTL），过期后要重新查询。每个部门可以设不同类型的联系信息：直线电话（A记录）、转接号码（CNAME别名）、值班邮箱（MX记录）、部门职责说明（TXT记录）。",
+    "workedExampleTitle": "www.example.com的完整DNS解析过程",
+    "workedExampleSteps": [
+      "查本地缓存 → 浏览器DNS缓存和操作系统hosts文件中均无www.example.com的记录，缓存未命中",
+      "递归查询本地DNS → 客户端向配置的本地DNS服务器（递归解析器，如8.8.8.8）发送递归查询请求，由本地DNS服务器负责完成全部解析过程",
+      "迭代查询根服务器 → 本地DNS服务器向根域名服务器查询，根服务器返回.com顶级域服务器的地址（根服务器不直接回答，只返回下一级指针）",
+      "迭代查询顶级域服务器 → 本地DNS服务器向.com顶级域服务器查询，顶级域服务器返回example.com权威域名服务器的地址",
+      "迭代查询权威服务器 → 本地DNS服务器向example.com权威服务器查询，权威服务器返回www.example.com的A记录（如93.184.216.34）",
+      "返回并缓存 → 本地DNS服务器将IP地址返回给客户端，并按A记录的TTL值缓存该结果。后续查询在TTL有效期内直接从缓存返回"
+    ],
+    "activities": [
+      {
+        "id": "cs103-DNS系统-1",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是客户端解析www.example.com时，本地DNS服务器完成的迭代查询过程。请将打乱的步骤排列为正确的执行顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "本地DNS服务器向根域名服务器查询，获取.com顶级域服务器地址",
+          "客户端向本地DNS服务器发送递归查询请求",
+          "本地DNS服务器向example.com权威服务器查询，获取www.example.com的A记录IP地址",
+          "本地DNS服务器向.com顶级域服务器查询，获取example.com权威服务器地址",
+          "本地DNS服务器将解析结果返回客户端并按TTL缓存"
+        ],
+        "answerIndexes": [
+          1,
+          0,
+          3,
+          2,
+          4
+        ],
+        "answer": "B → A → D → C → E",
+        "feedback": "DNS解析的完整流程为：客户端发递归查询给本地DNS服务器（B），本地DNS服务器依次迭代查询根服务器获取顶级域地址（A）、查询顶级域服务器获取权威服务器地址（D）、查询权威服务器获取最终IP（C），最后返回结果给客户端并缓存（E）。递归查询将复杂工作交给本地DNS服务器，根服务器和顶级域服务器只返回下一级指针而非最终答案。这与知识切片 cs103_k37 所述\"本地服务器依次向根服务器、顶级域服务器、权威服务器发送迭代查询\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 1034（DNS概念）；知识切片 cs103_k37"
+      },
+      {
+        "id": "cs103-DNS系统-2",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下是example.com的DNS区域文件片段。www主机需要直接映射到IPv4地址，请填入正确的资源记录类型",
+        "content": "代码：\n; example.com 区域文件\nexample.com.    IN  SOA   ns1.example.com. admin.example.com. (\n                        2026010101 ; 序列号\n                        3600       ; 刷新间隔\n                        1800       ; 重试间隔\n                        604800     ; 过期时间\n                        86400 )    ; 默认TTL\n\nwww             IN  ____    93.184.216.34    ; 填入正确的记录类型\nmail            IN  MX      10 mail.example.com.\nns1             IN  A       192.168.1.1\nexample.com.    IN  NS      ns1.example.com.",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "A",
+        "feedback": "A记录将域名映射到IPv4地址。www主机需要直接映射到IPv4地址93.184.216.34，因此使用A记录。MX用于指定邮件交换服务器及优先级，SOA用于区域起始授权信息，NS用于指定权威域名服务器，CNAME用于设置域名别名（指向另一个域名而非IP）。若www需要映射IPv6地址则使用AAAA记录。这与知识切片 cs103_k39 所述\"A记录将域名映射到IPv4地址\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 1035（DNS实现与规格）；知识切片 cs103_k39\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "路由算法与协议",
+    "visualTitle": "使用Dijkstra算法计算R1到R4的最短路径",
+    "visualSteps": [
+      "初始化",
+      "选择最近节点",
+      "选择下一个最近节点",
+      "选择下一个最近节点"
+    ],
+    "caseTitle": "现实案例：城际公路导航",
+    "caseBody": "开车导航有两种思路。一种是只问路边当地人\"下一个镇多远\"（距离向量算法），每个路口的司机互相交换距离信息，逐渐拼出最短路线，但信息传播慢且可能以讹传讹（计数到无穷问题）。另一种是先获取全省完整公路地图（链路状态算法），自己用导航算法算出最短路径，准确快速但需要存储整张地图。城市间跨省行驶时，各省交通厅各自管理省内道路（OSPF内部网关协议），省际路口由国道编号指引（BGP外部网关协议），按行政策略而非纯距离选择跨省路径。",
+    "workedExampleTitle": "使用Dijkstra算法计算R1到R4的最短路径",
+    "workedExampleSteps": [
+      "初始化 → 源节点R1。已知直连链路距离：R1→R2=2，R1→R3=5。R4距离为无穷大。已确定集合S={R1}",
+      "选择最近节点 → R2距离最短（2），将R2加入S。S={R1,R2}。检查R2的邻居：R2→R3=1，因此R1→R2→R3=2+1=3 < 5，更新R3距离为3",
+      "选择下一个最近节点 → R3距离最短（3），将R3加入S。S={R1,R2,R3}。检查R3的邻居：R3→R4=4，因此R1→R2→R3→R4=3+4=7 < 无穷大，更新R4距离为7",
+      "选择下一个最近节点 → R4距离最短（7），将R4加入S。S={R1,R2,R3,R4}。所有节点已确定",
+      "确定最短路径 → R1到R4的最短路径为R1→R2→R3→R4，总距离=7。注意直连路径R1→R3=5虽短于R1→R2→R3=3的单独段，但经R2中转到R3（距离3）比直连（距离5）更优，链路状态算法通过全局拓扑发现了这一更优路径"
+    ],
+    "activities": [
+      {
+        "id": "cs103-路由算法与协议-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "prompt": "路由器R1运行RIP协议（度量值为跳数），初始路由表如下。R2向R1发送了距离向量更新。请推演R1更新后的路由表",
+        "content": "初始状态：\nR1路由表：N1(距离0, 直连)、N2(距离2, 经R2)、N3(距离4, 经R3)。R2到各网段的距离：N1=1, N2=0, N3=1\n\n操作序列：\n1. R1收到R2的距离向量更新（R2到N1=1, N2=0, N3=1）\n  2. 对N1：原距离0（直连）vs R2通告1+1=2，0 < 2，保持不变\n  3. 对N2：原距离2（经R2）vs R2通告0+1=1，1 < 2，更新为距离1（经R2）\n  4. 对N3：原距离4（经R3）vs R2通告1+1=2，2 < 4，更新为距离2（经R2）\n\n推演过程：\n操作2后：N1=0(直连)，保持不变（直连距离0最优）\n操作3后：N2=1(经R2)，从2更新为1（R2是N2的直连网段，经R2只需1跳）\n操作4后：N3=2(经R2)，从4更新为2（经R2到N3只需2跳，比经R3的4跳更短）\n\n最终状态：\nR1路由表为：N1=0(直连)、N2=1(经R2)、N3=2(经R2)。Bellman-Ford方程：新距离=min(原距离, 邻居到目标距离+到邻居距离)",
+        "language": "推演草稿",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "",
+        "feedback": "距离向量算法使用Bellman-Ford方程更新路由：D(x,y)=min(D(x,y), D(x,v)+D(v,y))。R1收到R2的距离向量后，对每个目的网络比较原路径和新路径（经R2）的距离，取较小值。N1直连最优不更新，N2和N3经R2更短故更新。RIP每30秒交换距离向量，最大15跳限制防止计数到无穷。这与知识切片 cs103_k40、cs103_k41 所述Bellman-Ford方程和RIP机制一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k40、cs103_k41"
+      },
+      {
+        "id": "cs103-路由算法与协议-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是OSPF路由器从启动到计算出路由表的主要步骤。请将打乱的步骤排列为正确的执行顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "交换数据库描述报文（DBD），互相了解对方链路状态数据库（LSDB）的摘要",
+          "通过Hello协议发现邻居并建立邻接关系",
+          "各路由器独立运行Dijkstra算法，基于完整LSDB计算最短路径树并生成路由表",
+          "通过LSR/LSU/LSAck请求、交换和确认LSA，完成LSDB的完整同步",
+          "泛洪LSA（链路状态通告）在全区域同步链路状态数据库"
+        ],
+        "answerIndexes": [
+          1,
+          0,
+          3,
+          4,
+          2
+        ],
+        "answer": "B → A → D → E → C",
+        "feedback": "OSPF建立邻接和计算路由的流程为：先通过Hello协议发现邻居建立邻接关系（B），再交换DBD了解对方LSDB摘要（A），然后通过LSR/LSU/LSAck完成LSDB的详细同步（D），LSA在全区域泛洪使所有路由器的LSDB一致（E），最后每台路由器独立运行Dijkstra算法基于完整的LSDB计算最短路径树生成路由表（C）。与距离向量算法不同，链路状态算法中每台路由器都拥有完整拓扑图，收敛速度快且无计数到无穷问题。这与知识切片 cs103_k42 所述\"通过Hello协议发现邻居、泛洪LSA同步LSDB、运行Dijkstra算法\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 2328（OSPF v2）；知识切片 cs103_k42\n\n---"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
+    "courseId": "cs103",
+    "topic": "网络安全基础",
+    "visualTitle": "混合加密通信的完整过程（RSA + AES）",
+    "visualSteps": [
+      "生成对称密钥",
+      "用公钥加密对称密钥",
+      "用对称密钥加密数据",
+      "发送密文"
+    ],
+    "caseTitle": "现实案例：密封信件与签章",
+    "caseBody": "对称加密像用同一把钥匙锁箱子和开箱子——快但钥匙怎么安全给对方是难题（密钥分发问题）。非对称加密像你有一把公开的锁（公钥），任何人都能锁上但只有你有钥匙（私钥）能打开。数字签名则反过来：你用私钥盖章（签名），别人用你的公开印章模板（公钥）验证真伪，既证明是你盖的又无法伪造。实际通信中先用非对称方式安全交换一把对称钥匙，再用这把快钥匙加密大量数据——这就是混合加密体制，兼顾安全和效率。",
+    "workedExampleTitle": "混合加密通信的完整过程（RSA + AES）",
+    "workedExampleSteps": [
+      "生成对称密钥 → 发送方Alice生成一次性AES会话密钥K（如256位），用于加密大量数据，因AES加解密速度快适合大数据量",
+      "用公钥加密对称密钥 → Alice用接收方Bob的RSA公钥加密AES密钥K，得到密文C_key。RSA解决了对称密钥的安全分发问题",
+      "用对称密钥加密数据 → Alice用AES密钥K加密原始数据（如文件），得到密文C_data。AES加密速度远快于RSA，适合加密大量数据",
+      "发送密文 → Alice将C_key（加密的对称密钥）和C_data（加密的数据）一起发送给Bob",
+      "用私钥解密对称密钥 → Bob收到后，先用自己的RSA私钥解密C_key，恢复出AES密钥K。只有Bob的私钥能解密，保证了密钥分发的安全性",
+      "用对称密钥解密数据 → Bob用恢复的AES密钥K解密C_data，获得原始数据。整个过程中RSA仅用于加密少量数据（对称密钥），AES负责加密大量数据，兼顾了安全性和效率"
+    ],
+    "activities": [
+      {
+        "id": "cs103-网络安全基础-1",
+        "type": "step_order",
+        "title": "步骤排序",
+        "prompt": "以下是数字签名的生成与验证过程。请将打乱的步骤排列为正确的执行顺序",
+        "content": "",
+        "language": "步骤卡片",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "接收方用发送方公钥解密签名，恢复出摘要值",
+          "发送方对原消息计算哈希（如SHA-256），得到消息摘要",
+          "接收方用相同的哈希算法对收到的消息计算摘要，与解密出的摘要对比",
+          "发送方用自己的私钥对摘要加密，生成数字签名",
+          "发送方将原消息和数字签名一起发送给接收方"
+        ],
+        "answerIndexes": [
+          1,
+          3,
+          4,
+          0,
+          2
+        ],
+        "answer": "B → D → E → A → C",
+        "feedback": "数字签名的生成流程为：先对原消息计算哈希得到摘要（B），再用发送方私钥加密摘要生成签名（D），然后将消息和签名一起发送（E）。验证流程为：接收方用发送方公钥解密签名恢复摘要（A），再对收到的消息重新计算哈希并与恢复的摘要对比（C）。若两个摘要一致则验证通过，证明消息未被篡改（完整性）且确实来自私钥持有者（身份认证）。私钥仅持有者拥有，因此签名者无法否认（不可否认性）。这与知识切片 cs103_k46 所述\"签名方用私钥对消息哈希值加密生成签名，验证方用公钥验证\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k46"
+      },
+      {
+        "id": "cs103-网络安全基础-2",
+        "type": "code_fill",
+        "title": "代码填空",
+        "prompt": "以下Python代码使用AES-GCM模式进行认证加密。GCM模式同时提供机密性和完整性验证。请填入正确的模式构造方法",
+        "content": "代码：\nfrom cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes\nfrom cryptography.hazmat.backends import default_backend\nimport os\n\nkey = os.urandom(32)    # AES-256 密钥（32字节）\nnonce = os.urandom(12)  # GCM推荐12字节随机数\n\n# 使用AES-GCM认证加密模式\ncipher = Cipher(\n    algorithms.AES(key),\n    modes.____(nonce),   # 填入正确的GCM模式构造方法\n    backend=default_backend()\n)\n\nencryptor = cipher.encryptor()\nciphertext = encryptor.update(plaintext) + encryptor.finalize()\ntag = encryptor.tag      # GCM认证标签，用于完整性验证",
+        "language": "代码阅读",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "GCM",
+        "feedback": "AES-GCM（Galois/Counter Mode）是认证加密模式，同时提供机密性（加密）和完整性（认证标签tag）。modes.GCM(nonce)创建GCM模式实例，加密后生成认证标签tag，解密时需验证tag。相比之下ECB模式不安全（相同明文产生相同密文），CBC模式需要额外的IV和MAC才能实现完整性验证，GCM将加密和认证合二为一。TLS 1.3仅支持AEAD模式（如GCM和ChaCha20-Poly1305），不再使用CBC等非认证加密模式。这与知识切片 cs103_k44 所述\"GCM（认证加密，提供完整性验证）\"一致",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5288（AES-GCM for TLS）；知识切片 cs103_k44"
+      }
+    ]
   }
 ]

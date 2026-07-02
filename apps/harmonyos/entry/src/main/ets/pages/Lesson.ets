@@ -2,7 +2,7 @@ import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { CuratedKnowledgeChunk, LessonExperience, LessonProgress } from '../model/DataModels';
+import { CuratedKnowledgeChunk, LearningActivity, LessonExperience, LessonProgress } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const EMPTY_CHUNK: CuratedKnowledgeChunk = {
@@ -16,6 +16,7 @@ const EMPTY_CHUNK: CuratedKnowledgeChunk = {
 @Entry
 @Component
 struct LessonPage {
+  private contentScroller: Scroller = new Scroller();
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '';
@@ -26,7 +27,11 @@ struct LessonPage {
   @State saving: boolean = false;
   @State message: string = '';
   @State experience: LessonExperience | null = null;
-  @State selectedPrediction: number = -1;
+  @State activeActivityIndex: number = 0;
+  @State selectedIndexes: number[] = [];
+  @State responseText: string = '';
+  @State feedbackVisible: boolean = false;
+  @State attemptedActivityIds: string[] = [];
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -59,18 +64,98 @@ struct LessonPage {
     if (index < 0 || index >= this.chunks.length) return;
     this.currentIndex = index;
     this.activeChunk = this.chunks[index];
+    this.message = '';
+    this.contentScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
   }
 
-  private choosePrediction(index: number): void {
-    this.selectedPrediction = index;
+  private activeActivity(): LearningActivity | null {
+    if (this.experience === null || this.experience.activities.length === 0) return null;
+    return this.experience.activities[this.activeActivityIndex] ?? null;
   }
 
-  private predictionIsCorrect(): boolean {
-    return this.experience !== null && this.selectedPrediction === this.experience.answerIndex;
+  private resetActivityInput(): void {
+    this.selectedIndexes = [];
+    this.responseText = '';
+    this.feedbackVisible = false;
   }
 
   private experienceStepCount(): number {
     return this.experience === null ? 0 : this.experience.visualSteps.length;
+  }
+
+  private chooseSingle(index: number): void {
+    const activity = this.activeActivity();
+    if (activity === null || this.feedbackVisible) return;
+    this.selectedIndexes = [index];
+    this.feedbackVisible = true;
+    this.markActivityAttempted(activity.id);
+  }
+
+  private chooseOrderStep(index: number): void {
+    if (this.feedbackVisible || this.selectedIndexes.includes(index)) return;
+    this.selectedIndexes = this.selectedIndexes.concat([index]);
+  }
+
+  private submitOrder(): void {
+    const activity = this.activeActivity();
+    if (activity === null || this.selectedIndexes.length !== activity.options.length) return;
+    this.feedbackVisible = true;
+    this.markActivityAttempted(activity.id);
+  }
+
+  private revealFreeResponse(): void {
+    if (this.responseText.trim().length === 0) {
+      this.message = '请先写下你的推演或填空答案';
+      return;
+    }
+    this.message = '';
+    this.feedbackVisible = true;
+  }
+
+  private selfAssess(activityId: string): void {
+    this.markActivityAttempted(activityId);
+  }
+
+  private markActivityAttempted(activityId: string): void {
+    if (!this.attemptedActivityIds.includes(activityId)) {
+      this.attemptedActivityIds = this.attemptedActivityIds.concat([activityId]);
+    }
+  }
+
+  private activityIsCorrect(): boolean {
+    const activity = this.activeActivity();
+    if (activity === null || activity.answerIndexes.length !== this.selectedIndexes.length) return false;
+    return activity.answerIndexes.every((answer: number, index: number): boolean =>
+      answer === this.selectedIndexes[index]);
+  }
+
+  private allActivitiesAttempted(): boolean {
+    if (this.experience === null) return true;
+    return this.experience.activities.every((activity: LearningActivity): boolean =>
+      this.attemptedActivityIds.includes(activity.id));
+  }
+
+  private showIntroExperience(): boolean {
+    return this.experience !== null && this.currentIndex === 0;
+  }
+
+  private showPracticeExperience(): boolean {
+    return this.experience !== null && this.currentIndex === this.chunks.length - 1;
+  }
+
+  private goToActivity(index: number): void {
+    if (this.experience === null || index < 0 || index >= this.experience.activities.length) return;
+    this.activeActivityIndex = index;
+    this.resetActivityInput();
+    this.message = '';
+    this.contentScroller.scrollPage({ next: false });
+  }
+
+  private finalActionLabel(): string {
+    if (this.saving) return '保存中...';
+    if (this.currentIndex < this.chunks.length - 1) return '学完本节，继续';
+    if (!this.allActivitiesAttempted()) return '完成互动练习后继续';
+    return '完成主题并练习';
   }
 
   private contentBeats(): string[] {
@@ -83,6 +168,11 @@ struct LessonPage {
 
   private async completeCurrent(): Promise<void> {
     if (this.saving || this.activeChunk.id.length === 0) return;
+    if (this.currentIndex === this.chunks.length - 1 && !this.allActivitiesAttempted() &&
+      !this.completedChunkIds.includes(this.activeChunk.id)) {
+      this.message = '请先完成本主题的全部互动练习';
+      return;
+    }
     this.saving = true;
     this.message = '';
     try {
@@ -113,6 +203,306 @@ struct LessonPage {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'LessonPage Practice navigation failed: %{public}s', error.message);
     });
+  }
+
+  @Builder
+  private IntroExperience() {
+    if (this.experience !== null) {
+      Column({ space: 14 }) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.book_open_fill'))
+            .fontSize(18)
+            .fontColor([Constants.COLOR_BRAND])
+          Text('一眼看懂')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        }
+        .width('100%')
+        Text(this.experience.visualTitle)
+          .width('100%')
+          .fontSize(13)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Row({ space: 6 }) {
+          ForEach(this.experience.visualSteps, (step: string, index: number): void => {
+            Text(step)
+              .layoutWeight(1)
+              .constraintSize({ minHeight: 44 })
+              .fontSize(11)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(index === this.experienceStepCount() - 1 ?
+                Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+              .textAlign(TextAlign.Center)
+              .padding({ left: 4, right: 4, top: 6, bottom: 6 })
+              .backgroundColor(index === this.experienceStepCount() - 1 ?
+                Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_SM)
+          })
+        }
+        .width('100%')
+      }
+      .width('100%')
+
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
+            .fontSize(17)
+            .fontColor([Constants.COLOR_WARNING])
+          Text(this.experience.caseTitle)
+            .layoutWeight(1)
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        }
+        .width('100%')
+        Text(this.experience.caseBody)
+          .width('100%')
+          .fontSize(14)
+          .lineHeight(24)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+      .borderRadius(Constants.RADIUS_MD)
+    }
+  }
+
+  @Builder
+  private PracticeExperience() {
+    if (this.experience !== null) {
+      Column({ space: 10 }) {
+        Row() {
+          Text('分步示例')
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_BRAND)
+          Text(this.experience.workedExampleSteps.length.toString() + ' 步')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+        Text(this.experience.workedExampleTitle)
+          .width('100%')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        ForEach(this.experience.workedExampleSteps, (step: string, index: number): void => {
+          Row({ space: 10 }) {
+            Text((index + 1).toString())
+              .width(24)
+              .height(24)
+              .fontSize(11)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(12)
+            Text(step)
+              .layoutWeight(1)
+              .fontSize(13)
+              .lineHeight(21)
+              .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+        })
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .border({ width: 1, color: Constants.COLOR_BORDER })
+      .borderRadius(Constants.RADIUS_MD)
+
+      if (this.activeActivity() !== null) {
+        Column({ space: 12 }) {
+          Row() {
+            Text('主动练习 · ' + this.activeActivity()!.title)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_BRAND)
+            Text((this.activeActivityIndex + 1).toString() + ' / ' +
+              this.experience.activities.length.toString())
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          Text(this.activeActivity()!.prompt)
+            .width('100%')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .lineHeight(25)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+
+          if (this.activeActivity()!.content.length > 0) {
+            Column({ space: 8 }) {
+              Text(this.activeActivity()!.language)
+                .width('100%')
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
+              Text(this.activeActivity()!.content)
+                .width('100%')
+                .fontSize(12)
+                .fontFamily('monospace')
+                .lineHeight(20)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            }
+            .width('100%')
+            .padding(14)
+            .backgroundColor(Constants.COLOR_MAP_CORE)
+            .borderRadius(Constants.RADIUS_SM)
+          }
+
+          if (this.activeActivity()!.interactionMode === 'single_choice') {
+            ForEach(this.activeActivity()!.options, (option: string, index: number): void => {
+              Button(option)
+                .width('100%')
+                .constraintSize({ minHeight: 48 })
+                .fontSize(13)
+                .fontColor(this.selectedIndexes.includes(index) ?
+                  Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+                .backgroundColor(this.selectedIndexes.includes(index) ?
+                  (this.activityIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING) :
+                  Constants.COLOR_BG_TAG)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.chooseSingle(index); })
+            })
+          } else if (this.activeActivity()!.interactionMode === 'ordered_choice') {
+            ForEach(this.activeActivity()!.options, (option: string, index: number): void => {
+              Button((this.selectedIndexes.includes(index) ?
+                (this.selectedIndexes.indexOf(index) + 1).toString() + '. ' : '') + option)
+                .width('100%')
+                .constraintSize({ minHeight: 48 })
+                .fontSize(13)
+                .fontColor(this.selectedIndexes.includes(index) ?
+                  Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+                .backgroundColor(this.selectedIndexes.includes(index) ?
+                  Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.chooseOrderStep(index); })
+            })
+            Row({ space: 10 }) {
+              Button('重置顺序')
+                .layoutWeight(1)
+                .height(44)
+                .enabled(!this.feedbackVisible)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                .backgroundColor(Constants.COLOR_BG_TAG)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.resetActivityInput(); })
+              Button('提交顺序')
+                .layoutWeight(1)
+                .height(44)
+                .enabled(this.selectedIndexes.length === this.activeActivity()!.options.length &&
+                  !this.feedbackVisible)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.submitOrder(); })
+            }
+            .width('100%')
+          } else {
+            TextArea({ placeholder: '先写下你的答案或推演过程', text: this.responseText })
+              .width('100%')
+              .height(116)
+              .fontSize(14)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              .backgroundColor(Constants.COLOR_SURFACE_TINT)
+              .border({ width: 1, color: Constants.COLOR_BORDER })
+              .borderRadius(Constants.RADIUS_MD)
+              .onChange((value: string): void => { this.responseText = value; })
+            Button(this.feedbackVisible ? '已提交，向下对照答案' : '提交并对照答案')
+              .width('100%')
+              .height(46)
+              .enabled(!this.feedbackVisible)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.revealFreeResponse(); })
+          }
+
+          if (this.feedbackVisible) {
+            Column({ space: 8 }) {
+              Text(this.activeActivity()!.interactionMode === 'free_response' ?
+                '标准答案' : (this.activityIsCorrect() ? '回答正确' : '对照正确答案'))
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
+                  Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+              Text(this.activeActivity()!.answer)
+                .width('100%')
+                .fontSize(13)
+                .lineHeight(21)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              Text(this.activeActivity()!.feedback)
+                .width('100%')
+                .fontSize(12)
+                .lineHeight(20)
+                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+              Text('来源：' + this.activeActivity()!.source)
+                .width('100%')
+                .fontSize(11)
+                .lineHeight(18)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            }
+            .width('100%')
+            .padding(14)
+            .backgroundColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
+              Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_SURFACE_TINT)
+            .borderRadius(Constants.RADIUS_SM)
+
+            if (this.activeActivity()!.interactionMode === 'free_response' &&
+              !this.attemptedActivityIds.includes(this.activeActivity()!.id)) {
+              Row({ space: 10 }) {
+                Button('还需巩固')
+                  .layoutWeight(1)
+                  .height(44)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  .backgroundColor(Constants.COLOR_BG_TAG)
+                  .borderRadius(Constants.RADIUS_MD)
+                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id); })
+                Button('我答对了')
+                  .layoutWeight(1)
+                  .height(44)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .backgroundColor(Constants.COLOR_SUCCESS)
+                  .borderRadius(Constants.RADIUS_MD)
+                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id); })
+              }
+              .width('100%')
+            }
+          }
+
+          if (this.attemptedActivityIds.includes(this.activeActivity()!.id)) {
+            Row() {
+              Text('本练习已完成')
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_SUCCESS)
+              if (this.activeActivityIndex < this.experience.activities.length - 1) {
+                Button('下一练习')
+                  .height(40)
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .backgroundColor(Constants.COLOR_BRAND)
+                  .borderRadius(Constants.RADIUS_SM)
+                  .onClick((): void => { this.goToActivity(this.activeActivityIndex + 1); })
+              }
+            }
+            .width('100%')
+            .justifyContent(FlexAlign.SpaceBetween)
+          }
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(Constants.COLOR_BG_CARD)
+        .border({ width: 1, color: Constants.COLOR_BORDER })
+        .borderRadius(Constants.RADIUS_LG)
+      }
+    }
   }
 
   build() {
@@ -155,7 +545,7 @@ struct LessonPage {
         .width('100%')
         .padding({ left: 18, right: 18, top: 4, bottom: 12 })
 
-        Scroll() {
+        Scroll(this.contentScroller) {
           Column({ space: 24 }) {
             Column({ space: 12 }) {
               Row({ space: 8 }) {
@@ -181,138 +571,12 @@ struct LessonPage {
             .backgroundColor(Constants.COLOR_SURFACE_TINT)
             .borderRadius(Constants.RADIUS_LG)
 
-            if (this.experience !== null) {
-              Column({ space: 14 }) {
-                Row({ space: 8 }) {
-                  SymbolGlyph($r('sys.symbol.book_open_fill'))
-                    .fontSize(18)
-                    .fontColor([Constants.COLOR_BRAND])
-                  Text('一眼看懂')
-                    .fontSize(17)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                }
-                .width('100%')
+            if (this.showIntroExperience()) {
+              this.IntroExperience()
+            }
 
-                Text(this.experience.visualTitle)
-                  .width('100%')
-                  .fontSize(13)
-                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
-
-                Row({ space: 6 }) {
-                  ForEach(this.experience.visualSteps, (step: string, index: number): void => {
-                    Text(step)
-                      .layoutWeight(1)
-                      .height(44)
-                      .fontSize(11)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor(index === this.experienceStepCount() - 1 ?
-                        Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-                      .textAlign(TextAlign.Center)
-                      .padding({ left: 4, right: 4 })
-                      .backgroundColor(index === this.experienceStepCount() - 1 ?
-                        Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
-                      .borderRadius(Constants.RADIUS_SM)
-                  })
-                }
-                .width('100%')
-              }
-              .width('100%')
-
-              Column({ space: 8 }) {
-                Row({ space: 8 }) {
-                  SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
-                    .fontSize(17)
-                    .fontColor([Constants.COLOR_WARNING])
-                  Text(this.experience.caseTitle)
-                    .fontSize(15)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                }
-                .width('100%')
-                Text(this.experience.caseBody)
-                  .width('100%')
-                  .fontSize(14)
-                  .lineHeight(24)
-                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
-              }
-              .width('100%')
-              .padding(16)
-              .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
-              .borderRadius(Constants.RADIUS_MD)
-
-              Column() {
-                Row() {
-                  Text(this.experience.language)
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                  Text('阅读并预测')
-                    .fontSize(11)
-                    .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
-                }
-                .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
-                .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-
-                Text(this.experience.code)
-                  .width('100%')
-                  .fontSize(13)
-                  .fontFamily('monospace')
-                  .lineHeight(22)
-                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                  .padding({ left: 14, right: 14, bottom: 16 })
-              }
-              .width('100%')
-              .backgroundColor(Constants.COLOR_MAP_CORE)
-              .borderRadius(Constants.RADIUS_MD)
-
-              Column({ space: 10 }) {
-                Text(this.experience.prompt)
-                  .width('100%')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                ForEach(this.experience.options, (option: string, index: number): void => {
-                  Button(option)
-                    .width('100%')
-                    .height(44)
-                    .fontSize(13)
-                    .fontColor(this.selectedPrediction === index ?
-                      Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-                    .backgroundColor(this.selectedPrediction === index ?
-                      (this.predictionIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING) :
-                      Constants.COLOR_BG_TAG)
-                    .borderRadius(Constants.RADIUS_MD)
-                    .onClick((): void => { this.choosePrediction(index); })
-                })
-                if (this.selectedPrediction >= 0) {
-                  Row({ space: 8 }) {
-                    SymbolGlyph(this.predictionIsCorrect() ?
-                      $r('sys.symbol.checkmark_circle_fill') : $r('sys.symbol.xmark_circle_fill'))
-                      .fontSize(18)
-                      .fontColor([this.predictionIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING])
-                    Column({ space: 3 }) {
-                      Text(this.predictionIsCorrect() ? '判断正确，关键步骤已掌握' : '再推演一次，错误也是有效反馈')
-                        .fontSize(13)
-                        .fontWeight(FontWeight.Medium)
-                        .fontColor(this.predictionIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-                      Text(this.experience.explanation)
-                        .fontSize(12)
-                        .lineHeight(20)
-                        .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                    }
-                    .layoutWeight(1)
-                    .alignItems(HorizontalAlign.Start)
-                  }
-                  .width('100%')
-                  .padding(12)
-                  .backgroundColor(this.predictionIsCorrect() ?
-                    Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_SURFACE_TINT)
-                  .borderRadius(Constants.RADIUS_SM)
-                }
-              }
-              .width('100%')
+            if (this.showPracticeExperience()) {
+              this.PracticeExperience()
             }
 
             if (this.contentBeats().length > 1) {
@@ -400,8 +664,7 @@ struct LessonPage {
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => { this.moveTo(this.currentIndex - 1); })
 
-          Button(this.saving ? '保存中...' :
-            (this.currentIndex === this.chunks.length - 1 ? '完成主题并练习' : '学完本节，继续'))
+          Button(this.finalActionLabel())
             .layoutWeight(1)
             .height(48)
             .enabled(!this.saving)

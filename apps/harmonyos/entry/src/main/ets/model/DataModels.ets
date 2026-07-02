@@ -205,18 +205,31 @@ export interface CuratedKnowledgeChunk {
 }
 
 export interface LessonExperience {
+  schemaVersion: number;
   courseId: string;
   topic: string;
   visualTitle: string;
   visualSteps: string[];
   caseTitle: string;
   caseBody: string;
-  language: string;
-  code: string;
+  workedExampleTitle: string;
+  workedExampleSteps: string[];
+  activities: LearningActivity[];
+}
+
+export interface LearningActivity {
+  id: string;
+  type: string;
+  title: string;
   prompt: string;
+  content: string;
+  language: string;
+  interactionMode: string;
   options: string[];
-  answerIndex: number;
-  explanation: string;
+  answerIndexes: number[];
+  answer: string;
+  feedback: string;
+  source: string;
 }
 
 export interface CuratedQuestion {

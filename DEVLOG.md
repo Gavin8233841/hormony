@@ -4887,3 +4887,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 系统 UI 树显示应用内容区位于顶部系统避让区 136px 以下、底部手势避让区 98px 以上。
 - Web TypeScript 通过，Vitest 12 个文件 137 项通过；`entry@default` debug HAP 构建成功；学习体验 JSON 7 项可解析。
 - 视觉证据位于 `screenshots/codex-real-ai-20260701/`；Trae 的 Web 页面、`client-api`、审计文档与资产未纳入本批次。
+
+---
+
+## 2026-07-02 Codex：33 Topic 主动学习全覆盖与真流程交互
+
+### 数据契约与内容复核
+
+- 冻结 `LearningActivity v2`：支持 `single_choice`、`ordered_choice`、`free_response` 三种确定性交互，不执行用户输入的任意代码。
+- 新增生成脚本，将 Trae 三份规格机械转换为 26 个 Topic、52 个活动，并迁移既有 7 个 Topic；端侧最终覆盖 33/33 Topic、59 个活动。
+- 强制校验 Topic 与 `knowledge-chunks.json` 一致、每个新增 Topic 恰有两个活动、排序答案完整、类型枚举合法，并支持重复运行。
+- 复核纠正 Trae 手工统计：52 个新增活动实际为 `code_fill 13 / step_order 16 / state_trace 17 / output_predict 6`；同步修正规格附录与验证报告。
+
+### 端侧学习流程
+
+- Lesson 改为首节展示概念路径和现实案例，末节展示分步示例与主动练习，避免每个知识切片重复同一体验。
+- 代码填空、状态推演和输出预测支持先写答案、再显示标准答案与来源、最后自评；步骤排序支持依次选卡、重置、提交和确定性判分；既有 7 个活动保持单选即时反馈。
+- 未完成全部活动时不允许把 Topic 标为完成；已完成本地进度仍保留，不修改 ArkData schema。
+- 修复切换知识切片时保留旧滚动位置的问题；切片切换回到顶部，进入下一活动时回退一屏，避免内容出现在视口上方。
+- 长代码使用等宽多行块并允许纵向滚动，视觉步骤压缩为短标签；底部操作区继续避让系统手势区域。
+
+### 验证
+
+- `node scripts/generate-learning-activities.mjs`：33/33 Topic、59 个活动通过；新增 52 个活动类型分布与正文一致。
+- DevEco ArkTS Check：`DataModels.ets`、`Lesson.ets` 无诊断。
+- `entry@default` debug HAP 增量构建通过；当前仍为 unsigned HAP，未配置签名。
+- Pura 90 Pro Max 模拟器，竖屏 1260×2720：完成二叉树与 BST 首节概念/案例、末节分步示例、代码填空输入、标准答案、来源、自评和下一练习视觉与交互验收；证据位于 `.tmp/active-learning-v2/`，不提交仓库。
+- `scripts/harmonyos-app-smoke.ps1`：69 PASS、0 FAIL；证据位于 `screenshots/trae-smoke-20260702-121549/`，不提交仓库。
+- Web：ESLint 通过、TypeScript 通过、Vitest 12 个文件 137 项通过、Next.js 生产构建通过。
+- 真机能力本批次未验证；登录、云同步、资料导入、任意代码运行和商业后台均未进入实现范围。
