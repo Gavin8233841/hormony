@@ -14,6 +14,8 @@ export interface LearningTagInsight extends TagInsight {
   mediumQuestions: number;
   hardQuestions: number;
   lastDifficulty: string;
+  lastCourseId?: string;
+  lastTopic?: string;
   weakReason: string;
   nextStep: string;
 }

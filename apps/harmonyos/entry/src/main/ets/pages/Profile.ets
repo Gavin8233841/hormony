@@ -4,6 +4,7 @@
  */
 
 import { Constants } from '../common/Constants';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { UserProfile } from '../model/DataModels';
 import { LearningTagInsight as TagInsight } from '../model/LearningMetadataModels';
@@ -43,6 +44,26 @@ export struct ProfileContent {
     this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ProfileContent page navigation failed: %{public}s', error.message);
+    });
+  }
+
+  private courseTitle(courseId: string): string {
+    if (courseId === 'cs101') return '数据结构';
+    if (courseId === 'cs102') return '操作系统';
+    if (courseId === 'cs103') return '计算机网络';
+    return '课程';
+  }
+
+  private openTagPractice(item: TagInsight): void {
+    if (item.lastCourseId === undefined || item.lastTopic === undefined) return;
+    const topicQuestions = LearningContentRepository.getQuestions(item.lastCourseId, item.lastTopic);
+    const practiceTopic = topicQuestions.length > 0 ? item.lastTopic : '';
+    AppStorage.setOrCreate<string>('selectedCourseId', item.lastCourseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(item.lastCourseId));
+    AppStorage.setOrCreate<string>('selectedPracticeTopic', practiceTopic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ProfileContent tag practice navigation failed: %{public}s', error.message);
     });
   }
 
@@ -120,10 +141,33 @@ export struct ProfileContent {
         .fontSize(11)
         .fontColor(Constants.COLOR_TEXT_TERTIARY)
         .lineHeight(18)
-      Text('下一步：' + item.nextStep)
-        .fontSize(11)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Constants.COLOR_BRAND)
+      Row({ space: 8 }) {
+        Text('下一步：' + item.nextStep)
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND)
+          .layoutWeight(1)
+        if (item.lastCourseId !== undefined && item.lastTopic !== undefined) {
+          Button({ type: ButtonType.Normal }) {
+            Row({ space: 4 }) {
+              SymbolGlyph($r('sys.symbol.book_open_fill'))
+                .fontSize(13)
+                .fontColor([Constants.COLOR_BRAND])
+              Text('去练习')
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_BRAND)
+            }
+          }
+          .height(32)
+          .padding({ left: 10, right: 10 })
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.openTagPractice(item); })
+        }
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
   }

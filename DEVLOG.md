@@ -5158,6 +5158,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-03 Codex 鸿蒙1.13：标签洞察直达练习
+
+背景：继续按外部学习产品和行业 UX 标准自查。NN/g 对 dashboard 的定义强调信息应能快速指导行动；Khan Academy 与 Duolingo 的掌握/强度设计也都把技能状态连接到复习和个性化练习。本批次把画像页标签洞察从“看到薄弱点”推进到“立刻进入关联主题练习”。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/model/LearningMetadataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+
+行为变化：
+- `LearningTagInsight` 增加 `lastCourseId` 和 `lastTopic`，记录标签最近关联的课程和主题。
+- `LocalLearningRepository` schema 升至 9，迁移时重建 `tag_insights`，确保已有聚合能回填最近课程/主题。
+- 标签洞察聚合每次答题后同步更新最近关联课程/主题。
+- Profile 标签洞察行在存在关联主题时显示“去练习”按钮，复用 `selectedCourseId`、`selectedCourseTitle`、`selectedPracticeTopic` 进入 `pages/Practice`，让“下一步”建议变成可执行动作。
+- 进入练习前用 `LearningContentRepository.getQuestions(courseId, topic)` 校验最近主题是否有本地精选题；若无题则进入该课程综合练习，避免 AI 综合测验记录跳转到空主题页。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 149 ms`；补迁移后再次构建 exit 0，`BUILD SUCCESSFUL in 18 s 168 ms`；补主题兜底后再次构建 exit 0，`BUILD SUCCESSFUL in 17 s 145 ms`；收敛迁移重建后最终构建 exit 0，`BUILD SUCCESSFUL in 17 s 94 ms`；仍为 unsigned HAP，签名未配置。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`，安装最终构建的 `apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap` 成功，启动 `com.c4ai.hormony/EntryAbility` 成功。
+- 模拟器 UI：当前本地数据没有保留带标签的 `quiz_results`，Profile 标签洞察显示空态；UI 树 `simple_dump_hormony_20260703001544123.txt` 出现“标签洞察”“完成带标签的练习后，这里会显示能力短板和复习优先级”，证据目录 `.tmp/harmony-1.13-profile-tag-practice/` 不提交仓库。
+
+未验证：
+- 当前模拟器未捕获到带真实标签洞察行的“去练习”按钮截图；需要先完成一次带标签练习形成 `tag_insights` 数据后复验 CTA 可见性。
+- 真机未验证。
+
+---
+
 ## 2026-07-02 Codex 鸿蒙1.13：标签洞察长期聚合
 
 背景：继续复核学习洞察链路。画像页和记录页的薄弱标签虽然来自真实答题记录，但 `getTagInsights()` 仍从最近 20 条 `quiz_results` 即时汇总；长期学习后旧错因和能力标签会随着复盘列表截断而丢失。本批次把标签洞察也改为本地持久聚合。

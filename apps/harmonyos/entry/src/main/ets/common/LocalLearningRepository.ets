@@ -20,7 +20,7 @@ import {
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 8;
+const SCHEMA_VERSION: number = 9;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -117,7 +117,7 @@ export class LocalLearningRepository {
       const stats = await LocalLearningRepository.rebuildQuizStatsAggregate(profile ?? undefined);
       await LocalLearningRepository.putValue<QuizStatsAggregate>(KEY_QUIZ_STATS, stats);
     }
-    if (previousVersion < 8) {
+    if (previousVersion < 9) {
       const insights = await LocalLearningRepository.rebuildTagInsightsFromResults();
       await LocalLearningRepository.putValue<TagInsight[]>(KEY_TAG_INSIGHTS, insights);
     }
@@ -565,6 +565,8 @@ export class LocalLearningRepository {
             mediumQuestions: 0,
             hardQuestions: 0,
             lastDifficulty: detail.difficulty ?? result.difficulty ?? 'medium',
+            lastCourseId: result.courseId,
+            lastTopic: result.topic,
             weakReason: '',
             nextStep: ''
           };
@@ -580,6 +582,8 @@ export class LocalLearningRepository {
         item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
         item.lastPracticedAt = result.submittedAt;
         item.lastDifficulty = difficulty;
+        item.lastCourseId = result.courseId;
+        item.lastTopic = result.topic;
         item.weakReason = LocalLearningRepository.tagWeakReason(item);
         item.nextStep = LocalLearningRepository.tagNextStep(item);
       }
