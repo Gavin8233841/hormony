@@ -32,6 +32,7 @@ struct LessonPage {
   @State responseText: string = '';
   @State feedbackVisible: boolean = false;
   @State attemptedActivityIds: string[] = [];
+  @State codeRunStepIndex: number = -1;
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -77,6 +78,7 @@ struct LessonPage {
     this.selectedIndexes = [];
     this.responseText = '';
     this.feedbackVisible = false;
+    this.codeRunStepIndex = -1;
   }
 
   private experienceStepCount(): number {
@@ -185,6 +187,39 @@ struct LessonPage {
   private activityProgressText(): string {
     if (this.experience === null || this.experience.activities.length === 0) return '无互动练习';
     return this.attemptedActivityIds.length.toString() + '/' + this.experience.activities.length.toString() + ' 已练';
+  }
+
+  private codeRunSteps(activity: LearningActivity): string[] {
+    const contentLines = activity.content
+      .split('\n')
+      .map((line: string): string => line.trim())
+      .filter((line: string): boolean => line.length > 0 && line !== '代码：');
+    const firstLine = contentLines.length > 0 ? contentLines[0] : '题干';
+    const lastLine = contentLines.length > 1 ? contentLines[contentLines.length - 1] : firstLine;
+    const answer = activity.answer.length > 36 ? activity.answer.substring(0, 36) + '…' : activity.answer;
+    return [
+      '入口：从「' + firstLine + '」开始，圈出输入、状态变量和输出位置。',
+      '状态：逐行更新变量或指针，遇到空缺先写下自己的预测，不急着看答案。',
+      '出口：走到「' + lastLine + '」，代入答案「' + answer + '」并检查是否满足题意。'
+    ];
+  }
+
+  private codeRunProgressValue(activity: LearningActivity): number {
+    if (this.codeRunStepIndex < 0) return 0;
+    return Math.min(this.codeRunStepIndex + 1, this.codeRunSteps(activity).length);
+  }
+
+  private codeRunButtonLabel(activity: LearningActivity): string {
+    if (this.codeRunStepIndex < 0) return '运行推演';
+    if (this.codeRunStepIndex < this.codeRunSteps(activity).length - 1) return '下一步';
+    return '已完成推演';
+  }
+
+  private advanceCodeRun(activity: LearningActivity): void {
+    const total = this.codeRunSteps(activity).length;
+    if (this.codeRunStepIndex < total - 1) {
+      this.codeRunStepIndex += 1;
+    }
   }
 
   private async completeCurrent(): Promise<void> {
@@ -313,6 +348,98 @@ struct LessonPage {
     .padding(14)
     .backgroundColor(Constants.COLOR_MAP_SURFACE)
     .borderRadius(Constants.RADIUS_SM)
+  }
+
+  @Builder
+  private CodeRunPanel(activity: LearningActivity) {
+    Column({ space: 10 }) {
+      Row() {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.play_circle_fill'))
+            .fontSize(17)
+            .fontColor([Constants.COLOR_BRAND])
+          Text('代码推演器')
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        }
+        Text('本地状态演算')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Text('不是远程沙盒：它按“入口 → 状态 → 出口”帮你手动运行一遍，先形成预测，再对照答案。')
+        .width('100%')
+        .fontSize(12)
+        .lineHeight(19)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+
+      Progress({
+        value: this.codeRunProgressValue(activity),
+        total: this.codeRunSteps(activity).length,
+        type: ProgressType.Linear
+      })
+        .width('100%')
+        .color(Constants.COLOR_SUCCESS)
+        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+
+      ForEach(this.codeRunSteps(activity), (step: string, index: number): void => {
+        Row({ space: 10 }) {
+          Text((index + 1).toString())
+            .width(24)
+            .height(24)
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(index <= this.codeRunStepIndex ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND)
+            .textAlign(TextAlign.Center)
+            .backgroundColor(index <= this.codeRunStepIndex ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(12)
+          Text(step)
+            .layoutWeight(1)
+            .fontSize(12)
+            .lineHeight(20)
+            .fontColor(index <= this.codeRunStepIndex ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_SECONDARY)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Top)
+      })
+
+      Row({ space: 10 }) {
+        Button('重来')
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(12)
+          .enabled(this.codeRunStepIndex >= 0)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .backgroundColor(Constants.COLOR_BG_TAG)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.codeRunStepIndex = -1; })
+        Button(this.codeRunButtonLabel(activity))
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(12)
+          .enabled(this.codeRunStepIndex < this.codeRunSteps(activity).length - 1)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.advanceCodeRun(activity); })
+      }
+      .width('100%')
+
+      if (this.codeRunStepIndex >= this.codeRunSteps(activity).length - 1) {
+        Text(this.feedbackVisible ? '推演、作答、对照都已完成，这一题形成了可复盘闭环。' : '推演完成：现在作答，再用解析检查自己的状态链。')
+          .width('100%')
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_SUCCESS)
+      }
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+    .borderRadius(Constants.RADIUS_MD)
   }
 
   @Builder
@@ -478,6 +605,7 @@ struct LessonPage {
 
           if (this.activeActivity()!.content.length > 0) {
             this.CodeBlock(this.activeActivity()!)
+            this.CodeRunPanel(this.activeActivity()!)
           }
 
           if (this.activeActivity()!.interactionMode === 'single_choice') {

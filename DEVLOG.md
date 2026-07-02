@@ -5142,3 +5142,26 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 本批次未进行浏览器端手工点击验收，证据等级为静态诊断通过与构建通过。
 - 本批次不修改 Web API 路由、Agent、RAG 或模型配置；线上 Vercel 端点未重新回归。
+
+---
+
+## 2026-07-02 Codex：端侧 Lesson 代码推演反馈
+
+背景：用户要求学习环节不能停留在纯文字阅读，需要类似成熟编程学习产品的“运行/推演/正反馈”环节；本批次复核并采用 Lesson 页的小步代码推演交互，不引入远程沙盒或新依赖。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Lesson.ets
+
+行为变化：
+- Lesson 活动代码块下新增“代码推演器”，按“入口 → 状态 → 出口”三步引导用户手动运行题目中的代码或状态变化。
+- 推演器提供线性进度、步骤编号、下一步/重来按钮和完成文案，让学习页从被动阅读变成可操作反馈。
+- 切换学习切片时重置推演状态，避免上一题进度污染当前题。
+- 明确标注“不是远程沙盒”，不伪造真实代码运行结果；本批次只提供本地认知推演与正反馈。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，BUILD SUCCESSFUL in 4 s 150 ms；仍为 unsigned HAP，签名未配置。
+- HAP 产物检查：`apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap` 的 `ets/modules.abc` 包含“代码推演器”字符串。
+
+未验证：
+- 未进行模拟器 UI 树/截图验收；本批次证据等级为构建通过。
+- 未接入真实代码沙盒或远程执行环境。
