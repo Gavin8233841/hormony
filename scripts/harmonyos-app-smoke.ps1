@@ -402,7 +402,7 @@ if (-not (Verify-Page "pages/LearningMap" "Learning map")) { exit 1 }
 $mapIndex = 12
 foreach ($courseName in @('数据结构', '操作系统', '计算机网络')) {
     if (-not (Click-Element $courseName "Learning map: $courseName")) { exit 1 }
-    if (-not (Verify-TextExists "连线表示真实先修关系" "Learning map graph")) { exit 1 }
+    if (-not (Verify-TextExists "Level 0" "Learning map graph level")) { exit 1 }
     Take-Screenshot (("{0:D2}-learning-map-{1}" -f $mapIndex, $courseName))
     $mapIndex++
 }

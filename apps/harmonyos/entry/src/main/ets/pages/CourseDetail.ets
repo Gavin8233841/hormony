@@ -62,15 +62,6 @@ struct CourseDetailPage {
     });
   }
 
-  private openKnowledge(): void {
-    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
-      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'CourseDetailPage Knowledge navigation failed: %{public}s', err.message);
-    });
-  }
-
   build() {
     Column() {
       GradientHeader(this.courseTitle, this.topics.length.toString() + ' 个知识主题',
@@ -99,14 +90,6 @@ struct CourseDetailPage {
               .width('100%')
               .fontSize(11)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            Button('搜课程资料')
-              .width('100%')
-              .height(42)
-              .fontSize(13)
-              .fontColor(Constants.COLOR_BRAND)
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(Constants.RADIUS_MD)
-              .onClick((): void => { this.openKnowledge(); })
           }
           .width('100%')
           .padding(18)
@@ -149,19 +132,27 @@ struct CourseDetailPage {
                 .width('100%')
 
                 Row({ space: 10 }) {
-                  Button('学习内容')
+                  Column() {
+                    Text('学习内容')
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_BRAND)
+                  }
                     .layoutWeight(1)
                     .height(40)
-                    .fontSize(13)
-                    .fontColor(Constants.COLOR_BRAND)
+                    .justifyContent(FlexAlign.Center)
                     .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                     .borderRadius(Constants.RADIUS_MD)
                     .onClick((): void => { this.openTopic(topic); })
-                  Button('精选练习')
+                  Column() {
+                    Text('精选练习')
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  }
                     .layoutWeight(1)
                     .height(40)
-                    .fontSize(13)
-                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                    .justifyContent(FlexAlign.Center)
                     .backgroundColor(Constants.COLOR_BRAND)
                     .borderRadius(Constants.RADIUS_MD)
                     .onClick((): void => { this.openPractice(topic); })

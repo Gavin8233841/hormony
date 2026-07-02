@@ -5043,3 +5043,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - DevEco MCP ArkTS Check 本轮返回管道关闭，未作为有效诊断证据；以 hvigor `CompileArkTS` 通过作为静态构建证据。
 - 生产 Vercel 尚未部署本地 Web 改动，因此模拟器线上生成的计划未显示本批次新增 `agentTrace`；本批次只证明旧生产端点仍能生成计划。
 - 真机能力仍未验证：Lottie 渲染、OCR、TTS、distributedKVStore。
+
+---
+
+## 2026-07-02 Codex：端侧掌握型学习体验与冒烟脚本复核
+
+背景：用户要求继续向真实可用学习产品推进，避免纯文字阅读和无反馈操作；本批次聚焦课程学习页，让端侧学习从正文阅读升级为掌握标准、概念抓手、分步示例和主动练习闭环，并复核 Trae 冒烟脚本。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Lesson.ets
+- apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets
+- scripts/harmonyos-app-smoke.ps1
+
+行为变化：
+- Lesson 页顶部新增“本节掌握标准”，明确学完后能做什么、当前目标、学习方法、反馈路径和互动练习进度。
+- 课程内容正文切分兼容中文分号，减少长段堆叠。
+- 互动活动新增代码阅读容器，限制代码区高度并保留滚动，方便阅读代码/状态推演。
+- 选择题和排序题选项改为多行可读排版，长选项不再挤成单行；自由作答输入区加高。
+- CourseDetail 移除顶部“搜课程资料”入口，课程详情页只保留“学习内容”和“精选练习”两条学习动作，减少误触和分心。
+- 冒烟脚本学习星图断言从已删除旧文案改为稳定的 `Level 0` 图谱层级校验，避免不同课程图例是否在首屏内导致误失败。
+
+验证：
+- DevEco MCP ArkTS Check：返回管道关闭，未作为有效诊断证据。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 11 s 763 ms`；后续脚本内增量构建 exit 0，`BUILD SUCCESSFUL in 2 s 781 ms`。
+- HAP 产物复核：旧路径 `entry/build/default/outputs/default/app/entry-default.hap` 时间戳为 2026-07-01，未包含 `本节掌握标准`；正确安装路径为 `entry/build/default/outputs/default/entry-default-unsigned.hap`，HAP 内包含 `pages/Lesson`、`本节掌握标准` 和课程详情 Lesson 导航字符串。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`，安装 `entry-default-unsigned.hap` 成功，启动 `com.c4ai.hormony/EntryAbility` 成功。
+- 手工视觉验收：课程 Tab → 数据结构 → 进入课程 → 第一主题“学习内容”进入 Lesson，UI 树出现“精选课程内容”“本节掌握标准”“0/1 已练”“目标”“方法”“反馈”“先抓住核心”；第 4 段出现“主动练习 · 输出预测”和“阅读后再作答”。
+- CLI 冒烟：`.\scripts\harmonyos-app-smoke.ps1` exit 0，69 passed / 0 failed；截图目录 `screenshots/trae-smoke-20260702-215502`，不提交仓库。
+
+未验证：
+- 真机未验证。
+- 本批次未新增代码真实运行沙盒，互动练习仍为阅读、预测、选择和自评。
+- Trae 的题库、内容审计和资源文档仍需逐项复核后再采用提交。

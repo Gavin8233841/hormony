@@ -160,10 +160,31 @@ struct LessonPage {
 
   private contentBeats(): string[] {
     return this.activeChunk.text
+      .replace(/；/g, '。')
       .split('。')
       .map((sentence: string): string => sentence.trim())
       .filter((sentence: string): boolean => sentence.length > 0)
       .map((sentence: string): string => sentence + '。');
+  }
+
+  private masteryGoal(): string {
+    if (this.experience !== null && this.experience.visualSteps.length > 0) {
+      const first = this.experience.visualSteps[0];
+      const last = this.experience.visualSteps[this.experience.visualSteps.length - 1];
+      return '学完后能把「' + first + ' → ' + last + '」讲清楚，并完成一次主动练习。';
+    }
+    return '学完后能用自己的话解释本节核心点，并进入练习验证。';
+  }
+
+  private currentLearningFocus(): string {
+    if (this.showIntroExperience()) return '先建立概念图，再用现实案例落地。';
+    if (this.showPracticeExperience()) return '看一遍分步示例，再亲手做题验证。';
+    return '把正文拆成判断点，逐条确认自己是否能复述。';
+  }
+
+  private activityProgressText(): string {
+    if (this.experience === null || this.experience.activities.length === 0) return '无互动练习';
+    return this.attemptedActivityIds.length.toString() + '/' + this.experience.activities.length.toString() + ' 已练';
   }
 
   private async completeCurrent(): Promise<void> {
@@ -203,6 +224,125 @@ struct LessonPage {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'LessonPage Practice navigation failed: %{public}s', error.message);
     });
+  }
+
+  @Builder
+  private MasteryBrief() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('本节掌握标准')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_BRAND)
+        Text(this.activityProgressText())
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Text(this.masteryGoal())
+        .width('100%')
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .lineHeight(28)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+
+      Row({ space: 8 }) {
+        this.MasterySignal('目标', this.topic.length > 0 ? this.topic : this.courseTitle)
+        this.MasterySignal('方法', this.currentLearningFocus())
+        this.MasterySignal('反馈', this.showPracticeExperience() ? '做完练习后进题组' : '完成本节后继续')
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
+  }
+
+  @Builder
+  private MasterySignal(label: string, value: string) {
+    Column({ space: 4 }) {
+      Text(label)
+        .fontSize(10)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Text(value)
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        .lineHeight(18)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .layoutWeight(1)
+    .constraintSize({ minHeight: 62 })
+    .padding({ left: 10, right: 10, top: 9, bottom: 9 })
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_SM)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private CodeBlock(activity: LearningActivity) {
+    Column({ space: 8 }) {
+      Row() {
+        Text(activity.language.length > 0 ? activity.language : 'code')
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+        Text('阅读后再作答')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      Scroll() {
+        Text(activity.content)
+          .width('100%')
+          .fontSize(12)
+          .fontFamily('monospace')
+          .lineHeight(20)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+      }
+      .width('100%')
+      .constraintSize({ maxHeight: 220 })
+      .scrollBar(BarState.Auto)
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(Constants.COLOR_MAP_SURFACE)
+    .borderRadius(Constants.RADIUS_SM)
+  }
+
+  @Builder
+  private ActivityOption(option: string, index: number, ordered: boolean) {
+    Button({ type: ButtonType.Normal }) {
+      Text((ordered && this.selectedIndexes.includes(index) ?
+        (this.selectedIndexes.indexOf(index) + 1).toString() + '. ' : '') + option)
+        .width('100%')
+        .fontSize(13)
+        .lineHeight(20)
+        .fontColor(this.selectedIndexes.includes(index) ?
+          Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+        .textAlign(TextAlign.Start)
+        .maxLines(4)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .constraintSize({ minHeight: 48 })
+    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+    .backgroundColor(this.selectedIndexes.includes(index) ?
+      (ordered ? Constants.COLOR_BRAND : (this.activityIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)) :
+      Constants.COLOR_BG_TAG)
+    .borderRadius(Constants.RADIUS_MD)
+    .onClick((): void => {
+      if (ordered) {
+        this.chooseOrderStep(index);
+      } else {
+        this.chooseSingle(index);
+      }
+    })
   }
 
   @Builder
@@ -337,52 +477,16 @@ struct LessonPage {
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
           if (this.activeActivity()!.content.length > 0) {
-            Column({ space: 8 }) {
-              Text(this.activeActivity()!.language)
-                .width('100%')
-                .fontSize(11)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
-              Text(this.activeActivity()!.content)
-                .width('100%')
-                .fontSize(12)
-                .fontFamily('monospace')
-                .lineHeight(20)
-                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            }
-            .width('100%')
-            .padding(14)
-            .backgroundColor(Constants.COLOR_MAP_CORE)
-            .borderRadius(Constants.RADIUS_SM)
+            this.CodeBlock(this.activeActivity()!)
           }
 
           if (this.activeActivity()!.interactionMode === 'single_choice') {
             ForEach(this.activeActivity()!.options, (option: string, index: number): void => {
-              Button(option)
-                .width('100%')
-                .constraintSize({ minHeight: 48 })
-                .fontSize(13)
-                .fontColor(this.selectedIndexes.includes(index) ?
-                  Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-                .backgroundColor(this.selectedIndexes.includes(index) ?
-                  (this.activityIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING) :
-                  Constants.COLOR_BG_TAG)
-                .borderRadius(Constants.RADIUS_MD)
-                .onClick((): void => { this.chooseSingle(index); })
+              this.ActivityOption(option, index, false)
             })
           } else if (this.activeActivity()!.interactionMode === 'ordered_choice') {
             ForEach(this.activeActivity()!.options, (option: string, index: number): void => {
-              Button((this.selectedIndexes.includes(index) ?
-                (this.selectedIndexes.indexOf(index) + 1).toString() + '. ' : '') + option)
-                .width('100%')
-                .constraintSize({ minHeight: 48 })
-                .fontSize(13)
-                .fontColor(this.selectedIndexes.includes(index) ?
-                  Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-                .backgroundColor(this.selectedIndexes.includes(index) ?
-                  Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
-                .borderRadius(Constants.RADIUS_MD)
-                .onClick((): void => { this.chooseOrderStep(index); })
+              this.ActivityOption(option, index, true)
             })
             Row({ space: 10 }) {
               Button('重置顺序')
@@ -407,7 +511,7 @@ struct LessonPage {
           } else {
             TextArea({ placeholder: '先写下你的答案或推演过程', text: this.responseText })
               .width('100%')
-              .height(116)
+              .height(132)
               .fontSize(14)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
               .backgroundColor(Constants.COLOR_SURFACE_TINT)
@@ -547,6 +651,8 @@ struct LessonPage {
 
         Scroll(this.contentScroller) {
           Column({ space: 24 }) {
+            this.MasteryBrief()
+
             Column({ space: 12 }) {
               Row({ space: 8 }) {
                 SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
