@@ -5462,3 +5462,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未进行模拟器 UI 树/截图验收，无法标记为模拟器通过；本批次证据等级为构建通过。
 - 横屏、平板、折叠屏、真机刘海和手势导航仍需后续 UI 证据。
+
+---
+
+## 2026-07-03 Codex：收紧端侧 AI 测验评分并补齐学习闭环入口
+
+背景：用户要求继续向真实可用推进，不做浅层换色。复核鸿蒙1.11 学习闭环分支后，确认该分支不能整包合入当前 `main`，否则会回退安全区、1.12 Web AI 可靠性、1.13 标签洞察与 1.14 资源文档成果；本批次只手工摘取端侧学习闭环与 AI 测验评分校验中仍缺失的部分。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+
+行为变化：
+- HarmonyOS 端 Quiz 数据模型补齐 `difficulty` 字段，与 Web 端题组和端侧标签洞察链路保持一致。
+- AI 测验页新增云端题组结构校验：`quizId`、题目 ID、题型、题干、A-D 四选项、评分答案、解析、题目与评分 ID 一一匹配后才进入答题。
+- 提交 AI 测验前要求全部题目已作答，且评分数据完整；缺失 grading、重复 ID、非法答案或空解析时不写入本地学习画像，提示用户重新生成题组。
+- 课程详情页新增“主题学习闭环”说明和每个 Topic 的“AI 测验”入口，形成“学习 → 精选练习 → AI 标签复盘”的路线。
+- 精选练习结果页新增“进入 AI 测验”入口，把离线精选题组复盘继续接到云端分层测验。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：首次 exit 1，`Practice.ets` 新增 `hilog` 调用但缺少 import，已修复。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 17 s 647 ms`；仍提示未配置 signingConfigs。
+
+未验证：
+- 本批次尚未执行模拟器 UI 树/截图验收，课程详情与精选练习到 AI 测验的点击流仍为构建通过，未标记模拟器通过。
+- 生产 Vercel 与 HarmonyOS 端真实 AI 出题在线链路未重新验收。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

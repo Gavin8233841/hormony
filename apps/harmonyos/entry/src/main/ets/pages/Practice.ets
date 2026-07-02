@@ -3,6 +3,7 @@ import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   LearningCuratedQuestion as CuratedQuestion,
   LearningQuizResult as QuizResult,
@@ -93,6 +94,16 @@ struct PracticePage {
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';
+    });
+  }
+
+  private openQuiz(): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic.length > 0 ? this.topic : '综合');
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'PracticePage Quiz navigation failed: %{public}s', err.message);
     });
   }
 
@@ -332,13 +343,23 @@ struct PracticePage {
       .width('100%')
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
-      Button('返回课程')
+      Row({ space: 10 }) {
+        Button('返回课程')
+          .layoutWeight(1)
+          .height(48)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.getUIContext().getRouter().back(); })
+        Button('进入 AI 测验')
+          .layoutWeight(1)
+          .height(48)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.openQuiz(); })
+      }
         .width('100%')
-        .height(48)
-        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-        .backgroundColor(Constants.COLOR_BRAND)
-        .borderRadius(Constants.RADIUS_MD)
-        .onClick((): void => { this.getUIContext().getRouter().back(); })
     }
     .width('100%')
   }

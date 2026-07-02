@@ -63,6 +63,51 @@ struct CourseDetailPage {
     });
   }
 
+  private openQuiz(topic: string): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'CourseDetailPage Quiz navigation failed: %{public}s', err.message);
+    });
+  }
+
+  private topicStatusLabel(topic: string): string {
+    return this.completedTopics.includes(topic) ? '有学习记录' : '待掌握';
+  }
+
+  @Builder
+  private LoopStep(order: string, title: string, description: string, active: boolean) {
+    Column({ space: 5 }) {
+      Text(order)
+        .width(26)
+        .height(26)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(active ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(active ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(13)
+      Text(title)
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      Text(description)
+        .fontSize(10)
+        .lineHeight(15)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        .textAlign(TextAlign.Center)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .layoutWeight(1)
+    .constraintSize({ minHeight: 76 })
+    .padding({ left: 6, right: 6, top: 8, bottom: 8 })
+    .backgroundColor(active ? Constants.COLOR_SURFACE_TINT : Constants.COLOR_BG_TAG)
+    .borderRadius(Constants.RADIUS_MD)
+  }
+
   build() {
     Column() {
       GradientHeader(this.courseTitle, this.topics.length.toString() + ' 个知识主题',
@@ -94,6 +139,34 @@ struct CourseDetailPage {
           }
           .width('100%')
           .padding(18)
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .borderRadius(Constants.RADIUS_LG)
+
+          Column({ space: 12 }) {
+            Column({ space: 4 }) {
+              Text('主题学习闭环')
+                .width('100%')
+                .fontSize(16)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              Text('每个主题都按“读懂核心 → 做精选题 → AI 测验复盘”推进')
+                .width('100%')
+                .fontSize(12)
+                .lineHeight(19)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+
+            Row({ space: 8 }) {
+              this.LoopStep('1', '学习', '概念与案例', true)
+              this.LoopStep('2', '练习', '离线即时评分', false)
+              this.LoopStep('3', '测验', 'AI 标签复盘', false)
+            }
+            .width('100%')
+          }
+          .width('100%')
+          .padding(16)
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(Constants.RADIUS_LG)
 
@@ -129,18 +202,25 @@ struct CourseDetailPage {
                   }
                   .layoutWeight(1)
                   .alignItems(HorizontalAlign.Start)
+                  Text(this.topicStatusLabel(topic))
+                    .fontSize(11)
+                    .fontColor(this.completedTopics.includes(topic) ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+                    .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+                    .backgroundColor(this.completedTopics.includes(topic) ?
+                      Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BRAND_LIGHT)
+                    .borderRadius(Constants.RADIUS_SM)
                 }
                 .width('100%')
 
                 Row({ space: 10 }) {
                   Column() {
-                    Text('学习内容')
+                    Text('学习')
                       .fontSize(13)
                       .fontWeight(FontWeight.Medium)
                       .fontColor(Constants.COLOR_BRAND)
                   }
                     .layoutWeight(1)
-                    .height(40)
+                    .height(44)
                     .justifyContent(FlexAlign.Center)
                     .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                     .borderRadius(Constants.RADIUS_MD)
@@ -149,14 +229,26 @@ struct CourseDetailPage {
                     Text('精选练习')
                       .fontSize(13)
                       .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  }
+                    .layoutWeight(1)
+                    .height(44)
+                    .justifyContent(FlexAlign.Center)
+                    .backgroundColor(Constants.COLOR_BG_TAG)
+                    .borderRadius(Constants.RADIUS_MD)
+                    .onClick((): void => { this.openPractice(topic); })
+                  Column() {
+                    Text('AI 测验')
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Medium)
                       .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   }
                     .layoutWeight(1)
-                    .height(40)
+                    .height(44)
                     .justifyContent(FlexAlign.Center)
                     .backgroundColor(Constants.COLOR_BRAND)
                     .borderRadius(Constants.RADIUS_MD)
-                    .onClick((): void => { this.openPractice(topic); })
+                    .onClick((): void => { this.openQuiz(topic); })
                 }
                 .width('100%')
               }

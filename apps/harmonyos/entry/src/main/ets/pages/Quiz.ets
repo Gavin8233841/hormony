@@ -25,6 +25,14 @@ interface DifficultyOption {
   description: string;
 }
 
+interface QuizValidationResult {
+  valid: boolean;
+  message: string;
+  quizId: string;
+  questions: QuizQuestionView[];
+  grading: QuizGradingItem[];
+}
+
 @Entry
 @Component
 struct QuizPage {
@@ -49,6 +57,7 @@ struct QuizPage {
   @State weakTopics: string[] = [];
   @State progressStep: number = 0;
   private grading: QuizGradingItem[] = [];
+  private answerLabels: string[] = ['A', 'B', 'C', 'D'];
   private suggestions: string[] = ['二叉树与BST', '图的遍历', '动态规划'];
   private difficultyOptions: DifficultyOption[] = [
     { value: 'easy', label: '基础', description: '概念识别' },
@@ -146,16 +155,17 @@ struct QuizPage {
         JSON.stringify(request)
       );
       this.progressStep = 2;
-      if (!Array.isArray(response.questions) || !Array.isArray(response.grading) ||
-        response.questions.length === 0 || response.questions.length !== response.grading.length) {
-        throw new Error('Invalid quiz response');
+      const validation = this.validateQuizPackage(response);
+      if (!validation.valid) {
+        this.message = validation.message;
+        return;
       }
-      const nextAnswers = new Array<string>(response.questions.length).fill('');
-      this.quizId = response.quizId;
-      this.grading = response.grading;
+      const nextAnswers = new Array<string>(validation.questions.length).fill('');
+      this.quizId = validation.quizId;
+      this.grading = validation.grading;
       // 先提交答案槽位，最后提交题目，避免 ArkUI 在两次状态更新之间读取未初始化答案。
       this.answers = nextAnswers;
-      this.questions = response.questions;
+      this.questions = validation.questions;
       if (this.questions.length === 0) {
         this.message = '当前主题暂时没有可用题目';
       }
@@ -170,6 +180,14 @@ struct QuizPage {
 
   async submitQuiz(): Promise<void> {
     if (this.submitting || this.quizId.length === 0) return;
+    if (!this.allQuestionsAnswered()) {
+      this.message = '请先完成全部题目';
+      return;
+    }
+    if (!this.quizCanBeScored()) {
+      this.message = '题目评分数据不完整，请重新生成题组';
+      return;
+    }
     this.submitting = true;
     this.progressStep = 1;
     this.message = '';
@@ -177,7 +195,12 @@ struct QuizPage {
     let correctCount = 0;
     for (let i = 0; i < this.questions.length; i++) {
       const question = this.questions[i];
-      const grading = this.findGrading(question.id);
+      const grading = this.gradingForQuestion(question.id);
+      if (grading === null) {
+        this.message = '题目评分数据不完整，请重新生成题组';
+        this.submitting = false;
+        return;
+      }
       const userAnswer = this.answers[i] ?? '';
       const isCorrect = this.answerLetter(userAnswer) === grading.answer.trim().toUpperCase();
       if (isCorrect) correctCount += 1;
@@ -229,11 +252,153 @@ struct QuizPage {
     }
   }
 
-  private findGrading(questionId: string): QuizGradingItem {
-    for (const item of this.grading) {
-      if (item.questionId === questionId) return item;
+  private validateQuizPackage(response: QuizPackage | null): QuizValidationResult {
+    const invalidMessage = '云端返回的题组不完整，请重新生成';
+    const invalid: QuizValidationResult = {
+      valid: false,
+      message: invalidMessage,
+      quizId: '',
+      questions: [],
+      grading: []
+    };
+    if (response === null) return invalid;
+    const quizId = this.cleanText(response.quizId);
+    if (quizId.length === 0 || !Array.isArray(response.questions) || !Array.isArray(response.grading) ||
+      response.questions.length === 0 || response.questions.length !== response.grading.length) {
+      return invalid;
     }
-    return { questionId: questionId, answer: '', explanation: '暂无解析' };
+
+    const questionIds: string[] = [];
+    const questions: QuizQuestionView[] = [];
+    for (const source of response.questions) {
+      const id = this.cleanText(source.id);
+      const type = this.cleanText(source.type);
+      const stem = this.cleanText(source.stem);
+      const options = this.validatedOptions(source.options);
+      if (id.length === 0 || questionIds.includes(id) || type !== 'choice' || stem.length === 0 ||
+        options.length !== this.answerLabels.length) {
+        return invalid;
+      }
+      questionIds.push(id);
+      questions.push({
+        id: id,
+        type: type,
+        stem: stem,
+        options: options,
+        difficulty: this.quizDifficulty(source.difficulty) ?? this.difficulty,
+        tags: this.quizTags(source.tags)
+      });
+    }
+
+    const gradingIds: string[] = [];
+    const grading: QuizGradingItem[] = [];
+    for (const source of response.grading) {
+      const questionId = this.cleanText(source.questionId);
+      const answer = this.cleanText(source.answer).toUpperCase();
+      const explanation = this.cleanText(source.explanation);
+      if (questionId.length === 0 || !questionIds.includes(questionId) || gradingIds.includes(questionId) ||
+        !this.answerIsValid(answer) || explanation.length === 0) {
+        return invalid;
+      }
+      gradingIds.push(questionId);
+      grading.push({
+        questionId: questionId,
+        answer: answer,
+        explanation: explanation,
+        difficulty: this.quizDifficulty(source.difficulty) ?? this.difficulty,
+        tags: this.quizTags(source.tags)
+      });
+    }
+
+    if (gradingIds.length !== questionIds.length) return invalid;
+    return {
+      valid: true,
+      message: '',
+      quizId: quizId,
+      questions: questions,
+      grading: grading
+    };
+  }
+
+  private cleanText(value?: string): string {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private quizTags(tags?: string[]): string[] {
+    const nextTags: string[] = [];
+    const source = Array.isArray(tags) ? tags : [];
+    for (const tag of source) {
+      if (typeof tag !== 'string') continue;
+      const normalized = tag.trim();
+      if (normalized.length > 0 && normalized.length <= 12 && !nextTags.includes(normalized)) {
+        nextTags.push(normalized);
+      }
+    }
+    if (nextTags.length > 0) return nextTags.slice(0, 3);
+    const topicTag = this.topic.trim().substring(0, 12);
+    return [topicTag.length > 0 ? topicTag : '综合'];
+  }
+
+  private quizDifficulty(value?: string): string | undefined {
+    const normalized = this.cleanText(value);
+    if (normalized === 'easy' || normalized === 'medium' || normalized === 'hard') return normalized;
+    return undefined;
+  }
+
+  private validatedOptions(options?: string[]): string[] {
+    if (!Array.isArray(options) || options.length !== this.answerLabels.length) return [];
+    const normalizedOptions: string[] = [];
+    for (let index = 0; index < options.length; index++) {
+      const option = options[index];
+      if (typeof option !== 'string') return [];
+      const normalized = option.trim();
+      if (normalized.length === 0 ||
+        !normalized.toUpperCase().startsWith(this.answerLabels[index] + '.')) {
+        return [];
+      }
+      normalizedOptions.push(normalized);
+    }
+    return normalizedOptions;
+  }
+
+  private answerIsValid(answer: string): boolean {
+    return this.answerLabels.includes(answer.trim().toUpperCase());
+  }
+
+  private allQuestionsAnswered(): boolean {
+    if (this.questions.length === 0 || this.answers.length !== this.questions.length) return false;
+    for (const answer of this.answers) {
+      if (!this.answerIsValid(this.answerLetter(answer))) return false;
+    }
+    return true;
+  }
+
+  private quizCanBeScored(): boolean {
+    if (this.quizId.trim().length === 0 || this.questions.length === 0 ||
+      this.grading.length !== this.questions.length) {
+      return false;
+    }
+    const questionIds: string[] = [];
+    for (const question of this.questions) {
+      const id = this.cleanText(question.id);
+      if (id.length === 0 || questionIds.includes(id) ||
+        this.validatedOptions(question.options).length !== this.answerLabels.length ||
+        this.gradingForQuestion(id) === null) {
+        return false;
+      }
+      questionIds.push(id);
+    }
+    return true;
+  }
+
+  private gradingForQuestion(questionId: string): QuizGradingItem | null {
+    for (const item of this.grading) {
+      if (item.questionId === questionId && this.answerIsValid(item.answer) &&
+        item.explanation.trim().length > 0) {
+        return item;
+      }
+    }
+    return null;
   }
 
   private answerLetter(answer: string): string {

@@ -83,6 +83,7 @@ export interface QuizQuestionView {
   type: string;
   stem: string;
   options?: string[];
+  difficulty?: string;
   tags?: string[];
 }
 
@@ -97,6 +98,7 @@ export interface QuizGradingItem {
   questionId: string;
   answer: string;
   explanation: string;
+  difficulty?: string;
   tags?: string[];
 }
 
