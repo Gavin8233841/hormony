@@ -7,7 +7,7 @@
 import http from '@ohos.net.http';
 import { util } from '@kit.ArkTS';
 import { Constants } from './Constants';
-import { StreamEvent } from '../model/DataModels';
+import { HealthResponse, StreamEvent } from '../model/DataModels';
 
 export class HttpClient {
   /**
@@ -45,6 +45,50 @@ export class HttpClient {
         httpRequest.destroy();
       }
     }
+    throw lastNetworkError;
+  }
+
+  /**
+   * 健康探测只用于判断云端学伴是否可用，使用更短 readTimeout，避免启动和进入学伴页时长时间等待。
+   * 503 degraded 响应包含结构化 JSON；若后续 base URL 不可用，返回最后一次 degraded 状态。
+   */
+  static async getHealth(): Promise<HealthResponse> {
+    let lastNetworkError: Error = new Error('Network request failed');
+    let degradedResponse: HealthResponse | null = null;
+    for (const baseUrl of Constants.API_BASE_URLS) {
+      const httpRequest = http.createHttp();
+      try {
+        const response = await httpRequest.request(baseUrl + Constants.API_HEALTH, {
+          method: http.RequestMethod.GET,
+          header: { 'Content-Type': 'application/json' },
+          connectTimeout: Constants.CONNECT_TIMEOUT,
+          readTimeout: Constants.HEALTH_REQUEST_TIMEOUT,
+          expectDataType: http.HttpDataType.STRING,
+        });
+        const result = response.result;
+        if (typeof result !== 'string') {
+          throw new Error('Response is not a string');
+        }
+        const parsed: HealthResponse = JSON.parse(result);
+        if (response.responseCode === 200) {
+          return parsed;
+        }
+        if (response.responseCode === 503) {
+          degradedResponse = parsed;
+          continue;
+        }
+        throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error('Network request failed');
+        if (error.message === 'Response is not a string' || error.name === 'SyntaxError') {
+          throw error;
+        }
+        lastNetworkError = error;
+      } finally {
+        httpRequest.destroy();
+      }
+    }
+    if (degradedResponse !== null) return degradedResponse;
     throw lastNetworkError;
   }
 

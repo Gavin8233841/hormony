@@ -29,6 +29,7 @@ export class Constants {
   // 请求超时（毫秒）
   static readonly REQUEST_TIMEOUT: number = 30000;
   static readonly CONNECT_TIMEOUT: number = 8000;
+  static readonly HEALTH_REQUEST_TIMEOUT: number = 5000;
   static readonly MODEL_REQUEST_TIMEOUT: number = 120000;
   // SSE 流式请求超时（毫秒）——多 Agent 编排可能需要 30-40s，设 90s 留足余量
   static readonly SSE_TIMEOUT: number = 90000;

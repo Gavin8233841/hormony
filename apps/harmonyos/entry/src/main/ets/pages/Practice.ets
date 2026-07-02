@@ -17,6 +17,7 @@ const EMPTY_QUESTION: CuratedQuestion = {
 @Entry
 @Component
 struct PracticePage {
+  private practiceScroller: Scroller = new Scroller();
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '';
@@ -98,6 +99,14 @@ struct PracticePage {
 
   private allAnswered(): boolean {
     return this.answers.length > 0 && this.answers.every((answer: string): boolean => answer.length > 0);
+  }
+
+  private moveToQuestion(index: number): void {
+    if (index < 0 || index >= this.questions.length) return;
+    this.currentIndex = index;
+    this.activeQuestion = this.questions[this.currentIndex];
+    this.activeAnswer = this.answers[this.currentIndex] ?? '';
+    this.practiceScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
   }
 
   private async submit(): Promise<void> {
@@ -194,9 +203,7 @@ struct PracticePage {
           .backgroundColor(Constants.COLOR_BG_TAG)
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => {
-            this.currentIndex -= 1;
-            this.activeQuestion = this.questions[this.currentIndex];
-            this.activeAnswer = this.answers[this.currentIndex] ?? '';
+            this.moveToQuestion(this.currentIndex - 1);
           })
         if (this.currentIndex < this.questions.length - 1) {
           Button('下一题')
@@ -207,9 +214,7 @@ struct PracticePage {
             .backgroundColor(this.activeAnswer.length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => {
-              this.currentIndex += 1;
-              this.activeQuestion = this.questions[this.currentIndex];
-              this.activeAnswer = this.answers[this.currentIndex] ?? '';
+              this.moveToQuestion(this.currentIndex + 1);
             })
         } else {
           Button(this.saving ? '保存中...' : '提交评分')
@@ -301,7 +306,7 @@ struct PracticePage {
       if (this.message.length > 0) {
         Text(this.message).fontSize(12).fontColor(Constants.COLOR_ERROR).padding({ bottom: 8 })
       }
-      Scroll() {
+      Scroll(this.practiceScroller) {
         Column() {
           if (this.questions.length === 0) {
             Text('该主题暂无精选练习题')

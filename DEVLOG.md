@@ -5194,3 +5194,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未做真机验证和 DevEco Profiler 性能采样；本批次性能收益数值仍未验证。
 - 全量冒烟脚本未完成到最后，练习第 5 题可见性问题需单独排查脚本鲁棒性或本地练习状态影响。
 - Chat 长回答的掉帧、最终文本一致性、引用展开和真实 SSE 线上链路未做端到端测量。
+
+---
+
+## 2026-07-02 Codex：鸿蒙1.12 健康探测与练习切题稳定性
+
+背景：继续只围绕 HarmonyOS 端侧 App 推进。上一轮全量冒烟卡在练习第 5 题看不到 `A.` 选项；同时源码审计确认健康探测使用普通 GET 的 30 秒读取超时，会放大启动和进入学伴页时的等待。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/Constants.ets
+- apps/harmonyos/entry/src/main/ets/common/HttpClient.ets
+- apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets
+- apps/harmonyos/entry/src/main/ets/pages/Practice.ets
+
+行为变化：
+- 新增 `HEALTH_REQUEST_TIMEOUT = 5000`，健康探测不再沿用普通 GET 的 30 秒读取超时。
+- `HttpClient.getHealth()` 使用短超时请求 `/api/health`；HTTP 200 直接返回 ready 状态，HTTP 503 会保留结构化 degraded 响应并继续尝试后续 base URL，后续不可用时返回 degraded 状态。
+- EntryAbility 与 Chat 页统一调用 `HttpClient.getHealth()`，避免健康探测路径散落到泛型 GET 调用里。
+- Practice 页为外层 Scroll 增加 `practiceScroller`，上一题 / 下一题统一走 `moveToQuestion()`，切题后滚动回顶部，避免上一题底部滚动位置带到下一题导致题干和选项不可见。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 20 s 414 ms`。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；本轮已通过此前失败点，5 道精选练习全部完成并提交评分，随后通过错题追问、学伴页、画像页、学习记录、错题本、成就、学习星图数据结构与操作系统截图；最终在学习星图点击“计算机网络”后未找到 `Level 0` 退出。截图证据位于 `screenshots/trae-smoke-20260702-235725/`，不提交。
+- 数据源核验：`topic-relations.json` 中 `cs103_osi_model` 明确为 `courseId: cs103` 且 `level: 0`，因此最终失败不是缺少计算机网络 Level 0 数据。
+
+未验证：
+- 真机未验证。
+- 健康探测短超时的线上请求次数与耗时未用网关日志或 Profiler 量化。
+- 学习星图第三门课程的全量脚本失败仍需单独排查是 UI 等待、滚动位置还是点击目标选择问题。

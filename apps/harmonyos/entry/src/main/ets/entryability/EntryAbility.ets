@@ -8,7 +8,6 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { HttpClient } from '../common/HttpClient';
-import { HealthResponse } from '../model/DataModels';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { Course } from '../model/DataModels';
 
@@ -57,7 +56,7 @@ export default class EntryAbility extends UIAbility {
   private async probeCloudAgent(): Promise<void> {
     AppStorage.setOrCreate<boolean>('cloudAgentReady', false);
     try {
-      const health = await HttpClient.get<HealthResponse>(Constants.API_HEALTH);
+      const health = await HttpClient.getHealth();
       AppStorage.setOrCreate<boolean>('cloudAgentReady', health.status === 'ready');
       AppStorage.setOrCreate<number>('cloudAgentCheckedAt', Date.now());
     } catch (error) {

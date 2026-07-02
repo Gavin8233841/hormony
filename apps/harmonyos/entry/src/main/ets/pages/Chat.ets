@@ -6,7 +6,7 @@
 import http from '@ohos.net.http';
 import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Citation, StreamEvent, ChatRequest, ChatMessage, HealthResponse } from '../model/DataModels';
+import { Citation, StreamEvent, ChatRequest, ChatMessage } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 interface DisplayMessage {
@@ -161,7 +161,7 @@ export struct ChatContent {
     this.probing = true;
     this.serviceMessage = '正在连接云端学伴';
     try {
-      const health = await HttpClient.get<HealthResponse>(Constants.API_HEALTH);
+      const health = await HttpClient.getHealth();
       this.cloudAgentReady = health.status === 'ready';
       this.serviceMessage = this.cloudAgentReady ? '' : '云端学伴尚未就绪';
       AppStorage.setOrCreate<number>('cloudAgentCheckedAt', Date.now());
