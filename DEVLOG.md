@@ -5109,3 +5109,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 生产 Vercel AI 出题完整在线链路未在本批次重新回归；Quiz 结果页“下一步闭环”本轮为源码确认与构建通过，未标记线上通过。
 - Lesson 互动活动尝试结果仍为页面态，未扩展 ArkData schema；长期持久化互动结果需后续单独设计迁移。
+
+---
+
+## 2026-07-02 Codex：AI 测验评分数据防坏包入库
+
+背景：继续推进端侧学习闭环可信度；上一批次已把课程、练习和 AI 测验串联起来，本批次收紧 Quiz 端侧数据守卫，避免云端返回不完整题包时仍写入成绩、错题、画像和标签洞察。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- DEVLOG.md
+
+行为变化：
+- Quiz 生成后新增端侧题包校验：`quizId` 非空、题目与评分数组非空且等长、题目 ID 唯一、题干非空、题型为 `choice`、选项必须为 4 个并按 `A.` 到 `D.` 顺序开头。
+- 评分数据必须逐题匹配题目 ID，答案只能是 `A/B/C/D`，解析不能为空，缺失或重复评分项会直接阻止进入答题态。
+- 题目和评分标签在端侧去空、去重、限制 1-3 个短标签；缺失标签时回退当前主题，保持标签洞察可追踪。
+- 提交评分前再次检查全部题目已答、题包仍可评分；移除缺失 grading 时返回空答案和“暂无解析”的回退，坏数据不会进入 `LocalLearningRepository.appendQuizResult()`。
+- `resetQuiz()` 同步清理阶段进度，避免上一次生成/评分进度残留到下一轮。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，最终复跑 `BUILD SUCCESSFUL in 15 s 294 ms`；`CompileArkTS`、`PackageHap`、`SignHap` 均完成，仍为 unsigned HAP，签名未配置。
+- HAP 安装：`hdc install -r C:\Users\guo82\.codex\worktrees\5cef\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+- 应用启动：`hdc shell aa start -a EntryAbility -b com.c4ai.hormony -m entry` exit 0，返回 `start ability successfully`。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。UI 树确认首页出现“鸿学伴”“数据结构”，课程页第一张课程卡出现 `AI 出题` 按钮，Quiz 设置页出现“课程测验”“数据结构 · 即时评分”“选择本次练习主题”“综合练习”“难度分层”“开始答题”。
+- 证据位于 `.tmp/codex-learning-loop-20260702/quiz-validation-ui/`，包括 `quiz-validation-start.png`、`course-page.png`、`quiz-setup-page.png`、`quiz-current-hap.png` 及对应 UI 树 JSON，不提交仓库。
+
+未验证：
+- 未在设备上伪造 malformed AI 题包；坏包拦截本批次证据等级为源码确认与构建通过。
+- 未触发一次真实模型 AI 出题生成，避免本批次为端侧守卫改动额外消耗长模型请求；本机 Web `/api/health` 返回 200 且模型已配置，但未作为 Quiz 线上生成通过证据。
+- 真机未验证。
