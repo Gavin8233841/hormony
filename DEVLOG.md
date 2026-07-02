@@ -5075,3 +5075,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 本批次未新增代码真实运行沙盒，互动练习仍为阅读、预测、选择和自评。
 - Trae 的题库、内容审计和资源文档仍需逐项复核后再采用提交。
+
+---
+
+## 2026-07-02 Codex：课程学习闭环与练习到测验衔接
+
+背景：接力线程“鸿蒙1.11”继续推进成熟学习环节；本批次在已有掌握标准和主动练习基础上，参考成熟学习产品的即时反馈、低风险练习、错题回流和掌握度表达机制，把端侧学习流程串成更明确的“学习 -> 练习 -> AI 测验复盘”。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets
+- apps/harmonyos/entry/src/main/ets/pages/Lesson.ets
+- apps/harmonyos/entry/src/main/ets/pages/Practice.ets
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- docs/HARMONY-LEARNING-LOOP-20260702.md
+
+行为变化：
+- CourseDetail 增加“主题学习闭环”说明，并为每个 Topic 提供“学习 / 精选练习 / AI 测验”三段入口。
+- CourseDetail 将完成状态文案收紧为“有学习记录 / 待掌握”，避免把单次学习或测验记录夸大为完整闭环。
+- Lesson 增加“学习闭环”四步轨道：概念、拆解、练习、题组；主动练习显示题型、反馈方式和完成后的下一步。
+- Lesson 自由作答中“还需巩固”不计入完成，选择“我答对了”才推进活动完成状态。
+- Practice 结果页新增“进入 AI 测验”，离线精选题组完成后可继续进入 AI 标签化复盘。
+- Quiz 主题建议改为读取 `LearningContentRepository.getTopics(courseId)` 的真实 Topic；非课程 Topic 回退综合练习并提示。
+- Quiz 结果页新增“下一步闭环”，错题时提供复习关键词与问学伴入口，全对时建议挑战难度。
+- 新增 `docs/HARMONY-LEARNING-LOOP-20260702.md`，记录参考机制、落地范围和证据等级。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 19 s 109 ms`；仍为 unsigned HAP，签名未配置。
+- HAP 安装：`hdc install C:\Users\guo82\.codex\worktrees\5cef\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap` exit 0，安装路径确认来自当前 worktree；`hdc shell aa start -a EntryAbility -b com.c4ai.hormony` exit 0。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。UI 树确认 CourseDetail 出现“主题学习闭环”“精选练习”“AI 测验”“有学习记录 / 待掌握”；Lesson 出现“本节掌握标准”“学习闭环”“概念 / 拆解 / 练习 / 题组”；第 4/4 段出现主动练习、代码块、选项、反馈、完成状态和“完成主题并练习”；Practice 结果页出现“进入 AI 测验”。
+- 证据位于 `.tmp/codex-learning-loop-20260702/`，包括 `course-detail-loop.png`、`lesson-loop-rail.png`、`lesson-options.png`、`lesson-feedback-selected.png`、`practice-entry.png`、`practice-result-ai-quiz.png`、`practice-bottom-ai-quiz.png` 及对应 UI 树，不提交仓库。
+
+未验证：
+- 真机未验证。
+- 生产 Vercel AI 出题完整在线链路未在本批次重新回归；Quiz 结果页“下一步闭环”本轮为源码确认与构建通过，未标记线上通过。
+- Lesson 互动活动尝试结果仍为页面态，未扩展 ArkData schema；长期持久化互动结果需后续单独设计迁移。

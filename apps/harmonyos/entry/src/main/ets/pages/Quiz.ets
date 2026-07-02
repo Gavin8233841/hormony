@@ -5,6 +5,7 @@
 import { AnswerOption, GradientHeader, ReviewDetailRow, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   QuizGradingItem,
@@ -66,17 +67,22 @@ struct QuizPage {
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
-    if (this.courseId === 'cs102') {
-      this.suggestions = ['进程与线程', 'CPU调度', '虚拟内存与分页'];
-    } else if (this.courseId === 'cs103') {
-      this.suggestions = ['TCP握手与流量控制', 'HTTP协议', 'DNS系统'];
-    } else {
-      this.suggestions = ['二叉树与BST', '图的遍历', '动态规划'];
-    }
+    const courseTopics = LearningContentRepository.getTopics(this.courseId);
+    this.suggestions = courseTopics.slice(0, 3);
     const selectedTopic = AppStorage.get<string>('selectedQuizTopic') ?? '';
     if (selectedTopic.trim().length > 0) {
-      this.topic = selectedTopic.trim();
+      const normalizedTopic = selectedTopic.trim();
+      if (normalizedTopic === '综合' || courseTopics.includes(normalizedTopic)) {
+        this.topic = normalizedTopic;
+      } else {
+        this.topic = '综合';
+        this.message = '检索词不属于课程主题，已切换为综合练习';
+      }
       AppStorage.setOrCreate<string>('selectedQuizTopic', '');
+    }
+    if (this.topic !== '综合' && courseTopics.includes(this.topic) && !this.suggestions.includes(this.topic)) {
+      this.suggestions = [this.topic].concat(this.suggestions.filter((value: string): boolean =>
+        value !== this.topic).slice(0, 2));
     }
   }
 
@@ -123,6 +129,42 @@ struct QuizPage {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'QuizPage knowledge router.pushUrl failed: %{public}s', err.message);
     });
+  }
+
+  private incorrectDetails(): QuizResultDetail[] {
+    return this.resultDetails.filter((detail: QuizResultDetail): boolean => !detail.isCorrect);
+  }
+
+  private firstIncorrectDetail(): QuizResultDetail | null {
+    const items = this.incorrectDetails();
+    return items.length > 0 ? items[0] : null;
+  }
+
+  private primaryReviewKeyword(): string {
+    const items = this.incorrectDetails();
+    const tags: string[] = [];
+    for (const detail of items) {
+      for (const tag of detail.tags ?? []) {
+        const normalized = tag.trim();
+        if (normalized.length > 0 && !tags.includes(normalized)) tags.push(normalized);
+      }
+    }
+    if (tags.length > 0) return tags[0];
+    return this.topic;
+  }
+
+  private reviewPrimaryWeakPoint(): void {
+    this.reviewTopic(this.primaryReviewKeyword());
+  }
+
+  private askFirstIncorrect(): void {
+    const detail = this.firstIncorrectDetail();
+    if (detail !== null) this.askTutor(detail);
+  }
+
+  private restartHardQuiz(): void {
+    this.resetQuiz();
+    this.difficulty = 'hard';
   }
 
   async generateQuiz(): Promise<void> {
@@ -497,6 +539,63 @@ struct QuizPage {
       .padding(18)
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
+
+      Column({ space: 12 }) {
+        Row() {
+          Text('下一步闭环')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.incorrectDetails().length > 0 ?
+            this.incorrectDetails().length.toString() + ' 题待复盘' : '可以加难度')
+            .fontSize(11)
+            .fontColor(this.incorrectDetails().length > 0 ? Constants.COLOR_WARNING : Constants.COLOR_SUCCESS)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+
+        Text(this.incorrectDetails().length > 0 ?
+          '先回看薄弱标签，再让学伴讲第一道错题的判断步骤。' : '本轮表现稳定，下一组可直接切到挑战难度。')
+          .width('100%')
+          .fontSize(13)
+          .lineHeight(21)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+
+        if (this.incorrectDetails().length > 0) {
+          Row({ space: 10 }) {
+            Button('复习 ' + this.primaryReviewKeyword())
+              .layoutWeight(1)
+              .height(44)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.reviewPrimaryWeakPoint(); })
+            Button('问学伴')
+              .layoutWeight(1)
+              .height(44)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.askFirstIncorrect(); })
+          }
+          .width('100%')
+        } else {
+          Button('下一组用挑战难度')
+            .width('100%')
+            .height(44)
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.restartHardQuiz(); })
+        }
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor(Constants.COLOR_SURFACE_TINT)
+      .borderRadius(Constants.RADIUS_MD)
 
       if (this.weakTopics.length > 0) {
         Column({ space: 10 }) {
