@@ -20,7 +20,7 @@ import {
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 7;
+const SCHEMA_VERSION: number = 8;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -32,6 +32,7 @@ const KEY_LESSON_PROGRESS: string = 'lesson_progress';
 const KEY_REVIEW_ITEMS: string = 'review_items';
 const KEY_TOPIC_MASTERY: string = 'topic_mastery';
 const KEY_QUIZ_STATS: string = 'quiz_stats';
+const KEY_TAG_INSIGHTS: string = 'tag_insights';
 const KEY_FORM_IDS: string = 'form_ids';
 
 export class LocalLearningRepository {
@@ -115,6 +116,10 @@ export class LocalLearningRepository {
       const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
       const stats = await LocalLearningRepository.rebuildQuizStatsAggregate(profile ?? undefined);
       await LocalLearningRepository.putValue<QuizStatsAggregate>(KEY_QUIZ_STATS, stats);
+    }
+    if (previousVersion < 8) {
+      const insights = await LocalLearningRepository.rebuildTagInsightsFromResults();
+      await LocalLearningRepository.putValue<TagInsight[]>(KEY_TAG_INSIGHTS, insights);
     }
   }
 
@@ -283,6 +288,7 @@ export class LocalLearningRepository {
     results.unshift(result);
     await LocalLearningRepository.putValue<QuizResult[]>(KEY_QUIZ_RESULTS, results.slice(0, 20));
     await LocalLearningRepository.updateQuizStatsAggregate(result);
+    await LocalLearningRepository.updateTagInsightsAggregate(result);
     const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
     if (profile !== null) {
       for (const topic of result.weakTopics) {
@@ -516,54 +522,78 @@ export class LocalLearningRepository {
   }
 
   static async getTagInsights(limit: number = 6): Promise<TagInsight[]> {
+    let insights = (await LocalLearningRepository.getValue<TagInsight[]>(KEY_TAG_INSIGHTS)) ?? [];
+    if (insights.length === 0) {
+      insights = await LocalLearningRepository.rebuildTagInsightsFromResults();
+      if (insights.length > 0) await LocalLearningRepository.putValue<TagInsight[]>(KEY_TAG_INSIGHTS, insights);
+    }
+    return LocalLearningRepository.sortedTagInsights(insights).slice(0, limit);
+  }
+
+  private static async updateTagInsightsAggregate(result: QuizResult): Promise<void> {
+    const insights = (await LocalLearningRepository.getValue<TagInsight[]>(KEY_TAG_INSIGHTS)) ?? [];
+    LocalLearningRepository.applyResultToTagInsights(insights, result);
+    await LocalLearningRepository.putValue<TagInsight[]>(KEY_TAG_INSIGHTS,
+      LocalLearningRepository.sortedTagInsights(insights).slice(0, 80));
+  }
+
+  private static async rebuildTagInsightsFromResults(): Promise<TagInsight[]> {
     const results = await LocalLearningRepository.getQuizResults();
     const insights: TagInsight[] = [];
     for (const result of results.slice().reverse()) {
-      for (const detail of result.details) {
-        const tags = detail.tags ?? [];
-        for (const tag of tags) {
-          const normalized = tag.trim();
-          if (normalized.length === 0) continue;
-          let item = insights.find((value: TagInsight): boolean => value.tag === normalized);
-          if (item === undefined) {
-            item = {
-              tag: normalized,
-              totalQuestions: 0,
-              correctQuestions: 0,
-              accuracy: 0,
-              wrongQuestions: 0,
-              lastPracticedAt: result.submittedAt,
-              easyQuestions: 0,
-              mediumQuestions: 0,
-              hardQuestions: 0,
-              lastDifficulty: detail.difficulty ?? result.difficulty ?? 'medium',
-              weakReason: '',
-              nextStep: ''
-            };
-            insights.push(item);
-          }
-          const difficulty = detail.difficulty ?? result.difficulty ?? 'medium';
-          item.totalQuestions += 1;
-          if (detail.isCorrect) item.correctQuestions += 1;
-          if (difficulty === 'easy') item.easyQuestions += 1;
-          else if (difficulty === 'hard') item.hardQuestions += 1;
-          else item.mediumQuestions += 1;
-          item.wrongQuestions = item.totalQuestions - item.correctQuestions;
-          item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
-          item.lastPracticedAt = result.submittedAt;
-          item.lastDifficulty = difficulty;
-          item.weakReason = LocalLearningRepository.tagWeakReason(item);
-          item.nextStep = LocalLearningRepository.tagNextStep(item);
+      LocalLearningRepository.applyResultToTagInsights(insights, result);
+    }
+    return LocalLearningRepository.sortedTagInsights(insights).slice(0, 80);
+  }
+
+  private static applyResultToTagInsights(insights: TagInsight[], result: QuizResult): void {
+    for (const detail of result.details) {
+      const tags = detail.tags ?? [];
+      for (const tag of tags) {
+        const normalized = tag.trim();
+        if (normalized.length === 0) continue;
+        let item = insights.find((value: TagInsight): boolean => value.tag === normalized);
+        if (item === undefined) {
+          item = {
+            tag: normalized,
+            totalQuestions: 0,
+            correctQuestions: 0,
+            accuracy: 0,
+            wrongQuestions: 0,
+            lastPracticedAt: result.submittedAt,
+            easyQuestions: 0,
+            mediumQuestions: 0,
+            hardQuestions: 0,
+            lastDifficulty: detail.difficulty ?? result.difficulty ?? 'medium',
+            weakReason: '',
+            nextStep: ''
+          };
+          insights.push(item);
         }
+        const difficulty = detail.difficulty ?? result.difficulty ?? 'medium';
+        item.totalQuestions += 1;
+        if (detail.isCorrect) item.correctQuestions += 1;
+        if (difficulty === 'easy') item.easyQuestions += 1;
+        else if (difficulty === 'hard') item.hardQuestions += 1;
+        else item.mediumQuestions += 1;
+        item.wrongQuestions = item.totalQuestions - item.correctQuestions;
+        item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
+        item.lastPracticedAt = result.submittedAt;
+        item.lastDifficulty = difficulty;
+        item.weakReason = LocalLearningRepository.tagWeakReason(item);
+        item.nextStep = LocalLearningRepository.tagNextStep(item);
       }
     }
+  }
+
+  private static sortedTagInsights(insights: TagInsight[]): TagInsight[] {
     return insights.sort((left: TagInsight, right: TagInsight): number => {
       const wrongDelta = right.wrongQuestions - left.wrongQuestions;
       if (wrongDelta !== 0) return wrongDelta;
       const totalDelta = right.totalQuestions - left.totalQuestions;
       if (totalDelta !== 0) return totalDelta;
       return left.accuracy - right.accuracy;
-    }).slice(0, limit);
+    });
   }
 
   private static collectResultTags(result: QuizResult): string[] {

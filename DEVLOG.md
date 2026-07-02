@@ -5155,3 +5155,25 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未做模拟器页面截图；本批次为本地状态聚合逻辑，证据等级为构建通过。
 - 真机未验证。
+
+---
+
+## 2026-07-02 Codex 鸿蒙1.13：标签洞察长期聚合
+
+背景：继续复核学习洞察链路。画像页和记录页的薄弱标签虽然来自真实答题记录，但 `getTagInsights()` 仍从最近 20 条 `quiz_results` 即时汇总；长期学习后旧错因和能力标签会随着复盘列表截断而丢失。本批次把标签洞察也改为本地持久聚合。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+
+行为变化：
+- `LocalLearningRepository` schema 升至 8，新增 `tag_insights` 本地状态键。
+- `quiz_results` 继续只保留最近 20 次用于复盘；`tag_insights` 持久保存标签级总题数、正确数、正确率、错题数、难度分布、最近难度、错因说明和下一步建议。
+- `appendQuizResult()` 每次提交后同步更新标签洞察聚合；`getTagInsights()` 改为读取聚合结果并按错题数、练习量、正确率排序。
+- 迁移时从现有最近结果重建初始标签洞察；后续新答题会持续累积，不再被复盘列表长度截断。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 20 s 502 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未做模拟器页面截图；本批次为本地状态聚合逻辑，证据等级为构建通过。
+- 真机未验证。
