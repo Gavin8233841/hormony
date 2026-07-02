@@ -5457,7 +5457,7 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `EntryAbility.onWindowStageDestroy` 释放 `avoidAreaChange` 监听，避免窗口生命周期内监听泄漏。
 
 验证：
-- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 803 ms`；仍提示未配置 signingConfigs。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 797 ms`；仍提示未配置 signingConfigs。
 
 未验证：
 - 未进行模拟器 UI 树/截图验收，无法标记为模拟器通过；本批次证据等级为构建通过。
