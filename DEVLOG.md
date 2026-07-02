@@ -5010,3 +5010,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未进行模拟器 UI 树/截图验收；本批次证据等级为构建通过。
 - Trae 的题库难度/标签审计文档仍未复核采用。
+
+---
+
+## 2026-07-02 Codex：计划 Agent 可解释编排链路
+
+背景：继续把“真实可用”优先级放在浅层视觉之前；本批次聚焦计划生成，让 Planner Agent 输出为什么安排任务、端侧保存可解释工作链，并在生成期间提供明确反馈。
+
+文件：
+- apps/web/src/lib/types.ts
+- apps/web/src/lib/agents/planner-agent.ts
+- apps/web/src/app/api/plan/save/route.ts
+- apps/web/src/app/api/plan/plan-lifecycle.test.ts
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets
+
+行为变化：
+- `PlanTask` 新增 `reason`，`StudyPlan` 新增 `agentTrace`，解释每个任务与目标、画像、薄弱项或动作路由的关系。
+- Planner Agent 提示词要求模型从真实 33 Topic 中选择任务，并输出 `reason`；解析失败时给出确定性兜底说明，不伪造主题。
+- 计划保存接口保留并裁剪 `agentTrace` 和任务 `reason`，继续限制任务数量、标题、时长、动作枚举和完成状态。
+- HarmonyOS 计划页读取并保存 `agentTrace`，新计划可展示“Profile Agent / Planner Agent / Action Router / Local-first Guard”工作链。
+- 计划生成按钮在加载期间显示当前阶段文案（读取本地学习状态、锁定真实 Topic、生成可执行动作、写入端侧计划）和原生 LoadingProgress，避免长请求期间像卡死。
+- 首页切换今日任务完成状态时继续保留 `reason`，不擦除 Agent 解释字段。
+
+验证：
+- Web：`pnpm lint` 退出码 0；`pnpm typecheck` 退出码 0；`pnpm test` 退出码 0，12 files / 137 tests passed；`pnpm build` 退出码 0。
+- HarmonyOS：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` 退出码 0，`BUILD SUCCESSFUL in 13 s 559 ms`；仍为 unsigned HAP，签名未配置。
+- 模拟器：Pura 90 Pro Max 模拟器 `127.0.0.1:5555`，安装 `entry-default.hap` 成功，启动 `com.c4ai.hormony/EntryAbility` 成功；计划页通过“查看全部”进入，生成请求返回成功并显示“计划已生成并同步到首页”。
+- 证据位于 `.tmp/codex-plan-agent-20260702/`，包含 UI 树和截图，不提交仓库。
+
+未验证：
+- DevEco MCP ArkTS Check 本轮返回管道关闭，未作为有效诊断证据；以 hvigor `CompileArkTS` 通过作为静态构建证据。
+- 生产 Vercel 尚未部署本地 Web 改动，因此模拟器线上生成的计划未显示本批次新增 `agentTrace`；本批次只证明旧生产端点仍能生成计划。
+- 真机能力仍未验证：Lottie 渲染、OCR、TTS、distributedKVStore。

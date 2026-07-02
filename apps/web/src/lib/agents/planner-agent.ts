@@ -20,6 +20,7 @@ interface ParsedPlanItem {
   topic: string;
   action: PlanAction;
   title: string;
+  reason: string;
   estimatedMin: number;
 }
 
@@ -58,9 +59,10 @@ export async function runPlannerAgent(
   const topicCatalog = formatTopicCatalog(topicOptions);
 
   const systemPrompt = `你是一位学习规划专家。根据学生画像和学习目标，制定结构化学习计划。
-输出 JSON 数组，每个元素格式：{"courseId":"cs101","topic":"数组与线性表","action":"lesson|practice|quiz|review","title":"","estimatedMin":45}
+输出 JSON 数组，每个元素格式：{"courseId":"cs101","topic":"数组与线性表","action":"lesson|practice|quiz|review","title":"","reason":"为什么现在做这项任务","estimatedMin":45}
 courseId 和 topic 必须从下方清单逐字选择，不能改写、缩写或新增主题。
 action 含义：lesson=学习讲解，practice=本地练习，quiz=AI出题测验，review=错题复盘。
+reason 必须说明该任务与目标、画像、前置知识或掌握度的关系，40 字以内。
 计划从 ${startDate} 开始，所有日期必须位于接下来 ${durationDays} 天内。
 只输出 JSON，不要额外文字。
 
@@ -85,6 +87,7 @@ ${topicCatalog}`;
     userId,
     goal,
     tasks,
+    agentTrace: buildAgentTrace(profile, topicOptions.length, tasks.length),
   };
   return plan;
 }
@@ -111,6 +114,7 @@ function parseTasks(raw: string, startDate: string, durationDays: number, topicO
           topic: option.topic,
           action: rawAction,
           title: title.length > 0 ? title : `${ACTION_LABELS[rawAction]}：${option.topic}`,
+          reason: sanitizeReason(t.reason, rawAction, option.topic),
           estimatedMin: Math.min(Math.max(Number(t.estimatedMin) || 45, 15), 180),
         });
       }
@@ -126,6 +130,7 @@ function parseTasks(raw: string, startDate: string, durationDays: number, topicO
           courseId: item.courseId,
           topic: item.topic,
           action: item.action,
+          reason: item.reason,
         };
       });
     }
@@ -169,4 +174,24 @@ function findTopicOption(courseId: string, topic: string, options: TopicOption[]
 
 function isPlanAction(value: string): value is PlanAction {
   return ACTIONS.some((action) => action === value);
+}
+
+function sanitizeReason(raw: unknown, action: PlanAction, topic: string): string {
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (value.length > 0) return value.slice(0, 80);
+  return `${ACTION_LABELS[action]} ${topic}，用于把目标拆成可完成的下一步`;
+}
+
+function buildAgentTrace(
+  profile: ReturnType<typeof getProfileContext>,
+  topicCount: number,
+  taskCount: number
+): string[] {
+  const weak = profile.weakTopics.length > 0 ? `薄弱项 ${profile.weakTopics.slice(0, 3).join("、")}` : "暂无薄弱项";
+  return [
+    `Profile Agent：读取阶段「${profile.stage}」、风格「${profile.learningStyle}」与${weak}。`,
+    `Planner Agent：在 ${topicCount} 个真实 Topic 内选择 ${taskCount} 个可执行任务。`,
+    "Action Router：为每项任务写入 lesson / practice / quiz / review，端侧可直达对应环节。",
+    "Local-first Guard：云端只生成计划，计划保存和完成状态由 HarmonyOS 端本地仓库承担。",
+  ];
 }

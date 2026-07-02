@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     userId,
     goal,
     tasks: taskObjects.slice(0, 50).map((t) => sanitizeTask(t)),
+    agentTrace: sanitizeTrace(body.agentTrace),
   };
 
   store.savePlan(plan);
@@ -129,8 +130,19 @@ function sanitizeTask(t: Record<string, unknown>): PlanTask {
     courseId,
     topic,
     action: isPlanAction(action ?? "") ? action as PlanTask["action"] : undefined,
+    reason: typeof t.reason === "string" ? t.reason.trim().slice(0, 120) : undefined,
     done: Boolean(t.done),
   };
+}
+
+function sanitizeTrace(trace: unknown): string[] | undefined {
+  if (!Array.isArray(trace)) return undefined;
+  const items = trace
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().slice(0, 160))
+    .filter((item) => item.length > 0)
+    .slice(0, 8);
+  return items.length > 0 ? items : undefined;
 }
 
 function isPlanType(value: string): boolean {

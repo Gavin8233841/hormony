@@ -43,6 +43,7 @@ export interface PlanTask {
   courseId?: string;
   topic?: string;
   action?: "lesson" | "practice" | "quiz" | "review";
+  reason?: string;
   done?: boolean;
 }
 
@@ -51,6 +52,7 @@ export interface StudyPlan {
   userId: string;
   goal: string;
   tasks: PlanTask[];
+  agentTrace?: string[];
 }
 
 export interface QuizQuestion {

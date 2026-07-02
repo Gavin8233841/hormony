@@ -4,11 +4,19 @@
  */
 
 import { HttpClient } from '../common/HttpClient';
-import { GradientHeader } from '../common/Builders';
+import { GradientHeader, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { StudyEvent, StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
+
+interface AgentPlanTask extends PlanTask {
+  reason?: string;
+}
+
+interface AgentStudyPlan extends StudyPlan {
+  agentTrace?: string[];
+}
 
 @Entry
 @Component
@@ -19,8 +27,16 @@ struct PlanPage {
   @State loading: boolean = false;
   @State message: string = '';
   @State hasError: boolean = false;
+  @State agentTrace: string[] = [];
+  @State progressStep: number = 0;
   private durationOptions: number[] = [7, 14, 21];
   private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
+  private planSteps: WorkStep[] = [
+    { title: '画像', description: '读取本地学习状态' },
+    { title: '选题', description: '锁定真实 Topic' },
+    { title: '编排', description: '生成可执行动作' },
+    { title: '同步', description: '写入端侧计划' }
+  ];
 
   aboutToAppear(): void {
     this.loadPlan();
@@ -94,6 +110,7 @@ struct PlanPage {
       if (plan !== null) {
         this.goal = plan.goal;
         this.tasks = plan.tasks;
+        this.agentTrace = (plan as AgentStudyPlan).agentTrace ?? [];
       }
     } catch (e) {
       // 没有已保存计划时保留创建状态。
@@ -115,8 +132,9 @@ struct PlanPage {
             courseId: item.courseId,
             topic: item.topic,
             action: item.action,
+            reason: (item as AgentPlanTask).reason,
             done: nextDone
-          };
+          } as AgentPlanTask;
           nextTasks.push(updated);
         } else {
           nextTasks.push(item);
@@ -166,6 +184,73 @@ struct PlanPage {
     }
     .width('100%')
     .padding({ left: 16, right: 16 })
+  }
+
+  private taskReason(task: PlanTask): string {
+    const reason = (task as AgentPlanTask).reason ?? '';
+    return reason.trim().length > 0 ? reason.trim() : '学伴根据目标拆出的可执行下一步';
+  }
+
+  private runLocalProgress(): void {
+    this.progressStep = 0;
+    setTimeout((): void => {
+      if (this.loading) this.progressStep = 1;
+    }, 600);
+    setTimeout((): void => {
+      if (this.loading) this.progressStep = 2;
+    }, 1800);
+  }
+
+  private currentPlanStepIndex(): number {
+    return Math.min(Math.max(this.progressStep, 0), this.planSteps.length - 1);
+  }
+
+  private currentPlanStepDescription(): string {
+    return this.planSteps[this.currentPlanStepIndex()].description;
+  }
+
+  @Builder
+  AgentTraceCard() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('Agent 工作链')
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text('可解释规划')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_BRAND)
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      ForEach(this.agentTrace, (trace: string, index: number): void => {
+        Row({ space: 9 }) {
+          Stack({ alignContent: Alignment.Center }) {
+            Column().width(22).height(22).backgroundColor(Constants.COLOR_SUCCESS_LIGHT).borderRadius(11)
+            Text((index + 1).toString())
+              .fontSize(10)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_SUCCESS)
+          }
+          Text(trace)
+            .layoutWeight(1)
+            .fontSize(12)
+            .lineHeight(19)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Top)
+      })
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
+    .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
+    .margin({ left: 16, right: 16, bottom: 16 })
   }
 
   build() {
@@ -225,10 +310,12 @@ struct PlanPage {
                 .fontSize(18)
                 .fontColor([this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT])
             }
-            Text(this.loading ? '正在生成' : '生成学习计划')
+            Text(this.loading ? '正在' + this.currentPlanStepDescription() : '生成学习计划')
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
               .fontColor(this.canGenerate || this.loading ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
         }
         .width('100%')
@@ -277,6 +364,9 @@ struct PlanPage {
       if (this.loading) {
         this.PlanSkeleton()
       } else if (this.tasks.length > 0) {
+        if (this.agentTrace.length > 0) {
+          this.AgentTraceCard()
+        }
         Row() {
           Column() {
             Text('今日起步')
@@ -331,6 +421,13 @@ struct PlanPage {
                     .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_WARNING)
                     .margin({ top: 5 })
                     .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(this.taskReason(t))
+                    .fontSize(11)
+                    .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                    .lineHeight(17)
+                    .margin({ top: 5 })
+                    .maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                   Row({ space: 8 }) {
                     Text(t.date)
@@ -431,6 +528,8 @@ struct PlanPage {
     this.message = '';
     this.hasError = false;
     this.tasks = [];
+    this.agentTrace = [];
+    this.runLocalProgress();
     try {
       const req: PlanRequest = {
         userId: Constants.DEMO_USER_ID,
@@ -439,10 +538,12 @@ struct PlanPage {
         dailyMinutes: 90,
         profile: (await LocalLearningRepository.getProfile()) ?? undefined
       };
-      const plan = await HttpClient.post<StudyPlan>(Constants.API_PLAN, JSON.stringify(req));
+      const plan = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req));
+      this.progressStep = 3;
       await LocalLearningRepository.savePlan(plan);
       await LearningFormUpdater.refreshAll();
       this.tasks = plan.tasks;
+      this.agentTrace = plan.agentTrace ?? [];
       this.message = '计划已生成并同步到首页';
     } catch (e) {
       this.message = '云端学伴暂不可用，未生成任何计划';

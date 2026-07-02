@@ -6,6 +6,10 @@ import { LearningReminder } from '../common/LearningReminder';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
 import { common } from '@kit.AbilityKit';
 
+interface AgentPlanTask extends PlanTask {
+  reason?: string;
+}
+
 @Component
 export struct HomeContent {
   @Link selectedTab: number;
@@ -81,8 +85,9 @@ export struct HomeContent {
           courseId: item.courseId,
           topic: item.topic,
           action: item.action,
+          reason: (item as AgentPlanTask).reason,
           done: !Boolean(item.done)
-        };
+        } as AgentPlanTask;
       });
       const currentPlan = await LocalLearningRepository.getPlan();
       const plan: StudyPlan = currentPlan ?? {

@@ -9,8 +9,8 @@ describe("学习计划生命周期", () => {
   beforeEach(() => {
     delete process.env.MODEL_API_KEY;
     process.env.TEST_MODEL_RESPONSE = JSON.stringify([
-      { courseId: "cs101", topic: "二叉树与BST", action: "review", title: "复习二叉树", estimatedMin: 45 },
-      { courseId: "cs101", topic: "图的表示与遍历", action: "practice", title: "完成章节练习", estimatedMin: 30 },
+      { courseId: "cs101", topic: "二叉树与BST", action: "review", title: "复习二叉树", reason: "先复盘树结构错题", estimatedMin: 45 },
+      { courseId: "cs101", topic: "图的表示与遍历", action: "practice", title: "完成章节练习", reason: "用遍历练习巩固搜索路径", estimatedMin: 30 },
     ]);
   });
 
@@ -49,7 +49,9 @@ describe("学习计划生命周期", () => {
       topic: "二叉树与BST",
       action: "review",
       type: "review",
+      reason: "先复盘树结构错题",
     });
+    expect(generated.agentTrace?.some((item) => item.includes("Planner Agent"))).toBe(true);
   });
 
   it("模型未配置时应返回明确 503", async () => {
