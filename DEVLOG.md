@@ -5075,3 +5075,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 本批次未新增代码真实运行沙盒，互动练习仍为阅读、预测、选择和自评。
 - Trae 的题库、内容审计和资源文档仍需逐项复核后再采用提交。
+
+---
+
+## 2026-07-02 Codex：云端学伴多 Agent 工作台与 Markdown 渲染收口
+
+背景：用户指出学伴长请求缺少有效反馈、Markdown 文本仍有原始标记泄漏、真实 Agent 能力不可见；本批次只收口 Chat 端侧体验，不改 Web API 契约。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets
+- apps/harmonyos/entry/src/main/ets/model/DataModels.ets
+
+行为变化：
+- 学伴助手消息顶部新增“多 Agent 工作台”，按真实 SSE `thinking` / `trace` 事件展示 Profile、Retrieval、Tutor、Planner、Quiz、Evaluator、Safety 等 Agent 步骤，不再固定写死四格。
+- 流式等待期间显示“正在启动多 Agent 工作台”和当前协作步数；完成后显示完成步数与引用数量，避免用户误以为卡死。
+- `thinking` 和 `agentTrace` 去重，避免 SSE 重连或重复事件造成步骤刷屏。
+- 本地聊天历史保留 `agentTrace` 与 `thinking`，后续历史消息可继续展示 Agent 工作链；旧历史缺少 `thinking` 时保持兼容。
+- Markdown 渲染补足多级标题、数字列表、分隔线、代码块、表格行清洗和内联粗体/代码标记清理；`####`、`**`、`<br>` 和 Markdown 表格分隔线不再直接暴露给用户。
+- 发送按钮禁用态继续使用品牌浅底与品牌蓝图标，避免灰色按钮被误认为异常不可用。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` 多次执行通过；最终一次 exit 0，`BUILD SUCCESSFUL in 15 s 160 ms`；仍为 unsigned HAP，签名未配置。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`，安装 `entry-default-unsigned.hap` 成功，启动 `com.c4ai.hormony/EntryAbility` 成功。
+- Chat 真实提问 `解释TCP三次握手`：UI 树出现“多 Agent 工作台”“已完成 · 4 步 · 0 条依据”“画像”“检索”“讲解”“安全”及 Profile/Retrieval/Safety trace。
+- Chat 真实提问 `解释栈和队列区别`：UI 树出现“多 Agent 工作台”“已完成 · 4 步 · 3 条依据”“画像”“检索”“讲解”“安全”，证明检索有引用时也能展示完整工作链。
+- Markdown 验收：最终 UI 树 `full_dump_hormony_20260702230237679.json` 未出现 `####`、`**`、`<br>`、Markdown 表格分隔线；代码块 `sequenceDiagram` 保持代码容器展示，标题渲染为“先明确核心概念”“每一步的核心作用”。
+- 证据位于 `.tmp/codex-chat-agent-workbench-20260702/`，不提交仓库。
+
+未验证：
+- 真机未验证。
+- 当前批次不修改 Web 端 Agent/API；Plan/Quiz 真实可用性由后续 Web handoff 线程继续推进。
+- 旧历史消息在本批次前未保存 `thinking` 的主 Agent 步骤时只能展示已有 `agentTrace`，不会伪造缺失步骤；新历史会保留 `thinking`。

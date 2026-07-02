@@ -15,6 +15,7 @@ interface DisplayMessage {
   citations: Citation[];
   agentTrace: string[];
   thinking: string[];
+  agentExpanded: boolean;
   citationExpanded: boolean;
   failed: boolean;
   retryQuestion: string;
@@ -93,16 +94,22 @@ export struct ChatContent {
         continue;
       }
       if (trimmed.length === 0) continue;
-      if (trimmed.startsWith('### ')) {
-        blocks.push({ type: 'heading', text: trimmed.slice(4) });
-      } else if (trimmed.startsWith('## ')) {
-        blocks.push({ type: 'heading', text: trimmed.slice(3) });
-      } else if (trimmed.startsWith('# ')) {
-        blocks.push({ type: 'heading', text: trimmed.slice(2) });
+      const headingText = this.headingText(trimmed);
+      if (headingText.length > 0) {
+        blocks.push({ type: 'heading', text: headingText });
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        blocks.push({ type: 'bullet', text: trimmed.slice(2) });
+        blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
+      } else if (this.numberedText(trimmed).length > 0) {
+        blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
+      } else if (this.isTableRow(trimmed)) {
+        const tableText = this.tableText(trimmed);
+        if (tableText.length > 0) {
+          blocks.push({ type: 'table', text: tableText });
+        }
+      } else if (this.isDivider(trimmed)) {
+        blocks.push({ type: 'divider', text: '' });
       } else {
-        blocks.push({ type: 'paragraph', text: line });
+        blocks.push({ type: 'paragraph', text: this.cleanInline(line) });
       }
     }
     if (codeLines.length > 0) {
@@ -114,6 +121,77 @@ export struct ChatContent {
     return blocks;
   }
 
+  private headingText(line: string): string {
+    let level = 0;
+    while (level < line.length && line.charAt(level) === '#') {
+      level += 1;
+    }
+    if (level > 0 && level <= 6 && line.length > level && line.charAt(level) === ' ') {
+      return this.cleanInline(line.slice(level + 1));
+    }
+    return '';
+  }
+
+  private numberedText(line: string): string {
+    const dotIndex = line.indexOf('. ');
+    const cnIndex = line.indexOf('、');
+    let splitIndex = dotIndex;
+    let offset = 2;
+    if (splitIndex < 0 || (cnIndex > 0 && cnIndex < splitIndex)) {
+      splitIndex = cnIndex;
+      offset = 1;
+    }
+    if (splitIndex <= 0) return '';
+    const prefix = line.slice(0, splitIndex);
+    for (const ch of prefix) {
+      if (ch < '0' || ch > '9') return '';
+    }
+    return prefix + '. ' + this.cleanInline(line.slice(splitIndex + offset));
+  }
+
+  private isDivider(line: string): boolean {
+    if (line.length < 3) return false;
+    for (const ch of line) {
+      if (ch !== '-' && ch !== '*' && ch !== '_') return false;
+    }
+    return true;
+  }
+
+  private isTableRow(line: string): boolean {
+    return line.indexOf('|') >= 0 && line.indexOf('|') !== line.lastIndexOf('|');
+  }
+
+  private tableText(line: string): string {
+    const cells: string[] = [];
+    for (const cell of line.split('|')) {
+      const cleaned = this.cleanInline(cell.trim());
+      if (cleaned.length > 0) {
+        cells.push(cleaned);
+      }
+    }
+    if (cells.length === 0) return '';
+    let divider = true;
+    for (const cell of cells) {
+      for (const ch of cell) {
+        if (ch !== '-' && ch !== ':') {
+          divider = false;
+        }
+      }
+    }
+    if (divider) return '';
+    return cells.join('  ·  ');
+  }
+
+  private cleanInline(text: string): string {
+    return text
+      .replace(/<br\s*\/?\s*>/g, '；')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/__/g, '')
+      .replace(/`/g, '')
+      .trim();
+  }
+
   private async loadLocalHistory(): Promise<void> {
     try {
       const history = await LocalLearningRepository.getChatHistory();
@@ -123,8 +201,9 @@ export struct ChatContent {
           role: item.role,
           content: item.content,
           citations: item.citations ?? [],
-          agentTrace: [],
-          thinking: [],
+          agentTrace: item.agentTrace ?? [],
+          thinking: item.thinking ?? [],
+          agentExpanded: false,
           citationExpanded: false,
           failed: false,
           retryQuestion: ''
@@ -325,6 +404,7 @@ export struct ChatContent {
       citations: [],
       agentTrace: [],
       thinking: [],
+      agentExpanded: false,
       citationExpanded: false,
       failed: false,
       retryQuestion: '',
@@ -337,6 +417,7 @@ export struct ChatContent {
       citations: [],
       agentTrace: [],
       thinking: [],
+      agentExpanded: true,
       citationExpanded: false,
       failed: false,
       retryQuestion: content,
@@ -384,10 +465,14 @@ export struct ChatContent {
         const last = this.messages[this.messages.length - 1];
 
         if (evt.type === 'thinking' && evt.agent) {
-          last.thinking.push(evt.agent);
+          if (!last.thinking.includes(evt.agent)) {
+            last.thinking.push(evt.agent);
+          }
         } else if (evt.type === 'trace' && evt.agent && evt.content) {
           const traceText = evt.agent + ': ' + evt.content.slice(0, 100);
-          last.agentTrace.push(traceText);
+          if (!last.agentTrace.includes(traceText)) {
+            last.agentTrace.push(traceText);
+          }
         } else if (evt.type === 'delta' && evt.content) {
           last.content += evt.content;
         } else if (evt.type === 'citation' && evt.source) {
@@ -438,11 +523,77 @@ export struct ChatContent {
       const message: ChatMessage = {
         role: item.role,
         content: item.content,
-        citations: item.citations
+        citations: item.citations,
+        agentTrace: item.agentTrace,
+        thinking: item.thinking
       };
       history.push(message);
     }
     await LocalLearningRepository.saveChatHistory(history);
+  }
+
+  private agentLabel(agent: string): string {
+    if (agent === 'Profile') return '画像';
+    if (agent === 'Retrieval') return '检索';
+    if (agent === 'Tutor') return '讲解';
+    if (agent === 'Planner') return '规划';
+    if (agent === 'Quiz') return '出题';
+    if (agent === 'Evaluator') return '评估';
+    if (agent === 'Safety') return '安全';
+    return agent;
+  }
+
+  private agentDescription(agent: string): string {
+    if (agent === 'Profile') return '读取本地画像';
+    if (agent === 'Retrieval') return '检索课程证据';
+    if (agent === 'Tutor') return '组织解释路径';
+    if (agent === 'Planner') return '拆解学习计划';
+    if (agent === 'Quiz') return '生成分层题目';
+    if (agent === 'Evaluator') return '评估薄弱点';
+    if (agent === 'Safety') return '检查安全与依据';
+    return '执行 Agent 步骤';
+  }
+
+  private agentSeen(msg: DisplayMessage, agent: string): boolean {
+    if (msg.thinking.includes(agent)) return true;
+    for (const trace of msg.agentTrace) {
+      if (trace.startsWith(agent + ':')) return true;
+    }
+    return false;
+  }
+
+  private traceAgent(trace: string): string {
+    const splitIndex = trace.indexOf(':');
+    if (splitIndex <= 0) return '';
+    return trace.slice(0, splitIndex);
+  }
+
+  private appendAgent(flow: string[], agent: string): void {
+    if (agent.length === 0 || flow.includes(agent)) return;
+    flow.push(agent);
+  }
+
+  private agentFlow(msg: DisplayMessage): string[] {
+    const flow: string[] = [];
+    const knownOrder: string[] = ['Profile', 'Retrieval', 'Planner', 'Tutor', 'Quiz', 'Evaluator', 'Safety'];
+    for (const agent of knownOrder) {
+      if (this.agentSeen(msg, agent)) {
+        this.appendAgent(flow, agent);
+      }
+    }
+    for (const agent of msg.thinking) {
+      this.appendAgent(flow, agent);
+    }
+    for (const trace of msg.agentTrace) {
+      this.appendAgent(flow, this.traceAgent(trace));
+    }
+    return flow;
+  }
+
+  private agentSummary(msg: DisplayMessage): string {
+    const count = this.agentFlow(msg).length;
+    if (msg.content.length === 0) return '正在协作 · ' + count.toString() + ' 步';
+    return '已完成 · ' + count.toString() + ' 步 · ' + msg.citations.length.toString() + ' 条依据';
   }
 
   @Builder
@@ -477,6 +628,10 @@ export struct ChatContent {
             .borderRadius(16)
 
           Column() {
+            if (msg.thinking.length > 0 || msg.agentTrace.length > 0) {
+              this.AgentWorkbench(msg)
+            }
+
             if (msg.content.length > 0) {
               Column() {
                 this.MarkdownContent(msg.content, msg.failed)
@@ -487,16 +642,18 @@ export struct ChatContent {
                 .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
                 .width('100%')
             } else {
-              Row({ space: 8 }) {
-                LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
-                Text('正在检索课程资料')
-                  .fontSize(13)
-                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              if (msg.thinking.length === 0 && msg.agentTrace.length === 0) {
+                Row({ space: 8 }) {
+                  LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
+                  Text('正在启动多 Agent 工作台')
+                    .fontSize(13)
+                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                }
+                .width('100%')
+                .padding(12)
+                .backgroundColor(Constants.COLOR_BG_CARD)
+                .borderRadius(Constants.RADIUS_MD)
               }
-              .width('100%')
-              .padding(12)
-              .backgroundColor(Constants.COLOR_BG_CARD)
-              .borderRadius(Constants.RADIUS_MD)
             }
 
             if (msg.failed) {
@@ -571,6 +728,93 @@ export struct ChatContent {
   }
 
   @Builder
+  AgentWorkbench(msg: DisplayMessage) {
+    Column({ space: 10 }) {
+      Row({ space: 8 }) {
+        if (msg.content.length === 0) {
+          LoadingProgress()
+            .width(16)
+            .height(16)
+            .color(Constants.COLOR_BRAND)
+        } else {
+          SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+            .width(16)
+            .height(16)
+            .fontSize(16)
+            .fontColor([Constants.COLOR_SUCCESS])
+        }
+        Column({ space: 2 }) {
+          Text('多 Agent 工作台')
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.agentSummary(msg))
+            .fontSize(10)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Text(msg.agentExpanded ? '收起' : '展开')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_BRAND)
+      }
+      .width('100%')
+      .onClick((): void => {
+        msg.agentExpanded = !msg.agentExpanded;
+        this.messages = this.messages.slice();
+      })
+
+      Column({ space: 6 }) {
+        ForEach(this.agentFlow(msg), (agent: string): void => {
+          this.AgentStep(agent, msg)
+        })
+      }
+      .width('100%')
+
+      if (msg.agentExpanded) {
+        Column({ space: 6 }) {
+          ForEach(msg.agentTrace, (trace: string): void => {
+            Text(trace)
+              .width('100%')
+              .fontSize(11)
+              .lineHeight(17)
+              .fontColor(Constants.COLOR_TEXT_TERTIARY)
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          })
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_MD)
+    .margin({ bottom: 6 })
+  }
+
+  @Builder
+  AgentStep(agent: string, msg: DisplayMessage) {
+    Column({ space: 4 }) {
+      Text(this.agentLabel(agent))
+        .fontSize(11)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.agentSeen(msg, agent) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER)
+      Text(this.agentDescription(agent))
+        .fontSize(9)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .constraintSize({ minHeight: 48 })
+    .padding({ left: 7, right: 7, top: 6, bottom: 6 })
+    .backgroundColor(this.agentSeen(msg, agent) ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
+    .borderRadius(Constants.RADIUS_SM)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
   MarkdownContent(content: string, failed: boolean) {
     Column({ space: 7 }) {
       ForEach(this.markdownBlocks(content), (block: MarkdownBlock): void => {
@@ -580,12 +824,12 @@ export struct ChatContent {
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
-        } else if (block.type === 'bullet') {
+        } else if (block.type === 'bullet' || block.type === 'numbered') {
           Row({ space: 7 }) {
-            Text('•')
+            Text(block.type === 'numbered' ? block.text.split(' ')[0] : '•')
               .fontSize(14)
               .fontColor(Constants.COLOR_BRAND)
-            Text(block.text)
+            Text(block.type === 'numbered' ? block.text.slice(block.text.indexOf(' ') + 1) : block.text)
               .layoutWeight(1)
               .fontSize(14)
               .lineHeight(22)
@@ -593,15 +837,29 @@ export struct ChatContent {
           }
           .width('100%')
           .alignItems(VerticalAlign.Top)
+        } else if (block.type === 'divider') {
+          Divider()
+            .width('100%')
+            .color(Constants.COLOR_BORDER)
+            .margin({ top: 4, bottom: 4 })
         } else if (block.type === 'code') {
           Text(block.text)
             .width('100%')
             .fontSize(12)
             .lineHeight(19)
-            .fontColor('#d1fae5')
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
             .fontFamily('monospace')
             .padding(10)
-            .backgroundColor('#0f172a')
+            .backgroundColor(Constants.COLOR_MAP_SURFACE)
+            .borderRadius(Constants.RADIUS_SM)
+        } else if (block.type === 'table') {
+          Text(block.text)
+            .width('100%')
+            .fontSize(12)
+            .lineHeight(19)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .padding(9)
+            .backgroundColor(Constants.COLOR_SURFACE_TINT)
             .borderRadius(Constants.RADIUS_SM)
         } else {
           Text(block.text)

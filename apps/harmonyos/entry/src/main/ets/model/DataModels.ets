@@ -60,6 +60,7 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   agentTrace?: string[];
+  thinking?: string[];
 }
 
 export interface Citation {
