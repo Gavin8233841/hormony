@@ -23,6 +23,8 @@ interface RawQuizQuestion {
   options?: string[];
   answer: string;
   explanation: string;
+  difficulty: string;
+  tags: string[];
 }
 
 interface TopicRelation {
@@ -86,6 +88,12 @@ describe("课程数据资产完整性", () => {
         stems.add(stemKey);
         expect(question.answer.trim().length).toBeGreaterThan(0);
         expect(question.explanation.trim().length).toBeGreaterThan(0);
+        expect(["easy", "medium", "hard"]).toContain(question.difficulty);
+        expect(question.tags?.length ?? 0).toBeGreaterThan(0);
+        question.tags?.forEach((tag) => {
+          expect(tag.trim().length).toBeGreaterThan(0);
+          expect(tag.length).toBeLessThanOrEqual(12);
+        });
 
         if (question.type === "choice") {
           expect(question.options).toHaveLength(4);
@@ -128,10 +136,25 @@ describe("课程数据资产完整性", () => {
           ...(question.options ? { options: question.options } : {}),
           answer: question.answer,
           explanation: question.explanation,
+          difficulty: question.difficulty ?? "",
+          tags: question.tags ?? [],
         }))
     );
 
     expect(rawQuizQuestions).toEqual(webQuestions);
+
+    const relationTopics = topicRelations.map(
+      (relation) => `${relation.courseId}:${relation.topic}`
+    ).sort();
+    const rawTopics = Array.from(new Set(rawQuizQuestions.map(
+      (question) => `${question.courseId}:${question.topic}`
+    ))).sort();
+    const webTopics = Array.from(new Set(webQuestions.map(
+      (question) => `${question.courseId}:${question.topic}`
+    ))).sort();
+
+    expect(rawTopics).toEqual(relationTopics);
+    expect(webTopics).toEqual(relationTopics);
 
     for (const relation of topicRelations) {
       const topicQuestions = webQuestions.filter(
@@ -142,7 +165,7 @@ describe("课程数据资产完整性", () => {
       const choiceQuestions = topicQuestions.filter(
         (question) => question.options?.length === 4
       );
-      expect(choiceQuestions.length).toBeGreaterThanOrEqual(3);
+      expect(choiceQuestions.length).toBe(5);
 
       for (const question of choiceQuestions) {
         expect(question.options).toHaveLength(4);
@@ -150,6 +173,8 @@ describe("课程数据资产完整性", () => {
           expect(option).toMatch(new RegExp(`^${String.fromCharCode(65 + index)}\\.`));
         });
         expect(["A", "B", "C", "D"]).toContain(question.answer);
+        expect(["easy", "medium", "hard"]).toContain(question.difficulty);
+        expect(question.tags.length).toBeGreaterThan(0);
         expect(question.explanation.match(/[^。！？.!?]+[。！？.!?]/g)?.length ?? 0)
           .toBeGreaterThanOrEqual(2);
       }

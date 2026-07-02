@@ -5,7 +5,7 @@
  * 从 apps/web/src/lib/data/quizzes.ts 读取题库数据，
  * 生成端侧 apps/harmonyos/.../rawfile/learning/quizzes.json
  *
- * 格式：扁平 JSON 数组，每项包含 id/courseId/topic/question/options/answer/explanation
+ * 格式：扁平 JSON 数组，每项包含 id/courseId/topic/question/options/answer/explanation/difficulty/tags
  * 仅包含 type === "choice" 的题目（简答题不入端侧题库）
  * UTF-8 编码，中文不转义
  *
@@ -51,6 +51,8 @@ const flatQuestions = allQuizzes.flatMap((quiz) =>
       options: q.options,
       answer: q.answer,
       explanation: q.explanation,
+      difficulty: q.difficulty,
+      tags: q.tags,
     }))
 );
 

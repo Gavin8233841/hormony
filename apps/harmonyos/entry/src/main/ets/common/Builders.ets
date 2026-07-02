@@ -4,7 +4,7 @@
  */
 
 import { Constants } from './Constants';
-import { QuizResultDetail } from '../model/DataModels';
+import { LearningQuizResultDetail as QuizResultDetail } from '../model/LearningMetadataModels';
 
 export interface WorkStep {
   title: string;
@@ -234,8 +234,17 @@ export function ReviewDetailRow(
 
     if (expanded) {
       Column({ space: 7 }) {
-        if ((detail.tags ?? []).length > 0) {
+        if ((detail.tags ?? []).length > 0 || detail.difficulty !== undefined) {
           Flex({ wrap: FlexWrap.Wrap }) {
+            if (detail.difficulty !== undefined) {
+              Text(detail.difficulty === 'easy' ? '基础' : (detail.difficulty === 'hard' ? '挑战' : '进阶'))
+                .fontSize(10)
+                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .backgroundColor(Constants.COLOR_BG_TAG)
+                .borderRadius(9)
+                .margin({ right: 6, bottom: 6 })
+            }
             ForEach(detail.tags ?? [], (tag: string): void => {
               Text(tag)
                 .fontSize(10)

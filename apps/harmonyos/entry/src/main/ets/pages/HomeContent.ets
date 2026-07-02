@@ -1,5 +1,6 @@
 import { Constants } from '../common/Constants';
-import { Course, PlanTask, StudyEvent, StudyPlan } from '../model/DataModels';
+import { Course, PlanTask, StudyPlan } from '../model/DataModels';
+import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningReminder } from '../common/LearningReminder';

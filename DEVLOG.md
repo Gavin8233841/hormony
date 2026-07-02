@@ -5350,6 +5350,7 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 背景：用户要求新线程不受搜索预算限制地为端侧前端寻找成熟可复用的人类产品参考与资源，解决当前 App 前端“太素”和缺少成熟方案参照的问题。本批次只合入已完成的 1.14 文档产物，不引入外部素材、OHPM 依赖或二进制资产。
 
 文件：
+- DEVLOG.md
 - docs/FRONTEND-ASSET-HUNT-20260702.md
 - docs/FRONTEND-PRODUCT-PATTERN-BENCHMARK-20260702.md
 
@@ -5359,9 +5360,66 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 明确不把 Apple SF Symbols、Material 资产、Web 状态库/CSS 动画/React 资源、许可证页不可访问素材、任意代码运行 Web 沙盒直接纳入 HarmonyOS HAP。
 
 验证：
-- `git cherry-pick --no-commit e652398a6fb563bea3bf5bc54e21042483f92318`：exit 0，仅新增两份文档。
+- `git cherry-pick --no-commit e652398a6fb563bea3bf5bc54e21042483f92318`：exit 0，合入两份 1.14 文档产物并追加本批 DEVLOG。
 - 本批次为文档合入，未执行 Web/HarmonyOS 构建；原因是未修改源码、配置、依赖或资源目录。
 
 未验证：
 - 文档列出的第三方素材、OHPM 包、Lottie、插画与模拟器/真机渲染均仍为未验证，不得据此直接进入 HAP。
 - 1.14 线程只提供资源与产品模式基准，具体 UI 实现需后续按单页面小批次推进并补构建、UI 树和截图证据。
+
+---
+
+## 2026-07-02 Codex 鸿蒙1.13：知识星图、题库标签与学习洞察闭环
+
+背景：接力鸿蒙1.13，围绕“题目难度分层、每题标签化、记录页/画像页可诊断、知识星图能表达先修与推荐路径”推进，复核前序审计结论后落到 Web 单一题库源、端侧生成产物和 ArkUI 页面。
+
+文件：
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/types.ts`
+- `apps/web/src/lib/agents/quiz-agent.ts`
+- `apps/web/src/app/api/quiz/route.ts`
+- `apps/web/src/app/api/quiz/quiz-flow.test.ts`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+- `scripts/generate-quizzes-json.mjs`
+- `scripts/validate-topic-relations.py`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `apps/harmonyos/entry/src/main/ets/model/LearningMetadataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LearningContentRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/common/Builders.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+
+行为变化：
+- Web 题库源为 165 道选择题补齐 `difficulty` 与 `tags`，标签由课程 Topic、能力点与难度派生，端侧 `quizzes.json` 继续由脚本生成。
+- 端侧新增 `LearningMetadataModels.ets` 承载本批次扩展字段，避免改动交接中点名保留的 `DataModels.ets`。
+- Quiz API 与 AI 出题链路保留题目难度；展示题与评分字段同步带上 `difficulty`，测试覆盖生成包结构。
+- 数据完整性测试要求 rawfile 与 Web 源题库、topic relations 的 Topic 集合一致，并校验难度枚举、标签数量与 33 个 Topic 各 5 题约束。
+- topic relations 校验脚本新增 schema、课程 ID、层级、重复先修、跨课程先修、单根节点和 `quizzes.json` 一致性检查。
+- 端侧学习记录保存 `source`、`difficulty`、`tags`、题目正确率和 Topic 掌握聚合；Profile 与 ActivityRecords 以真实答题记录生成薄弱标签、难度分布、错因解释和下一步建议。
+- Practice 精选题与 Quiz AI 题都在当前题、答题结果和错题复盘中展示难度/标签，避免离线题库绕过洞察链路。
+- LearningMap 合并 lesson progress 与 persistent topic mastery，按先修解锁、掌握状态和正确率选择当前推荐主题；星图表达层级、先修边、四种状态、推荐理由和后续解锁。
+- 修复 LearningMap 外层 Scroll 内容列固定高度导致详情卡不可滚动到达的问题；详情卡现在可在模拟器进入视口。
+
+验证：
+- `node scripts/generate-quizzes-json.mjs`：exit 0，生成 165 道选择题，源数据与 rawfile 校验通过。
+- `python scripts/validate-topic-relations.py`：exit 0，schema、唯一性、引用、DAG、连通性、单根节点、层级、knowledge chunks 与 quizzes 一致性全部通过。
+- `cd apps/web; pnpm lint`：exit 0，无 ESLint warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，11 files / 115 tests passed。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 20 s 851 ms`；仍为 unsigned HAP，签名未配置。
+- DevEco MCP ArkTS Check：工具返回管道关闭，未作为有效诊断证据；以 hvigor `CompileArkTS` 通过作为本批次 ArkTS 构建证据。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`，竖屏 `1256x2760`；安装最终构建的 `apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap` 成功，启动 `com.c4ai.hormony/EntryAbility` 成功。
+- 模拟器 UI 证据：`.tmp/harmony-1.13-learning-map/learning-map-top-fixed.png` 展示课程、当前推荐、层级星图和四状态图例；`.tmp/harmony-1.13-learning-map/learning-map-detail-fixed.png` 展示详情卡、学习中 56%、先修、解锁后续、推荐原因、学习主题与主题练习按钮；UI 树为 `.tmp/harmony-1.13-learning-map/simple_dump_hormony_20260702233504983.txt`，不提交仓库。
+
+未验证：
+- 真机未验证。
+- OCR、TTS、Lottie、distributedKVStore 仍未验证。
+- 生产 Vercel 尚未部署本地 Web 改动；本批次线上接口未重新验收。
+- 旧用户超出已保留本地结果的历史答题明细无法回填；新结果会持续写入 Topic 掌握聚合。

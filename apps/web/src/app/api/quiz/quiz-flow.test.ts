@@ -51,9 +51,10 @@ describe("题库与资源 API 闭环", () => {
     expect(quiz.questions).toHaveLength(5);
     expect(quiz.questions.every((question) => !("answer" in question))).toBe(true);
     expect(quiz.questions.every((question) => !("explanation" in question))).toBe(true);
+    expect(quiz.questions[0].difficulty).toBe("medium");
     expect(quiz.questions[0].tags).toEqual(["概念理解"]);
     expect(quiz.grading).toHaveLength(5);
-    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["概念理解"] });
+    expect(quiz.grading[0]).toMatchObject({ answer: "A", difficulty: "medium", tags: ["概念理解"] });
   });
 
   it("Web 生成测验后应可立即提交服务端评分", async () => {

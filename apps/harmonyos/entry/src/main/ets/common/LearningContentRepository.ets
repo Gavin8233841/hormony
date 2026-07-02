@@ -2,11 +2,11 @@ import { resourceManager } from '@kit.LocalizationKit';
 import { util } from '@kit.ArkTS';
 import {
   CuratedKnowledgeChunk,
-  CuratedQuestion,
   ExternalLearningResource,
   LessonExperience,
   TopicRelation
 } from '../model/DataModels';
+import { LearningCuratedQuestion as CuratedQuestion } from '../model/LearningMetadataModels';
 
 const KNOWLEDGE_PATH: string = 'learning/knowledge-chunks.json';
 const QUIZZES_PATH: string = 'learning/quizzes.json';

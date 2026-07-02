@@ -5,18 +5,21 @@ import {
   AchievementProgress,
   Course,
   LessonProgress,
-  QuizResult,
-  ReviewItem,
   StudyPlan,
-  StudyEvent,
-  TagInsight,
   TopicMastery,
   UserProfile
 } from '../model/DataModels';
+import {
+  LearningQuizResult as QuizResult,
+  LearningQuizResultDetail as QuizResultDetail,
+  LearningReviewItem as ReviewItem,
+  LearningStudyEvent as StudyEvent,
+  LearningTagInsight as TagInsight
+} from '../model/LearningMetadataModels';
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 5;
+const SCHEMA_VERSION: number = 6;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -26,6 +29,7 @@ const KEY_CHAT_HISTORY: string = 'chat_history';
 const KEY_STUDY_EVENTS: string = 'study_events';
 const KEY_LESSON_PROGRESS: string = 'lesson_progress';
 const KEY_REVIEW_ITEMS: string = 'review_items';
+const KEY_TOPIC_MASTERY: string = 'topic_mastery';
 const KEY_FORM_IDS: string = 'form_ids';
 
 export class LocalLearningRepository {
@@ -100,6 +104,10 @@ export class LocalLearningRepository {
         }
         await LocalLearningRepository.putValue<ReviewItem[]>(KEY_REVIEW_ITEMS, items);
       }
+    }
+    if (previousVersion < 6) {
+      const mastery = await LocalLearningRepository.rebuildTopicMasteryFromResults();
+      await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, mastery);
     }
   }
 
@@ -295,9 +303,14 @@ export class LocalLearningRepository {
       timestamp: result.submittedAt,
       courseId: result.courseId,
       topic: result.topic,
+      source: result.source,
+      difficulty: result.difficulty,
+      accuracy: result.accuracy,
+      tags: LocalLearningRepository.collectResultTags(result),
       totalQuestions: result.totalQuestions,
       correctCount: result.correctCount
     });
+    await LocalLearningRepository.updateTopicMastery(result);
     await LocalLearningRepository.updateReviewItems(result);
   }
 
@@ -325,6 +338,7 @@ export class LocalLearningRepository {
             nextReviewAt: nextInterval === 0 ? result.submittedAt :
               LocalLearningRepository.addDays(result.submittedAt, nextInterval),
             updatedAt: result.submittedAt,
+            difficulty: detail.difficulty ?? previous.difficulty,
             tags: detail.tags ?? previous.tags ?? []
           };
         }
@@ -345,6 +359,7 @@ export class LocalLearningRepository {
         intervalDays: 1,
         nextReviewAt: LocalLearningRepository.addDays(result.submittedAt, 1),
         updatedAt: result.submittedAt,
+        difficulty: detail.difficulty ?? result.difficulty,
         tags: detail.tags ?? []
       };
       if (existingIndex >= 0) items[existingIndex] = next;
@@ -408,32 +423,53 @@ export class LocalLearningRepository {
   }
 
   static async getTopicMastery(courseId?: string): Promise<TopicMastery[]> {
+    let mastery = (await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY)) ?? [];
+    if (mastery.length === 0) {
+      mastery = await LocalLearningRepository.rebuildTopicMasteryFromResults();
+      if (mastery.length > 0) await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, mastery);
+    }
+    if (courseId !== undefined) {
+      return mastery.filter((item: TopicMastery): boolean => item.courseId === courseId);
+    }
+    return mastery;
+  }
+
+  private static async updateTopicMastery(result: QuizResult): Promise<void> {
+    const mastery = (await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY)) ?? [];
+    LocalLearningRepository.applyResultToMastery(mastery, result);
+    await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, mastery);
+  }
+
+  private static async rebuildTopicMasteryFromResults(): Promise<TopicMastery[]> {
     const results = await LocalLearningRepository.getQuizResults();
     const mastery: TopicMastery[] = [];
     for (const result of results.slice().reverse()) {
-      if (courseId !== undefined && result.courseId !== courseId) continue;
-      let item = mastery.find((value: TopicMastery): boolean =>
-        value.courseId === result.courseId && value.topic === result.topic);
-      if (item === undefined) {
-        item = {
-          courseId: result.courseId,
-          topic: result.topic,
-          attempts: 0,
-          totalQuestions: 0,
-          correctQuestions: 0,
-          accuracy: 0,
-          mastered: false
-        };
-        mastery.push(item);
-      }
-      item.attempts += 1;
-      item.totalQuestions += result.totalQuestions;
-      item.correctQuestions += result.correctCount;
-      item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
-      item.mastered = item.accuracy >= 0.8;
-      item.lastPracticedAt = result.submittedAt;
+      LocalLearningRepository.applyResultToMastery(mastery, result);
     }
     return mastery;
+  }
+
+  private static applyResultToMastery(mastery: TopicMastery[], result: QuizResult): void {
+    let item = mastery.find((value: TopicMastery): boolean =>
+      value.courseId === result.courseId && value.topic === result.topic);
+    if (item === undefined) {
+      item = {
+        courseId: result.courseId,
+        topic: result.topic,
+        attempts: 0,
+        totalQuestions: 0,
+        correctQuestions: 0,
+        accuracy: 0,
+        mastered: false
+      };
+      mastery.push(item);
+    }
+    item.attempts += 1;
+    item.totalQuestions += result.totalQuestions;
+    item.correctQuestions += result.correctCount;
+    item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
+    item.mastered = item.accuracy >= 0.8;
+    item.lastPracticedAt = result.submittedAt;
   }
 
   static async getTagInsights(limit: number = 6): Promise<TagInsight[]> {
@@ -453,15 +489,28 @@ export class LocalLearningRepository {
               correctQuestions: 0,
               accuracy: 0,
               wrongQuestions: 0,
-              lastPracticedAt: result.submittedAt
+              lastPracticedAt: result.submittedAt,
+              easyQuestions: 0,
+              mediumQuestions: 0,
+              hardQuestions: 0,
+              lastDifficulty: detail.difficulty ?? result.difficulty ?? 'medium',
+              weakReason: '',
+              nextStep: ''
             };
             insights.push(item);
           }
+          const difficulty = detail.difficulty ?? result.difficulty ?? 'medium';
           item.totalQuestions += 1;
           if (detail.isCorrect) item.correctQuestions += 1;
+          if (difficulty === 'easy') item.easyQuestions += 1;
+          else if (difficulty === 'hard') item.hardQuestions += 1;
+          else item.mediumQuestions += 1;
           item.wrongQuestions = item.totalQuestions - item.correctQuestions;
           item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
           item.lastPracticedAt = result.submittedAt;
+          item.lastDifficulty = difficulty;
+          item.weakReason = LocalLearningRepository.tagWeakReason(item);
+          item.nextStep = LocalLearningRepository.tagNextStep(item);
         }
       }
     }
@@ -472,6 +521,33 @@ export class LocalLearningRepository {
       if (totalDelta !== 0) return totalDelta;
       return left.accuracy - right.accuracy;
     }).slice(0, limit);
+  }
+
+  private static collectResultTags(result: QuizResult): string[] {
+    const tags: string[] = [];
+    const wrongDetails = result.details.filter((detail: QuizResultDetail): boolean => !detail.isCorrect);
+    const source = wrongDetails.length > 0 ? wrongDetails : result.details;
+    for (const detail of source) {
+      for (const tag of detail.tags ?? []) {
+        const normalized = tag.trim();
+        if (normalized.length > 0 && !tags.includes(normalized)) tags.push(normalized);
+      }
+    }
+    return tags.slice(0, 6);
+  }
+
+  private static tagWeakReason(item: TagInsight): string {
+    if (item.wrongQuestions === 0) return '最近答题稳定，暂未形成错题';
+    if (item.accuracy < 0.6) return '正确率低于 60%，说明概念或判断步骤不稳';
+    if (item.wrongQuestions >= 2) return '错题重复出现，建议按标签集中复盘';
+    return '偶发失误，适合用短练习巩固';
+  }
+
+  private static tagNextStep(item: TagInsight): string {
+    if (item.wrongQuestions === 0) return '继续挑战同主题进阶题';
+    if (item.easyQuestions > 0 && item.accuracy < 0.7) return '先做基础题，确认定义和关键条件';
+    if (item.hardQuestions > 0) return '复盘挑战题，拆解边界条件和推理步骤';
+    return '练 5 道同标签题，再查看错题解析';
   }
 
   static async getChatHistory(): Promise<ChatMessage[]> {

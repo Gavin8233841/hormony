@@ -46,7 +46,7 @@ ${courseContext}`;
     maxTokens: 1500,
     signal,
   });
-  const questions = parseQuestions(raw, count, topic);
+  const questions = parseQuestions(raw, count, topic, difficulty);
   if (questions.length !== count) {
     throw new ModelInvalidResponseError("题目数量或结构不符合要求");
   }
@@ -60,7 +60,12 @@ ${courseContext}`;
   return quiz;
 }
 
-function parseQuestions(raw: string, count: number, topic: string): QuizQuestion[] {
+function parseQuestions(
+  raw: string,
+  count: number,
+  topic: string,
+  difficulty: "easy" | "medium" | "hard"
+): QuizQuestion[] {
   try {
     const arr = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
@@ -87,6 +92,7 @@ function parseQuestions(raw: string, count: number, topic: string): QuizQuestion
           options,
           answer,
           explanation,
+          difficulty,
           tags,
         });
       }

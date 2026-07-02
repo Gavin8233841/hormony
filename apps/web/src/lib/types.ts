@@ -34,6 +34,8 @@ export interface Course {
   topics: string[];
 }
 
+export type QuizDifficulty = "easy" | "medium" | "hard";
+
 export interface PlanTask {
   id: string;
   title: string;
@@ -62,6 +64,7 @@ export interface QuizQuestion {
   options?: string[];
   answer: string;
   explanation: string;
+  difficulty?: QuizDifficulty;
   tags?: string[];
 }
 
@@ -77,6 +80,7 @@ export interface QuizQuestionView {
   type: "choice" | "short";
   stem: string;
   options?: string[];
+  difficulty?: QuizDifficulty;
   tags: string[];
 }
 
@@ -91,6 +95,7 @@ export interface QuizGradingItem {
   questionId: string;
   answer: string;
   explanation: string;
+  difficulty?: QuizDifficulty;
   tags: string[];
 }
 
@@ -203,6 +208,7 @@ export interface QuizResultDetail {
   correctAnswer: string;
   isCorrect: boolean;
   explanation: string;
+  difficulty?: QuizDifficulty;
   tags?: string[];
 }
 
