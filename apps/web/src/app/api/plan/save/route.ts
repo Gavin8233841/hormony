@@ -3,10 +3,14 @@
 
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
-import type { StudyPlan } from "@/lib/types";
+import type { PlanTask, StudyPlan } from "@/lib/types";
+import { isCourseId } from "@/lib/data";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
 
 export const dynamic = "force-dynamic";
+
+const PLAN_TYPES = ["review", "practice", "reading", "quiz"] as const;
+const PLAN_ACTIONS = ["lesson", "practice", "quiz", "review"] as const;
 
 // 保存完整计划
 export async function POST(req: Request) {
@@ -36,21 +40,26 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  const taskObjects = tasks as unknown as Record<string, unknown>[];
+
+  for (const task of taskObjects) {
+    if (task.courseId !== undefined && !isCourseId(String(task.courseId))) {
+      return Response.json({ error: "任务包含不支持的课程", code: "INVALID_COURSE" }, { status: 400 });
+    }
+    const topic = task.topic === undefined ? undefined : String(task.topic).trim();
+    if (topic !== undefined && (topic.length === 0 || topic.length > 100)) {
+      return Response.json({ error: "任务主题长度必须为 1-100 字符", code: "INVALID_TOPIC" }, { status: 400 });
+    }
+    if (task.action !== undefined && !isPlanAction(String(task.action))) {
+      return Response.json({ error: "任务包含不支持的动作", code: "INVALID_ACTION" }, { status: 400 });
+    }
+  }
 
   const plan: StudyPlan = {
     planId: body.planId ?? `plan_${Date.now().toString(36)}`,
     userId,
     goal,
-    tasks: tasks.slice(0, 50).map((t) => ({
-      id: String(t.id ?? `task_${Math.random().toString(36).slice(2, 8)}`),
-      title: String(t.title ?? "未命名任务").slice(0, 200),
-      date: String(t.date ?? new Date().toISOString().slice(0, 10)),
-      estimatedMin: Math.min(Math.max(Number(t.estimatedMin) || 30, 5), 480),
-      type: ["review", "practice", "reading", "quiz"].includes(String(t.type))
-        ? t.type
-        : "review",
-      done: Boolean(t.done),
-    })),
+    tasks: taskObjects.slice(0, 50).map((t) => sanitizeTask(t)),
   };
 
   store.savePlan(plan);
@@ -104,4 +113,30 @@ export async function PATCH(req: Request) {
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 });
+}
+
+function sanitizeTask(t: Record<string, unknown>): PlanTask {
+  const type = isPlanType(String(t.type)) ? String(t.type) as PlanTask["type"] : "review";
+  const courseId = t.courseId === undefined ? undefined : String(t.courseId);
+  const topic = t.topic === undefined ? undefined : String(t.topic).trim();
+  const action = t.action === undefined ? undefined : String(t.action);
+  return {
+    id: String(t.id ?? `task_${Math.random().toString(36).slice(2, 8)}`),
+    title: String(t.title ?? "未命名任务").slice(0, 200),
+    date: String(t.date ?? new Date().toISOString().slice(0, 10)),
+    estimatedMin: Math.min(Math.max(Number(t.estimatedMin) || 30, 5), 480),
+    type,
+    courseId,
+    topic,
+    action: isPlanAction(action ?? "") ? action as PlanTask["action"] : undefined,
+    done: Boolean(t.done),
+  };
+}
+
+function isPlanType(value: string): boolean {
+  return PLAN_TYPES.some((type) => type === value);
+}
+
+function isPlanAction(value: string): boolean {
+  return PLAN_ACTIONS.some((action) => action === value);
 }

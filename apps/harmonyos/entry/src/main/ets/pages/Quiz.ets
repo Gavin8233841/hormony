@@ -16,6 +16,12 @@ import {
 } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
+interface DifficultyOption {
+  value: string;
+  label: string;
+  description: string;
+}
+
 @Entry
 @Component
 struct QuizPage {
@@ -28,6 +34,7 @@ struct QuizPage {
   @State currentIndex: number = 0;
   @State loading: boolean = false;
   @State submitting: boolean = false;
+  @State difficulty: string = 'medium';
   @State message: string = '';
   @State resultReady: boolean = false;
   @State resultAccuracy: number = 0;
@@ -39,6 +46,11 @@ struct QuizPage {
   @State weakTopics: string[] = [];
   private grading: QuizGradingItem[] = [];
   private suggestions: string[] = ['二叉树与BST', '图的遍历', '动态规划'];
+  private difficultyOptions: DifficultyOption[] = [
+    { value: 'easy', label: '基础', description: '概念识别' },
+    { value: 'medium', label: '进阶', description: '场景判断' },
+    { value: 'hard', label: '挑战', description: '多步推理' }
+  ];
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -111,7 +123,7 @@ struct QuizPage {
       courseId: this.courseId,
       topic: this.topic,
       count: 5,
-      difficulty: 'medium',
+      difficulty: this.difficulty,
     };
     try {
       const response = await HttpClient.post<QuizPackage>(
@@ -216,6 +228,13 @@ struct QuizPage {
     return answer;
   }
 
+  private difficultyLabel(): string {
+    for (const option of this.difficultyOptions) {
+      if (option.value === this.difficulty) return option.label;
+    }
+    return '进阶';
+  }
+
   @Builder
   LoadingState() {
     Column({ space: 14 }) {
@@ -239,7 +258,7 @@ struct QuizPage {
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('每组 5 道选择题，提交后立即查看解析')
+        Text('每组 5 道选择题，按难度生成并立即查看解析')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
       }
@@ -265,6 +284,36 @@ struct QuizPage {
             .borderRadius(Constants.RADIUS_MD)
             .onClick(() => { this.topic = suggestion; })
         })
+      }
+      .width('100%')
+
+      Column({ space: 8 }) {
+        Text('难度分层')
+          .width('100%')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Row({ space: 8 }) {
+          ForEach(this.difficultyOptions, (option: DifficultyOption): void => {
+            Button({ type: ButtonType.Normal }) {
+              Column({ space: 3 }) {
+                Text(option.label)
+                  .fontSize(13)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(this.difficulty === option.value ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+                Text(option.description)
+                  .fontSize(10)
+                  .fontColor(this.difficulty === option.value ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
+              }
+            }
+            .layoutWeight(1)
+            .height(54)
+            .backgroundColor(this.difficulty === option.value ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.difficulty = option.value; })
+          })
+        }
+        .width('100%')
       }
       .width('100%')
 
@@ -383,6 +432,9 @@ struct QuizPage {
           Text(this.resultAccuracy >= 0.8 ? '掌握得很好，可以进入下一主题' : '查看解析后，再练一组巩固薄弱点')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text('本次难度：' + this.difficultyLabel())
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)

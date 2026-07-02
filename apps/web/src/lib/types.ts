@@ -40,6 +40,9 @@ export interface PlanTask {
   date: string;
   estimatedMin: number;
   type: "review" | "practice" | "reading" | "quiz";
+  courseId?: string;
+  topic?: string;
+  action?: "lesson" | "practice" | "quiz" | "review";
   done?: boolean;
 }
 

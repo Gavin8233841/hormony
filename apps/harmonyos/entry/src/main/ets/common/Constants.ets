@@ -58,13 +58,14 @@ export class Constants {
   static readonly COLOR_BRAND_LIGHT: string = '#eaf2ff';
   static readonly COLOR_ERROR_LIGHT: string = '#fff0f1';
   static readonly COLOR_SUCCESS_LIGHT: string = '#eaf8ef';
-  // 学习图谱：浅色科学画布 + 真实状态色，不用装饰线冒充先修关系。
-  static readonly COLOR_MAP_SURFACE: string = '#eef2f7';
-  static readonly COLOR_MAP_LINE: string = '#cbd4e1';
-  static readonly COLOR_MAP_LINE_ACTIVE: string = '#8aa8d8';
-  static readonly COLOR_MAP_NODE_IDLE: string = '#aeb9c9';
-  static readonly COLOR_MAP_TEXT_MUTED: string = '#65738a';
-  static readonly COLOR_MAP_CORE: string = '#151a23';
+  // 学习图谱：深色星云画布 + 真实状态色，不用装饰线冒充先修关系。
+  static readonly COLOR_MAP_SURFACE: string = '#111827';
+  static readonly COLOR_MAP_LINE: string = '#34415c';
+  static readonly COLOR_MAP_LINE_ACTIVE: string = '#6fb6ff';
+  static readonly COLOR_MAP_NODE_IDLE: string = '#70809f';
+  static readonly COLOR_MAP_TEXT_MUTED: string = '#9aa8c4';
+  static readonly COLOR_MAP_CORE: string = '#eef5ff';
+  static readonly COLOR_MAP_STAR: string = '#dbeafe';
 
   // 阴影色（带透明度的黑色）
   static readonly SHADOW_CARD: string = '#120f2748';

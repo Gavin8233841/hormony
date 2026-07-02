@@ -78,6 +78,9 @@ export struct HomeContent {
           date: item.date,
           estimatedMin: item.estimatedMin,
           type: item.type,
+          courseId: item.courseId,
+          topic: item.topic,
+          action: item.action,
           done: !Boolean(item.done)
         };
       });

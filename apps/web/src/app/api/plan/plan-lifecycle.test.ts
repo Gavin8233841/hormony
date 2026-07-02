@@ -9,8 +9,8 @@ describe("学习计划生命周期", () => {
   beforeEach(() => {
     delete process.env.MODEL_API_KEY;
     process.env.TEST_MODEL_RESPONSE = JSON.stringify([
-      { title: "复习二叉树", date: "2026-07-02", estimatedMin: 45, type: "review" },
-      { title: "完成章节练习", date: "2026-07-03", estimatedMin: 30, type: "practice" },
+      { courseId: "cs101", topic: "二叉树与BST", action: "review", title: "复习二叉树", estimatedMin: 45 },
+      { courseId: "cs101", topic: "图的表示与遍历", action: "practice", title: "完成章节练习", estimatedMin: 30 },
     ]);
   });
 
@@ -44,6 +44,12 @@ describe("学习计划生命周期", () => {
     expect(generateResponse.status).toBe(200);
     expect(generated.tasks).toHaveLength(2);
     expect(generated.goal).toBe("两周复习数据结构");
+    expect(generated.tasks[0]).toMatchObject({
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      action: "review",
+      type: "review",
+    });
   });
 
   it("模型未配置时应返回明确 503", async () => {

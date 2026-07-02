@@ -4916,3 +4916,44 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `scripts/harmonyos-app-smoke.ps1`：69 PASS、0 FAIL；证据位于 `screenshots/trae-smoke-20260702-121549/`，不提交仓库。
 - Web：ESLint 通过、TypeScript 通过、Vitest 12 个文件 137 项通过、Next.js 生产构建通过。
 - 真机能力本批次未验证；登录、云同步、资料导入、任意代码运行和商业后台均未进入实现范围。
+
+---
+
+## 2026-07-02 Codex：可执行学习计划、分层测验与星云学习图谱
+
+### 后端真实可用
+
+- `PlanTask` 增加 `courseId`、`topic` 和 `action`，Web 与 HarmonyOS 端类型同步。
+- Planner Agent 只允许从真实题库的 33 个 Topic 中逐字选择目标，生成 `lesson`、`practice`、`quiz`、`review` 四类可导航任务，并把动作映射为既有计划类型。
+- 计划保存接口保留新字段，校验课程 ID、主题长度和动作枚举，继续限制任务数量、标题长度、预计时长和完成状态。
+- Web 演示计划补齐真实课程、主题和动作，避免端侧计划卡片只能显示静态文字。
+
+### 端侧学习闭环
+
+- Plan 页面把任务从“勾选清单”升级为“学习/练习/测验/复盘 + 完成/恢复”双按钮，带目标的任务可直达 Lesson、Practice 或 Quiz。
+- 首页今日任务切换完成状态时保留 `courseId`、`topic`、`action`，不再擦除可导航字段。
+- Quiz 页面增加“基础 / 进阶 / 挑战”三档难度选择，请求 AI 出题时传递 `easy`、`medium`、`hard`，结果页显示本次难度。
+- Quiz Agent 难度提示词明确：基础考概念识别，进阶考场景判断，挑战考边界条件、运行过程、故障诊断或多步判断。
+- 本地错题复习节奏从一次答对即解决改为确定性 `1 → 3 → 7 → 14 → resolved`，答错仍回到 1 天后复习。
+
+### 前端视觉
+
+- LearningMap 从浅色图谱升级为深色星云画布，使用 ArkUI 原生低透明星云光晕、静态星点、层级轨道、节点外发光、描边环和选中标签。
+- 图谱摘要第三行改为“下一节点”，让用户看到下一步学习目标，而不是只看到关系说明。
+- 本批次没有引入第三方图形库、图片资产、Lottie 或 ArkWeb。
+
+### 验证
+
+- Web：`pnpm lint` 退出码 0；`pnpm typecheck` 退出码 0；`pnpm test` 退出码 0，12 files / 137 tests passed；`pnpm build` 退出码 0，Next.js production build 通过。
+- 关系数据：`python scripts/validate-topic-relations.py` 退出码 0，33 nodes、147 chunks、all checks passed。
+- ArkTS：DevEco MCP 检查本批次修改的 `.ets` 文件通过；`Plan.ets` 初次发现未使用 `taskStatus` 警告，删除后复查无诊断。
+- HarmonyOS 构建：`apps/harmonyos/hvigorw.bat assembleHap --no-daemon` 退出码 0，`BUILD SUCCESSFUL in 11 s 477 ms`；仍为 unsigned HAP，签名未配置。
+- 模拟器：HAP 已安装并启动，bundle 为 `com.c4ai.hormony`；Plan 页面 UI 树确认新动作按钮、完成/恢复按钮和“重新生成后可直达学习环节”提示存在。
+- 视觉证据位于 `.tmp/codex-ui-tree-20260702-plan-quiz-map/`，包括 `01-home.png`、`02-plan.png`、`03-courses.png`、`04-course-detail.png`、`05-quiz-difficulty.png`，不提交仓库。
+- `scripts/harmonyos-app-smoke.ps1` 本批次复核时在解析阶段失败，涉及中文字符串和语法错误；该脚本本轮未作为通过证据采用。
+
+### 未验证
+
+- 生产 Vercel 线上端点本批次未重新回归，不能把本批次改动标记为线上通过。
+- 真机能力仍未验证：Lottie 渲染、Core Vision Kit OCR、Core Speech Kit TTS、distributedKVStore 跨设备同步。
+- 旧本地计划缺少 `courseId/topic/action` 时，端侧会提示重新生成可执行计划；新 Planner 生成的计划会携带目标字段。

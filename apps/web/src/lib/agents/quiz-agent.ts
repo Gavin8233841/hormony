@@ -21,6 +21,10 @@ export async function runQuizAgent(
   const systemPrompt = `你是一位出题专家。根据指定主题生成选择题。
 输出 JSON 数组，每个元素：{"type":"choice","stem":"","options":["A. ","B. ","C. ","D. "],"answer":"A","explanation":""}
 题干、答案和解析必须与提供的课程资料一致，禁止引入资料外的事实。
+难度规则：
+- easy：考查定义、术语、直接性质或一步识别，适合刚学完概念的学生。
+- medium：给出简短场景或对比，需要应用概念完成一步推理。
+- hard：必须包含边界条件、运行过程、故障诊断或多步判断，不能只问定义。
 每题必须有 4 个选项，答案只能是 A、B、C、D，解析说明正确理由。只输出 JSON。`;
 
   const userPrompt = `课程ID：${courseId}

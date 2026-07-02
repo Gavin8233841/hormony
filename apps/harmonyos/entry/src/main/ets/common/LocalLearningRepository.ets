@@ -306,9 +306,25 @@ export class LocalLearningRepository {
       const existingIndex = items.findIndex((item: ReviewItem): boolean => item.questionId === detail.questionId);
       if (detail.isCorrect) {
         if (existingIndex >= 0) {
-          items[existingIndex].resolved = true;
-          items[existingIndex].attempts += 1;
-          items[existingIndex].updatedAt = result.submittedAt;
+          const previous = items[existingIndex];
+          const nextInterval = LocalLearningRepository.nextReviewInterval(previous.intervalDays);
+          items[existingIndex] = {
+            id: previous.id,
+            questionId: previous.questionId,
+            courseId: previous.courseId,
+            topic: previous.topic,
+            source: previous.source,
+            stem: detail.stem,
+            userAnswer: detail.userAnswer,
+            correctAnswer: detail.correctAnswer,
+            explanation: detail.explanation,
+            attempts: previous.attempts + 1,
+            resolved: nextInterval === 0,
+            intervalDays: nextInterval === 0 ? previous.intervalDays : nextInterval,
+            nextReviewAt: nextInterval === 0 ? result.submittedAt :
+              LocalLearningRepository.addDays(result.submittedAt, nextInterval),
+            updatedAt: result.submittedAt
+          };
         }
         continue;
       }
@@ -332,6 +348,14 @@ export class LocalLearningRepository {
       else items.push(next);
     }
     await LocalLearningRepository.putValue<ReviewItem[]>(KEY_REVIEW_ITEMS, items.slice(-200));
+  }
+
+  private static nextReviewInterval(currentIntervalDays: number): number {
+    if (currentIntervalDays < 1) return 1;
+    if (currentIntervalDays < 3) return 3;
+    if (currentIntervalDays < 7) return 7;
+    if (currentIntervalDays < 14) return 14;
+    return 0;
   }
 
   static async getReviewItems(activeOnly: boolean = true): Promise<ReviewItem[]> {

@@ -24,9 +24,32 @@ interface MapEdge {
   active: boolean;
 }
 
+interface NebulaStar {
+  x: number;
+  y: number;
+  size: number;
+  opacity: number;
+}
+
 const MAP_WIDTH: number = 328;
 const NODE_WIDTH: number = 72;
 const LEVEL_GAP: number = 82;
+const NEBULA_STARS: NebulaStar[] = [
+  { x: 26, y: 36, size: 2, opacity: 0.52 },
+  { x: 72, y: 92, size: 3, opacity: 0.36 },
+  { x: 128, y: 48, size: 2, opacity: 0.42 },
+  { x: 196, y: 118, size: 2, opacity: 0.34 },
+  { x: 286, y: 64, size: 3, opacity: 0.44 },
+  { x: 42, y: 188, size: 2, opacity: 0.30 },
+  { x: 112, y: 246, size: 3, opacity: 0.38 },
+  { x: 238, y: 214, size: 2, opacity: 0.32 },
+  { x: 298, y: 286, size: 2, opacity: 0.40 },
+  { x: 74, y: 356, size: 2, opacity: 0.34 },
+  { x: 164, y: 404, size: 3, opacity: 0.36 },
+  { x: 266, y: 468, size: 2, opacity: 0.30 },
+  { x: 36, y: 532, size: 3, opacity: 0.32 },
+  { x: 206, y: 574, size: 2, opacity: 0.35 }
+];
 
 @Entry
 @Component
@@ -133,6 +156,11 @@ struct LearningMapPage {
     return this.nodes.filter((node: MapNode): boolean => node.mastery?.mastered === true).length;
   }
 
+  private nextTopicLabel(): string {
+    const next = this.nodes.find((node: MapNode): boolean => node.mastery?.mastered !== true);
+    return next?.topic ?? '本课程已全部点亮';
+  }
+
   private prerequisiteLabel(node: MapNode): string {
     if (node.prerequisiteIds.length === 0) return '课程起点，无先修主题';
     const topics: string[] = [];
@@ -188,12 +216,43 @@ struct LearningMapPage {
         .height(this.canvasHeight)
         .backgroundColor(Constants.COLOR_MAP_SURFACE)
         .borderRadius(Constants.RADIUS_LG)
+      Column()
+        .width(210)
+        .height(170)
+        .backgroundColor(Constants.COLOR_BRAND)
+        .borderRadius(105)
+        .opacity(0.10)
+        .position({ x: 28, y: 28 })
+      Column()
+        .width(190)
+        .height(220)
+        .backgroundColor(Constants.COLOR_MAP_LINE_ACTIVE)
+        .borderRadius(95)
+        .opacity(0.08)
+        .position({ x: 116, y: Math.max(160, Math.floor(this.canvasHeight * 0.36)) })
+      Column()
+        .width(120)
+        .height(120)
+        .backgroundColor(Constants.COLOR_SUCCESS)
+        .borderRadius(60)
+        .opacity(0.06)
+        .position({ x: 22, y: Math.max(280, this.canvasHeight - 156) })
+
+      ForEach(NEBULA_STARS, (star: NebulaStar): void => {
+        Column()
+          .width(star.size)
+          .height(star.size)
+          .backgroundColor(Constants.COLOR_MAP_STAR)
+          .borderRadius(star.size / 2)
+          .opacity(star.opacity)
+          .position({ x: star.x, y: Math.min(star.y, this.canvasHeight - 18) })
+      })
 
       ForEach(this.levelRows, (level: number): void => {
-        Text('L' + level.toString())
+        Text('Level ' + level.toString())
           .fontSize(9)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-          .position({ x: 10, y: 38 + level * LEVEL_GAP })
+          .position({ x: 12, y: 34 + level * LEVEL_GAP })
         Line()
           .width(MAP_WIDTH - 40)
           .height(1)
@@ -201,6 +260,7 @@ struct LearningMapPage {
           .endPoint([MAP_WIDTH - 40, 0])
           .stroke(Constants.COLOR_MAP_LINE)
           .strokeWidth(0.5)
+          .opacity(0.7)
           .position({ x: 26, y: 50 + level * LEVEL_GAP })
       })
 
@@ -211,43 +271,57 @@ struct LearningMapPage {
           .startPoint([edge.fromX, edge.fromY])
           .endPoint([edge.toX, edge.toY])
           .stroke(edge.active ? Constants.COLOR_MAP_LINE_ACTIVE : Constants.COLOR_MAP_LINE)
-          .strokeWidth(edge.active ? 1.8 : 1)
+          .strokeWidth(edge.active ? 2.2 : 1)
+          .opacity(edge.active ? 0.86 : 0.52)
       })
 
       ForEach(this.nodes, (node: MapNode): void => {
         Stack({ alignContent: Alignment.Center }) {
           Column()
-            .width(this.nodeSize(node))
-            .height(this.nodeSize(node))
+            .width(this.nodeSize(node) + 18)
+            .height(this.nodeSize(node) + 18)
             .backgroundColor(this.nodeColor(node))
-            .borderRadius(this.nodeSize(node) / 2)
-            .opacity(node.mastery === null ? 0.14 : 0.18)
+            .borderRadius((this.nodeSize(node) + 18) / 2)
+            .opacity(this.selectedTopic === node.topic ? 0.28 : node.mastery === null ? 0.12 : 0.20)
           Column()
-            .width(node.mastery === null ? 26 : 30)
-            .height(node.mastery === null ? 26 : 30)
-            .backgroundColor(this.nodeColor(node))
-            .borderRadius(node.mastery === null ? 13 : 15)
+            .width(this.nodeSize(node) + 8)
+            .height(this.nodeSize(node) + 8)
+            .backgroundColor(Constants.COLOR_MAP_SURFACE)
             .border({
-              width: this.selectedTopic === node.topic ? 2 : 0,
-              color: Constants.COLOR_BG_CARD
+              width: this.selectedTopic === node.topic ? 2 : 1,
+              color: this.selectedTopic === node.topic ? Constants.COLOR_MAP_CORE : Constants.COLOR_MAP_LINE
+            })
+            .borderRadius((this.nodeSize(node) + 8) / 2)
+            .opacity(0.92)
+          Column()
+            .width(node.mastery === null ? 28 : 32)
+            .height(node.mastery === null ? 28 : 32)
+            .backgroundColor(this.nodeColor(node))
+            .borderRadius(node.mastery === null ? 14 : 16)
+            .border({
+              width: 1,
+              color: this.selectedTopic === node.topic ? Constants.COLOR_MAP_CORE : Constants.COLOR_MAP_SURFACE
             })
             .shadow(node.mastery === null ? undefined :
-              { radius: 5, color: this.nodeColor(node), offsetX: 0, offsetY: 0 })
+              { radius: 8, color: this.nodeColor(node), offsetX: 0, offsetY: 0 })
           Text((node.order < 10 ? '0' : '') + node.order.toString())
             .fontSize(9)
             .fontWeight(FontWeight.Bold)
-            .fontColor(node.mastery === null ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_ON_GRADIENT)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           if (this.selectedTopic === node.topic) {
             Text(node.topic)
-            .width(NODE_WIDTH)
-            .fontSize(node.topic.length > 7 ? 9 : 10)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            .textAlign(TextAlign.Center)
-            .maxLines(2)
-            .wordBreak(WordBreak.BREAK_ALL)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .position({ x: 2, y: 40 })
+              .width(NODE_WIDTH)
+              .fontSize(node.topic.length > 7 ? 9 : 10)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_MAP_CORE)
+              .textAlign(TextAlign.Center)
+              .maxLines(2)
+              .wordBreak(WordBreak.BREAK_ALL)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .padding({ left: 4, right: 4, top: 3, bottom: 3 })
+              .backgroundColor(Constants.COLOR_MAP_LINE)
+              .borderRadius(8)
+              .position({ x: 0, y: 43 })
           }
         }
         .width(NODE_WIDTH)
@@ -283,7 +357,7 @@ struct LearningMapPage {
         Text('已掌握 ' + this.masteredCount().toString() + ' / ' + this.nodes.length.toString() + ' 个主题')
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Text('连线表示真实先修关系')
+        Text('下一节点：' + this.nextTopicLabel())
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_TERTIARY)
       }

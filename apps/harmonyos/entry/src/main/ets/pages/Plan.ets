@@ -38,8 +38,54 @@ struct PlanPage {
     return type;
   }
 
-  private taskStatus(task: PlanTask): string {
-    return task.done ? '已完成' : '待完成';
+  private courseTitle(courseId?: string): string {
+    if (courseId === 'cs102') return '操作系统';
+    if (courseId === 'cs103') return '计算机网络';
+    return '数据结构';
+  }
+
+  private actionLabel(task: PlanTask): string {
+    if (task.action === 'lesson') return '学习';
+    if (task.action === 'practice') return '练习';
+    if (task.action === 'quiz') return '测验';
+    if (task.action === 'review') return '复盘';
+    return this.taskTypeLabel(task.type);
+  }
+
+  private hasTaskTarget(task: PlanTask): boolean {
+    return task.courseId !== undefined && task.courseId.length > 0 &&
+      task.topic !== undefined && task.topic.length > 0;
+  }
+
+  private openTask(task: PlanTask): void {
+    if (!this.hasTaskTarget(task)) {
+      this.message = '旧计划缺少课程主题，请重新生成可执行计划';
+      this.hasError = true;
+      return;
+    }
+    const courseId = task.courseId ?? 'cs101';
+    const topic = task.topic ?? '';
+    AppStorage.setOrCreate<string>('selectedCourseId', courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(courseId));
+    if (task.action === 'quiz' || task.type === 'quiz') {
+      AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
+      this.pushPage('pages/Quiz');
+      return;
+    }
+    if (task.action === 'practice' || task.action === 'review' || task.type === 'practice' || task.type === 'review') {
+      AppStorage.setOrCreate<string>('selectedPracticeTopic', topic);
+      this.pushPage('pages/Practice');
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedContentTopic', topic);
+    this.pushPage('pages/Lesson');
+  }
+
+  private pushPage(url: string): void {
+    this.getUIContext().getRouter().pushUrl({ url: url }).catch((): void => {
+      this.message = '无法打开学习环节，请稍后重试';
+      this.hasError = true;
+    });
   }
 
   private async loadPlan(): Promise<void> {
@@ -66,6 +112,9 @@ struct PlanPage {
             date: item.date,
             estimatedMin: item.estimatedMin,
             type: item.type,
+            courseId: item.courseId,
+            topic: item.topic,
+            action: item.action,
             done: nextDone
           };
           nextTasks.push(updated);
@@ -275,6 +324,14 @@ struct PlanPage {
                     .fontSize(14)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(t.done ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_PRIMARY)
+                    .maxLines(2)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text((this.hasTaskTarget(t) ? this.courseTitle(t.courseId) + ' · ' + (t.topic ?? '') : '重新生成后可直达学习环节'))
+                    .fontSize(11)
+                    .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_WARNING)
+                    .margin({ top: 5 })
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
                   Row({ space: 8 }) {
                     Text(t.date)
                       .fontSize(11)
@@ -294,18 +351,30 @@ struct PlanPage {
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
 
-                Text(this.taskStatus(t))
-                  .fontSize(11)
-                  .fontColor(t.done ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
-                  .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-                  .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BRAND_LIGHT)
-                  .borderRadius(11)
+                Column({ space: 6 }) {
+                  Button(this.actionLabel(t))
+                    .width(58)
+                    .height(30)
+                    .fontSize(11)
+                    .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+                    .backgroundColor(this.hasTaskTarget(t) ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+                    .borderRadius(Constants.RADIUS_SM)
+                    .enabled(this.hasTaskTarget(t))
+                    .onClick(() => { this.openTask(t); })
+                  Button(t.done ? '恢复' : '完成')
+                    .width(58)
+                    .height(30)
+                    .fontSize(11)
+                    .fontColor(t.done ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
+                    .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)
+                    .borderRadius(Constants.RADIUS_SM)
+                    .onClick(() => { this.toggleTask(t); })
+                }
               }
               .width('100%')
               .padding(14)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_MD)
-              .onClick(() => { this.toggleTask(t); })
             }
           })
         }

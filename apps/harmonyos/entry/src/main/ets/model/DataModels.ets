@@ -33,6 +33,9 @@ export interface PlanTask {
   date: string;
   estimatedMin: number;
   type: string;
+  courseId?: string;
+  topic?: string;
+  action?: string;
   done?: boolean;
 }
 

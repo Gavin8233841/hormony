@@ -106,13 +106,13 @@ function seedDemoData() {
     userId: "demo",
     goal: "两周复习数据结构期末考试",
     tasks: [
-      { id: "t1", title: "复习数组与链表基础", date: "2026-06-27", estimatedMin: 60, type: "review", done: true },
-      { id: "t2", title: "练习栈与队列题目", date: "2026-06-28", estimatedMin: 90, type: "practice", done: true },
-      { id: "t3", title: "学习二叉树遍历", date: "2026-06-29", estimatedMin: 75, type: "reading", done: false },
-      { id: "t4", title: "完成 BST 与 AVL 练习题", date: "2026-06-30", estimatedMin: 90, type: "practice", done: false },
-      { id: "t5", title: "复习图论算法（DFS/BFS）", date: "2026-07-01", estimatedMin: 90, type: "review", done: false },
-      { id: "t6", title: "动态规划专项练习", date: "2026-07-02", estimatedMin: 120, type: "practice", done: false },
-      { id: "t7", title: "模拟测验：数据结构综合", date: "2026-07-03", estimatedMin: 60, type: "quiz", done: false },
+      { id: "t1", title: "复习数组与链表基础", date: "2026-06-27", estimatedMin: 60, type: "review", courseId: "cs101", topic: "数组与线性表", action: "review", done: true },
+      { id: "t2", title: "练习栈与队列题目", date: "2026-06-28", estimatedMin: 90, type: "practice", courseId: "cs101", topic: "栈与队列", action: "practice", done: true },
+      { id: "t3", title: "学习二叉树遍历", date: "2026-06-29", estimatedMin: 75, type: "reading", courseId: "cs101", topic: "二叉树与BST", action: "lesson", done: false },
+      { id: "t4", title: "完成 BST 与 AVL 练习题", date: "2026-06-30", estimatedMin: 90, type: "practice", courseId: "cs101", topic: "AVL树与红黑树", action: "practice", done: false },
+      { id: "t5", title: "复习图论算法（DFS/BFS）", date: "2026-07-01", estimatedMin: 90, type: "review", courseId: "cs101", topic: "图的表示与遍历", action: "review", done: false },
+      { id: "t6", title: "动态规划专项练习", date: "2026-07-02", estimatedMin: 120, type: "practice", courseId: "cs101", topic: "动态规划", action: "practice", done: false },
+      { id: "t7", title: "模拟测验：数据结构综合", date: "2026-07-03", estimatedMin: 60, type: "quiz", courseId: "cs101", topic: "动态规划", action: "quiz", done: false },
     ],
   };
   db.plans.set("demo", demoPlan);
