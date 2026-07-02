@@ -2,7 +2,11 @@ import { AnswerOption, GradientHeader, ReviewDetailRow } from '../common/Builder
 import { Constants } from '../common/Constants';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { CuratedQuestion, QuizResult, QuizResultDetail } from '../model/DataModels';
+import {
+  LearningCuratedQuestion as CuratedQuestion,
+  LearningQuizResult as QuizResult,
+  LearningQuizResultDetail as QuizResultDetail
+} from '../model/LearningMetadataModels';
 
 const EMPTY_QUESTION: CuratedQuestion = {
   id: '',
@@ -116,7 +120,9 @@ struct PracticePage {
         userAnswer: userAnswer,
         correctAnswer: this.findCorrectOption(question),
         isCorrect: correct,
-        explanation: question.explanation
+        explanation: question.explanation,
+        difficulty: question.difficulty,
+        tags: question.tags ?? []
       });
     }
     const result: QuizResult = {
@@ -125,6 +131,7 @@ struct PracticePage {
       courseId: this.courseId,
       topic: this.topic.length > 0 ? this.topic : '综合',
       source: 'curated',
+      difficulty: this.dominantDifficulty(),
       totalQuestions: this.questions.length,
       correctCount: totalCorrect,
       accuracy: totalCorrect / this.questions.length,
@@ -153,6 +160,26 @@ struct PracticePage {
     return question.answer;
   }
 
+  private dominantDifficulty(): string {
+    let easy = 0;
+    let medium = 0;
+    let hard = 0;
+    for (const question of this.questions) {
+      if (question.difficulty === 'easy') easy += 1;
+      else if (question.difficulty === 'hard') hard += 1;
+      else medium += 1;
+    }
+    if (hard > easy && hard >= medium) return 'hard';
+    if (easy > hard && easy >= medium) return 'easy';
+    return 'medium';
+  }
+
+  private difficultyLabel(value?: string): string {
+    if (value === 'easy') return '基础';
+    if (value === 'hard') return '挑战';
+    return '进阶';
+  }
+
   @Builder
   QuestionView() {
     Column({ space: 16 }) {
@@ -179,6 +206,27 @@ struct PracticePage {
         .fontWeight(FontWeight.Bold)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
         .lineHeight(27)
+      if ((this.activeQuestion.tags ?? []).length > 0 || this.activeQuestion.difficulty !== undefined) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          Text(this.difficultyLabel(this.activeQuestion.difficulty))
+            .fontSize(10)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor(Constants.COLOR_BG_TAG)
+            .borderRadius(9)
+            .margin({ right: 6, bottom: 6 })
+          ForEach(this.activeQuestion.tags ?? [], (tag: string): void => {
+            Text(tag)
+              .fontSize(10)
+              .fontColor(Constants.COLOR_BRAND)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(9)
+              .margin({ right: 6, bottom: 6 })
+          })
+        }
+        .width('100%')
+      }
       Column({ space: 10 }) {
         ForEach(this.activeQuestion.options, (option: string): void => {
           AnswerOption(option, this.activeAnswer === option, (): void => { this.choose(option); })

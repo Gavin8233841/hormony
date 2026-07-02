@@ -50,9 +50,10 @@ describe("题库与资源 API 闭环", () => {
     expect(quiz.questions).toHaveLength(5);
     expect(quiz.questions.every((question) => !("answer" in question))).toBe(true);
     expect(quiz.questions.every((question) => !("explanation" in question))).toBe(true);
+    expect(quiz.questions[0].difficulty).toBe("medium");
     expect(quiz.questions[0].tags).toEqual(["概念理解"]);
     expect(quiz.grading).toHaveLength(5);
-    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["概念理解"] });
+    expect(quiz.grading[0]).toMatchObject({ answer: "A", difficulty: "medium", tags: ["概念理解"] });
   });
 
   it("模型未配置时应返回明确 503", async () => {

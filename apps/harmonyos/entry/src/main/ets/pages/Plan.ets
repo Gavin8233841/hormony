@@ -6,7 +6,8 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
-import { StudyEvent, StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
+import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
+import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
 

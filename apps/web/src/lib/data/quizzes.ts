@@ -5,11 +5,272 @@
 
 import type { Quiz } from "@/lib/types";
 
+
+type QuizDifficulty = "easy" | "medium" | "hard";
+type QuizSeedQuestion = Omit<Quiz["questions"][number], "difficulty" | "tags"> & {
+  difficulty?: QuizDifficulty;
+  tags?: string[];
+};
+type QuizSeed = Omit<Quiz, "questions"> & { questions: QuizSeedQuestion[] };
+
+const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
+  "cs101_q01": "easy",
+  "cs101_q02": "medium",
+  "cs101_q03": "medium",
+  "cs101_q04": "hard",
+  "cs101_q06": "easy",
+  "cs101_q07": "medium",
+  "cs101_q09": "medium",
+  "cs101_q10": "medium",
+  "cs101_q11": "medium",
+  "cs101_q13": "medium",
+  "cs101_q15": "easy",
+  "cs101_q16": "medium",
+  "cs101_q17": "medium",
+  "cs101_q18": "medium",
+  "cs101_q19": "medium",
+  "cs101_q21": "medium",
+  "cs101_q23": "medium",
+  "cs101_q25": "medium",
+  "cs101_q26": "medium",
+  "cs101_q27": "medium",
+  "cs101_q28": "easy",
+  "cs101_q29": "easy",
+  "cs101_q30": "easy",
+  "cs101_q31": "easy",
+  "cs101_q32": "easy",
+  "cs101_q33": "hard",
+  "cs101_q34": "easy",
+  "cs101_q35": "medium",
+  "cs101_q36": "medium",
+  "cs101_q37": "easy",
+  "cs101_q38": "easy",
+  "cs101_q39": "easy",
+  "cs101_q40": "medium",
+  "cs101_q41": "medium",
+  "cs101_q42": "easy",
+  "cs101_q43": "medium",
+  "cs101_q44": "easy",
+  "cs101_q45": "medium",
+  "cs101_q46": "medium",
+  "cs101_q47": "medium",
+  "cs101_q48": "medium",
+  "cs101_q49": "hard",
+  "cs101_q50": "easy",
+  "cs101_q51": "medium",
+  "cs101_q52": "medium",
+  "cs101_q53": "easy",
+  "cs101_q54": "medium",
+  "cs101_q55": "easy",
+  "cs101_q56": "medium",
+  "cs101_q57": "medium",
+  "cs101_q58": "easy",
+  "cs101_q59": "medium",
+  "cs101_q60": "easy",
+  "cs101_q61": "medium",
+  "cs101_q62": "medium",
+  "cs101_q63": "easy",
+  "cs101_q64": "medium",
+  "cs101_q65": "easy",
+  "cs101_q66": "hard",
+  "cs101_q67": "medium",
+  "cs102_q01": "easy",
+  "cs102_q02": "easy",
+  "cs102_q04": "medium",
+  "cs102_q05": "easy",
+  "cs102_q07": "easy",
+  "cs102_q08": "medium",
+  "cs102_q10": "easy",
+  "cs102_q11": "medium",
+  "cs102_q13": "easy",
+  "cs102_q14": "easy",
+  "cs102_q16": "easy",
+  "cs102_q17": "easy",
+  "cs102_q19": "medium",
+  "cs102_q20": "easy",
+  "cs102_q22": "easy",
+  "cs102_q23": "easy",
+  "cs102_q24": "easy",
+  "cs102_q25": "easy",
+  "cs102_q26": "medium",
+  "cs102_q27": "medium",
+  "cs102_q28": "easy",
+  "cs102_q29": "medium",
+  "cs102_q30": "easy",
+  "cs102_q31": "easy",
+  "cs102_q32": "easy",
+  "cs102_q33": "easy",
+  "cs102_q34": "easy",
+  "cs102_q35": "medium",
+  "cs102_q36": "easy",
+  "cs102_q37": "easy",
+  "cs102_q38": "easy",
+  "cs102_q39": "easy",
+  "cs102_q40": "easy",
+  "cs102_q41": "easy",
+  "cs102_q42": "medium",
+  "cs102_q43": "medium",
+  "cs102_q44": "medium",
+  "cs102_q45": "medium",
+  "cs102_q46": "easy",
+  "cs102_q47": "easy",
+  "cs102_q48": "easy",
+  "cs102_q49": "medium",
+  "cs102_q50": "easy",
+  "cs102_q51": "medium",
+  "cs102_q52": "easy",
+  "cs102_q53": "easy",
+  "cs102_q54": "medium",
+  "cs102_q55": "easy",
+  "cs102_q56": "easy",
+  "cs102_q57": "easy",
+  "cs103_q01": "easy",
+  "cs103_q02": "easy",
+  "cs103_q04": "medium",
+  "cs103_q05": "easy",
+  "cs103_q07": "easy",
+  "cs103_q08": "easy",
+  "cs103_q09": "easy",
+  "cs103_q10": "easy",
+  "cs103_q12": "medium",
+  "cs103_q13": "easy",
+  "cs103_q15": "medium",
+  "cs103_q16": "easy",
+  "cs103_q18": "medium",
+  "cs103_q19": "medium",
+  "cs103_q21": "easy",
+  "cs103_q22": "easy",
+  "cs103_q24": "medium",
+  "cs103_q25": "medium",
+  "cs103_q26": "easy",
+  "cs103_q27": "medium",
+  "cs103_q28": "easy",
+  "cs103_q29": "easy",
+  "cs103_q30": "easy",
+  "cs103_q31": "easy",
+  "cs103_q32": "easy",
+  "cs103_q33": "medium",
+  "cs103_q34": "medium",
+  "cs103_q35": "easy",
+  "cs103_q36": "easy",
+  "cs103_q37": "easy",
+  "cs103_q38": "easy",
+  "cs103_q39": "easy",
+  "cs103_q40": "easy",
+  "cs103_q41": "easy",
+  "cs103_q42": "easy",
+  "cs103_q43": "medium",
+  "cs103_q44": "medium",
+  "cs103_q45": "medium",
+  "cs103_q46": "medium",
+  "cs103_q47": "easy",
+  "cs103_q48": "easy",
+  "cs103_q49": "easy",
+  "cs103_q50": "easy",
+  "cs103_q51": "easy",
+  "cs103_q52": "easy",
+  "cs103_q53": "medium",
+  "cs103_q54": "easy",
+  "cs103_q55": "easy",
+  "cs103_q56": "easy",
+  "cs103_q57": "easy",
+  "cs103_q58": "easy",
+  "cs103_q59": "easy",
+  "cs103_q60": "easy",
+  "cs103_q61": "easy",
+  "cs103_q62": "easy",
+};
+
+const TOPIC_TAGS: Record<string, string> = {
+  "数组与线性表": "线性表操作",
+  "链表": "链式结构",
+  "栈与队列": "受限线性结构",
+  "二叉树与BST": "树结构性质",
+  "AVL树与红黑树": "平衡树机制",
+  "图的表示与遍历": "图遍历建模",
+  "排序算法": "排序策略",
+  "动态规划": "状态转移",
+  "哈希表": "散列冲突",
+  "堆与优先队列": "堆结构维护",
+  "最短路径算法": "路径搜索",
+  "贪心算法与分治": "算法设计范式",
+  "进程与线程": "进程线程模型",
+  "CPU调度算法": "调度策略",
+  "内存管理基础": "内存分配",
+  "虚拟内存与分页": "分页置换",
+  "文件系统": "文件组织",
+  "死锁": "死锁分析",
+  "同步与互斥": "并发同步",
+  "I/O系统与磁盘调度": "I/O调度",
+  "分段与段页式": "地址转换",
+  "进程间通信": "IPC机制",
+  "OSI与TCP/IP模型": "网络分层",
+  "TCP握手与挥手": "TCP状态",
+  "TCP流量控制与拥塞控制": "拥塞控制",
+  "UDP协议": "UDP机制",
+  "HTTP协议": "HTTP语义",
+  "HTTPS与TLS": "TLS安全",
+  "DNS系统": "DNS解析",
+  "路由算法与协议": "路由决策",
+  "网络安全基础": "安全机制",
+  "物理层与数据链路层": "链路层机制",
+  "网络层与IP协议": "IP寻址",
+};
+
+function withQuizMetadata(quizzes: QuizSeed[]): Quiz[] {
+  return quizzes.map((quiz) => ({
+    ...quiz,
+    questions: quiz.questions.map((question) => {
+      const difficulty = question.difficulty ?? QUESTION_DIFFICULTY[question.id] ?? inferQuestionDifficulty(question);
+      return {
+        ...question,
+        difficulty,
+        tags: buildQuestionTags(quiz.topic, question, difficulty),
+      };
+    }),
+  }));
+}
+
+function inferQuestionDifficulty(question: QuizSeedQuestion): QuizDifficulty {
+  if (question.type === "short") return "medium";
+  return "medium";
+}
+
+function buildQuestionTags(topic: string, question: QuizSeedQuestion, difficulty: QuizDifficulty): string[] {
+  const source = [question.stem, question.explanation].join(" ");
+  const tags = [TOPIC_TAGS[topic] ?? topic, abilityTag(source), difficultyTag(difficulty)];
+  return tags.filter((tag, index, values) => values.indexOf(tag) === index).slice(0, 3);
+}
+
+function difficultyTag(difficulty: QuizDifficulty): string {
+  if (difficulty === "easy") return "基础识别";
+  if (difficulty === "hard") return "挑战推演";
+  return "应用推理";
+}
+
+function abilityTag(source: string): string {
+  if (source.includes("复杂度") || source.includes("O(") || source.includes("O（") ||
+    source.includes("时间") || source.includes("空间")) return "复杂度分析";
+  if (/指针|链表|插入|删除|旋转|上浮|下沉/.test(source)) return "结构操作";
+  if (/状态|SYN|ACK|FIN|TIME_WAIT|CLOSE_WAIT|就绪|阻塞|运行态/.test(source)) return "状态推演";
+  if (source.includes("公式") || source.includes("平均") || source.includes("计算") ||
+    source.includes("序列") || source.includes("CIDR") || source.includes("Hz") ||
+    source.includes("bps") || source.includes("窗口") || source.includes("等待时间") ||
+    source.includes("P(") || source.includes("V(") || source.includes("信号量")) return "数值计算";
+  if (/原因|作用|主要|为什么|目的|优势|缺点/.test(source)) return "机制解释";
+  if (/比较|区别|相比|正确|错误|下列说法|描述/.test(source)) return "概念辨析";
+  if (/协议|HTTP|HTTPS|TLS|DNS|TCP|UDP|IP|ARP|ICMP|BGP|OSPF|RIP/.test(source)) return "协议机制";
+  if (/死锁|调度|页面|磁盘|内存|分段|分页|进程|线程|文件/.test(source)) return "系统机制";
+  if (/算法|Dijkstra|BFS|DFS|排序|动态规划|贪心|分治|背包|LCS|LIS|Floyd|Bellman/.test(source)) return "算法推演";
+  return "概念理解";
+}
+
+
 // ===========================================================================
 // CS101 数据结构（共 27 题：20 选择 + 7 简答）
 // ===========================================================================
 
-export const cs101Quizzes: Quiz[] = [
+export const cs101Quizzes: Quiz[] = withQuizMetadata([
   // ---- 数组与线性表（3 题）----
   {
     quizId: "quiz_cs101_array",
@@ -845,13 +1106,13 @@ export const cs101Quizzes: Quiz[] = [
       },
     ],
   },
-];
+]);
 
 // ===========================================================================
 // CS102 操作系统（共 27 题：20 选择 + 7 简答）
 // ===========================================================================
 
-export const cs102Quizzes: Quiz[] = [
+export const cs102Quizzes: Quiz[] = withQuizMetadata([
   // ---- 进程与线程（3 题）----
   {
     quizId: "quiz_cs102_process",
@@ -1644,13 +1905,13 @@ export const cs102Quizzes: Quiz[] = [
       },
     ],
   },
-];
+]);
 
 // ===========================================================================
 // CS103 计算机网络（共 62 题：55 选择 + 7 简答）
 // ===========================================================================
 
-export const cs103Quizzes: Quiz[] = [
+export const cs103Quizzes: Quiz[] = withQuizMetadata([
   // ---- OSI与TCP/IP模型（3 题）----
   {
     quizId: "quiz_cs103_model",
@@ -2527,4 +2788,4 @@ export const cs103Quizzes: Quiz[] = [
       },
     ],
   },
-];
+]);

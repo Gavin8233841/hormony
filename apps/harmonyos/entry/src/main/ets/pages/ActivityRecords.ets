@@ -1,7 +1,10 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { StudyEvent, TagInsight } from '../model/DataModels';
+import {
+  LearningStudyEvent as StudyEvent,
+  LearningTagInsight as TagInsight
+} from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Entry
@@ -36,12 +39,21 @@ struct ActivityRecordsPage {
   }
 
   private detail(event: StudyEvent): string {
+    const source = event.source === 'ai' ? 'AI 出题' : (event.source === 'curated' ? '精选题库' : '');
+    const difficulty = event.difficulty !== undefined ? this.difficultyLabel(event.difficulty) : '';
+    const prefix = source.length > 0 || difficulty.length > 0 ? source + (source.length > 0 && difficulty.length > 0 ? ' · ' : '') + difficulty + ' · ' : '';
     if (event.topic !== undefined && event.totalQuestions !== undefined && event.correctCount !== undefined) {
-      return event.topic + ' · ' + event.correctCount.toString() + '/' + event.totalQuestions.toString() + ' 题正确';
+      return prefix + event.topic + ' · ' + event.correctCount.toString() + '/' + event.totalQuestions.toString() + ' 题正确';
     }
     if (event.topic !== undefined) return event.topic;
     if (event.taskId !== undefined) return '任务 ' + event.taskId;
     return '本地学习记录';
+  }
+
+  private difficultyLabel(value: string): string {
+    if (value === 'easy') return '基础';
+    if (value === 'hard') return '挑战';
+    return '进阶';
   }
 
   private icon(event: StudyEvent): Resource {
@@ -124,21 +136,32 @@ struct ActivityRecordsPage {
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
                 ForEach(this.tagInsights, (item: TagInsight): void => {
-                  Row({ space: 10 }) {
-                    Text(item.tag)
-                      .fontSize(12)
-                      .fontColor(Constants.COLOR_BRAND)
-                      .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-                      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                      .borderRadius(Constants.RADIUS_SM)
-                    Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
-                      .layoutWeight(1)
-                      .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-                      .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-                      .borderRadius(4)
-                    Text(Math.round(item.accuracy * 100).toString() + '%')
+                  Column({ space: 6 }) {
+                    Row({ space: 10 }) {
+                      Text(item.tag)
+                        .fontSize(12)
+                        .fontColor(Constants.COLOR_BRAND)
+                        .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                        .borderRadius(Constants.RADIUS_SM)
+                      Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
+                        .layoutWeight(1)
+                        .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+                        .borderRadius(4)
+                      Text(Math.round(item.accuracy * 100).toString() + '%')
+                        .fontSize(11)
+                        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    }
+                    .width('100%')
+                    Text(item.weakReason)
                       .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                      .lineHeight(18)
+                    Text('下一步：' + item.nextStep)
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_BRAND)
                   }
                   .width('100%')
                 })

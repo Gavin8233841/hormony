@@ -106,12 +106,14 @@ function toQuizPackage(quiz: Quiz): QuizPackage {
       type: question.type,
       stem: question.stem,
       options: question.options,
+      difficulty: question.difficulty,
       tags: questionTags(question.tags, quiz.topic),
     })),
     grading: quiz.questions.map((question) => ({
       questionId: question.id,
       answer: question.answer,
       explanation: question.explanation,
+      difficulty: question.difficulty,
       tags: questionTags(question.tags, quiz.topic),
     })),
   };

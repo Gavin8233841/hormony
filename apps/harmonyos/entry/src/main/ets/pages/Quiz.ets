@@ -7,13 +7,15 @@ import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
-  QuizGradingItem,
   QuizPackage,
-  QuizQuestionView,
   QuizRequest,
-  QuizResult,
-  QuizResultDetail,
 } from '../model/DataModels';
+import {
+  LearningQuizGradingItem as QuizGradingItem,
+  LearningQuizQuestionView as QuizQuestionView,
+  LearningQuizResult as QuizResult,
+  LearningQuizResultDetail as QuizResultDetail
+} from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 interface DifficultyOption {
@@ -185,6 +187,7 @@ struct QuizPage {
         correctAnswer: this.correctOption(question, grading.answer),
         isCorrect: isCorrect,
         explanation: grading.explanation,
+        difficulty: grading.difficulty ?? question.difficulty ?? this.difficulty,
         tags: grading.tags ?? question.tags ?? []
       };
       details.push(detail);
@@ -197,6 +200,7 @@ struct QuizPage {
       courseId: this.courseId,
       topic: this.topic,
       source: 'ai',
+      difficulty: this.difficulty,
       totalQuestions: this.questions.length,
       correctCount: correctCount,
       accuracy: this.questions.length > 0 ? correctCount / this.questions.length : 0,
@@ -248,6 +252,12 @@ struct QuizPage {
     for (const option of this.difficultyOptions) {
       if (option.value === this.difficulty) return option.label;
     }
+    return '进阶';
+  }
+
+  private questionDifficultyLabel(value?: string): string {
+    if (value === 'easy') return '基础';
+    if (value === 'hard') return '挑战';
     return '进阶';
   }
 
@@ -397,8 +407,16 @@ struct QuizPage {
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
         .lineHeight(27)
 
-      if ((this.questions[this.currentIndex].tags ?? []).length > 0) {
+      if ((this.questions[this.currentIndex].tags ?? []).length > 0 ||
+        this.questions[this.currentIndex].difficulty !== undefined) {
         Flex({ wrap: FlexWrap.Wrap }) {
+          Text(this.questionDifficultyLabel(this.questions[this.currentIndex].difficulty))
+            .fontSize(10)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor(Constants.COLOR_BG_TAG)
+            .borderRadius(9)
+            .margin({ right: 6, bottom: 6 })
           ForEach(this.questions[this.currentIndex].tags ?? [], (tag: string): void => {
             Text(tag)
               .fontSize(10)

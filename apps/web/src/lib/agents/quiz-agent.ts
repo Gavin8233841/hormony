@@ -36,7 +36,7 @@ tags 必须是 1-3 个中文短标签，用于学习画像量化，优先使用�
 ${courseContext}`;
 
   const raw = await callModel(systemPrompt, userPrompt, { temperature: 0.5, maxTokens: 1500 });
-  const questions = parseQuestions(raw, count, topic);
+  const questions = parseQuestions(raw, count, topic, difficulty);
   if (questions.length !== count) {
     throw new Error("MODEL_INVALID_RESPONSE: 题目数量或结构不符合要求");
   }
@@ -50,7 +50,12 @@ ${courseContext}`;
   return quiz;
 }
 
-function parseQuestions(raw: string, count: number, topic: string): QuizQuestion[] {
+function parseQuestions(
+  raw: string,
+  count: number,
+  topic: string,
+  difficulty: "easy" | "medium" | "hard"
+): QuizQuestion[] {
   try {
     const arr = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
@@ -77,6 +82,7 @@ function parseQuestions(raw: string, count: number, topic: string): QuizQuestion
           options,
           answer,
           explanation,
+          difficulty,
           tags,
         });
       }

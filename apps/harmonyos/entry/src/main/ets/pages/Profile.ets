@@ -5,7 +5,8 @@
 
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { TagInsight, UserProfile } from '../model/DataModels';
+import { UserProfile } from '../model/DataModels';
+import { LearningTagInsight as TagInsight } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
@@ -103,6 +104,26 @@ export struct ProfileContent {
       Text(item.wrongQuestions > 0 ? '错题 ' + item.wrongQuestions.toString() + ' 道，建议优先复盘' : '当前表现稳定')
         .fontSize(11)
         .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_SUCCESS)
+      Row({ space: 6 }) {
+        Text('基础 ' + item.easyQuestions.toString())
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Text('进阶 ' + item.mediumQuestions.toString())
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Text('挑战 ' + item.hardQuestions.toString())
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      Text(item.weakReason)
+        .fontSize(11)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        .lineHeight(18)
+      Text('下一步：' + item.nextStep)
+        .fontSize(11)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_BRAND)
     }
     .width('100%')
   }
@@ -276,7 +297,7 @@ export struct ProfileContent {
                   .fontSize(15)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                Text('按错题数排序')
+                Text('错因与下一步')
                   .fontSize(11)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
               }
