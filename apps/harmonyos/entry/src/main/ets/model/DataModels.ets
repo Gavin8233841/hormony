@@ -73,6 +73,7 @@ export interface QuizQuestionView {
   type: string;
   stem: string;
   options?: string[];
+  tags?: string[];
 }
 
 export interface QuizView {
@@ -86,6 +87,7 @@ export interface QuizGradingItem {
   questionId: string;
   answer: string;
   explanation: string;
+  tags?: string[];
 }
 
 export interface QuizPackage extends QuizView {
@@ -118,6 +120,7 @@ export interface QuizResultDetail {
   correctAnswer: string;
   isCorrect: boolean;
   explanation: string;
+  tags?: string[];
 }
 
 export interface QuizResult {

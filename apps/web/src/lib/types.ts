@@ -60,6 +60,7 @@ export interface QuizQuestion {
   options?: string[];
   answer: string;
   explanation: string;
+  tags?: string[];
 }
 
 export interface Quiz {
@@ -74,6 +75,7 @@ export interface QuizQuestionView {
   type: "choice" | "short";
   stem: string;
   options?: string[];
+  tags: string[];
 }
 
 export interface QuizView {
@@ -87,6 +89,7 @@ export interface QuizGradingItem {
   questionId: string;
   answer: string;
   explanation: string;
+  tags: string[];
 }
 
 export interface QuizPackage extends QuizView {
@@ -198,6 +201,7 @@ export interface QuizResultDetail {
   correctAnswer: string;
   isCorrect: boolean;
   explanation: string;
+  tags?: string[];
 }
 
 // ========== 仪表盘统计 ==========

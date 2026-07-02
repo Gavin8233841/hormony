@@ -4957,3 +4957,25 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 生产 Vercel 线上端点本批次未重新回归，不能把本批次改动标记为线上通过。
 - 真机能力仍未验证：Lottie 渲染、Core Vision Kit OCR、Core Speech Kit TTS、distributedKVStore 跨设备同步。
 - 旧本地计划缺少 `courseId/topic/action` 时，端侧会提示重新生成可执行计划；新 Planner 生成的计划会携带目标字段。
+
+---
+
+## 2026-07-02 Codex：Markdown 渲染、AI 出题反馈与题目标签契约
+
+### 修复
+
+- Web 与 HarmonyOS 学伴消息支持最小 Markdown 渲染：标题、列表和代码块分层展示，避免云端回答以原始 Markdown 文本堆在气泡中。
+- HarmonyOS 发送按钮禁用态从灰色改为品牌浅色，保留不可点击状态但不再像系统禁用错误。
+- AI 出题等待区增加阶段反馈：资料检索、难度控制、标签化，并显示原生 LoadingProgress 与线性进度，避免生成期间像空白卡死。
+- AI Quiz 契约增加 `tags`，模型输出、服务端解析、展示题、评分数据和提交结果均保留题目标签；无标签时按主题给出可追踪默认标签。
+- HarmonyOS Quiz 结果详情展示题目标签，后续记录页和画像页可基于标签做薄弱项统计。
+
+### 待办
+
+- 先锋视觉系统与星云图高级美术暂缓，不再继续做浅层换色；后续先做成熟竞品拆解与交互原型，再实现新的视觉语言。
+- 记录页尚未聚合标签洞察，本批次只打通标签数据链路与单题展示。
+
+### 验证
+
+- Web：`pnpm lint` 退出码 0；`pnpm typecheck` 退出码 0；`pnpm test -- --runInBand` 退出码 0，12 files / 137 tests passed；`pnpm build` 退出码 0。
+- HarmonyOS：`apps/harmonyos/hvigorw.bat assembleHap --no-daemon` 退出码 0，`BUILD SUCCESSFUL in 11 s 818 ms`；仍为 unsigned HAP，签名未配置。

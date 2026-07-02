@@ -44,6 +44,7 @@ struct QuizPage {
   @State expandedResultId: string = '';
   @State evaluation: string = '';
   @State weakTopics: string[] = [];
+  @State progressStep: number = 0;
   private grading: QuizGradingItem[] = [];
   private suggestions: string[] = ['二叉树与BST', '图的遍历', '动态规划'];
   private difficultyOptions: DifficultyOption[] = [
@@ -118,6 +119,7 @@ struct QuizPage {
     if (this.loading) return;
     this.resetQuiz();
     this.loading = true;
+    this.progressStep = 1;
     const request: QuizRequest = {
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
@@ -130,6 +132,7 @@ struct QuizPage {
         Constants.API_QUIZ,
         JSON.stringify(request)
       );
+      this.progressStep = 3;
       if (!Array.isArray(response.questions) || !Array.isArray(response.grading) ||
         response.questions.length === 0 || response.questions.length !== response.grading.length) {
         throw new Error('Invalid quiz response');
@@ -170,7 +173,8 @@ struct QuizPage {
         userAnswer: userAnswer,
         correctAnswer: this.correctOption(question, grading.answer),
         isCorrect: isCorrect,
-        explanation: grading.explanation
+        explanation: grading.explanation,
+        tags: grading.tags ?? question.tags ?? []
       };
       details.push(detail);
     }
@@ -326,12 +330,61 @@ struct QuizPage {
         .backgroundColor(Constants.COLOR_BRAND)
         .borderRadius(Constants.RADIUS_MD)
         .onClick(() => { this.generateQuiz(); })
+
+      if (this.loading) {
+        this.GenerationProgress()
+      }
     }
     .width('100%')
     .padding(18)
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
     .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+  }
+
+  @Builder
+  GenerationProgress() {
+    Column({ space: 12 }) {
+      Row({ space: 8 }) {
+        LoadingProgress()
+          .width(22)
+          .height(22)
+          .color(Constants.COLOR_BRAND)
+        Column({ space: 3 }) {
+          Text(this.progressStep >= 3 ? '正在整理题目标签' : 'AI 正在生成题目')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.progressStep >= 3 ? '校验 A-D 选项、解析和能力标签' : '检索课程资料、匹配难度、生成可评分题组')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      Progress({ value: this.progressStep >= 3 ? 85 : 45, total: 100, type: ProgressType.Linear })
+        .width('100%')
+        .color(Constants.COLOR_BRAND)
+        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+        .borderRadius(4)
+      Row() {
+        Text('资料检索')
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        Text('难度控制')
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        Text('标签化')
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_MD)
   }
 
   @Builder

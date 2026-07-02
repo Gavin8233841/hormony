@@ -12,6 +12,11 @@ interface ChatItem {
   thinking?: AgentName[];
 }
 
+interface MarkdownBlock {
+  type: "paragraph" | "heading" | "bullet" | "code";
+  text: string;
+}
+
 const agentColors: Record<AgentName, string> = {
   Profile: "bg-blue-500/20 text-blue-300",
   Retrieval: "bg-emerald-500/20 text-emerald-300",
@@ -21,6 +26,38 @@ const agentColors: Record<AgentName, string> = {
   Evaluator: "bg-cyan-500/20 text-cyan-300",
   Safety: "bg-red-500/20 text-red-300",
 };
+
+function renderMarkdown(text: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  const code: string[] = [];
+  let inCode = false;
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trimEnd();
+    if (line.trim().startsWith("```")) {
+      if (inCode) {
+        blocks.push({ type: "code", text: code.join("\n") });
+        code.length = 0;
+      }
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode) {
+      code.push(line);
+      continue;
+    }
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^#{1,3}\s+/.test(trimmed)) {
+      blocks.push({ type: "heading", text: trimmed.replace(/^#{1,3}\s+/, "") });
+    } else if (/^[-*]\s+/.test(trimmed)) {
+      blocks.push({ type: "bullet", text: trimmed.replace(/^[-*]\s+/, "") });
+    } else {
+      blocks.push({ type: "paragraph", text: line });
+    }
+  }
+  if (code.length > 0) blocks.push({ type: "code", text: code.join("\n") });
+  return blocks.length > 0 ? blocks : [{ type: "paragraph", text }];
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
@@ -200,8 +237,19 @@ export default function ChatPage() {
                 </div>
               )}
 
-              <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                {msg.content || (loading && msg.role === "assistant" ? "思考中..." : "")}
+              <div className="space-y-2 text-sm leading-relaxed">
+                {renderMarkdown(msg.content || (loading && msg.role === "assistant" ? "思考中..." : "")).map((block, blockIndex) => {
+                  if (block.type === "heading") {
+                    return <div key={blockIndex} className="pt-1 text-base font-semibold text-slate-100">{block.text}</div>;
+                  }
+                  if (block.type === "bullet") {
+                    return <div key={blockIndex} className="flex gap-2 text-slate-200"><span className="text-brand-300">•</span><span>{block.text}</span></div>;
+                  }
+                  if (block.type === "code") {
+                    return <pre key={blockIndex} className="overflow-x-auto rounded-lg bg-slate-950/80 p-3 font-mono text-xs leading-5 text-emerald-100">{block.text}</pre>;
+                  }
+                  return <p key={blockIndex} className="whitespace-pre-wrap text-slate-200">{block.text}</p>;
+                })}
               </div>
 
               {/* 执行轨迹 */}
@@ -249,7 +297,7 @@ export default function ChatPage() {
         <button
           onClick={send}
           disabled={loading || !input.trim()}
-          className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-40"
+          className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-brand-600/70 disabled:text-white/70"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           发送

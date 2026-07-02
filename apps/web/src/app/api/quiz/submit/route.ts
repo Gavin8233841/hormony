@@ -59,6 +59,7 @@ export async function POST(req: Request) {
         correctAnswer: question.answer,
         isCorrect,
         explanation: question.explanation,
+        tags: question.tags && question.tags.length > 0 ? question.tags : [quiz.topic.slice(0, 12)],
       });
     }
 

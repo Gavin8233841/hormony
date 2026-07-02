@@ -178,6 +178,20 @@ export function ReviewDetailRow(
 
     if (expanded) {
       Column({ space: 7 }) {
+        if ((detail.tags ?? []).length > 0) {
+          Flex({ wrap: FlexWrap.Wrap }) {
+            ForEach(detail.tags ?? [], (tag: string): void => {
+              Text(tag)
+                .fontSize(10)
+                .fontColor(Constants.COLOR_BRAND)
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(9)
+                .margin({ right: 6, bottom: 6 })
+            })
+          }
+          .width('100%')
+        }
         Text('你的答案：' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答'))
           .width('100%')
           .fontSize(12)

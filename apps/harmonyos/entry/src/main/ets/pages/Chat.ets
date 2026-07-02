@@ -20,6 +20,11 @@ interface DisplayMessage {
   retryQuestion: string;
 }
 
+interface MarkdownBlock {
+  type: string;
+  text: string;
+}
+
 @Component
 export struct ChatContent {
   @Prop quickQuestion: string = '';
@@ -66,6 +71,47 @@ export struct ChatContent {
 
   get canSend(): boolean {
     return this.cloudAgentReady && !this.loading && this.inputText.trim().length > 0;
+  }
+
+  private markdownBlocks(content: string): MarkdownBlock[] {
+    const blocks: MarkdownBlock[] = [];
+    const codeLines: string[] = [];
+    let inCode = false;
+    for (const rawLine of content.split('\n')) {
+      const line = rawLine.trimEnd();
+      const trimmed = line.trim();
+      if (trimmed.startsWith('```')) {
+        if (inCode) {
+          blocks.push({ type: 'code', text: codeLines.join('\n') });
+          codeLines.splice(0, codeLines.length);
+        }
+        inCode = !inCode;
+        continue;
+      }
+      if (inCode) {
+        codeLines.push(line);
+        continue;
+      }
+      if (trimmed.length === 0) continue;
+      if (trimmed.startsWith('### ')) {
+        blocks.push({ type: 'heading', text: trimmed.slice(4) });
+      } else if (trimmed.startsWith('## ')) {
+        blocks.push({ type: 'heading', text: trimmed.slice(3) });
+      } else if (trimmed.startsWith('# ')) {
+        blocks.push({ type: 'heading', text: trimmed.slice(2) });
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        blocks.push({ type: 'bullet', text: trimmed.slice(2) });
+      } else {
+        blocks.push({ type: 'paragraph', text: line });
+      }
+    }
+    if (codeLines.length > 0) {
+      blocks.push({ type: 'code', text: codeLines.join('\n') });
+    }
+    if (blocks.length === 0 && content.length > 0) {
+      blocks.push({ type: 'paragraph', text: content });
+    }
+    return blocks;
   }
 
   private async loadLocalHistory(): Promise<void> {
@@ -248,11 +294,11 @@ export struct ChatContent {
         Button() {
           SymbolGlyph($r('sys.symbol.paperplane_right_fill'))
             .fontSize(20)
-            .fontColor([this.canSend ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT])
+            .fontColor([this.canSend ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND])
         }
           .width(44)
           .height(44)
-          .backgroundColor(this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+          .backgroundColor(this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
           .borderRadius(22)
           .enabled(this.canSend)
           .onClick(() => {
@@ -432,9 +478,9 @@ export struct ChatContent {
 
           Column() {
             if (msg.content.length > 0) {
-              Text(msg.content)
-                .fontSize(14)
-                .fontColor(msg.failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+              Column() {
+                this.MarkdownContent(msg.content, msg.failed)
+              }
                 .padding(12)
                 .backgroundColor(msg.failed ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_CARD)
                 .borderRadius(Constants.RADIUS_MD)
@@ -522,6 +568,51 @@ export struct ChatContent {
     }
     .width('100%')
     .padding({ top: 8, bottom: 8 })
+  }
+
+  @Builder
+  MarkdownContent(content: string, failed: boolean) {
+    Column({ space: 7 }) {
+      ForEach(this.markdownBlocks(content), (block: MarkdownBlock): void => {
+        if (block.type === 'heading') {
+          Text(block.text)
+            .width('100%')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+        } else if (block.type === 'bullet') {
+          Row({ space: 7 }) {
+            Text('•')
+              .fontSize(14)
+              .fontColor(Constants.COLOR_BRAND)
+            Text(block.text)
+              .layoutWeight(1)
+              .fontSize(14)
+              .lineHeight(22)
+              .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+        } else if (block.type === 'code') {
+          Text(block.text)
+            .width('100%')
+            .fontSize(12)
+            .lineHeight(19)
+            .fontColor('#d1fae5')
+            .fontFamily('monospace')
+            .padding(10)
+            .backgroundColor('#0f172a')
+            .borderRadius(Constants.RADIUS_SM)
+        } else {
+          Text(block.text)
+            .width('100%')
+            .fontSize(14)
+            .lineHeight(22)
+            .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+        }
+      })
+    }
+    .width('100%')
   }
 
 }

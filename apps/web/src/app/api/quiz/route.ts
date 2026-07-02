@@ -106,13 +106,19 @@ function toQuizPackage(quiz: Quiz): QuizPackage {
       type: question.type,
       stem: question.stem,
       options: question.options,
+      tags: questionTags(question.tags, quiz.topic),
     })),
     grading: quiz.questions.map((question) => ({
       questionId: question.id,
       answer: question.answer,
       explanation: question.explanation,
+      tags: questionTags(question.tags, quiz.topic),
     })),
   };
+}
+
+function questionTags(tags: string[] | undefined, topic: string): string[] {
+  return tags && tags.length > 0 ? tags : [topic.slice(0, 12)];
 }
 
 export async function OPTIONS() {
