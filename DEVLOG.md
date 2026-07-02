@@ -5342,3 +5342,26 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未跑模拟器 UI 流程、性能 trace 或真机；本批次运行证据等级为静态诊断通过与构建通过，性能收益数值未验证。
 - 仍未处理更高风险的 LocalLearningRepository 读缓存、Chat delta 合批、请求体字节级上限、store 持久化写放大和脚本层增量优化；这些已有只读审计证据，但需要单独批次与更细测试保护。
+
+---
+
+## 2026-07-02 Codex：合入鸿蒙1.14端侧前端资源猎采地图
+
+背景：用户要求新线程不受搜索预算限制地为端侧前端寻找成熟可复用的人类产品参考与资源，解决当前 App 前端“太素”和缺少成熟方案参照的问题。本批次只合入已完成的 1.14 文档产物，不引入外部素材、OHPM 依赖或二进制资产。
+
+文件：
+- docs/FRONTEND-ASSET-HUNT-20260702.md
+- docs/FRONTEND-PRODUCT-PATTERN-BENCHMARK-20260702.md
+
+行为变化：
+- 新增端侧前端资源猎采地图，按 ArkUI 原生能力、系统 Symbol、Canvas/Path/Line、关键帧动画、Markdown/代码块范式、图标/插画/Lottie/OHPM 方向分级记录来源、许可、商用风险、适配方式、页面用途和验证状态。
+- 新增成熟学习产品模式基准，将 Duolingo、Brilliant、Mimo、Codecademy、Khan Academy、Coursera、GitHub/Primer、Notion、Obsidian 等公开产品逻辑映射为鸿学伴 Lesson、Chat、Quiz、Plan、LearningMap、Profile、Records、Code Learning 的可执行改造单元。
+- 明确不把 Apple SF Symbols、Material 资产、Web 状态库/CSS 动画/React 资源、许可证页不可访问素材、任意代码运行 Web 沙盒直接纳入 HarmonyOS HAP。
+
+验证：
+- `git cherry-pick --no-commit e652398a6fb563bea3bf5bc54e21042483f92318`：exit 0，仅新增两份文档。
+- 本批次为文档合入，未执行 Web/HarmonyOS 构建；原因是未修改源码、配置、依赖或资源目录。
+
+未验证：
+- 文档列出的第三方素材、OHPM 包、Lottie、插画与模拟器/真机渲染均仍为未验证，不得据此直接进入 HAP。
+- 1.14 线程只提供资源与产品模式基准，具体 UI 实现需后续按单页面小批次推进并补构建、UI 树和截图证据。
