@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Database, Search, FileText, Upload, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import type { KnowledgeChunk } from "@/lib/types";
+import { requestJson, getErrorMessage } from "@/lib/client-api";
 
 export default function KnowledgePage() {
   const [query, setQuery] = useState("");
@@ -10,6 +11,9 @@ export default function KnowledgePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // 取消旧搜索请求，避免快速多次搜索时旧响应覆盖新结果
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   // 上传状态
   const [showUpload, setShowUpload] = useState(false);
@@ -21,23 +25,40 @@ export default function KnowledgePage() {
 
   const search = async () => {
     if (!query.trim()) return;
+    // 取消上一次未完成的搜索，避免旧响应覆盖新结果
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     setLoading(true);
     setError(null);
     setHasSearched(true);
     try {
-      const res = await fetch("/api/knowledge/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: "demo", query: query.trim(), topK: 5 }),
-      });
-      if (!res.ok) throw new Error(`检索失败 (HTTP ${res.status})`);
-      const data = (await res.json()) as { chunks?: KnowledgeChunk[] };
+      const data = await requestJson<{ chunks?: KnowledgeChunk[] }>(
+        "/api/knowledge/search",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: "demo", query: query.trim(), topK: 5 }),
+        },
+        controller.signal,
+      );
+      // 请求已被新搜索取代，丢弃本次结果
+      if (searchAbortRef.current !== controller) return;
       setResults(data.chunks ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "检索失败");
-      setResults([]);
+      // 请求已被新搜索取代，忽略旧请求的错误
+      if (searchAbortRef.current !== controller) return;
+      const msg = getErrorMessage(e, "检索失败");
+      // AbortError → msg 为 null：不显示红色错误，也不清空已有结果
+      if (msg !== null) {
+        setError(msg);
+        setResults([]);
+      }
     } finally {
-      setLoading(false);
+      // 仅当本次请求仍是当前请求时才关闭 loading
+      if (searchAbortRef.current === controller) {
+        setLoading(false);
+      }
     }
   };
 
@@ -46,7 +67,13 @@ export default function KnowledgePage() {
     setUploading(true);
     setUploadMsg(null);
     try {
-      const res = await fetch("/api/knowledge/upload", {
+      const data = await requestJson<{
+        success: boolean;
+        courseId: string;
+        source: string;
+        chunkCount: number;
+        chunkIds: string[];
+      }>("/api/knowledge/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -56,16 +83,15 @@ export default function KnowledgePage() {
           text: uploadText.trim(),
         }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "上传失败" }));
-        throw new Error(err.error ?? `上传失败 (HTTP ${res.status})`);
-      }
-      const data = await res.json();
       setUploadMsg({ type: "success", text: `上传成功：${data.chunkCount} 个知识切片已加入知识库` });
       setUploadSource("");
       setUploadText("");
     } catch (e) {
-      setUploadMsg({ type: "error", text: e instanceof Error ? e.message : "上传失败" });
+      const msg = getErrorMessage(e, "上传失败");
+      // AbortError → msg 为 null；错误时保留用户输入的 source/text（仅在成功时清空）
+      if (msg !== null) {
+        setUploadMsg({ type: "error", text: msg });
+      }
     } finally {
       setUploading(false);
     }

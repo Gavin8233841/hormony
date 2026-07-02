@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CalendarDays, Loader2, CheckCircle2, Clock, Circle } from "lucide-react";
 import type { PlanTask, StudyPlan } from "@/lib/types";
+import { requestJson, getErrorMessage, isNotFound, isEndpointDisabled } from "@/lib/client-api";
 
 export default function PlanPage() {
   const [goal, setGoal] = useState("");
@@ -13,26 +14,45 @@ export default function PlanPage() {
   const [error, setError] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [endpointDisabled, setEndpointDisabled] = useState(false);
 
   // 加载已有计划
-  const loadPlan = useCallback(async () => {
+  const loadPlan = useCallback(async (signal?: AbortSignal) => {
     setInitialLoading(true);
+    setLoadFailed(false);
+    setEndpointDisabled(false);
     try {
-      const res = await fetch("/api/plan?userId=demo");
-      if (res.ok) {
-        const plan = (await res.json()) as StudyPlan;
-        setTasks(plan.tasks ?? []);
-        if (plan.goal) setGoal(plan.goal);
+      const plan = await requestJson<StudyPlan>("/api/plan?userId=demo", undefined, signal);
+      setTasks(plan.tasks ?? []);
+      if (plan.goal) setGoal(plan.goal);
+    } catch (e) {
+      if (isNotFound(e)) {
+        // 计划不存在 = 正常空态，显示生成表单
+        setTasks([]);
+        return;
       }
-    } catch {
-      // 静默失败，用户可手动生成
+      if (isEndpointDisabled(e)) {
+        setEndpointDisabled(true);
+        return;
+      }
+      const msg = getErrorMessage(e, "获取计划失败");
+      if (msg === null) {
+        // AbortError — 不显示错误
+        return;
+      }
+      setLoadFailed(true);
     } finally {
-      setInitialLoading(false);
+      if (!signal?.aborted) {
+        setInitialLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    loadPlan();
+    const controller = new AbortController();
+    loadPlan(controller.signal);
+    return () => controller.abort();
   }, [loadPlan]);
 
   const generate = async () => {
@@ -41,7 +61,7 @@ export default function PlanPage() {
     setError("");
     setTasks([]);
     try {
-      const res = await fetch("/api/plan", {
+      const plan = await requestJson<StudyPlan>("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -51,11 +71,10 @@ export default function PlanPage() {
           dailyMinutes: minutes,
         }),
       });
-      if (!res.ok) throw new Error("生成失败");
-      const plan = (await res.json()) as StudyPlan;
       setTasks(plan.tasks ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = getErrorMessage(e, "生成计划失败");
+      if (msg) setError(msg);
     } finally {
       setLoading(false);
     }
@@ -70,15 +89,16 @@ export default function PlanPage() {
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, done: !t.done } : t));
 
     try {
-      const res = await fetch("/api/plan/save", {
+      await requestJson<StudyPlan>("/api/plan/save", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: "demo", taskId, done: !task.done }),
       });
-      if (!res.ok) throw new Error("打卡失败");
-    } catch {
-      // 回滚
+    } catch (e) {
+      // 回滚乐观更新
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, done: task.done } : t));
+      const msg = getErrorMessage(e, "打卡失败");
+      if (msg) setError(msg);
     } finally {
       setTogglingId(null);
     }
@@ -140,11 +160,31 @@ export default function PlanPage() {
 
       {error && <div className="card border-red-500/40 text-sm text-red-400">{error}</div>}
 
+      {/* ENDPOINT_DISABLED 提示 */}
+      {endpointDisabled && (
+        <div className="card text-sm text-slate-300">
+          请在鸿学伴 HarmonyOS App 中查看或操作
+        </div>
+      )}
+
       {/* 初始加载 */}
       {initialLoading && (
         <div className="card flex items-center justify-center py-12">
           <Loader2 size={24} className="animate-spin text-brand-500" />
           <span className="ml-3 text-sm text-slate-400">加载学习计划...</span>
+        </div>
+      )}
+
+      {/* 加载失败 + 重试 */}
+      {loadFailed && !initialLoading && (
+        <div className="card flex items-center justify-between">
+          <span className="text-sm text-red-400">加载学习计划失败，请重试</span>
+          <button
+            onClick={() => loadPlan()}
+            className="rounded-lg border border-slate-700/60 px-4 py-2 text-sm text-slate-300 transition hover:border-brand-500/50"
+          >
+            重试
+          </button>
         </div>
       )}
 

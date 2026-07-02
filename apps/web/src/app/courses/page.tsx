@@ -3,30 +3,48 @@
 import { useEffect, useState } from "react";
 import { BookOpen, FileText } from "lucide-react";
 import type { Course } from "@/lib/types";
+import { requestJson, getErrorMessage } from "@/lib/client-api";
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/courses?userId=demo");
-        if (!res.ok) throw new Error(`加载失败 (HTTP ${res.status})`);
-        const data = (await res.json()) as { courses?: Course[] };
+        const data = await requestJson<{ courses: Course[] }>(
+          "/api/courses?userId=demo",
+          undefined,
+          controller.signal
+        );
+        if (!active) return;
         setCourses(data.courses ?? []);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "课程加载失败");
+        if (!active) return;
+        const msg = getErrorMessage(e, "课程数据获取失败");
+        if (msg === null) return; // AbortError：请求被取消，不作为业务失败
+        setError(msg);
         setCourses([]);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     load();
-  }, []);
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [retryKey]);
+
+  const retry = () => setRetryKey((k) => k + 1);
 
   return (
     <div className="space-y-6">
@@ -42,8 +60,15 @@ export default function CoursesPage() {
       )}
 
       {error && (
-        <div className="card border-red-500/30">
+        <div className="card flex items-center justify-between border-red-500/30">
           <p className="text-sm text-red-400">{error}</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-300 transition hover:border-brand-500/50 hover:text-brand-100"
+          >
+            重试
+          </button>
         </div>
       )}
 

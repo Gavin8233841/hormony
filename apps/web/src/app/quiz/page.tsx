@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Brain, Loader2, CheckCircle2, XCircle, Target, TrendingDown, RefreshCw, History } from "lucide-react";
 import type { QuizView, QuizResult, QuizAnswer } from "@/lib/types";
+import { requestJson, getErrorMessage, isEndpointDisabled } from "@/lib/client-api";
 
 export default function QuizPage() {
   const [courseId, setCourseId] = useState("cs101");
@@ -18,24 +19,38 @@ export default function QuizPage() {
   const [error, setError] = useState("");
   const [history, setHistory] = useState<QuizResult[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+  const [endpointDisabled, setEndpointDisabled] = useState(false);
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (signal?: AbortSignal) => {
     setHistoryLoading(true);
+    setHistoryError("");
+    setEndpointDisabled(false);
     try {
-      const res = await fetch("/api/quiz?userId=demo");
-      if (res.ok) {
-        const data = await res.json();
-        setHistory(data.results ?? []);
+      const data = await requestJson<{ results: QuizResult[] }>("/api/quiz?userId=demo", undefined, signal);
+      setHistory(data.results ?? []);
+    } catch (e) {
+      if (isEndpointDisabled(e)) {
+        setEndpointDisabled(true);
+        return;
       }
-    } catch {
-      // 静默失败
+      const msg = getErrorMessage(e, "获取测验数据失败");
+      if (msg === null) {
+        // AbortError — 不显示错误
+        return;
+      }
+      setHistoryError(msg);
     } finally {
-      setHistoryLoading(false);
+      if (!signal?.aborted) {
+        setHistoryLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    loadHistory();
+    const controller = new AbortController();
+    loadHistory(controller.signal);
+    return () => controller.abort();
   }, [loadHistory]);
 
   const generate = async () => {
@@ -45,7 +60,7 @@ export default function QuizPage() {
     setResult(null);
     setAnswers({});
     try {
-      const res = await fetch("/api/quiz", {
+      const data = await requestJson<QuizView>("/api/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -56,11 +71,10 @@ export default function QuizPage() {
           difficulty,
         }),
       });
-      if (!res.ok) throw new Error("生成失败");
-      const data = (await res.json()) as QuizView;
       setQuiz(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "生成测验失败");
+      const msg = getErrorMessage(e, "生成测验失败");
+      if (msg) setError(msg);
     } finally {
       setLoading(false);
     }
@@ -75,7 +89,7 @@ export default function QuizPage() {
         questionId: q.id,
         userAnswer: answers[q.id] ?? "",
       }));
-      const res = await fetch("/api/quiz/submit", {
+      const data = await requestJson<QuizResult>("/api/quiz/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -84,12 +98,11 @@ export default function QuizPage() {
           answers: answerList,
         }),
       });
-      if (!res.ok) throw new Error("提交失败");
-      const data = (await res.json()) as QuizResult;
       setResult(data);
       loadHistory(); // 刷新历史
     } catch (e) {
-      setError(e instanceof Error ? e.message : "提交测验失败");
+      const msg = getErrorMessage(e, "提交测验失败");
+      if (msg) setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -355,7 +368,15 @@ export default function QuizPage() {
             <History size={18} className="text-slate-400" />
             <h3 className="font-semibold">测验记录</h3>
           </div>
-          {historyLoading ? (
+          {endpointDisabled ? (
+            <p className="py-6 text-center text-sm text-slate-400">
+              请在鸿学伴 HarmonyOS App 中查看
+            </p>
+          ) : historyError ? (
+            <p className="py-6 text-center text-sm text-red-400">
+              {historyError}
+            </p>
+          ) : historyLoading ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 size={20} className="animate-spin text-slate-500" />
             </div>

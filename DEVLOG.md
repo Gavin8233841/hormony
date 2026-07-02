@@ -5106,3 +5106,39 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 当前批次不修改 Web 端 Agent/API；Plan/Quiz 真实可用性由后续 Web handoff 线程继续推进。
 - 旧历史消息在本批次前未保存 `thinking` 的主 Agent 步骤时只能展示已有 `agentTrace`，不会伪造缺失步骤；新历史会保留 `thinking`。
+
+---
+
+## 2026-07-02 Codex：Web API 消费层错误边界收口
+
+背景：继续处理“真实可用”而非浅层视觉问题；本批次复核并采用 Trae 的 Web 前端 API 消费层改动，让 Web 页面不再把非 2xx 响应、端点禁用、请求取消或模型错误误当作成功数据或静默失败。
+
+文件：
+- apps/web/src/lib/client-api.ts
+- apps/web/src/lib/client-api.test.ts
+- apps/web/src/app/page.tsx
+- apps/web/src/app/courses/page.tsx
+- apps/web/src/app/plan/page.tsx
+- apps/web/src/app/quiz/page.tsx
+- apps/web/src/app/knowledge/page.tsx
+- apps/web/src/app/profile/page.tsx
+- docs/TRAE-WEB-RESILIENCE-RESULT.md
+
+行为变化：
+- 新增零依赖 `requestJson<T>` 与 `ApiError`，仅在 `response.ok` 时返回成功数据，非 2xx 保留 HTTP status、服务端 `error` 和 `code`。
+- 错误响应解析不接受非对象 JSON、数组或非字符串 `error/code`，未知结构降级为带 HTTP 状态的错误消息。
+- Dashboard、Courses、Plan、Quiz、Knowledge、Profile 页面区分加载、空态、错误、重试、请求取消和 `ENDPOINT_DISABLED` 引导。
+- 计划与测验页面保留服务端 `MODEL_UNAVAILABLE`、`MODEL_INVALID_RESPONSE`、`RATE_LIMITED` 等真实错误消息，不再统一替换成“生成失败”。
+- Knowledge 与 Profile 的加载请求加入 AbortController 身份校验，避免旧请求覆盖新状态；错误时保留用户输入。
+- Codex 复核修正 `client-api.test.ts` 网络异常用例，使同一次请求同时证明原始 `TypeError` 不会被包装为 `ApiError`。
+
+验证：
+- `cd apps/web; pnpm lint`：exit 0。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，12 files / 139 tests passed。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build completed。
+- `git diff --check`：exit 0。
+
+未验证：
+- 本批次未进行浏览器端手工点击验收，证据等级为静态诊断通过与构建通过。
+- 本批次不修改 Web API 路由、Agent、RAG 或模型配置；线上 Vercel 端点未重新回归。

@@ -4,27 +4,48 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MessageSquare, BookOpen, CalendarDays, Target, TrendingUp, ShieldCheck, Database } from "lucide-react";
 import type { DashboardStats } from "@/lib/types";
+import { requestJson, getErrorMessage } from "@/lib/client-api";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
     const load = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch("/api/stats?userId=demo");
-        if (res.ok) {
-          const data = (await res.json()) as DashboardStats;
-          setStats(data);
-        }
-      } catch {
-        // 降级到默认值
+        const data = await requestJson<DashboardStats>(
+          "/api/stats?userId=demo",
+          undefined,
+          controller.signal
+        );
+        if (!active) return;
+        setStats(data);
+      } catch (e) {
+        if (!active) return;
+        const msg = getErrorMessage(e, "统计数据获取失败");
+        if (msg === null) return; // AbortError：请求被取消，不作为业务失败
+        setError(msg);
+        setStats(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     load();
-  }, []);
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [retryKey]);
+
+  const retry = () => setRetryKey((k) => k + 1);
 
   const totalQuestions = stats?.totalQuestions ?? 0;
   const accuracy = stats ? Math.round(stats.accuracy * 100) : 0;
@@ -42,11 +63,24 @@ export default function DashboardPage() {
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-4 gap-4">
-        <StatCard icon={MessageSquare} label="累计提问" value={loading ? "…" : String(totalQuestions)} color="text-brand-100" />
-        <StatCard icon={Target} label="答题正确率" value={loading ? "…" : `${accuracy}%`} color="text-emerald-400" />
-        <StatCard icon={CalendarDays} label="连续学习" value={loading ? "…" : `${studyDays} 天`} color="text-amber-400" />
-        <StatCard icon={BookOpen} label="进行中课程" value={loading ? "…" : `${activeCourses} 门`} color="text-purple-400" />
+        <StatCard icon={MessageSquare} label="累计提问" value={loading ? "…" : error ? "—" : String(totalQuestions)} color="text-brand-100" />
+        <StatCard icon={Target} label="答题正确率" value={loading ? "…" : error ? "—" : `${accuracy}%`} color="text-emerald-400" />
+        <StatCard icon={CalendarDays} label="连续学习" value={loading ? "…" : error ? "—" : `${studyDays} 天`} color="text-amber-400" />
+        <StatCard icon={BookOpen} label="进行中课程" value={loading ? "…" : error ? "—" : `${activeCourses} 门`} color="text-purple-400" />
       </div>
+
+      {error && (
+        <div className="card flex items-center justify-between border-red-500/30">
+          <p className="text-sm text-red-400">统计数据暂不可用</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-300 transition hover:border-brand-500/50 hover:text-brand-100"
+          >
+            重试
+          </button>
+        </div>
+      )}
 
       {/* 快捷入口 */}
       <div className="grid grid-cols-3 gap-4">
