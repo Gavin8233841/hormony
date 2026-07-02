@@ -5291,6 +5291,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-02 Codex：主线合入鸿蒙1.12 Web AI/RAG 可靠性
+
+背景：将 handoff 分支 `codex/harmony-1.12-web-ai-reliability` 的两枚已推送提交合入主线，覆盖 Web AI/API 运行时校验、模型超时取消、输出 Safety、Quiz 服务端评分一致性、RAG 命中质量和端侧离线检索效率。
+
+合入提交：
+- `9f24d0c feat: 增强 Web AI API 可靠性` → 主线 `8ca3927`
+- `ba986a9 perf: 优化端侧 AI 检索效率` → 主线 `640e71e`
+
+验证：
+- `cd apps/web; pnpm lint`：exit 0。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，13 files / 161 tests passed。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build completed。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，BUILD SUCCESSFUL in 15 s 497 ms；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 本批次未部署到 Vercel，线上 Health、Chat SSE、Plan、Quiz 未回归。
+- 未进行模拟器 UI 树/截图验收；证据等级为静态诊断通过与构建通过。
+
+---
+
 ## 2026-07-02 Codex：鸿蒙1.12 端侧核心效率优化
 
 背景：用户明确要求不把精力放在 Web UI / admin 等非竞赛交付面，本批次聚焦服务 HarmonyOS 端侧 App 的核心性能与效率：端侧课程内容查询、Chat/Quiz 依赖的 RAG 检索、以及聊天编排中无用前置检索。
