@@ -69,6 +69,40 @@ function Find-ElementByText($uiTree, $text) {
     return Search-Node $uiTree $text
 }
 
+function Find-ElementByTextContains($uiTree, $textPart) {
+    function Search-Node($node, $part) {
+        $results = @()
+        if ($node.attributes.text -ne $null -and $node.attributes.visible -eq 'true' -and
+            ([string]$node.attributes.text).Contains($part)) {
+            $results += $node
+        }
+        if ($node.children) {
+            foreach ($child in $node.children) {
+                $results += Search-Node $child $part
+            }
+        }
+        return $results
+    }
+    return Search-Node $uiTree $textPart
+}
+
+function Find-ElementByTextPrefix($uiTree, $textPrefix) {
+    function Search-Node($node, $prefix) {
+        $results = @()
+        if ($node.attributes.text -ne $null -and $node.attributes.visible -eq 'true' -and
+            ([string]$node.attributes.text).StartsWith($prefix)) {
+            $results += $node
+        }
+        if ($node.children) {
+            foreach ($child in $node.children) {
+                $results += Search-Node $child $prefix
+            }
+        }
+        return $results
+    }
+    return Search-Node $uiTree $textPrefix
+}
+
 function Find-OptionA($uiTree) {
     function Search-Node($node) {
         $results = @()
@@ -142,27 +176,136 @@ function Click-Element($textPattern, $description) {
     return $true
 }
 
+function Click-ElementByTextPrefix($textPrefix, $description) {
+    $uiTree = Get-UiTree
+    if (-not $uiTree) {
+        Write-Step "Click: $description" "FAIL" "UI tree not available"
+        return $false
+    }
+    $elements = Find-ElementByTextPrefix $uiTree $textPrefix
+    if ($elements.Count -eq 0) {
+        Write-Step "Click: $description" "FAIL" "Element prefix not found: $textPrefix"
+        return $false
+    }
+    $target = $elements[0]
+    $center = Get-BoundsCenter $target.attributes.bounds
+    if (-not $center) {
+        Write-Step "Click: $description" "FAIL" "Cannot parse bounds: $($target.attributes.bounds)"
+        return $false
+    }
+    $parts = $center -split ' '
+    Invoke-HdcShell @("uitest", "uiInput", "click", $parts[0], $parts[1]) | Out-Null
+    Start-Sleep -Seconds 1
+    Write-Step "Click: $description" "PASS" "at ($($parts[0]), $($parts[1]))"
+    return $true
+}
+
 function Take-Screenshot($name) {
     $devicePath = "/data/local/tmp/smoke_screenshot.jpeg"
-    Invoke-HdcShell @("snapshot_display", "-f", $devicePath) | Out-Null
+    $snapshotOutput = Invoke-HdcShell @("snapshot_display", "-f", $devicePath)
+    $snapshotExit = $LASTEXITCODE
     $localPath = Join-Path $SCREENSHOT_DIR "$name.jpeg"
-    & $HDC file recv $devicePath $localPath 2>&1 | Out-Null
-    if (Test-Path $localPath) {
+    $recvOutput = & $HDC file recv $devicePath $localPath 2>&1
+    $recvExit = $LASTEXITCODE
+    if ($snapshotExit -eq 0 -and $recvExit -eq 0 -and (Test-Path $localPath) -and
+        (Get-Item -LiteralPath $localPath).Length -gt 0) {
         Write-Step "Screenshot: $name" "PASS" $localPath
     } else {
-        Write-Step "Screenshot: $name" "FAIL" "File not received"
+        Write-Step "Screenshot: $name" "FAIL" "snapshotExit=$snapshotExit recvExit=$recvExit output=$snapshotOutput $($recvOutput -join ' ')"
         exit 1
     }
 }
 
 function Verify-Page($pagePath, $description) {
-    $actual = Get-PagePath (Get-UiTree)
-    if ($actual -ne $pagePath) {
-        Write-Step "Page: $description" "FAIL" "expected=$pagePath actual=$actual"
+    return Wait-Page $pagePath $description
+}
+
+function Wait-Page($pagePath, $description, $timeoutMs = 5000) {
+    $deadline = (Get-Date).AddMilliseconds($timeoutMs)
+    $actual = $null
+    $lastError = ""
+    do {
+        try {
+            $actual = Get-PagePath (Get-UiTree)
+            if ($actual -eq $pagePath) {
+                Write-Step "Page: $description" "PASS" $actual
+                return $true
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    $detail = "expected=$pagePath actual=$actual"
+    if ($lastError) { $detail = "$detail lastError=$lastError" }
+    Write-Step "Page: $description" "FAIL" $detail
+    return $false
+}
+
+function Wait-TextExists($textPattern, $description, $timeoutMs = 5000) {
+    $deadline = (Get-Date).AddMilliseconds($timeoutMs)
+    $lastError = ""
+    do {
+        try {
+            $uiTree = Get-UiTree
+            if ($uiTree) {
+                $elements = Find-ElementByText $uiTree $textPattern
+                if ($elements.Count -gt 0) {
+                    Write-Step "Verify: $description" "PASS" "Found: $textPattern"
+                    return $true
+                }
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    $detail = "Not found: $textPattern"
+    if ($lastError) { $detail = "$detail lastError=$lastError" }
+    Write-Step "Verify: $description" "FAIL" $detail
+    return $false
+}
+
+function Wait-TextContains($textPart, $description, $timeoutMs = 5000) {
+    $deadline = (Get-Date).AddMilliseconds($timeoutMs)
+    $lastError = ""
+    do {
+        try {
+            $uiTree = Get-UiTree
+            if ($uiTree) {
+                $elements = Find-ElementByTextContains $uiTree $textPart
+                if ($elements.Count -gt 0) {
+                    Write-Step "Verify: $description" "PASS" "Contains: $textPart"
+                    return $true
+                }
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    $detail = "Not found containing: $textPart"
+    if ($lastError) { $detail = "$detail lastError=$lastError" }
+    Write-Step "Verify: $description" "FAIL" $detail
+    return $false
+}
+
+function Test-TextExists($textPattern) {
+    try {
+        $uiTree = Get-UiTree
+        if (-not $uiTree) { return $false }
+        $elements = Find-ElementByText $uiTree $textPattern
+        return $elements.Count -gt 0
+    } catch {
         return $false
     }
-    Write-Step "Page: $description" "PASS" $actual
-    return $true
+}
+
+function Verify-TextExists($textPattern, $description) {
+    return Wait-TextExists $textPattern $description
 }
 
 function Click-FirstOptionA() {
@@ -206,22 +349,6 @@ function Swipe-Viewport($direction) {
     return $true
 }
 
-function Verify-TextExists($textPattern, $description) {
-    $uiTree = Get-UiTree
-    if (-not $uiTree) {
-        Write-Step "Verify: $description" "FAIL" "UI tree not available"
-        return $false
-    }
-    $elements = Find-ElementByText $uiTree $textPattern
-    if ($elements.Count -gt 0) {
-        Write-Step "Verify: $description" "PASS" "Found: $textPattern"
-        return $true
-    } else {
-        Write-Step "Verify: $description" "FAIL" "Not found: $textPattern"
-        return $false
-    }
-}
-
 # ==================== 主流程 ====================
 
 Write-Output "========================================"
@@ -234,12 +361,13 @@ Write-Output ""
 # 0. 检查设备连接
 Write-Output "[INFO] Checking device connection..."
 $deviceList = & $HDC list targets 2>&1
-if ($deviceList -match "No device" -or $deviceList -match "Empty") {
-    Write-Step "Device connection" "FAIL" "No device found"
+$deviceTargets = @($deviceList | Where-Object { $_ -match '\S' -and $_ -notmatch 'No device' -and $_ -notmatch 'Empty' })
+if ($deviceTargets.Count -ne 1) {
+    Write-Step "Device connection" "FAIL" "Expected exactly one device, actual=$($deviceTargets.Count), output=$($deviceList -join ' ')"
     Write-Output "`n=== SUMMARY: $script:passCount passed, $script:failCount failed ==="
     exit 1
 }
-Write-Step "Device connection" "PASS" $deviceList.Trim()
+Write-Step "Device connection" "PASS" $deviceTargets[0].Trim()
 
 # 1. 构建增量 HAP（不 clean）
 Write-Output "`n[INFO] Building HAP (incremental, no clean)..."
@@ -285,8 +413,8 @@ for ($attempt = 0; $attempt -lt 8; $attempt++) {
     Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
     Start-Sleep -Milliseconds 500
 }
-Take-Screenshot "01-launch"
 if (-not (Verify-Page "pages/Index" "Root")) { exit 1 }
+Take-Screenshot "01-launch"
 
 # 4. 验证首页 Tab (今日)
 Write-Output "`n[INFO] Verifying Home tab..."
@@ -305,7 +433,7 @@ if ($uiTree) {
 # 5. 点击"课程" Tab
 Write-Output "`n[INFO] Navigating to Course tab..."
 Click-Element "课程" "Course tab" | Out-Null
-Start-Sleep -Seconds 2
+if (-not (Wait-TextExists "数据结构" "Course tab ready")) { exit 1 }
 Take-Screenshot "02-course-tab"
 
 # 6. 验证课程列表
@@ -353,8 +481,13 @@ if (-not (Verify-TextExists "逐题复盘" "Question review")) { exit 1 }
 Take-Screenshot "05-practice-result"
 
 # 9. 从错题解析进入真实学伴，再返回主框架
+if (-not (Test-TextExists "向学伴追问")) {
+    if (-not (Click-ElementByTextPrefix "1. " "Expand first review item")) { exit 1 }
+}
+if (-not (Verify-TextExists "向学伴追问" "Review tutor action")) { exit 1 }
 if (-not (Click-Element "向学伴追问" "Ask tutor from review")) { exit 1 }
 if (-not (Verify-Page "pages/Chat" "Tutor follow-up")) { exit 1 }
+if (-not (Wait-TextContains "请结合课程资料讲解这道题：" "Tutor follow-up prompt")) { exit 1 }
 Take-Screenshot "06-review-chat"
 Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
 Start-Sleep -Milliseconds 500
@@ -384,13 +517,14 @@ if (-not (Swipe-Viewport "down")) { exit 1 }
 
 # 16. 验证三个 Profile 子页面
 foreach ($profilePage in @(
-    @{ Text = '学习记录'; Path = 'pages/ActivityRecords'; Shot = '09-activity-records' },
-    @{ Text = '错题本'; Path = 'pages/MistakeBook'; Shot = '10-mistake-book' },
-    @{ Text = '成就'; Path = 'pages/Achievements'; Shot = '11-achievements' }
+    @{ Text = '学习记录'; Path = 'pages/ActivityRecords'; Shot = '09-activity-records'; Content = '提交练习' },
+    @{ Text = '错题本'; Path = 'pages/MistakeBook'; Shot = '10-mistake-book'; Content = '查看解析' },
+    @{ Text = '成就'; Path = 'pages/Achievements'; Shot = '11-achievements'; Content = '里程碑进度' }
 )) {
     if (-not (Click-Element $profilePage.Text $profilePage.Text)) { exit 1 }
     if (-not (Verify-Page $profilePage.Path $profilePage.Text)) { exit 1 }
     if (-not (Verify-TextExists $profilePage.Text $profilePage.Text)) { exit 1 }
+    if (-not (Verify-TextExists $profilePage.Content "$($profilePage.Text) content")) { exit 1 }
     Take-Screenshot $profilePage.Shot
     Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
     Start-Sleep -Milliseconds 500
@@ -400,10 +534,15 @@ foreach ($profilePage in @(
 if (-not (Click-Element "学习星图" "Learning map")) { exit 1 }
 if (-not (Verify-Page "pages/LearningMap" "Learning map")) { exit 1 }
 $mapIndex = 12
-foreach ($courseName in @('数据结构', '操作系统', '计算机网络')) {
-    if (-not (Click-Element $courseName "Learning map: $courseName")) { exit 1 }
+foreach ($mapCourse in @(
+    @{ Name = '数据结构'; FirstTopic = '数组与线性表' },
+    @{ Name = '操作系统'; FirstTopic = '进程与线程' },
+    @{ Name = '计算机网络'; FirstTopic = 'OSI与TCP/IP模型' }
+)) {
+    if (-not (Click-Element $mapCourse.Name "Learning map: $($mapCourse.Name)")) { exit 1 }
+    if (-not (Verify-TextExists $mapCourse.FirstTopic "Learning map first topic: $($mapCourse.Name)")) { exit 1 }
     if (-not (Verify-TextExists "Level 0" "Learning map graph level")) { exit 1 }
-    Take-Screenshot (("{0:D2}-learning-map-{1}" -f $mapIndex, $courseName))
+    Take-Screenshot (("{0:D2}-learning-map-{1}" -f $mapIndex, $mapCourse.Name))
     $mapIndex++
 }
 Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null

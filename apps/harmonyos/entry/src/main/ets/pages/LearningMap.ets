@@ -24,6 +24,11 @@ interface MapEdge {
   active: boolean;
 }
 
+interface RelationLevelBucket {
+  level: number;
+  relations: TopicRelation[];
+}
+
 interface NebulaStar {
   x: number;
   y: number;
@@ -91,16 +96,41 @@ struct LearningMapPage {
     this.selectedCourseId = course.id;
     this.selectedCourseTitle = course.title;
     this.selectedTopic = '';
+    this.message = '';
+    this.applyCourseMap(course.id, []);
     const mastery = await LocalLearningRepository.getTopicMastery(course.id);
-    const relations = LearningContentRepository.getTopicRelations(course.id);
+    this.applyCourseMap(course.id, mastery);
+  }
+
+  private handleCourseClick(course: Course): void {
+    this.selectCourse(course).catch((error: Error): void => {
+      this.message = '课程星图切换失败';
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'LearningMapPage course switch failed: %{public}s', error.message);
+    });
+  }
+
+  private applyCourseMap(courseId: string, mastery: TopicMastery[]): void {
+    const relations = LearningContentRepository.getTopicRelations(courseId);
+    const levelBuckets: RelationLevelBucket[] = [];
+    for (const relation of relations) {
+      let bucket = levelBuckets.find((item: RelationLevelBucket): boolean => item.level === relation.level);
+      if (bucket === undefined) {
+        bucket = { level: relation.level, relations: [] };
+        levelBuckets.push(bucket);
+      }
+      bucket.relations.push(relation);
+    }
     const nextNodes: MapNode[] = [];
     const levels: number[] = [];
     let maxLevel = 0;
     for (let relationIndex = 0; relationIndex < relations.length; relationIndex++) {
       const relation = relations[relationIndex];
-      const peers = relations.filter((item: TopicRelation): boolean => item.level === relation.level);
+      const levelBucket = levelBuckets.find((item: RelationLevelBucket): boolean => item.level === relation.level);
+      const peers = levelBucket === undefined ? [] : levelBucket.relations;
       const peerIndex = peers.findIndex((item: TopicRelation): boolean => item.id === relation.id);
-      const item = mastery.find((value: TopicMastery): boolean => value.topic === relation.topic) ?? null;
+      const item = mastery.find((value: TopicMastery): boolean =>
+        value.courseId === courseId && value.topic === relation.topic) ?? null;
       if (!levels.includes(relation.level)) levels.push(relation.level);
       maxLevel = Math.max(maxLevel, relation.level);
       nextNodes.push({
@@ -202,7 +232,7 @@ struct LearningMapPage {
           .fontColor(this.selectedCourseId === course.id ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
           .backgroundColor(this.selectedCourseId === course.id ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BG_TAG)
           .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => { this.selectCourse(course); })
+          .onClick((): void => { this.handleCourseClick(course); })
       })
     }
     .width('100%')

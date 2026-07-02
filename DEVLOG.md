@@ -5223,3 +5223,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 健康探测短超时的线上请求次数与耗时未用网关日志或 Profiler 量化。
 - 学习星图第三门课程的全量脚本失败仍需单独排查是 UI 等待、滚动位置还是点击目标选择问题。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.12 学习星图与模拟器验收稳定性
+
+背景：继续只服务 HarmonyOS 端侧 App。上一轮完整冒烟已经通过练习、画像和前两门学习星图，但在学习星图点击“计算机网络”后未找到 `Level 0`；复跑时还观察到课程 Tab 进入后 UI 树与截图/页面稳定存在短暂不同步，说明验收脚本固定等待会误判端侧核心流程。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets
+- scripts/harmonyos-app-smoke.ps1
+
+行为变化：
+- 学习星图切课时先用本地课程关系同步渲染拓扑，再异步补充掌握状态；课程关系不再等待 `getTopicMastery()` 完成才显示。
+- 课程按钮点击改为带错误边界的 `handleCourseClick()`，异步失败时写入页面错误信息并输出 hilog，不产生未处理 Promise。
+- 学习星图构图按 level 预分组，避免每个节点重复 `filter` 全部关系。
+- 模拟器冒烟脚本新增 `Wait-Page()` 与 `Wait-TextExists()`，页面和文本校验改为轮询 UI 树，课程 Tab 截图前等待“数据结构”出现。
+- 学习星图三门课验收不再只检查通用 `Level 0`，同时检查每门课首个主题：`数组与线性表`、`进程与线程`、`OSI与TCP/IP模型`，确保第三门课切换真实完成。
+- 冒烟脚本截图步骤检查 `snapshot_display`、`hdc file recv` 退出码和本地 JPEG 文件长度，避免空截图或接收失败被记为通过。
+- 练习复盘进入学伴前显式确认 `向学伴追问` 可见，进入 Chat 后验证输入内容包含 `请结合课程资料讲解这道题：`，覆盖复盘到待发送追问的端侧状态传递。
+- Profile 子页不再只验证标题，学习记录检查 `提交练习`，错题本检查 `查看解析`，成就检查 `里程碑进度`。
+- 设备连接检查要求 `hdc list targets` 恰好返回一个有效目标，减少多设备或无设备时的误验收。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 17 s 746 ms`；仍提示未配置 signingConfigs。
+- 首次脚本语法检查命令因外层 PowerShell 变量展开写法错误 exit 1，未完成脚本检查；随后使用单引号重跑 `pwsh -NoProfile -Command '[scriptblock]::Create((Get-Content -Raw -Path "scripts/harmonyos-app-smoke.ps1")) | Out-Null'`：exit 0。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，73 passed / 0 failed；覆盖构建、安装、启动、首页、课程、课程详情、精选练习 5 题、错题追问、学伴页、画像页、学习记录、错题本、成就、学习星图三门课程和回到首页。截图证据位于 `screenshots/trae-smoke-20260703-001758/`，不提交。
+- 加强业务锚点后重跑 `pwsh -NoProfile -Command '[scriptblock]::Create((Get-Content -Raw -Path "scripts/harmonyos-app-smoke.ps1")) | Out-Null'`：exit 0。
+- 加强业务锚点后重跑 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，78 passed / 0 failed；新增覆盖复盘追问前缀、学习记录真实提交、错题本解析入口、成就内容和截图非空。截图证据位于 `screenshots/trae-smoke-20260703-002639/`，不提交。
+
+未验证：
+- 真机未验证。
+- 未用 DevEco Profiler 量化学习星图切课耗时；本批次证据等级为构建通过与模拟器通过。
