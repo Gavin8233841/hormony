@@ -5315,3 +5315,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未做模拟器页面截图；本批次为本地状态聚合逻辑，证据等级为构建通过。
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex 鸿蒙1.13：题库难度分层硬约束
+
+背景：继续自审题库是否真正适配新手、中等和进阶用户。统计端侧 165 道选择题后发现 `cs102`、`cs103` 没有挑战题，且“文件系统”“OSI与TCP/IP模型”“HTTP协议”“网络层与IP协议”4 个 Topic 全是基础题，难度分层不足。本批次只调整精确题号的难度映射，并把分布要求写成测试，避免后续回退。
+
+文件：
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+
+行为变化：
+- 将 `cs102_q14`、`cs102_q40`、`cs103_q28`、`cs103_q40`、`cs103_q59` 调整为 `medium`。
+- 将 `cs102_q38`、`cs103_q30`、`cs103_q42`、`cs103_q60` 调整为 `hard`。
+- 重新生成 HarmonyOS rawfile 题库，保持 Web 源与端侧 JSON 完全一致。
+- `data-integrity.test.ts` 增加难度分布约束：每门课程选择题必须覆盖 `easy`、`medium`、`hard` 三档；每个真实 Topic 的 5 道选择题至少覆盖两档难度。
+- 当前统计：`cs101 easy=21 medium=35 hard=4`，`cs102 easy=32 medium=17 hard=1`，`cs103 easy=34 medium=18 hard=3`；单一难度 Topic 数为 0。
+
+验证：
+- `node scripts/generate-quizzes-json.mjs`：exit 0，生成 165 道选择题并通过 Web 源与端侧 JSON 完全一致校验。
+- `python scripts/validate-topic-relations.py`：exit 0，全部检查通过。
+- `cd apps/web; pnpm test -- src/lib/data/data-integrity.test.ts`：exit 0，11 files / 115 tests passed。
+- `cd apps/web; pnpm lint`：exit 0，无 ESLint warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 成功。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 508 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 本批次为题库数据与测试约束变更，未新增模拟器截图。
+- 真机未验证。

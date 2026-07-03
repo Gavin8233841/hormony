@@ -116,11 +116,14 @@ describe("课程数据资产完整性", () => {
 
   it("每门课程选择题数量应不少于 20 道", () => {
     for (const courseId of COURSE_IDS) {
-      const choiceCount = allQuizzes
+      const choiceQuestions = allQuizzes
         .filter((quiz) => quiz.courseId === courseId)
         .flatMap((quiz) => quiz.questions)
-        .filter((question) => question.type === "choice").length;
+        .filter((question) => question.type === "choice");
+      const choiceCount = choiceQuestions.length;
       expect(choiceCount).toBeGreaterThanOrEqual(MINIMUM_COUNTS[courseId].choices);
+      const difficultyLevels = new Set(choiceQuestions.map((question) => question.difficulty));
+      expect(difficultyLevels).toEqual(new Set(["easy", "medium", "hard"]));
     }
   });
 
@@ -166,6 +169,8 @@ describe("课程数据资产完整性", () => {
         (question) => question.options?.length === 4
       );
       expect(choiceQuestions.length).toBe(5);
+      const difficultyLevels = new Set(choiceQuestions.map((question) => question.difficulty));
+      expect(difficultyLevels.size).toBeGreaterThanOrEqual(2);
 
       for (const question of choiceQuestions) {
         expect(question.options).toHaveLength(4);
