@@ -5200,6 +5200,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-03 Codex 鸿蒙1.13：标签练习目标保留最近错因主题
+
+背景：继续自审标签洞察的行动质量。`tag_insights` 会统计同标签下所有题目，原逻辑每道题都会刷新 `lastCourseId` 和 `lastTopic`；当某个标签仍有历史错题时，后续同标签正确题会把“去练习”目标覆盖到非错因主题，削弱“薄弱在哪里、下一步练什么”的解释力。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+
+行为变化：
+- 标签洞察仍用全部题目更新题量、正确率、难度分布和最近练习时间。
+- `lastCourseId` / `lastTopic` 只在本题答错，或该标签当前没有错题时更新；有错题的标签会把练习入口保留在最近错因主题。
+- Profile 与 ActivityRecords 的“去练习”入口因此更稳定地指向需要复盘的主题。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 638 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未新增模拟器截图；本批次为本地聚合目标选择逻辑，证据等级为构建通过。
+- 真机未验证。
+
+---
+
 ## 2026-07-03 Codex 鸿蒙1.13：增强学习星图推荐路径表达
 
 背景：继续对照 subagent 只读审计结果和知识图谱信息架构要求自查。原 LearningMap 只把推荐节点放大，未把“已掌握先修 -> 下一步主题”的路径表达出来；横向星图也关闭滚动条，窄屏下右侧节点不够可见。本批次不做浅层换色，而是把先修方向、推荐路径、未解锁状态和图例语义补齐。

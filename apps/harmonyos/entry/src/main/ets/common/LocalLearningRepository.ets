@@ -584,8 +584,10 @@ export class LocalLearningRepository {
         item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
         item.lastPracticedAt = result.submittedAt;
         item.lastDifficulty = difficulty;
-        item.lastCourseId = result.courseId;
-        item.lastTopic = detailTopic;
+        if (!detail.isCorrect || item.wrongQuestions === 0) {
+          item.lastCourseId = result.courseId;
+          item.lastTopic = detailTopic;
+        }
         item.weakReason = LocalLearningRepository.tagWeakReason(item);
         item.nextStep = LocalLearningRepository.tagNextStep(item);
       }
