@@ -78,6 +78,28 @@ struct ActivityRecordsPage {
     return Constants.COLOR_BRAND_LIGHT;
   }
 
+  private tagMasteryLabel(item: TagInsight): string {
+    if (item.totalQuestions <= 0) return '未开始';
+    if (item.totalQuestions < 3) return '已接触';
+    if (item.accuracy < 0.6) return '待巩固';
+    if (item.accuracy < 0.8) return '熟悉中';
+    return '已掌握';
+  }
+
+  private tagMasteryColor(item: TagInsight): string {
+    if (item.totalQuestions < 3) return Constants.COLOR_TEXT_TERTIARY;
+    if (item.accuracy < 0.6) return Constants.COLOR_ERROR;
+    if (item.accuracy < 0.8) return Constants.COLOR_WARNING;
+    return Constants.COLOR_SUCCESS;
+  }
+
+  private tagMasteryBackground(item: TagInsight): string {
+    if (item.totalQuestions < 3) return Constants.COLOR_BG_TAG;
+    if (item.accuracy < 0.6) return Constants.COLOR_ERROR_LIGHT;
+    if (item.accuracy < 0.8) return Constants.COLOR_BG_TAG;
+    return Constants.COLOR_SUCCESS_LIGHT;
+  }
+
   private isFirstOfDay(index: number): boolean {
     if (index === 0) return true;
     return this.events[index - 1].timestamp.slice(0, 10) !== this.events[index].timestamp.slice(0, 10);
@@ -145,9 +167,16 @@ struct ActivityRecordsPage {
                         .padding({ left: 9, right: 9, top: 4, bottom: 4 })
                         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                         .borderRadius(Constants.RADIUS_SM)
+                      Text(this.tagMasteryLabel(item))
+                        .fontSize(10)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(this.tagMasteryColor(item))
+                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                        .backgroundColor(this.tagMasteryBackground(item))
+                        .borderRadius(9)
                       Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
                         .layoutWeight(1)
-                        .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                        .color(this.tagMasteryColor(item))
                         .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
                         .borderRadius(4)
                       Text(Math.round(item.accuracy * 100).toString() + '%')

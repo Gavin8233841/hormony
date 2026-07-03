@@ -5500,3 +5500,43 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次为文档与规格产出，未执行 Web/HarmonyOS 构建；原因是未修改源码、配置、依赖或资源目录。
 - 未进行模拟器 UI 树/截图验收，未进行真机验证。
 - 所有第三方素材、OHPM 包、Lottie、音效、字体加载和 ArkUI SVG 渲染仍为未验证，不得据此直接进入 HAP。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.15端侧前端P0产品化体验落地
+
+背景：在 1.15 资源猎采与产品化规格基础上，先落地不新增依赖的 P0 端侧体验：强化云端学伴 Markdown/代码块阅读、降低学生端技术术语、让标签洞察显示掌握层级、让学习星图表达先修方向与局部关系，并把 Quiz/Practice 结果页接到下一步复盘动作。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `Chat.ets` 的手写 Markdown 分块扩展代码围栏语言、代码行数组、表格单元格、引用块和列表层级；代码块新增语言标题、行数、行号、横向滚动和“解释这段”预填追问入口。
+- `Chat.ets` 学生端状态文案从“多 Agent 工作台”改为“回答生成过程”，Agent 步骤显示为“了解你、查资料、组织讲解、安排步骤、生成练习、分析薄弱点、内容核对”等学习语义；内部字段和 API 契约不变。
+- `Profile.ets` 与 `ActivityRecords.ets` 仅在 UI 层用现有标签统计推导“未开始、已接触、待巩固、熟悉中、已掌握”掌握层级，补充样本数、错题数和下一步说明，不改 ArkData schema。
+- `LearningMap.ets` 为边补充 `fromId/toId/fromTopic/toTopic` 元数据，选中节点后一跳前置/后继高亮，非邻域降透明；节点大小跟练习次数关联，补“推”推荐标记、箭头方向说明、亮线/灰线说明、直接先修和解锁后继。
+- `Quiz.ets` 和 `Practice.ets` 结果区新增“本轮标签下一步”，优先从错题标签提取 1-4 个重点标签，提供“查资料”和“问学伴”动作；学伴问题写入 `pendingChatQuestion`，不自动发送。
+- 本批次未新增 OHPM 依赖，未下载或写入外部 SVG/PNG/Lottie/音效/字体资产，未修改 `oh-package.json5` 或 SDK 目标版本。
+
+验证：
+- `git status --short`：exit 0，启动时显示 6 个页面修改和未跟踪 `.tmp/` 证据目录；未发现其他待提交生产文件。
+- `git log -5 --oneline`：exit 0，确认当前分支基于 `d72aa0f docs: 深化端侧前端资源产品化规格` 等最近提交。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 898 ms`；`CompileArkTS` 为 up-to-date；仍提示未配置 signingConfigs，生成 unsigned HAP。
+- `rg -n "candidate|多 Agent|RAG|Retrieval|Agent 工作台|Agent" ...`：exit 0，只命中 `Chat.ets` 内部字段、Builder 名和 `Retrieval` 映射分支；未命中学生端旧文案“多 Agent 工作台”。
+- DevEco MCP 模拟器：Pura 90 Pro Max，竖屏 `1256x2760`。截图证据保存在 `.tmp/harmony-1.15-p0-ui/`，不提交仓库：
+  - `chat-screen.png`：云端学伴回答渲染，表格分隔线未作为原始 Markdown 暴露。
+  - `profile-tab-from-chat.png`：画像页首屏显示学习记录、错题本、成就和学习星图入口。
+  - `profile-after-tab-click.png`：学习星图首屏显示课程、推荐主题、星图节点和先修边。
+  - `simple_dump_hormony_20260703184441634.txt`：画像页 UI 树包含“标签洞察”和“已掌握知识点”等节点。
+
+未验证：
+- 真机未验证；OCR、TTS、Lottie、音效、字体加载、distributedKVStore 仍未验证。
+- Quiz/Practice 新增“本轮标签下一步”卡片已构建通过，但本轮未稳定取得结果页截图；需后续用固定本地结果流程补模拟器截图。
+- Profile 标签洞察区有 UI 树证据，但本轮滚动截图未稳定停在该区；视觉结论暂不标为完整模拟器通过。
+- 本批次未运行 Web 检查；原因是未修改 `apps/web` 源码、配置、依赖或 API 契约。

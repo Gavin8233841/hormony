@@ -24,6 +24,10 @@ interface DisplayMessage {
 interface MarkdownBlock {
   type: string;
   text: string;
+  language?: string;
+  rows?: string[];
+  cells?: string[];
+  level?: number;
 }
 
 @Component
@@ -77,14 +81,18 @@ export struct ChatContent {
   private markdownBlocks(content: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
+    let codeLanguage = '';
     let inCode = false;
     for (const rawLine of content.split('\n')) {
       const line = rawLine.trimEnd();
       const trimmed = line.trim();
       if (trimmed.startsWith('```')) {
         if (inCode) {
-          blocks.push({ type: 'code', text: codeLines.join('\n') });
+          blocks.push({ type: 'code', text: codeLines.join('\n'), language: codeLanguage, rows: codeLines.slice() });
           codeLines.splice(0, codeLines.length);
+          codeLanguage = '';
+        } else {
+          codeLanguage = this.codeFenceLanguage(trimmed);
         }
         inCode = !inCode;
         continue;
@@ -97,14 +105,19 @@ export struct ChatContent {
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
         blocks.push({ type: 'heading', text: headingText });
+      } else if (trimmed.startsWith('>')) {
+        const quoteText = this.quoteText(trimmed);
+        if (quoteText.length > 0) {
+          blocks.push({ type: 'quote', text: quoteText, level: this.quoteLevel(trimmed) });
+        }
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
+        blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)), level: this.listLevel(line) });
       } else if (this.numberedText(trimmed).length > 0) {
-        blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
+        blocks.push({ type: 'numbered', text: this.numberedText(trimmed), level: this.listLevel(line) });
       } else if (this.isTableRow(trimmed)) {
-        const tableText = this.tableText(trimmed);
-        if (tableText.length > 0) {
-          blocks.push({ type: 'table', text: tableText });
+        const cells = this.tableCells(trimmed);
+        if (cells.length > 0 && !this.isTableDivider(cells)) {
+          blocks.push({ type: 'table', text: cells.join('  ·  '), cells: cells });
         }
       } else if (this.isDivider(trimmed)) {
         blocks.push({ type: 'divider', text: '' });
@@ -113,12 +126,18 @@ export struct ChatContent {
       }
     }
     if (codeLines.length > 0) {
-      blocks.push({ type: 'code', text: codeLines.join('\n') });
+      blocks.push({ type: 'code', text: codeLines.join('\n'), language: codeLanguage, rows: codeLines.slice() });
     }
     if (blocks.length === 0 && content.length > 0) {
       blocks.push({ type: 'paragraph', text: content });
     }
     return blocks;
+  }
+
+  private codeFenceLanguage(line: string): string {
+    const language = line.slice(3).trim();
+    if (language.length === 0) return '';
+    return this.cleanInline(language).slice(0, 24);
   }
 
   private headingText(line: string): string {
@@ -149,6 +168,32 @@ export struct ChatContent {
     return prefix + '. ' + this.cleanInline(line.slice(splitIndex + offset));
   }
 
+  private listLevel(line: string): number {
+    let spaces = 0;
+    for (const ch of line) {
+      if (ch === ' ') spaces += 1;
+      else break;
+    }
+    return Math.min(Math.floor(spaces / 2), 3);
+  }
+
+  private quoteLevel(line: string): number {
+    let level = 0;
+    for (const ch of line) {
+      if (ch === '>') level += 1;
+      else if (ch !== ' ') break;
+    }
+    return Math.min(Math.max(level, 1), 3);
+  }
+
+  private quoteText(line: string): string {
+    let index = 0;
+    while (index < line.length && (line.charAt(index) === '>' || line.charAt(index) === ' ')) {
+      index += 1;
+    }
+    return this.cleanInline(line.slice(index));
+  }
+
   private isDivider(line: string): boolean {
     if (line.length < 3) return false;
     for (const ch of line) {
@@ -161,15 +206,20 @@ export struct ChatContent {
     return line.indexOf('|') >= 0 && line.indexOf('|') !== line.lastIndexOf('|');
   }
 
-  private tableText(line: string): string {
+  private tableCells(line: string): string[] {
+    const rawCells = line.split('|');
     const cells: string[] = [];
-    for (const cell of line.split('|')) {
-      const cleaned = this.cleanInline(cell.trim());
-      if (cleaned.length > 0) {
-        cells.push(cleaned);
-      }
+    for (let index = 0; index < rawCells.length; index++) {
+      const isEdgeEmpty = (index === 0 || index === rawCells.length - 1) && rawCells[index].trim().length === 0;
+      if (isEdgeEmpty) continue;
+      const cleaned = this.cleanInline(rawCells[index].trim());
+      cells.push(cleaned.length > 0 ? cleaned : ' ');
     }
-    if (cells.length === 0) return '';
+    return cells.slice(0, 8);
+  }
+
+  private isTableDivider(cells: string[]): boolean {
+    if (cells.length === 0) return false;
     let divider = true;
     for (const cell of cells) {
       for (const ch of cell) {
@@ -178,8 +228,31 @@ export struct ChatContent {
         }
       }
     }
-    if (divider) return '';
-    return cells.join('  ·  ');
+    return divider;
+  }
+
+  private codeLanguageLabel(block: MarkdownBlock): string {
+    const language = block.language ?? '';
+    return language.length > 0 ? language : '代码片段';
+  }
+
+  private codeLineCount(block: MarkdownBlock): string {
+    const rows = block.rows ?? [];
+    return Math.max(rows.length, 1).toString() + ' 行';
+  }
+
+  private codeRows(block: MarkdownBlock): string[] {
+    const rows = block.rows ?? [];
+    const visibleRows = rows.length > 0 ? rows.slice(0, 80) : [block.text];
+    if (rows.length > 80) {
+      visibleRows.push('... 其余代码已折叠');
+    }
+    return visibleRows;
+  }
+
+  private codeExplainPrompt(block: MarkdownBlock): string {
+    const clipped = block.text.length > 800 ? block.text.slice(0, 800) + '\n...' : block.text;
+    return '请解释这段代码的执行过程和关键状态：\n```' + (block.language ?? '') + '\n' + clipped + '\n```';
   }
 
   private cleanInline(text: string): string {
@@ -533,25 +606,25 @@ export struct ChatContent {
   }
 
   private agentLabel(agent: string): string {
-    if (agent === 'Profile') return '画像';
-    if (agent === 'Retrieval') return '检索';
-    if (agent === 'Tutor') return '讲解';
-    if (agent === 'Planner') return '规划';
-    if (agent === 'Quiz') return '出题';
-    if (agent === 'Evaluator') return '评估';
-    if (agent === 'Safety') return '安全';
+    if (agent === 'Profile') return '了解你';
+    if (agent === 'Retrieval') return '查资料';
+    if (agent === 'Tutor') return '组织讲解';
+    if (agent === 'Planner') return '安排步骤';
+    if (agent === 'Quiz') return '生成练习';
+    if (agent === 'Evaluator') return '分析薄弱点';
+    if (agent === 'Safety') return '内容核对';
     return agent;
   }
 
   private agentDescription(agent: string): string {
-    if (agent === 'Profile') return '读取本地画像';
-    if (agent === 'Retrieval') return '检索课程证据';
-    if (agent === 'Tutor') return '组织解释路径';
-    if (agent === 'Planner') return '拆解学习计划';
-    if (agent === 'Quiz') return '生成分层题目';
-    if (agent === 'Evaluator') return '评估薄弱点';
-    if (agent === 'Safety') return '检查安全与依据';
-    return '执行 Agent 步骤';
+    if (agent === 'Profile') return '结合你的本地学习记录';
+    if (agent === 'Retrieval') return '查找课程资料依据';
+    if (agent === 'Tutor') return '把知识点讲清楚';
+    if (agent === 'Planner') return '拆成可执行学习步骤';
+    if (agent === 'Quiz') return '生成适合当前主题的题目';
+    if (agent === 'Evaluator') return '找出需要复习的标签';
+    if (agent === 'Safety') return '核对内容边界和依据';
+    return '整理回答步骤';
   }
 
   private agentSeen(msg: DisplayMessage, agent: string): boolean {
@@ -592,7 +665,7 @@ export struct ChatContent {
 
   private agentSummary(msg: DisplayMessage): string {
     const count = this.agentFlow(msg).length;
-    if (msg.content.length === 0) return '正在协作 · ' + count.toString() + ' 步';
+    if (msg.content.length === 0) return '正在生成 · ' + count.toString() + ' 步';
     return '已完成 · ' + count.toString() + ' 步 · ' + msg.citations.length.toString() + ' 条依据';
   }
 
@@ -645,7 +718,7 @@ export struct ChatContent {
               if (msg.thinking.length === 0 && msg.agentTrace.length === 0) {
                 Row({ space: 8 }) {
                   LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
-                  Text('正在启动多 Agent 工作台')
+                  Text('正在整理回答过程')
                     .fontSize(13)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
                 }
@@ -744,7 +817,7 @@ export struct ChatContent {
             .fontColor([Constants.COLOR_SUCCESS])
         }
         Column({ space: 2 }) {
-          Text('多 Agent 工作台')
+          Text('回答生成过程')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -837,30 +910,108 @@ export struct ChatContent {
           }
           .width('100%')
           .alignItems(VerticalAlign.Top)
+          .padding({ left: (block.level ?? 0) * 12 })
+        } else if (block.type === 'quote') {
+          Row({ space: 9 }) {
+            Column()
+              .width(3)
+              .height(42)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(2)
+            Text(block.text)
+              .layoutWeight(1)
+              .fontSize(13)
+              .lineHeight(21)
+              .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_TERTIARY)
+          }
+          .width('100%')
+          .padding({ left: 10 + ((block.level ?? 1) - 1) * 10, right: 10, top: 9, bottom: 9 })
+          .backgroundColor(Constants.COLOR_SURFACE_TINT)
+          .borderRadius(Constants.RADIUS_SM)
         } else if (block.type === 'divider') {
           Divider()
             .width('100%')
             .color(Constants.COLOR_BORDER)
             .margin({ top: 4, bottom: 4 })
         } else if (block.type === 'code') {
-          Text(block.text)
+          Column() {
+            Row() {
+              Text(this.codeLanguageLabel(block))
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_MAP_CORE)
+              Text(this.codeLineCount(block))
+                .fontSize(10)
+                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+            }
             .width('100%')
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .fontFamily('monospace')
-            .padding(10)
-            .backgroundColor(Constants.COLOR_MAP_SURFACE)
+            .justifyContent(FlexAlign.SpaceBetween)
+            .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+            .backgroundColor(Constants.COLOR_TEXT_PRIMARY)
+
+            Scroll() {
+              Column({ space: 0 }) {
+                ForEach(this.codeRows(block), (line: string, index: number): void => {
+                  Row({ space: 10 }) {
+                    Text((index + 1).toString())
+                      .width(28)
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                      .textAlign(TextAlign.End)
+                    Text(line.length > 0 ? line : ' ')
+                      .fontSize(12)
+                      .lineHeight(19)
+                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                      .fontFamily('monospace')
+                  }
+                  .constraintSize({ minHeight: 22 })
+                })
+              }
+              .alignItems(HorizontalAlign.Start)
+              .padding({ left: 10, right: 12, top: 10, bottom: 10 })
+            }
+            .width('100%')
+            .scrollable(ScrollDirection.Horizontal)
+            .scrollBar(BarState.Auto)
+
+            Button({ type: ButtonType.Normal }) {
+              Text('解释这段')
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_BRAND)
+            }
+            .height(32)
+            .padding({ left: 12, right: 12 })
+            .margin({ left: 10, bottom: 10 })
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
             .borderRadius(Constants.RADIUS_SM)
+            .alignSelf(ItemAlign.Start)
+            .onClick((): void => {
+              this.inputText = this.codeExplainPrompt(block);
+            })
+          }
+          .width('100%')
+          .backgroundColor(Constants.COLOR_MAP_SURFACE)
+          .borderRadius(Constants.RADIUS_SM)
         } else if (block.type === 'table') {
-          Text(block.text)
-            .width('100%')
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
-            .padding(9)
-            .backgroundColor(Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_SM)
+          Scroll() {
+            Row({ space: 6 }) {
+              ForEach(block.cells ?? [], (cell: string): void => {
+                Text(cell)
+                  .constraintSize({ minWidth: 68, maxWidth: 160 })
+                  .fontSize(11)
+                  .lineHeight(18)
+                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                  .padding({ left: 8, right: 8, top: 7, bottom: 7 })
+                  .backgroundColor(Constants.COLOR_SURFACE_TINT)
+                  .borderRadius(Constants.RADIUS_SM)
+              })
+            }
+            .padding({ left: 2, right: 2 })
+          }
+          .width('100%')
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
         } else {
           Text(block.text)
             .width('100%')

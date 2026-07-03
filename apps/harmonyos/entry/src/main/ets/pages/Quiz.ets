@@ -128,6 +128,29 @@ struct QuizPage {
     });
   }
 
+  private resultFocusTags(): string[] {
+    const tags: string[] = [];
+    const wrongDetails = this.resultDetails.filter((detail: QuizResultDetail): boolean => !detail.isCorrect);
+    const source = wrongDetails.length > 0 ? wrongDetails : this.resultDetails;
+    for (const detail of source) {
+      for (const tag of detail.tags ?? []) {
+        const normalized = tag.trim();
+        if (normalized.length > 0 && !tags.includes(normalized)) tags.push(normalized);
+      }
+    }
+    return tags.slice(0, 4);
+  }
+
+  private askAboutResultTags(): void {
+    const tags = this.resultFocusTags();
+    const tagText = tags.length > 0 ? tags.join('、') : this.topic;
+    AppStorage.setOrCreate<string>('pendingChatQuestion',
+      '我刚完成“' + this.topic + '”测验，重点标签是“' + tagText + '”。请结合课程资料给我一份复盘顺序和 3 个易错点。');
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
+      this.message = '无法打开学伴，请重试';
+    });
+  }
+
   async generateQuiz(): Promise<void> {
     if (this.loading) return;
     this.resetQuiz();
@@ -543,6 +566,58 @@ struct QuizPage {
         .padding(16)
         .backgroundColor(Constants.COLOR_SURFACE_TINT)
         .borderRadius(Constants.RADIUS_MD)
+      }
+
+      if (this.resultFocusTags().length > 0) {
+        Column({ space: 10 }) {
+          Row() {
+            Text('本轮标签下一步')
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text(this.resultAccuracy >= 0.8 ? '保持复习节奏' : '优先处理错题标签')
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          Flex({ wrap: FlexWrap.Wrap }) {
+            ForEach(this.resultFocusTags(), (tag: string): void => {
+              Text(tag)
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.resultAccuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                .backgroundColor(this.resultAccuracy >= 0.8 ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)
+                .borderRadius(10)
+                .margin({ right: 6, bottom: 6 })
+            })
+          }
+          .width('100%')
+          Row({ space: 10 }) {
+            Button('查资料')
+              .layoutWeight(1)
+              .height(40)
+              .fontSize(13)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.reviewTopic(this.topic); })
+            Button('问学伴')
+              .layoutWeight(1)
+              .height(40)
+              .fontSize(13)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.askAboutResultTags(); })
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(Constants.COLOR_BG_CARD)
+        .borderRadius(Constants.RADIUS_LG)
       }
 
       Text('逐题解析')

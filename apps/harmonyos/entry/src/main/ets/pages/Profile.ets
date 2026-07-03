@@ -47,6 +47,36 @@ export struct ProfileContent {
     });
   }
 
+  private tagMasteryLabel(item: TagInsight): string {
+    if (item.totalQuestions <= 0) return '未开始';
+    if (item.totalQuestions < 3) return '已接触';
+    if (item.accuracy < 0.6) return '待巩固';
+    if (item.accuracy < 0.8) return '熟悉中';
+    return '已掌握';
+  }
+
+  private tagMasteryDescription(item: TagInsight): string {
+    if (item.totalQuestions < 3) return '样本还少，先完成 3 题建立稳定判断';
+    if (item.accuracy < 0.6) return '先回到定义和关键条件，再做同标签基础题';
+    if (item.accuracy < 0.8) return '已经能判断大部分题目，继续补齐错题模式';
+    if (item.wrongQuestions > 0) return '整体稳定，保留错题复盘避免遗忘';
+    return '表现稳定，可以尝试同主题挑战题';
+  }
+
+  private tagMasteryColor(item: TagInsight): string {
+    if (item.totalQuestions < 3) return Constants.COLOR_TEXT_TERTIARY;
+    if (item.accuracy < 0.6) return Constants.COLOR_ERROR;
+    if (item.accuracy < 0.8) return Constants.COLOR_WARNING;
+    return Constants.COLOR_SUCCESS;
+  }
+
+  private tagMasteryBackground(item: TagInsight): string {
+    if (item.totalQuestions < 3) return Constants.COLOR_BG_TAG;
+    if (item.accuracy < 0.6) return Constants.COLOR_ERROR_LIGHT;
+    if (item.accuracy < 0.8) return Constants.COLOR_BG_TAG;
+    return Constants.COLOR_SUCCESS_LIGHT;
+  }
+
   @Builder
   GrowthEntry(title: string, subtitle: string, icon: Resource, url: string) {
     Row({ space: 12 }) {
@@ -90,9 +120,18 @@ export struct ProfileContent {
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text(item.correctQuestions.toString() + '/' + item.totalQuestions.toString())
-          .fontSize(11)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Row({ space: 6 }) {
+          Text(this.tagMasteryLabel(item))
+            .fontSize(10)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.tagMasteryColor(item))
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor(this.tagMasteryBackground(item))
+            .borderRadius(9)
+          Text(item.correctQuestions.toString() + '/' + item.totalQuestions.toString())
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
@@ -105,6 +144,10 @@ export struct ProfileContent {
       Text(item.wrongQuestions > 0 ? '错题 ' + item.wrongQuestions.toString() + ' 道，建议优先复盘' : '当前表现稳定')
         .fontSize(11)
         .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_SUCCESS)
+      Text(this.tagMasteryDescription(item))
+        .fontSize(11)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        .lineHeight(18)
       Row({ space: 6 }) {
         Text('基础 ' + item.easyQuestions.toString())
           .fontSize(10)
