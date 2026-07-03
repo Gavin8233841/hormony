@@ -267,7 +267,13 @@ if (-not $hapFiles) {
     exit 1
 }
 $hapPath = $hapFiles[0].FullName
-$installResult = & $HDC install "$hapPath" 2>&1
+$deviceHapPath = "/data/local/tmp/codex-smoke-entry-default-unsigned.hap"
+$sendResult = & $HDC file send "$hapPath" $deviceHapPath 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Step "HAP send" "FAIL" "output=$($sendResult -join ' ')"
+    exit 1
+}
+$installResult = & $HDC shell bm install -r -p $deviceHapPath 2>&1
 $installExit = $LASTEXITCODE
 if ($installExit -eq 0 -and (($installResult -join "`n") -match "success")) {
     Write-Step "HAP install" "PASS" $hapFiles[0].Name
@@ -342,10 +348,15 @@ Take-Screenshot "04-practice"
 # 8. 完成五题并进入逐题复盘
 for ($questionIndex = 0; $questionIndex -lt 5; $questionIndex++) {
     if (-not (Click-FirstOptionA)) { exit 1 }
+    if (-not (Click-Element "查看本题反馈" "Practice question feedback")) { exit 1 }
+    if ($questionIndex -eq 0) {
+        if (-not (Verify-TextExists "答案已锁定" "Practice answer lock")) { exit 1 }
+        Take-Screenshot "04-practice-feedback"
+    }
     if ($questionIndex -lt 4) {
-        if (-not (Click-Element "下一题" "Next question")) { exit 1 }
+        if (-not (Click-Element "进入下一题" "Next question")) { exit 1 }
     } else {
-        if (-not (Click-Element "提交评分" "Submit practice")) { exit 1 }
+        if (-not (Click-Element "提交本组总结" "Submit practice")) { exit 1 }
     }
 }
 if (-not (Verify-TextExists "本轮已完成" "Practice result")) { exit 1 }

@@ -5223,3 +5223,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - “AI 测验”和“问学伴讲题”的设备点击后完整跳转流程本批次未作为有效证据；对应 AppStorage 写入与 router 目标为源码确认。
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex：精选练习单题即时反馈
+
+背景：继续推进 HarmonyOS 端成熟学习闭环；AI 测验已具备单题反馈和答案锁定，离线精选练习仍是整组提交后才知道对错。本批次把精选练习改为“先选择 -> 查看本题反馈 -> 锁定答案 -> 再进入下一题/提交总结”，让离线题组也有低风险即时反馈。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Practice.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- Practice 新增 `checkedQuestionIds`，每题点击“查看本题反馈”后记录已查看状态；顶部显示“即时反馈”和 `X / 5 已查看`。
+- 查看反馈后本题答案锁定，继续点击其他选项不会改写 `answers`。
+- 精选练习选项在反馈后直接标出正确选项和错选项，复用成功/错误语义色与系统 Symbol。
+- 单题反馈卡展示“判断正确 / 先标记这个薄弱点”“答案已锁定”“你的答案”“正确答案”和解析；反馈卡内提供“进入下一题 / 提交本组总结”。
+- 底部“下一题”和“提交评分”增加反馈门禁：必须查看当前题反馈后才能下一题，必须全部答完且全部反馈已查看后才能提交。
+- Practice 结果页“向学伴追问”前同步写入 `selectedCourseId` 与 `selectedCourseTitle`，避免 Chat 请求缺课程上下文。
+- 冒烟脚本适配精选练习即时反馈流程，并把 HAP 安装改为 `file send` + `bm install -r -p`，减少设备继续显示旧页面的风险。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0；仅输出未配置签名 warning。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --no-incremental`：exit 0，`BUILD SUCCESSFUL in 14 s 898 ms`；`CompileArkTS`、`PackageHap`、`SignHap` 均完成。
+- HAP 覆盖安装：`hdc file send ...entry-default-unsigned.hap /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0；`hdc shell bm install -r -p /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。窄流程 UI 树和截图确认 Practice 出现“即时反馈”“1 / 5 已查看”“答案已锁定”“进入下一题”；反馈后点击 B，UI 树仍保留“你的答案：A”，证明答案锁定。
+- 证据位于 `.tmp/codex-learning-loop-20260703/practice-immediate-feedback-nonincr/`，包括 `practice-before-answer.json/jpeg`、`practice-feedback-after-a.json/jpeg`、`practice-feedback-after-b-click.json/jpeg`，不提交仓库。
+- 反馈卡继续动作单独验证：`practice-next-action-bm/after-next.json` 确认点击“进入下一题”后仍在 `pages/Practice` 且显示 `2 / 5`。
+
+未验证：
+- `scripts/harmonyos-app-smoke.ps1` 完整长流程仍未通过：更新安装方式后，Practice 前四题即时反馈均通过，后续长循环在第 5 题前找不到可见 `A`，需后续把脚本的滚动/等待策略继续收紧；本批次不把完整脚本标为通过。
+- 真机未验证。
