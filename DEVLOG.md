@@ -5462,3 +5462,41 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未进行模拟器 UI 树/截图验收，无法标记为模拟器通过；本批次证据等级为构建通过。
 - 横屏、平板、折叠屏、真机刘海和手势导航仍需后续 UI 证据。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.15端侧前端资源深度猎采与产品化规格
+
+背景：接力线程「鸿蒙1.15」围绕端侧前端“不够成熟、不够产品化”的问题，按用户授权并行做 ArkUI/OHPM、成熟学习产品、图标/插画/动效/音效授权、Markdown/代码学习、知识星图/标签洞察方向的只读核验。本批次只形成文档和路线，不下载外部资产，不写入 `.tmp/`，不修改 HarmonyOS 生产代码或依赖。
+
+文件：
+- `docs/FRONTEND-ASSET-HUNT-DEEP-20260702.md`
+- `docs/FRONTEND-PRODUCTIZATION-ROADMAP-20260702.md`
+- `docs/FRONTEND-ASSET-ADOPTION-SPEC-20260702.md`
+- `DEVLOG.md`
+
+行为变化：
+- 新增端侧前端深度资源总表，逐项记录 ArkUI 原生能力、OHPM 包方向、Markdown 源码方向、图标/插画/Lottie/音效/字体资源、Duolingo/Brilliant/Mimo/Codecademy/Khan/Obsidian/GitHub 等产品模式的 URL、授权、维护状态、API 12 适配判断、引入方式、风险、可解决的问题和证据等级。
+- 明确 `FluidMarkdown` 与 `Harmony-Markdown-Editor` 虽有可参考源码和许可，但 README 指向 API 15，不适合当前 API 12 直接引入；`@luvi/lv-markdown-in`、`@ohos/lottie-turbo`、`@ohos/lottie`、`@ohos/mpchart` 可通过 OHPM registry 编码路径核验版本和许可，但本仓库未安装、未构建、未运行，不能写入依赖。
+- 新增 P0/P1/P2 产品化路线：优先推进 `Chat.ets` 代码块 V2、回答生成过程去技术化、`StagedProgress` 可恢复进度、Khan 式标签掌握等级、`LearningMap.ets` 方向箭头/一跳邻域/双编码、按钮/icon 语义统一。
+- 新增可交给主线实现的模块规格：Markdown+代码块、长任务进度、标签洞察、学习星图、Lesson 概念玩具、正反馈动画/声音边界、图标按钮语义、素材建账模板。
+- 明确第三方图标只允许单图补系统 Symbol 缺口；插画、Lottie、音效、字体进入 HAP 前必须逐条记录 URL、作者、许可证、哈希、体积、用途和运行证据。
+
+验证：
+- `git status --short`：exit 0，启动时无输出，工作区干净。
+- `git log -5 --oneline`：exit 0，确认当前 HEAD 为 `b7774a7 docs: 修正安全区构建验证记录`，并读取最近主线提交。
+- `ohpm --version`：exit 0，版本 `26.0.0.410`。
+- `ohpm info @luvi/lv-markdown-in`：exit 1，OHPM 返回 502 / `Fetch Pkg Info Failed`。
+- `ohpm info @ohos/lottie-turbo`：exit 1，OHPM 返回 502 / `Fetch Pkg Info Failed`。
+- `ohpm info @ohos/lottie`：exit 1，OHPM 返回 502 / `Fetch Pkg Info Failed`。
+- `ohpm info @ohos/mpchart`：exit 1，OHPM 返回 502 / `Fetch Pkg Info Failed`。
+- `Invoke-WebRequest https://ohpm.openharmony.cn/ohpm/@luvi%2Flv-markdown-in`：exit 0，registry JSON 确认 latest `3.4.4`、MIT、modified `2026-06-25T15:14:58.66Z`、`compatibleSdkVersion: 12`。
+- `Invoke-WebRequest https://ohpm.openharmony.cn/ohpm/@ohos%2Flottie-turbo`：exit 0，registry JSON 确认 latest `1.0.12`、Apache-2.0、modified `2026-05-20T09:41:43.229Z`、`compatibleSdkVersion: 12`、依赖 `liblottie-turbo.so`。
+- `Invoke-WebRequest https://ohpm.openharmony.cn/ohpm/@ohos%2Flottie`：exit 0，registry JSON 确认 latest `2.0.31`、MIT、modified `2026-05-21T15:30:58.039Z`。
+- `Invoke-WebRequest https://ohpm.openharmony.cn/ohpm/@ohos%2Fmpchart`：exit 0，registry JSON 确认 latest `3.0.28`、Apache License 2.0、modified `2026-04-27T10:09:51.523Z`、`compatibleSdkVersion: 12`。
+- GitHub API / Gitee 页面 / HarmonyOS 官方英文文档 URL 只读访问用于许可证、维护状态和官方文档入口核验。
+
+未验证：
+- 本批次为文档与规格产出，未执行 Web/HarmonyOS 构建；原因是未修改源码、配置、依赖或资源目录。
+- 未进行模拟器 UI 树/截图验收，未进行真机验证。
+- 所有第三方素材、OHPM 包、Lottie、音效、字体加载和 ArkUI SVG 渲染仍为未验证，不得据此直接进入 HAP。
