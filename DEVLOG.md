@@ -5192,3 +5192,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未重新跑完整真实 AI 出题流程截图；本批次证据等级为源码确认、构建通过和 HAP 安装通过。
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex：错题本复盘动作与复习节奏
+
+背景：继续推进 HarmonyOS 端“学习 -> 练习 -> 错题复盘 -> 再练/AI 测验/问学伴”的成熟闭环；本批次聚焦错题本，不让错题只停留在静态列表。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets
+- DEVLOG.md
+
+行为变化：
+- 错题本卡片显示复习状态：到期题显示“今日复习”，未到期题显示“下次 MM/DD”。
+- 错题卡片显示“错 X 次 · 间隔 N 天”，展开解析时继续显示“复习节奏：第 X 次 · 今日复习/下次 MM/DD”。
+- “重练主题”进入精选练习前同步写入 `selectedCourseId`、`selectedCourseTitle` 和 `selectedPracticeTopic`。
+- 新增“AI 测验”入口，进入 AI Quiz 前同步写入课程上下文和 `selectedQuizTopic`。
+- 新增“问学伴讲题”入口，进入 Chat 前同步写入课程上下文，并把题干、用户答案、正确答案和“步骤说明 + 同类小练习”请求写入 `pendingChatQuestion`。
+- 动作区改成两行两列：`查看解析 / 重练主题` 与 `AI 测验 / 问学伴讲题`，提升触控区稳定性并避免三按钮拥挤。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 688 ms`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --no-incremental`：exit 0，`BUILD SUCCESSFUL in 17 s 6 ms`；用于刷新 ArkTS 运行产物，避免增量缓存导致设备仍显示旧页面。
+- HAP 覆盖安装：`hdc file send ...entry-default-unsigned.hap /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0；`hdc shell bm install -r -p /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+- 应用重启：`hdc shell aa force-stop com.c4ai.hormony` exit 0；`hdc shell aa start -a EntryAbility -b com.c4ai.hormony -m entry` exit 0。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。UI 树确认错题本出现“今日复习”“错 1 次 · 间隔 1 天”“AI 测验”“问学伴讲题”，按钮为两行两列布局。
+- 模拟器展开解析：UI 树确认“你的答案：B. 选择排序”“正确答案：C. 归并排序”“复习节奏：第 1 次 · 今日复习”存在。
+- 证据位于 `.tmp/codex-learning-loop-20260702/mistakebook-review-actions/`，包括 `mistakebook-final-two-row-actions.png`、`mistakebook-final-two-row-actions.txt`、`mistakebook-final-expanded-review-rhythm.png`、`mistakebook-final-expanded-review-rhythm.txt`，不提交仓库。
+
+未验证：
+- “AI 测验”和“问学伴讲题”的设备点击后完整跳转流程本批次未作为有效证据；对应 AppStorage 写入与 router 目标为源码确认。
+- 真机未验证。
