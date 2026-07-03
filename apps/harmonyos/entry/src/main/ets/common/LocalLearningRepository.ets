@@ -219,6 +219,13 @@ export class LocalLearningRepository {
     return profile;
   }
 
+  static getCachedProfile(): UserProfile | null {
+    const cached = LocalLearningRepository.valueCache.find((item: CachedStatePayload): boolean => item.key === KEY_PROFILE);
+    if (cached === undefined) return null;
+    const profile: UserProfile = JSON.parse(cached.payload);
+    return profile;
+  }
+
   static async getProfileSnapshot(tagLimit: number = 6): Promise<ProfileSnapshot> {
     const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
     const results = await LocalLearningRepository.getQuizResults();

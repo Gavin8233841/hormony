@@ -5336,3 +5336,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 真机未验证。
 - 未用启动 trace 量化 `onWindowStageCreate` 到首页可见的耗时收益；本批次性能收益为源码确认、构建通过和模拟器通过。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.12 Chat/Plan 画像读取去阻塞
+
+背景：继续只服务 HarmonyOS 端侧 App。只读审计确认 Chat 发送消息后会等待 `LocalLearningRepository.getProfile()` 读取测验结果与学习事件并重算统计，才启动 SSE；Plan 生成请求前也等待同一完整画像聚合。`ChatRequest.profile` 与 `PlanRequest.profile` 在端侧类型中均为可选字段，因此可以复用已初始化的本地画像缓存，避免请求前扫描历史数据。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- DEVLOG.md
+
+行为变化：
+- `LocalLearningRepository` 新增 `getCachedProfile()`，只从现有 `valueCache` 读取 `KEY_PROFILE` 并 `JSON.parse` 返回新对象，不新增持久化状态源。
+- Chat 发送时同步附带缓存画像并立即调用 `startSseRequest()`，不再等待完整 `getProfile()` Promise 后才发起 `/api/chat` SSE。
+- Plan 生成时同步附带缓存画像，不再在 `/api/plan` 请求前读取测验结果和学习事件来重算统计。
+- API 请求结构、`DataModels.ets` 和后端契约未变化；画像字段仍保持可选。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 247 ms`；仍提示未配置 signingConfigs。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，86 passed / 0 failed；覆盖构建、安装、启动、课程详情、精选练习、复盘追问进入学伴页、Profile 子页、学习星图三门课程和回首页。截图证据位于 `screenshots/trae-smoke-20260703-160305/`，不提交。
+
+未验证：
+- 未执行真实云端 Chat 发送并测量首 token 时间；本批次 Chat 去阻塞为源码确认、构建通过和模拟器主流程通过。
+- 未在模拟器中执行 Plan 云端生成；Plan 请求前画像去阻塞为源码确认与构建通过。
+- 真机未验证，未用 DevEco Profiler 量化请求发起前等待时间变化。

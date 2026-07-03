@@ -545,7 +545,7 @@ struct PlanPage {
         goal: this.goal.trim(),
         durationDays: this.days,
         dailyMinutes: 90,
-        profile: (await LocalLearningRepository.getProfile()) ?? undefined
+        profile: LocalLearningRepository.getCachedProfile() ?? undefined
       };
       const plan = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req));
       this.progressStep = 3;

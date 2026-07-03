@@ -414,16 +414,12 @@ export struct ChatContent {
       userId: Constants.DEMO_USER_ID,
       message: message,
       history: requestHistory,
+      profile: LocalLearningRepository.getCachedProfile() ?? undefined,
       context: {
         courseId: AppStorage.get<string>('selectedCourseId') ?? 'cs101'
       }
     };
-    LocalLearningRepository.getProfile().then((profile): void => {
-      if (profile !== null) req.profile = profile;
-      this.startSseRequest(req);
-    }).catch((): void => {
-      this.startSseRequest(req);
-    });
+    this.startSseRequest(req);
   }
 
   private startSseRequest(req: ChatRequest): void {
