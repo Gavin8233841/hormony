@@ -11,6 +11,9 @@ import { generateId } from "@/lib/utils";
 import { formatContext, retrieve } from "@/lib/rag";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 
+const MAX_QUESTIONS_PER_MODEL_BATCH = 5;
+const MAX_RAW_OUTPUT_FOR_REPAIR = 3600;
+
 export async function runQuizAgent(
   userId: string,
   courseId: string,
@@ -25,32 +28,15 @@ export async function runQuizAgent(
     throw new KnowledgeUnavailableError();
   }
 
-  const systemPrompt = `你是一位出题专家。根据指定主题生成选择题。
-输出 JSON 数组，每个元素：{"type":"choice","stem":"","options":["A. ","B. ","C. ","D. "],"answer":"A","explanation":"","tags":["概念理解","边界条件"]}
-题干、答案和解析必须与提供的课程资料一致，禁止引入资料外的事实。
-难度规则：
-- easy：考查定义、术语、直接性质或一步识别，适合刚学完概念的学生。
-- medium：给出简短场景或对比，需要应用概念完成一步推理。
-- hard：必须包含边界条件、运行过程、故障诊断或多步判断，不能只问定义。
-tags 必须是 1-3 个中文短标签，用于学习画像量化，优先使用知识点、能力类型或错误类型，例如：概念理解、代码推演、复杂度分析、边界条件、协议状态、调度策略。
-如果提供重点标签，每道题的 tags 必须包含该重点标签，并围绕它设计考查点。
-每题必须有 4 个选项，答案只能是 A、B、C、D，解析 50-90 字说明正确理由。
-只输出 JSON，不要 Markdown 代码块，不要输出额外说明。`;
-
-  const userPrompt = `课程ID：${courseId}
-主题：${topic}
-难度：${difficulty}
-数量：${count}
-重点标签：${focusTag && focusTag.length > 0 ? focusTag : "无"}
-课程资料：
-${courseContext}`;
-
-  const raw = await callModel(systemPrompt, userPrompt, {
-    temperature: 0.5,
-    maxTokens: 2048,
+  const questions = await generateQuizQuestions({
+    courseId,
+    topic,
+    count,
+    difficulty,
+    focusTag,
+    courseContext,
     signal,
   });
-  const questions = parseQuestions(raw, count, topic, difficulty, focusTag);
   if (questions.length !== count) {
     throw new ModelInvalidResponseError("题目数量或结构不符合要求");
   }
@@ -65,12 +51,127 @@ ${courseContext}`;
   return quiz;
 }
 
+interface GenerateQuizQuestionsInput {
+  courseId: string;
+  topic: string;
+  count: number;
+  difficulty: "easy" | "medium" | "hard";
+  focusTag?: string;
+  courseContext: string;
+  signal?: AbortSignal;
+}
+
+async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise<QuizQuestion[]> {
+  const questions: QuizQuestion[] = [];
+  const usedStems = new Set<string>();
+  while (questions.length < input.count) {
+    const remaining = input.count - questions.length;
+    const batchSize = Math.min(remaining, MAX_QUESTIONS_PER_MODEL_BATCH);
+    const raw = await callModel(
+      quizSystemPrompt(),
+      quizUserPrompt(input, batchSize, questions),
+      {
+        temperature: 0.5,
+        maxTokens: 2048,
+        signal: input.signal,
+      }
+    );
+    let batch = parseQuestions(raw, batchSize, input.topic, input.difficulty, input.focusTag, usedStems);
+    if (batch.length < batchSize) {
+      const repairedRaw = await repairQuizJson(raw, batchSize, input, questions);
+      batch = parseQuestions(repairedRaw, batchSize, input.topic, input.difficulty, input.focusTag, usedStems);
+    }
+    if (batch.length === 0) break;
+    const beforeCount = questions.length;
+    for (const question of batch) {
+      if (questions.length >= input.count) break;
+      const normalizedStem = normalizeStem(question.stem);
+      if (usedStems.has(normalizedStem)) continue;
+      usedStems.add(normalizedStem);
+      questions.push(question);
+    }
+    if (questions.length === beforeCount) break;
+  }
+  return questions;
+}
+
+function quizSystemPrompt(): string {
+  const systemPrompt = `你是一位出题专家。根据指定主题生成选择题。
+输出 JSON 数组，每个元素：{"type":"choice","stem":"","options":["A. ","B. ","C. ","D. "],"answer":"A","explanation":"","tags":["概念理解","边界条件"]}
+题干、答案和解析必须与提供的课程资料一致，禁止引入资料外的事实。
+难度规则：
+- easy：考查定义、术语、直接性质或一步识别，适合刚学完概念的学生。
+- medium：给出简短场景或对比，需要应用概念完成一步推理。
+- hard：必须包含边界条件、运行过程、故障诊断或多步判断，不能只问定义。
+tags 必须是 1-3 个中文短标签，用于学习画像量化，优先使用知识点、能力类型或错误类型，例如：概念理解、代码推演、复杂度分析、边界条件、协议状态、调度策略。
+如果提供重点标签，每道题的 tags 必须包含该重点标签，并围绕它设计考查点。
+每题必须有 4 个选项，答案只能是 A、B、C、D，解析 50-90 字说明正确理由。
+只输出 JSON，不要 Markdown 代码块，不要输出额外说明。`;
+  return systemPrompt;
+}
+
+function quizUserPrompt(
+  input: GenerateQuizQuestionsInput,
+  batchSize: number,
+  existingQuestions: QuizQuestion[]
+): string {
+  const existingStems = existingQuestions.length > 0
+    ? existingQuestions.map((question, index) => `${index + 1}. ${question.stem}`).join("\n")
+    : "无";
+  const userPrompt = `课程ID：${input.courseId}
+主题：${input.topic}
+难度：${input.difficulty}
+本批数量：${batchSize}
+总题量：${input.count}
+重点标签：${input.focusTag && input.focusTag.length > 0 ? input.focusTag : "无"}
+已生成题干，禁止重复：
+${existingStems}
+课程资料：
+${input.courseContext}`;
+  return userPrompt;
+}
+
+async function repairQuizJson(
+  raw: string,
+  batchSize: number,
+  input: GenerateQuizQuestionsInput,
+  existingQuestions: QuizQuestion[]
+): Promise<string> {
+  const repairPrompt = `请把下面的模型输出修复成严格 JSON 数组。
+要求：
+- 只保留与课程资料一致的选择题，不要新增资料外事实。
+- 输出 ${batchSize} 道题；如果原输出中没有足够题目，也只能基于同一课程资料补齐。
+- 每题必须包含 stem、options、answer、explanation、tags。
+- options 必须是 A-D 四个选项，answer 只能是 A、B、C、D。
+- 如果有重点标签，每题 tags 必须包含重点标签。
+- 只输出 JSON，不要 Markdown，不要额外说明。
+
+课程ID：${input.courseId}
+主题：${input.topic}
+难度：${input.difficulty}
+重点标签：${input.focusTag && input.focusTag.length > 0 ? input.focusTag : "无"}
+已生成题干，禁止重复：
+${existingQuestions.length > 0 ? existingQuestions.map((question, index) => `${index + 1}. ${question.stem}`).join("\n") : "无"}
+课程资料：
+${input.courseContext}
+
+待修复输出：
+${raw.slice(0, MAX_RAW_OUTPUT_FOR_REPAIR)}`;
+
+  return callModel(quizSystemPrompt(), repairPrompt, {
+    temperature: 0.1,
+    maxTokens: 2048,
+    signal: input.signal,
+  });
+}
+
 function parseQuestions(
   raw: string,
   count: number,
   topic: string,
   difficulty: "easy" | "medium" | "hard",
-  focusTag?: string
+  focusTag?: string,
+  usedStems?: Set<string>
 ): QuizQuestion[] {
   try {
     const payload: unknown = JSON.parse(extractJsonPayload(raw));
@@ -87,6 +188,8 @@ function parseQuestions(
         const explanation =
           typeof q.explanation === "string" ? q.explanation.trim() : "";
         const tags = parseTags(q.tags, topic, focusTag);
+        const normalizedStem = normalizeStem(stem);
+        if (usedStems?.has(normalizedStem)) continue;
         const validOptions = options.length === 4 && options.every((option, index) =>
           option.toUpperCase().startsWith(`${String.fromCharCode(65 + index)}.`)
         );
@@ -108,6 +211,10 @@ function parseQuestions(
     return [];
   }
   return [];
+}
+
+function normalizeStem(stem: string): string {
+  return stem.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function readQuestionArray(payload: unknown): unknown[] {

@@ -6,6 +6,19 @@ import type { QuizPackage } from "@/lib/types";
 
 const originalModelKey = process.env.MODEL_API_KEY;
 const originalDeploymentMode = process.env.DEPLOYMENT_MODE;
+const originalModelResponseSequence = process.env.TEST_MODEL_RESPONSE_SEQUENCE;
+const originalModelResponseSequenceScope = process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE;
+
+function modelQuestion(index: number, tags: string[] = ["概念理解"]) {
+  return {
+    type: "choice",
+    stem: `模型分批题 ${index}`,
+    options: ["A. 选项一", "B. 选项二", "C. 选项三", "D. 选项四"],
+    answer: "A",
+    explanation: "这是测试环境中用于验证模型分批与修复的固定解析。",
+    tags,
+  };
+}
 
 describe("题库与资源 API 闭环", () => {
   beforeEach(() => {
@@ -27,6 +40,10 @@ describe("题库与资源 API 闭环", () => {
       process.env.MODEL_API_KEY = originalModelKey;
     }
     delete process.env.TEST_MODEL_RESPONSE;
+    if (originalModelResponseSequence === undefined) delete process.env.TEST_MODEL_RESPONSE_SEQUENCE;
+    else process.env.TEST_MODEL_RESPONSE_SEQUENCE = originalModelResponseSequence;
+    if (originalModelResponseSequenceScope === undefined) delete process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE;
+    else process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = originalModelResponseSequenceScope;
     if (originalDeploymentMode === undefined) delete process.env.DEPLOYMENT_MODE;
     else process.env.DEPLOYMENT_MODE = originalDeploymentMode;
   });
@@ -231,6 +248,64 @@ describe("题库与资源 API 闭环", () => {
     expect(quiz.questions).toHaveLength(1);
     expect(quiz.questions[0].stem).toContain("完全二叉树");
     expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["公式应用"] });
+  });
+
+  it("超过单批题量时应分批调用真实模型并合并结果", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify(Array.from(
+      { length: 6 },
+      (_, index) => modelQuestion(index + 1, ["分批生成"])
+    ));
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 6,
+          difficulty: "medium",
+        }),
+      })
+    );
+    const quiz = (await response.json()) as QuizPackage;
+
+    expect(response.status).toBe(200);
+    expect(quiz.questions).toHaveLength(6);
+    expect(quiz.grading).toHaveLength(6);
+    expect(quiz.questions.map((question) => question.stem)).toEqual([
+      "模型分批题 1",
+      "模型分批题 2",
+      "模型分批题 3",
+      "模型分批题 4",
+      "模型分批题 5",
+      "模型分批题 6",
+    ]);
+  });
+
+  it("模型首轮格式损坏时应调用真实模型修复 JSON", async () => {
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：修复序列";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      "这不是 JSON，但描述了二叉树题目。",
+      [modelQuestion(1, ["格式修复"])],
+    ]);
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 1,
+          difficulty: "medium",
+          focusTag: "修复序列",
+        }),
+      })
+    );
+    const quiz = (await response.json()) as QuizPackage;
+
+    expect(response.status).toBe(200);
+    expect(quiz.questions).toHaveLength(1);
+    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["修复序列", "格式修复"] });
   });
 
   it("应拒绝缺少 A-D 顺序前缀的 AI 选项", async () => {

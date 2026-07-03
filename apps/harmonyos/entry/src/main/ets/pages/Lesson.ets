@@ -4,6 +4,7 @@ import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { CuratedKnowledgeChunk, LearningActivity, LessonExperience, LessonProgress } from '../model/DataModels';
+import { LearningStudyEvent } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const EMPTY_CHUNK: CuratedKnowledgeChunk = {
@@ -34,6 +35,7 @@ struct LessonPage {
   @State feedbackVisible: boolean = false;
   @State attemptedActivityIds: string[] = [];
   @State codeRunStepIndex: number = -1;
+  @State activityEvidenceMessage: string = '';
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -80,6 +82,7 @@ struct LessonPage {
     this.responseText = '';
     this.feedbackVisible = false;
     this.codeRunStepIndex = -1;
+    this.activityEvidenceMessage = '';
   }
 
   private experienceStepCount(): number {
@@ -91,7 +94,7 @@ struct LessonPage {
     if (activity === null || this.feedbackVisible) return;
     this.selectedIndexes = [index];
     this.feedbackVisible = true;
-    this.markActivityAttempted(activity.id);
+    this.markActivityAttempted(activity, this.activityIsCorrect());
   }
 
   private chooseOrderStep(index: number): void {
@@ -103,7 +106,7 @@ struct LessonPage {
     const activity = this.activeActivity();
     if (activity === null || this.selectedIndexes.length !== activity.options.length) return;
     this.feedbackVisible = true;
-    this.markActivityAttempted(activity.id);
+    this.markActivityAttempted(activity, this.activityIsCorrect());
   }
 
   private revealFreeResponse(): void {
@@ -115,14 +118,72 @@ struct LessonPage {
     this.feedbackVisible = true;
   }
 
-  private selfAssess(activityId: string): void {
-    this.markActivityAttempted(activityId);
+  private selfAssess(activity: LearningActivity, correct: boolean): void {
+    this.markActivityAttempted(activity, correct);
   }
 
-  private markActivityAttempted(activityId: string): void {
-    if (!this.attemptedActivityIds.includes(activityId)) {
-      this.attemptedActivityIds = this.attemptedActivityIds.concat([activityId]);
+  private markActivityAttempted(activity: LearningActivity, correct: boolean): void {
+    if (!this.attemptedActivityIds.includes(activity.id)) {
+      this.attemptedActivityIds = this.attemptedActivityIds.concat([activity.id]);
+      this.persistActivityEvidence(activity, correct);
     }
+  }
+
+  private persistActivityEvidence(activity: LearningActivity, correct: boolean): void {
+    const now = new Date().toISOString();
+    const event: LearningStudyEvent = {
+      id: 'lesson_activity_' + now + '_' + activity.id,
+      type: 'lesson_activity',
+      timestamp: now,
+      courseId: this.courseId,
+      topic: this.topic,
+      taskId: activity.id,
+      source: 'lesson_interactive',
+      difficulty: this.activityDifficulty(activity),
+      accuracy: correct ? 1 : 0,
+      tags: this.activityTags(activity),
+      totalQuestions: 1,
+      correctCount: correct ? 1 : 0
+    };
+    LocalLearningRepository.appendStudyEvent(event).then((): void => {
+      this.activityEvidenceMessage = correct ?
+        '已记录为掌握证据：画像、成就和标签洞察会同步更新。' :
+        '已记录为复盘证据：建议问学伴讲清错因，或进入同标签测验。';
+    }).catch((): void => {
+      this.activityEvidenceMessage = '互动记录保存失败，本次仍可继续学习。';
+    });
+  }
+
+  private appendUniqueTag(tags: string[], value: string): void {
+    const normalized = value.trim();
+    if (normalized.length > 0 && !tags.includes(normalized)) tags.push(normalized);
+  }
+
+  private activityTags(activity: LearningActivity): string[] {
+    const tags: string[] = [];
+    this.appendUniqueTag(tags, this.topic);
+    this.appendUniqueTag(tags, activity.title);
+    this.appendUniqueTag(tags, this.activityModeLabel(activity));
+    if (activity.language.length > 0) this.appendUniqueTag(tags, activity.language);
+    return tags.slice(0, 5);
+  }
+
+  private activityModeLabel(activity: LearningActivity): string {
+    if (activity.content.length > 0) return '代码推演';
+    if (activity.interactionMode === 'ordered_choice') return '步骤排序';
+    if (activity.interactionMode === 'free_response') return '主动表达';
+    return '概念判断';
+  }
+
+  private activityDifficulty(activity: LearningActivity): string {
+    if (activity.interactionMode === 'free_response' || activity.interactionMode === 'ordered_choice') return 'medium';
+    if (activity.content.length > 0) return 'medium';
+    return 'easy';
+  }
+
+  private primaryActivityTag(activity: LearningActivity): string {
+    if (activity.title.length > 0) return activity.title;
+    return this.topic.length > 0 ? this.topic : this.courseTitle;
   }
 
   private activityIsCorrect(): boolean {
@@ -221,6 +282,39 @@ struct LessonPage {
     if (this.codeRunStepIndex < total - 1) {
       this.codeRunStepIndex += 1;
     }
+  }
+
+  private activityAnswerText(activity: LearningActivity): string {
+    if (activity.interactionMode === 'free_response') {
+      return this.responseText.trim().length > 0 ? this.responseText.trim() : '未作答';
+    }
+    const answers: string[] = [];
+    for (const index of this.selectedIndexes) {
+      const option = activity.options[index] ?? '';
+      if (option.length > 0) answers.push(option);
+    }
+    return answers.length > 0 ? answers.join(' → ') : '未作答';
+  }
+
+  private askTutorForActivity(activity: LearningActivity): void {
+    const question = '请结合课程资料讲解这道互动练习：' + activity.prompt +
+      '。主题是“' + this.topic + '”，我的答案是“' + this.activityAnswerText(activity) +
+      '”，参考答案是“' + activity.answer + '”。请指出关键概念、错因和下一步练习建议。';
+    AppStorage.setOrCreate<string>('pendingChatQuestion', question);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
+      this.message = '无法打开学伴，请重试';
+    });
+  }
+
+  private openFocusedQuizForActivity(activity: LearningActivity): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic.length > 0 ? this.topic : '综合');
+    AppStorage.setOrCreate<string>('selectedQuizFocusTag', this.primaryActivityTag(activity));
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'LessonPage focused quiz navigation failed: %{public}s', error.message);
+    });
   }
 
   private async completeCurrent(): Promise<void> {
@@ -680,6 +774,15 @@ struct LessonPage {
                 .fontSize(11)
                 .lineHeight(18)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              if (this.activityEvidenceMessage.length > 0) {
+                Text(this.activityEvidenceMessage)
+                  .width('100%')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Medium)
+                  .lineHeight(18)
+                  .fontColor(this.activityEvidenceMessage.includes('失败') ?
+                    Constants.COLOR_ERROR : Constants.COLOR_BRAND)
+              }
             }
             .width('100%')
             .padding(14)
@@ -696,17 +799,37 @@ struct LessonPage {
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   .backgroundColor(Constants.COLOR_BG_TAG)
                   .borderRadius(Constants.RADIUS_MD)
-                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id); })
+                  .onClick((): void => { this.selfAssess(this.activeActivity()!, false); })
                 Button('我答对了')
                   .layoutWeight(1)
                   .height(44)
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   .backgroundColor(Constants.COLOR_SUCCESS)
                   .borderRadius(Constants.RADIUS_MD)
-                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id); })
+                  .onClick((): void => { this.selfAssess(this.activeActivity()!, true); })
               }
               .width('100%')
             }
+
+            Row({ space: 10 }) {
+              Button('问学伴讲解')
+                .layoutWeight(1)
+                .height(42)
+                .fontSize(12)
+                .fontColor(Constants.COLOR_BRAND)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.askTutorForActivity(this.activeActivity()!); })
+              Button('同标签测验')
+                .layoutWeight(1)
+                .height(42)
+                .fontSize(12)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.openFocusedQuizForActivity(this.activeActivity()!); })
+            }
+            .width('100%')
           }
 
           if (this.attemptedActivityIds.includes(this.activeActivity()!.id)) {

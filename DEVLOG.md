@@ -5807,3 +5807,50 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未完成模拟器中“生成 AI 题 → 答题 → 提交 → 点击问学伴复盘/练这个标签”的完整视觉点击流，不能标记为模拟器通过。
 - 本批次未修改 Web API，未重新验证线上 Health、Plan、Chat SSE、Quiz。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：测验分批生成与互动学习证据
+
+背景：继续向真实成熟学习产品靠近。本批次参考掌握学习与互动学习产品的共同结构：挑战长度可调、生成过程可恢复、互动练习要写入画像证据、答错后能立即进入学伴讲解或同标签练习。实现仍坚持真实 AI 出题，不用精选题库补齐，不新增 OHPM 依赖，不把端侧状态迁移到云端。
+
+外部依据：
+- Khan Academy Mastery Challenge：以小题组覆盖多个技能，用于巩固和更新掌握状态。
+- Codecademy：强调 step-by-step lessons、代码练习和即时反馈。
+- Duolingo：streak/连续学习作为可量化习惯反馈。
+- GitHub Docs：fenced code block 与语言名用于可读代码展示；本轮未改 Chat 代码块，但继续沿用该方向。
+
+文件：
+- `DEVLOG.md`
+- `apps/web/src/lib/agents/model.ts`
+- `apps/web/src/lib/agents/quiz-agent.ts`
+- `apps/web/src/app/api/quiz/quiz-flow.test.ts`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+
+行为变化：
+- Web Quiz Agent 将 6-20 题请求拆成每批最多 5 题的真实模型调用，降低单次 2048 token 截断导致的 502。
+- 每批模型输出若题量或 JSON 结构不足，最多再调用一次真实模型做 JSON 修复；仍不足时返回 `MODEL_INVALID_RESPONSE`，不使用本地题库或静态模板补题。
+- 分批生成会把已生成题干写入下一批提示，并在服务端按题干去重，减少重复题。
+- 测试环境新增有作用域的 `TEST_MODEL_RESPONSE_SEQUENCE`，只在匹配 prompt 时消费，避免并行测试互相抢占模型响应。
+- HarmonyOS Quiz 设置页新增挑战长度：速练 5 题、标准 10 题、挑战 15 题；生成请求使用用户选择的 `questionCount`。
+- Quiz 生成进度文案显示当前题量，例如“进阶 · 10 题”，避免用户误以为长题组卡住。
+- Lesson 互动练习完成后写入 `lesson_activity` 学习事件，记录课程、主题、标签、难度、正确数与总题数。
+- 标签洞察会合并 Lesson 互动证据，Profile/ActivityRecords 的标签画像不再只来自测验。
+- 新增“主动学习”成就：完成 3 个课程互动练习后解锁。
+- Lesson 互动反馈区新增“问学伴讲解”和“同标签测验”入口，把互动练习从纯阅读补充为学伴复盘与专项练习的闭环。
+
+验证：
+- `cd apps/web; pnpm test -- src/app/api/quiz/quiz-flow.test.ts`：exit 0；Vitest 实际执行 13 个测试文件、167 个测试全部通过，新增覆盖 `count=6` 分批合并与首轮坏 JSON 后模型修复。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm lint`：exit 0，`No ESLint warnings or errors`。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 成功，`/api/quiz` 仍为动态路由。
+- DevEco MCP `check_ets_files` 对 `LocalLearningRepository.ets`、`Lesson.ets`、`Quiz.ets` 返回 `no diagnostics`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 570 ms`；仍提示未配置 signingConfigs。
+- DevEco MCP `start_app`：模拟器 `Pura 90 Pro Max` 安装并启动当前 HAP 成功。
+
+失败或未验证：
+- 本批次尚未等待 Vercel 部署后验证线上 `count=10/15` 分批出题；推送后需验证 Health、Quiz、Plan、Chat SSE。
+- 未完成端侧模拟器中“Lesson 互动 → 问学伴讲解/同标签测验 → 生成长题组 → 提交写回画像”的完整点击流，不能标记为该流程模拟器通过。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

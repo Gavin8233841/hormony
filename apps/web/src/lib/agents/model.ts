@@ -114,8 +114,26 @@ function readModelConfig(): ModelConfig {
   };
 }
 
-function readTestModelResponse(): string | undefined {
+function readTestModelResponse(sourceText: string = ""): string | undefined {
   if (process.env.NODE_ENV !== "test") return undefined;
+  const sequence = process.env.TEST_MODEL_RESPONSE_SEQUENCE?.trim();
+  const sequenceScope = process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE?.trim();
+  if (sequence && sequence.length > 0) {
+    if (sequenceScope && !sourceText.includes(sequenceScope)) {
+      const scopedFallback = process.env.TEST_MODEL_RESPONSE?.trim();
+      return scopedFallback && scopedFallback.length > 0 ? scopedFallback : undefined;
+    }
+    try {
+      const values = JSON.parse(sequence) as unknown;
+      if (Array.isArray(values) && values.length > 0) {
+        const [current, ...rest] = values;
+        process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify(rest);
+        return typeof current === "string" ? current : JSON.stringify(current);
+      }
+    } catch {
+      return sequence;
+    }
+  }
   const value = process.env.TEST_MODEL_RESPONSE?.trim();
   return value && value.length > 0 ? value : undefined;
 }
@@ -221,7 +239,7 @@ export async function callModel(
   userPrompt: string,
   opts?: ModelCallOptions
 ): Promise<string> {
-  const testResponse = readTestModelResponse();
+  const testResponse = readTestModelResponse(`${systemPrompt}\n${userPrompt}`);
   if (testResponse !== undefined) return testResponse;
 
   const config = readModelConfig();
@@ -271,7 +289,7 @@ export async function callModelWithHistory(
   history: { role: "user" | "assistant"; content: string }[],
   opts?: ModelCallOptions
 ): Promise<string> {
-  const testResponse = readTestModelResponse();
+  const testResponse = readTestModelResponse(`${systemPrompt}\n${userPrompt}`);
   if (testResponse !== undefined) return testResponse;
 
   const config = readModelConfig();

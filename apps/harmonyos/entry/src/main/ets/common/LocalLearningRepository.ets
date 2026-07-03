@@ -522,6 +522,55 @@ export class LocalLearningRepository {
         }
       }
     }
+    const events = await LocalLearningRepository.getStudyEvents();
+    for (const event of events) {
+      if (event.type !== 'lesson_activity') continue;
+      const tags = event.tags ?? [];
+      const totalQuestions = event.totalQuestions ?? 1;
+      const correctQuestions = event.correctCount ?? 0;
+      for (const tag of tags) {
+        const normalized = tag.trim();
+        if (normalized.length === 0) continue;
+        let item = insights.find((value: TagInsight): boolean => value.tag === normalized);
+        if (item === undefined) {
+          item = {
+            tag: normalized,
+            courseId: event.courseId ?? '',
+            topic: event.topic ?? '',
+            totalQuestions: 0,
+            correctQuestions: 0,
+            accuracy: 0,
+            wrongQuestions: 0,
+            lastPracticedAt: event.timestamp,
+            easyQuestions: 0,
+            mediumQuestions: 0,
+            hardQuestions: 0,
+            lastDifficulty: event.difficulty ?? 'easy',
+            masteryLevel: '尝试',
+            masteryPoints: 0,
+            weakReason: '',
+            nextStep: ''
+          };
+          insights.push(item);
+        }
+        const difficulty = event.difficulty ?? 'easy';
+        item.totalQuestions += totalQuestions;
+        item.correctQuestions += correctQuestions;
+        if (difficulty === 'hard') item.hardQuestions += totalQuestions;
+        else if (difficulty === 'medium') item.mediumQuestions += totalQuestions;
+        else item.easyQuestions += totalQuestions;
+        item.wrongQuestions = item.totalQuestions - item.correctQuestions;
+        item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
+        item.lastPracticedAt = event.timestamp;
+        item.courseId = event.courseId ?? item.courseId;
+        item.topic = event.topic ?? item.topic;
+        item.lastDifficulty = difficulty;
+        item.masteryPoints = LocalLearningRepository.tagMasteryPoints(item);
+        item.masteryLevel = LocalLearningRepository.tagMasteryLevel(item.masteryPoints);
+        item.weakReason = LocalLearningRepository.tagWeakReason(item);
+        item.nextStep = LocalLearningRepository.tagNextStep(item);
+      }
+    }
     return insights.sort((left: TagInsight, right: TagInsight): number => {
       const wrongDelta = right.wrongQuestions - left.wrongQuestions;
       if (wrongDelta !== 0) return wrongDelta;
@@ -598,9 +647,12 @@ export class LocalLearningRepository {
     const results = await LocalLearningRepository.getQuizResults();
     const completedTasks = LocalLearningRepository.uniqueEvents(events, 'task_completed', true);
     const masteredTopics = LocalLearningRepository.uniqueEvents(events, 'quiz_mastered', false);
+    const lessonActivities = LocalLearningRepository.uniqueEvents(events, 'lesson_activity', true);
     return [
       LocalLearningRepository.achievement('first_quiz', '初次练习', '完成第一次练习', results.length, 1,
         results.length > 0 ? results[results.length - 1].submittedAt : undefined),
+      LocalLearningRepository.achievement('active_learning_3', '主动学习', '完成 3 个课程互动练习',
+        lessonActivities.length, 3, lessonActivities.length >= 3 ? lessonActivities[2].timestamp : undefined),
       LocalLearningRepository.achievement('task_5', '稳步前进', '完成 5 项学习任务', completedTasks.length, 5,
         completedTasks.length >= 5 ? completedTasks[4].timestamp : undefined),
       LocalLearningRepository.achievement('mastery_3', '掌握新知', '掌握 3 个知识点', masteredTopics.length, 3,
