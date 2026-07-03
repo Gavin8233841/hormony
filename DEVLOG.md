@@ -5696,3 +5696,43 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未完成端侧 Quiz 页面点击生成的一整轮模拟器视觉截图；证据等级为静态诊断通过、构建通过和安装启动成功，非 Quiz 页面模拟器通过。
 - `/api/quiz` 曾出现一次 502，说明线上仍存在偶发模型输出或平台链路失败；本批次通过端侧错误恢复降低用户感知损害，未改 Web Agent 路由。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：端侧前端资源深猎与产品化执行手册
+
+背景：独立接力线程「端侧前端资源深猎」按用户授权继续深挖 HarmonyOS 端侧学习 App 可落地的真实前端资源、ArkUI 原生能力、OHPM/OpenHarmony 包、成熟学习产品 UX 范式与资产合规边界。本批次只产出文档和账本，不下载外部资产，不修改 HarmonyOS 生产代码或依赖。
+
+文件：
+- `DEVLOG.md`
+- `docs/FRONTEND-RESOURCE-DEEP-HUNT-20260703.md`
+- `docs/FRONTEND-PRODUCTIZATION-PLAYBOOK-20260703.md`
+- `docs/FRONTEND-ASSET-LEDGER-20260703.md`
+
+行为变化：
+- 新增 2026-07-03 端侧前端资源深猎报告，覆盖 59 项资源/能力/UX 范式：ArkUI 原生能力、OHPM 包、Markdown 源码参考、图标/插画/动效/音效/字体、代码展示参考库、成熟学习产品机制。
+- 明确当前仓库底座：HarmonyOS 目标仍为 API 12，OHPM 依赖为空，`Chat.ets` 已有代码块 V2，`StagedProgress` 已被 Chat/Plan/Quiz 复用，`LearningMap.ets` 与标签洞察已有可继续增强的真实数据基础。
+- 核验 OHPM registry 最新元数据：`@luvi/lv-markdown-in` latest `3.4.5`、MIT、`compatibleSdkVersion: 12`；`@ohos/lottie-turbo` latest `1.0.12`、Apache-2.0、`compatibleSdkVersion: 12`；`@ohos/lottie` latest `2.0.31`、MIT、latest 元数据未给 `compatibleSdkVersion`；`@ohos/mpchart` latest `3.0.28`、Apache License 2.0、`compatibleSdkVersion: 12`。
+- 补充依赖链风险：`@luvi/lv-markdown-in` 依赖 `@luvi/html2md`、`@cangjie-tpc/formula_hybrid`、`@cangjie-tpc/prism_hybrid`，其中 Cangjie hybrid 依赖 native loader，进入主线前必须单包 proof。
+- 确认 `FluidMarkdown` README 写明 HarmonyOS 最低 API 15，`Harmony-Markdown-Editor` README 徽章标注 API 15，因此当前 API 12 主线拒绝直接引入，只保留源码结构参考。
+- 新增 2-3 周产品化执行手册，按 P0/P1/P2 拆解 Chat Markdown/代码块、AI 出题等待进度、答题结果复盘、记录页标签洞察、学习地图星云图、首页学习任务、错题追问、成就反馈。
+- 新增资产与依赖受控账本，记录每类资源 URL、许可证、用途、是否已下载、是否可进入 HAP 和验证状态；所有外部素材当前均未下载、未进入 HAP、未验证。
+
+验证：
+- `git status --short`：exit 0，启动时无输出，工作区干净。
+- `git log -5 --oneline`：exit 0，确认当前起点包含 `78d995d feat: 增强 AI 出题反馈` 等最近提交。
+- `git switch -c codex/frontend-resource-deep-hunt-20260703`：exit 0，已把独立 worktree 从 detached HEAD 切到独立分支。
+- `ohpm --version`：exit 0，版本 `26.0.0.410`。
+- `ohpm info @luvi/lv-markdown-in`、`@ohos/lottie-turbo`、`@ohos/lottie`、`@ohos/mpchart`：exit 1，CLI 未编码路径均返回 502 / `Fetch Pkg Info Failed`。
+- `Invoke-RestMethod https://ohpm.openharmony.cn/ohpm/%40luvi%2Flv-markdown-in`：exit 0，确认 latest `3.4.5`、MIT、modified `2026-07-03T17:15:28`、`compatibleSdkVersion: 12`。
+- `Invoke-RestMethod https://ohpm.openharmony.cn/ohpm/%40ohos%2Flottie-turbo`：exit 0，确认 latest `1.0.12`、Apache-2.0、modified `2026-05-20T09:41:43`、`compatibleSdkVersion: 12`、依赖 `liblottie-turbo.so`。
+- `Invoke-RestMethod https://ohpm.openharmony.cn/ohpm/%40ohos%2Flottie`：exit 0，确认 latest `2.0.31`、MIT、modified `2026-05-21T15:30:58`；latest 元数据未给 `compatibleSdkVersion` 字段。
+- `Invoke-RestMethod https://ohpm.openharmony.cn/ohpm/%40ohos%2Fmpchart`：exit 0，确认 latest `3.0.28`、Apache License 2.0、modified `2026-04-27T10:09:51`、`compatibleSdkVersion: 12`。
+- GitHub API 只读核验 `antgroup/FluidMarkdown`、`electronicminer/Harmony-Markdown-Editor`、Tabler、Phosphor、Lucide、Iconoir、Noto CJK 等维护与许可字段。
+- 官方产品与许可证页面只读访问：Duolingo、Khan Academy、Brilliant、GitHub Docs、GitHub Copilot Docs、Notion、Linear、Tabler、Phosphor、Lucide、Iconoir、Open Peeps、unDraw、Rive、Freesound、Mixkit 等返回可访问结果；Codecademy 特定帮助文章、LeetCode 页面、LottieFiles 许可证页、Pixabay license summary 在本机自动请求下返回 403，ManyPixels `/license` 路径返回 404，文档已标注需人工浏览复核。
+
+未验证：
+- 本批次只改文档和 DEVLOG，未执行 HarmonyOS 构建；原因是未修改源码、配置、依赖或资源目录。
+- 未安装任何 OHPM 包，未进行 HAP 构建、模拟器 UI 树、截图或真机验证。
+- 第三方 SVG、插画、Lottie、音效、字体、`@luvi/lv-markdown-in`、`@ohos/lottie-turbo`、`@ohos/lottie`、`@ohos/mpchart` 均未进入 HAP，不能标记运行通过。
+- Codecademy 特定帮助文章和 LeetCode 页面在本机自动请求下返回 403；文档已标注为需人工浏览复核的产品参考。
