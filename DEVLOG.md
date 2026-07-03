@@ -5258,3 +5258,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 本轮冒烟没有触发真实包含 fenced code 的学伴回复，因此代码块 V2 的专项视觉仍未验证；当前证据等级为构建通过。
 - 本批次没有引入 `@luvi/lv-markdown-in`、JetBrains Mono、Lottie 或其他新依赖。
+
+---
+
+## 2026-07-03 Codex：标签洞察升级为掌握层级
+
+背景：继续落实成熟学习产品的标签化诊断模式。上一批已让精选练习把真实 topic tags 写入 `QuizResultDetail.tags`，本批次只在 Profile 页把已有 `TagInsight` 聚合结果展示成掌握层级和下一步复习动作，不改本地 schema、Repository 或 Web API。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Profile.ets
+- DEVLOG.md
+
+行为变化：
+- Profile 标签洞察从“正确率进度 + 错题数”升级为“标签名 + 掌握层级 + 正确题数/总题数 + 正确率 + 最近练习日期 + 下一步动作”。
+- 掌握层级由已有 `totalQuestions`、`accuracy`、`wrongQuestions` 推导：刚开始、尝试中、需巩固、熟悉、熟练、掌握；60% 且仍有错题会明确显示“需巩固”。
+- 下一步动作把标签诊断连接到复习行为：有错题时提示先复盘错题再练 3 题；稳定掌握时提示隔天复习保持。
+- 视觉仍使用 `Constants.ets` 现有颜色和 ArkUI 原生 `Progress`，没有新增图表库、字体或 OHPM 依赖。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 515 ms`。
+- `.\scripts\harmonyos-app-smoke.ps1`：exit 0，71 passed / 0 failed；脚本内增量构建 exit 0，`BUILD SUCCESSFUL in 3 s 684 ms`。
+- 模拟器视觉复核：Pura 90 Pro Max，`127.0.0.1:5555`；截图 `screenshots/trae-smoke-20260703-203305/08-profile-tab-scrolled.jpeg` 显示标签洞察卡包含“掌握层级”“需巩固”“正确率 60%”“最近 07月03日”和“下一步：先复盘 16 道错题，再练 3 题”，文本未遮挡、底部导航未覆盖。
+
+未验证：
+- 真机未验证。
+- 当前层级仅基于本地历史聚合即时推导，没有新增长期掌握状态迁移表；后续如要做 Khan 式升降级，需要单独设计 schema 与迁移。

@@ -80,29 +80,95 @@ export struct ProfileContent {
     .alignItems(HorizontalAlign.Center)
   }
 
+  private tagMasteryLevel(item: TagInsight): string {
+    if (item.totalQuestions < 2) {
+      return item.wrongQuestions > 0 ? '尝试中' : '刚开始';
+    }
+    if (item.wrongQuestions > 0 && item.accuracy <= 0.6) return '需巩固';
+    if (item.accuracy >= 0.9 && item.totalQuestions >= 4 && item.wrongQuestions === 0) return '掌握';
+    if (item.accuracy >= 0.8) return '熟练';
+    if (item.accuracy >= 0.65) return '熟悉';
+    return '需巩固';
+  }
+
+  private tagMasteryColor(item: TagInsight): string {
+    const level = this.tagMasteryLevel(item);
+    if (level === '掌握' || level === '熟练') return Constants.COLOR_SUCCESS;
+    if (level === '熟悉') return Constants.COLOR_WARNING;
+    if (level === '需巩固') return Constants.COLOR_ERROR;
+    return Constants.COLOR_BRAND;
+  }
+
+  private tagMasteryBackground(item: TagInsight): string {
+    const level = this.tagMasteryLevel(item);
+    if (level === '掌握' || level === '熟练') return Constants.COLOR_SUCCESS_LIGHT;
+    if (level === '需巩固') return Constants.COLOR_ERROR_LIGHT;
+    if (level === '熟悉') return Constants.COLOR_BG_TAG;
+    return Constants.COLOR_BRAND_LIGHT;
+  }
+
+  private tagPracticeDate(item: TagInsight): string {
+    if (item.lastPracticedAt.length < 10) return '最近练习';
+    return item.lastPracticedAt.slice(5, 7) + '月' + item.lastPracticedAt.slice(8, 10) + '日';
+  }
+
+  private tagNextAction(item: TagInsight): string {
+    if (item.wrongQuestions > 0) {
+      return '下一步：先复盘 ' + item.wrongQuestions.toString() + ' 道错题，再练 3 题';
+    }
+    if (item.accuracy >= 0.8 && item.totalQuestions >= 3) {
+      return '下一步：隔天复习一次，保持掌握';
+    }
+    if (item.totalQuestions < 3) {
+      return '下一步：再完成 ' + (3 - item.totalQuestions).toString() + ' 题，形成稳定判断';
+    }
+    return '下一步：补一组同主题练习，把正确率提升到 80%';
+  }
+
   @Builder
   TagInsightRow(item: TagInsight) {
-    Column({ space: 8 }) {
-      Row() {
+    Column({ space: 9 }) {
+      Row({ space: 8 }) {
         Text(item.tag)
+          .layoutWeight(1)
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.tagMasteryLevel(item))
+          .fontSize(10)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.tagMasteryColor(item))
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .backgroundColor(this.tagMasteryBackground(item))
+          .borderRadius(Constants.RADIUS_SM)
         Text(item.correctQuestions.toString() + '/' + item.totalQuestions.toString())
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
       }
       .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
       Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
         .width('100%')
         .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : (item.accuracy >= 0.6 ? Constants.COLOR_WARNING :
           Constants.COLOR_ERROR))
         .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
         .borderRadius(4)
-      Text(item.wrongQuestions > 0 ? '错题 ' + item.wrongQuestions.toString() + ' 道，建议优先复盘' : '当前表现稳定')
+      Row() {
+        Text('正确率 ' + Math.round(item.accuracy * 100).toString() + '%')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Text('最近 ' + this.tagPracticeDate(item))
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      Text(this.tagNextAction(item))
+        .width('100%')
         .fontSize(11)
-        .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_SUCCESS)
+        .lineHeight(17)
+        .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_TEXT_TERTIARY : this.tagMasteryColor(item))
     }
     .width('100%')
   }
@@ -276,7 +342,7 @@ export struct ProfileContent {
                   .fontSize(15)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                Text('按错题数排序')
+                Text('掌握层级')
                   .fontSize(11)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
               }
