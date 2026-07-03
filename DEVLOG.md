@@ -5644,3 +5644,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未安装新 HAP 到模拟器，未取得 Plan 新截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
 - 真机未验证。
 - Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.15课程资料检索产品化闭环
+
+背景：继续推进 1.15 产品化路线中“知识资料不只是文字列表”的落地。此前 `Knowledge.ets` 已有云端 `/api/knowledge/search` 与本地 `LearningContentRepository.getKnowledge()` 兜底，但结果卡只展示来源、相关度和正文，缺少关键句、主题动作、延伸阅读和“读完之后做什么”的学习闭环。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `Knowledge.ets` 新增结果资料卡：显示来源、相关度、主题标签、资料来源状态、关键句、可展开正文，并把卡片点击展开改为独立“展开全文”动作，避免与卡内按钮冲突。
+- 新增“资料使用路径”卡，把搜索后的学习步骤明确为“抓关键句 → 问学伴 → 做测验”，云端命中和本地兜底使用不同状态文案。
+- 新增“延伸阅读”卡，读取 `LearningContentRepository.getResources(courseId)`，按当前关键词匹配 `title`、`description`、`tags`，展示当前课程的教材、课程、文档、标准或工具资源；本批次不打开外链、不新增权限。
+- 结果卡新增“学主题”“问学伴”“测验”动作：有 `topic` 的资料可直达 `Lesson`；“问学伴”把来源、主题和关键句写入 `pendingChatQuestion` 后进入 `Chat`，不自动发送；“测验”写入 `selectedQuizTopic` 后进入 `Quiz`。
+- 空态保留课程建议词，同时展示当前课程延伸阅读，让资料页首次进入时也有可扫描内容。
+- 未新增 OHPM 依赖，未下载或写入外部 SVG/PNG/Lottie/音效/字体资产，未修改 `oh-package.json5`、SDK 目标版本、API 契约或本地数据 schema。
+
+验证：
+- `git status --short`：exit 0，启动时仅显示未跟踪 `.tmp/`。
+- `git log -5 --oneline`：exit 0，确认当前分支 HEAD 为 `4ee53b8 feat: 强化计划页生成恢复体验`。
+- 读取 `DataModels.ets`：确认 `KnowledgeChunk` 字段为 `id?`、`text`、`source`、`courseId?`、`topic?`、`score?`，`ExternalLearningResource` 字段为 `id`、`title`、`type`、`url`、`description`、`courseId`、`tags`。
+- 读取 `external-resources.json`：确认 `type` 精确值包含 `textbook`、`course`、`documentation`、`standard`、`tool`。
+- 学生端旧技术文案扫描：exit 1，无命中；禁用英文词扫描：exit 1，无命中。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 17 s 64 ms`；`CompileArkTS` 重新执行并通过；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得 Knowledge 页新截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
+- 真机未验证。
+- 外部资源只作为课程内延伸阅读文本展示，未验证系统浏览器打开、深链、复制链接或网络可达性。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
