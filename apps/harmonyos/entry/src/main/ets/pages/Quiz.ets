@@ -47,6 +47,7 @@ struct QuizPage {
   @State submitting: boolean = false;
   @State difficulty: string = 'medium';
   @State message: string = '';
+  @State hasError: boolean = false;
   @State resultReady: boolean = false;
   @State resultAccuracy: number = 0;
   @State resultCorrectCount: number = 0;
@@ -119,6 +120,7 @@ struct QuizPage {
     this.answers = [];
     this.currentIndex = 0;
     this.message = '';
+    this.hasError = false;
     this.resultReady = false;
     this.resultDetails = [];
     this.expandedResultId = '';
@@ -141,7 +143,7 @@ struct QuizPage {
     if (this.loading) return;
     this.resetQuiz();
     this.loading = true;
-    this.progressStep = 1;
+    this.runGenerationProgress();
     const request: QuizRequest = {
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
@@ -158,6 +160,7 @@ struct QuizPage {
       const validation = this.validateQuizPackage(response);
       if (!validation.valid) {
         this.message = validation.message;
+        this.hasError = true;
         return;
       }
       const nextAnswers = new Array<string>(validation.questions.length).fill('');
@@ -168,11 +171,16 @@ struct QuizPage {
       this.questions = validation.questions;
       if (this.questions.length === 0) {
         this.message = '当前主题暂时没有可用题目';
+        this.hasError = true;
+      } else {
+        this.message = '题目已生成，完成后会按标签记录到本机';
+        this.hasError = false;
       }
     } catch (e) {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'QuizPage API failed: %{public}s', (e as Error).message);
-      this.message = '云端学伴暂不可用，请检查网络后重试';
+      this.message = this.quizErrorMessage(e as Error);
+      this.hasError = true;
     } finally {
       this.loading = false;
     }
@@ -407,6 +415,36 @@ struct QuizPage {
     return trimmed.substring(0, 1);
   }
 
+  private runGenerationProgress(): void {
+    this.progressStep = 0;
+    setTimeout((): void => {
+      if (this.loading) this.progressStep = 1;
+    }, 700);
+    setTimeout((): void => {
+      if (this.loading) this.progressStep = 2;
+    }, 2200);
+  }
+
+  private quizErrorMessage(error: Error): string {
+    const message = error.message;
+    if (message.includes('MODEL_INVALID_RESPONSE')) {
+      return '这组 AI 题目格式没过校验，答案不会保存。请点重试重新生成。';
+    }
+    if (message.includes('MODEL_TIMEOUT')) {
+      return 'AI 出题超时了，当前主题和难度已保留，请稍后重试。';
+    }
+    if (message.includes('KNOWLEDGE_UNAVAILABLE')) {
+      return '当前主题缺少课程资料，请换一个主题或先学习相关课程。';
+    }
+    if (message.includes('SAFETY_BLOCKED')) {
+      return '这组题目没有通过安全审核，请重新生成一组。';
+    }
+    if (message.startsWith('HTTP ')) {
+      return '云端出题暂时失败，未保存题组。请检查网络后重试。';
+    }
+    return '云端学伴暂不可用，请检查网络后重试';
+  }
+
   private correctOption(question: QuizQuestionView, answer: string): string {
     const options = question.options ?? [];
     const index = answer.trim().toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
@@ -533,11 +571,39 @@ struct QuizPage {
   @Builder
   GenerationProgress() {
     StagedProgress(
-      this.progressStep >= 2 ? '正在整理题目标签' : 'AI 正在生成题目',
-      this.progressStep >= 2 ? '校验 A-D 选项、解析和能力标签' : '检索课程资料、匹配难度、生成可评分题组',
+      this.progressStep >= 2 ? '正在整理题目标签' :
+        (this.progressStep === 1 ? '正在控制难度与题型' : '正在检索课程依据'),
+      this.progressStep >= 2 ? '校验 A-D 选项、解析和能力标签' :
+        (this.progressStep === 1 ? '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + '题组' :
+          '先查课程资料，再让 AI 出题，避免凭空编题'),
       this.progressStep,
       this.generationSteps
     )
+  }
+
+  @Builder
+  MessageBanner() {
+    Row({ space: 8 }) {
+      SymbolGlyph($r(this.hasError ? 'sys.symbol.exclamationmark_triangle_fill' : 'sys.symbol.checkmark_circle_fill'))
+        .fontSize(16)
+        .fontColor([this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_SUCCESS])
+      Text(this.message)
+        .layoutWeight(1)
+        .fontSize(12)
+        .lineHeight(18)
+        .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+      if (this.hasError && !this.loading && this.questions.length === 0) {
+        Button('重试')
+          .height(32)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.generateQuiz(); })
+      }
+    }
+    .width('100%')
+    .padding({ left: 18, right: 18, bottom: 10 })
   }
 
   @Builder
@@ -747,11 +813,7 @@ struct QuizPage {
       GradientHeader('课程测验', this.courseTitle + ' · 即时评分', () => this.getUIContext().getRouter().back())
 
       if (this.message.length > 0) {
-        Text(this.message)
-          .width('100%')
-          .fontSize(12)
-          .fontColor(Constants.COLOR_ERROR)
-          .padding({ left: 18, right: 18, bottom: 10 })
+        this.MessageBanner()
       }
 
       Scroll() {

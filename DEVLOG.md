@@ -5665,3 +5665,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 接力恢复后再次按 UI 树 bounds 操作：底部“学伴”tab 为 left=628/top=2270/width=283/height=252，输入框为 left=56/top=2032/width=948/height=154，发送按钮为 left=1046/top=2032/width=154/height=154；输入“请用Python给出二分查找Markdown代码块并三句解释”成功，但点击发送后截图 `.tmp/codex-chat-code-v2-20260703/chat-after-send-8s.png` 显示回到首页，仍未证明新 `/api/chat` SSE 完整返回或代码块 V2 在新回答中可见。
 - 后续重新进入 Chat 时底部导航 UI 树/点击坐标仍不稳定，未取得新代码块 V2 模拟器截图；本批次证据等级为构建通过，非模拟器通过。
 - 未验证横向滚动在长代码上的真实触控手感；需后续在稳定 UI 树后用新回答或本地历史捕获截图。
+
+---
+
+## 2026-07-03 Codex：Quiz 出题反馈与失败恢复
+
+背景：用户指出模拟器中 AI 出题不可用、等待期间缺少有效反馈。本批次先做实因核验：线上 `/api/plan` 可返回有效结构；线上 `/api/quiz` 曾出现一次 HTTP 502，随后同主题真实调用返回 HTTP 200。端侧必须把这种“等待较久或偶发失败”的状态表达清楚，不能让用户看到空白或误以为应用卡死。本批次不引入假题、不改题库数据、不绕过云端真实 Agent。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+
+行为变化：
+- Quiz 生成进度从固定步骤改为本地阶段推进：检索课程依据 → 控制难度与题型 → 整理题目标签，长模型请求期间页面持续给出反馈。
+- 生成失败后保留主题和难度，显示可操作错误横幅与“重试”按钮；不会保存不完整题组。
+- 端侧根据 HTTP 错误体中的精确错误码区分文案：`MODEL_INVALID_RESPONSE`、`MODEL_TIMEOUT`、`KNOWLEDGE_UNAVAILABLE`、`SAFETY_BLOCKED` 和其他 HTTP 失败。
+- 成功生成后显示“题目已生成，完成后会按标签记录到本机”，使标签化学习记录的后续行为更明确。
+
+验证：
+- `POST https://hormony-ruddy.vercel.app/api/plan`：HTTP 200，返回 `planId=plan_fc87e812`，`tasks=10`，首个任务 `courseId=cs101`、`topic=数组与线性表`、`action=lesson`。
+- `POST https://hormony-ruddy.vercel.app/api/quiz`：首次 exit 1，HTTP 502；未记录为通过。
+- `POST https://hormony-ruddy.vercel.app/api/quiz`：重试 HTTP 200，返回 `quizId=quiz_02844428`，`questions=5`，`grading=5`，题目包含 `difficulty=medium` 与标签，如 `概念理解`、`性质应用`。
+- DevEco MCP `check_ets_files` 对 `Quiz.ets` 首次返回 `arkts-no-any-unknown`，定位到新增 `unknown` 参数；已修复。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：首次 exit 1，失败原因为上述 ArkTS 显式类型错误；已修复。
+- DevEco MCP `check_ets_files` 对 `Quiz.ets` 二次返回 `no diagnostics`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：二次 exit 0，`BUILD SUCCESSFUL in 16 s 56 ms`；仍提示未配置 signingConfigs。
+- DevEco MCP `start_app`：模拟器 `127.0.0.1:5555` 安装并启动当前 HAP 成功。
+
+失败或未验证：
+- 本批次未完成端侧 Quiz 页面点击生成的一整轮模拟器视觉截图；证据等级为静态诊断通过、构建通过和安装启动成功，非 Quiz 页面模拟器通过。
+- `/api/quiz` 曾出现一次 502，说明线上仍存在偶发模型输出或平台链路失败；本批次通过端侧错误恢复降低用户感知损害，未改 Web Agent 路由。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
