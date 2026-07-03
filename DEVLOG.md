@@ -5566,3 +5566,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未安装新 HAP 到模拟器，未取得新错题本 UI 截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
 - 真机未验证。
 - Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.15学习节奏热力与成就来源
+
+背景：继续推进 1.15 产品化路线中的“活动记录热力/时间轴”和“成就真实事件来源”。本批次不新增依赖、不改 schema，使用已有 `StudyEvent` 与 `AchievementProgress` 构建可扫描的学习节奏和里程碑解释。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `ActivityRecords.ets` 新增近 4 周学习热力卡，按本地学习事件统计每日记录数、活跃天数、总事件数和峰值日；掌握、完成任务或完成课程的日期使用成功色表达。
+- `ActivityRecords.ets` 新增“全部 / 练习 / 课程 / 任务”筛选胶囊，时间轴随筛选实时切换；筛选为空时显示明确空态，不再只给空列表。
+- `ActivityRecords.ets` 的日期分组改为基于筛选后的事件列表计算，避免筛选后日期标题错位。
+- `Achievements.ets` 为每个成就增加真实来源说明、剩余步数或解锁日期、下一步动作；成就图标只使用仓库已有 `SymbolGlyph` 名称，未新增第三方图标。
+- `Achievements.ets` 的里程碑总览补充“真实事件”说明，强调练习、计划、掌握主题自动更新，不使用演示进度。
+
+验证：
+- `rg -o "sys\.symbol\.[A-Za-z0-9_]+" apps/harmonyos/entry/src/main/ets | Sort-Object -Unique`：exit 0，用于核对系统 Symbol 名称；本批次保留的 `calendar_fill`、`checkmark_circle_fill`、`star_fill` 均为仓库既有使用项。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 16 s 168 ms`；`CompileArkTS` 重新执行并通过；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得 ActivityRecords/Achievements 新截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
+- 真机未验证。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
