@@ -5515,3 +5515,22 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次尚未安装到模拟器点击验证 Plan 生成与任务跳转，因此证据等级为构建通过。
 - 生产 Vercel `/api/plan` 线上响应未重新验收。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：线上 AI 端点结构回归
+
+背景：前序 Web 与端侧改动已推送，但 DEVLOG 仍记录生产 Vercel Health、Chat SSE、Plan、Quiz 未重新验收。本批次不改源码，只对线上无状态网关做不含秘密的结构回归，确认端侧依赖的真实 AI 能力仍可用。
+
+文件：
+- `DEVLOG.md`
+
+验证：
+- `GET https://hormony-ruddy.vercel.app/api/health`：HTTP 200，`status=ready`，`deploymentMode=stateless`，模型名为 `doubao-seed-2-1-pro-260628`。
+- `POST https://hormony-ruddy.vercel.app/api/plan`：HTTP 200，返回 5 个任务；首个任务含 `action=lesson`、`courseId=cs101`、真实 Topic `数组与线性表`，任务字段校验通过。
+- `POST https://hormony-ruddy.vercel.app/api/quiz`：HTTP 200，返回 5 道展示题与 5 条 grading；首题 4 个 A-D 选项，含 difficulty/tags；展示题未出现 `answer` 或 `explanation` 泄露。
+- `POST https://hormony-ruddy.vercel.app/api/chat`（`Accept: text/event-stream`）：HTTP 200，SSE 内容包含 `thinking`、`delta`、`citation`、`done`，响应体约 1688 字节。
+
+未验证：
+- 本批次没有安装 HAP 到模拟器，因此不能证明 HarmonyOS 端真实点击 Plan/Quiz/Chat 流程通过。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
