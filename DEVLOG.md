@@ -5629,3 +5629,39 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `scripts/harmonyos-app-smoke.ps1` 首次 exit 1：`uitest dumpLayout` 返回 `Wait for subscribe ... timeout`；第二次 exit 1：脚本未找到当前课程页上的 `进入课程` 元素，完整冒烟不能标记通过。
 - 模拟器端完成一次新 Chat SSE 问答尚未通过；本批次只证明线上 Health、模拟器网关 Health、HAP 安装启动和 Chat 页面局部视觉状态。Plan/Quiz 端侧真实点击链路仍需后续稳定 UI 树后继续验收。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：Chat 代码块 V2 学习交互
+
+背景：继续按前端产品化 P0 推进，不做浅层换色。GitHub 官方 Markdown 文档确认 fenced code block 通过三反引号和语言名表达代码块与语法高亮意图；Codecademy 公开产品介绍强调交互式代码学习有助于保留和练习新概念。本批次在 API 12、零 OHPM 依赖边界下，把 Chat 的代码块从单段黑底文本升级为更接近学习产品的代码阅读组件。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- Chat Markdown 代码块语言栏从默认 `code` 改为无语言时显示“代码片段”，有语言时保留模型返回的语言名。
+- 代码块新增顶部工具条：语言标签、“可横向滚动”提示和“解释这段”按钮。
+- 代码正文按行渲染，增加两位行号、等宽字体和横向滚动容器，长代码不再依赖整段文本硬塞入气泡。
+- “解释这段”不会自动发送，也不会执行任意代码；只把被截断到 1600 字以内的代码围栏预填到输入框，要求学伴逐行解释关键变量、执行顺序和现实类比。
+
+外部依据：
+- GitHub Docs：`https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-and-highlighting-code-blocks`
+- Codecademy：`https://www.codecademy.com/`
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：首次 exit 1，失败原因是 `.hvigor/outputs/build-logs/build.log` 文件锁 `EBUSY`，不是 ArkTS 语法错误，未清理缓存。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：重试 exit 0，`BUILD SUCCESSFUL in 15 s 407 ms`；仍提示未配置 signingConfigs。
+- `GET http://127.0.0.1:3001/api/health`：HTTP 200，确认本地模拟器 API 网关仍可用。
+- DevEco MCP `start_app`：模拟器 `127.0.0.1:5555` 安装并启动当前 HAP 成功。
+- 接力恢复后复核：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 2 s 766 ms`；仍提示未配置 signingConfigs。
+- DevEco MCP `check_ets_files` 对 `Chat.ets` 返回 `no diagnostics`。
+- DevEco MCP `start_app`：模拟器 `127.0.0.1:5555` 再次安装并启动当前 HAP 成功。
+- DevEco MCP `get_app_ui_tree` + 截图：`.tmp/codex-chat-code-v2-20260703/chat-tab.png` 确认 Chat 页可进入，历史 Markdown 信息块仍可见；证据不提交仓库。
+
+失败或未验证：
+- 尝试通过 UI 自动化输入“用Python写一个二分查找示例，必须使用Markdown代码块，并用三句话解释。”时，第一次 `inputText` 因空格参数拆分失败；第二次输入成功后复用旧发送坐标，点击落到底部导航，页面切走，未触发 `/api/chat`。
+- 接力恢复后再次按 UI 树 bounds 操作：底部“学伴”tab 为 left=628/top=2270/width=283/height=252，输入框为 left=56/top=2032/width=948/height=154，发送按钮为 left=1046/top=2032/width=154/height=154；输入“请用Python给出二分查找Markdown代码块并三句解释”成功，但点击发送后截图 `.tmp/codex-chat-code-v2-20260703/chat-after-send-8s.png` 显示回到首页，仍未证明新 `/api/chat` SSE 完整返回或代码块 V2 在新回答中可见。
+- 后续重新进入 Chat 时底部导航 UI 树/点击坐标仍不稳定，未取得新代码块 V2 模拟器截图；本批次证据等级为构建通过，非模拟器通过。
+- 未验证横向滚动在长代码上的真实触控手感；需后续在稳定 UI 树后用新回答或本地历史捕获截图。

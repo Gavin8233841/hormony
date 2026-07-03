@@ -217,7 +217,38 @@ export struct ChatContent {
 
   private codeLanguage(block: MarkdownBlock): string {
     const language = block.meta ?? '';
-    return language.length > 0 ? language : 'code';
+    return language.length > 0 ? language : '代码片段';
+  }
+
+  private codeFenceLanguage(block: MarkdownBlock): string {
+    const language = block.meta ?? '';
+    return language.length > 0 ? language : 'text';
+  }
+
+  private codeLines(block: MarkdownBlock): string[] {
+    const lines = block.text.split('\n');
+    return lines.length > 0 ? lines : [''];
+  }
+
+  private codeLineNumber(index: number): string {
+    const value = (index + 1).toString();
+    return value.length === 1 ? '0' + value : value;
+  }
+
+  private boundedCodeText(block: MarkdownBlock): string {
+    const text = block.text.trim();
+    if (text.length <= 1600) return text;
+    return text.slice(0, 1600) + '\n...';
+  }
+
+  private explainCodeBlock(block: MarkdownBlock): void {
+    const language = this.codeFenceLanguage(block);
+    this.inputText = '请逐行解释这段 ' + language + ' 代码，说明关键变量、执行顺序，并给一个现实类比帮助记忆：\n\n```' +
+      language + '\n' + this.boundedCodeText(block) + '\n```';
+    if (!this.cloudAgentReady && !this.probing) {
+      this.probeCloudAgent();
+    }
+    this.scrollToBottom();
   }
 
   private taskDone(block: MarkdownBlock): boolean {
@@ -943,27 +974,64 @@ export struct ChatContent {
             .color(Constants.COLOR_BORDER)
             .margin({ top: 4, bottom: 4 })
         } else if (block.type === 'code') {
-          Column({ space: 8 }) {
-            Row() {
+          Column({ space: 0 }) {
+            Row({ space: 8 }) {
               Text(this.codeLanguage(block))
                 .fontSize(11)
                 .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-              Text('代码块')
+                .fontColor(Constants.COLOR_MAP_SURFACE)
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .backgroundColor(Constants.COLOR_MAP_CORE)
+                .borderRadius(10)
+              Text('可横向滚动')
                 .fontSize(11)
                 .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                .layoutWeight(1)
+              Button('解释这段')
+                .fontSize(11)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .height(28)
+                .padding({ left: 10, right: 10 })
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(14)
+                .onClick((): void => {
+                  this.explainCodeBlock(block);
+                })
             }
             .width('100%')
-            .justifyContent(FlexAlign.SpaceBetween)
-            Text(block.text)
-              .width('100%')
-              .fontSize(12)
-              .lineHeight(20)
-              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-              .fontFamily('monospace')
+            .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+            .backgroundColor(Constants.COLOR_MAP_LINE)
+
+            Scroll() {
+              Column({ space: 0 }) {
+                ForEach(this.codeLines(block), (line: string, index: number): void => {
+                  Row({ space: 12 }) {
+                    Text(this.codeLineNumber(index))
+                      .width(30)
+                      .fontSize(11)
+                      .lineHeight(20)
+                      .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                      .textAlign(TextAlign.End)
+                    Text(line.length > 0 ? line : ' ')
+                      .fontSize(12)
+                      .lineHeight(20)
+                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                      .fontFamily('monospace')
+                      .maxLines(1)
+                  }
+                  .constraintSize({ minWidth: 520 })
+                  .padding({ top: 2, bottom: 2 })
+                  .alignItems(VerticalAlign.Top)
+                })
+              }
+              .padding({ left: 10, right: 12, top: 10, bottom: 10 })
+            }
+            .width('100%')
+            .constraintSize({ maxHeight: 260 })
+            .scrollable(ScrollDirection.Horizontal)
+            .scrollBar(BarState.Auto)
           }
           .width('100%')
-          .padding(11)
           .backgroundColor(Constants.COLOR_MAP_SURFACE)
           .borderRadius(Constants.RADIUS_SM)
         } else if (block.type === 'table') {
