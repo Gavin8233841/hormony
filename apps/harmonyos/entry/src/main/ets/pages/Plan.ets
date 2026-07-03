@@ -193,6 +193,32 @@ struct PlanPage {
     return reason.trim().length > 0 ? reason.trim() : '学伴根据目标拆出的可执行下一步';
   }
 
+  private taskOutcome(task: PlanTask): string {
+    if (task.action === 'quiz' || task.type === 'quiz') return '完成后得到一次主题掌握诊断';
+    if (task.action === 'practice' || task.type === 'practice') return '完成后刷新错题和标签掌握度';
+    if (task.action === 'review' || task.type === 'review') return '完成后降低同类错题再次出现';
+    return '完成后推进课程进度并解锁后续练习';
+  }
+
+  private totalPlanMinutes(): number {
+    let total = 0;
+    for (const task of this.tasks) total += task.estimatedMin;
+    return total;
+  }
+
+  private doneTaskCount(): number {
+    return this.tasks.filter((task: PlanTask): boolean => task.done === true).length;
+  }
+
+  private nextTaskTitle(): string {
+    const next = this.tasks.find((task: PlanTask): boolean => task.done !== true);
+    return next !== undefined ? next.title : '本计划任务已全部完成';
+  }
+
+  private planProgressPercent(): number {
+    return this.tasks.length > 0 ? Math.round(this.doneTaskCount() * 100 / this.tasks.length) : 0;
+  }
+
   private runLocalProgress(): void {
     this.progressStep = 0;
     setTimeout((): void => {
@@ -212,14 +238,14 @@ struct PlanPage {
   }
 
   @Builder
-  AgentTraceCard() {
+  ProcessTraceCard() {
     Column({ space: 12 }) {
       Row() {
-        Text('Agent 工作链')
+        Text('规划依据')
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('可解释规划')
+        Text('可解释')
           .fontSize(11)
           .fontColor(Constants.COLOR_BRAND)
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
@@ -246,6 +272,82 @@ struct PlanPage {
         .width('100%')
         .alignItems(VerticalAlign.Top)
       })
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
+    .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
+    .margin({ left: 16, right: 16, bottom: 16 })
+  }
+
+  @Builder
+  PlanInsightCard() {
+    Column({ space: 12 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text('计划进度')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('下一步：' + this.nextTaskTitle())
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Text(this.planProgressPercent().toString() + '%')
+          .fontSize(22)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.planProgressPercent() >= 100 ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+      }
+      .width('100%')
+
+      Progress({ value: this.doneTaskCount(), total: Math.max(this.tasks.length, 1), type: ProgressType.Linear })
+        .width('100%')
+        .height(6)
+        .color(this.planProgressPercent() >= 100 ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+        .borderRadius(4)
+
+      Row({ space: 8 }) {
+        Column({ space: 3 }) {
+          Text(this.tasks.length.toString())
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('任务数')
+            .fontSize(10)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        Column({ space: 3 }) {
+          Text(this.totalPlanMinutes().toString())
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_BRAND)
+          Text('总分钟')
+            .fontSize(10)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        Column({ space: 3 }) {
+          Text(this.doneTaskCount().toString())
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_SUCCESS)
+          Text('已完成')
+            .fontSize(10)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ top: 8, bottom: 8 })
+      .backgroundColor(Constants.COLOR_SURFACE_TINT)
+      .borderRadius(Constants.RADIUS_MD)
     }
     .width('100%')
     .padding(16)
@@ -363,12 +465,27 @@ struct PlanPage {
         .padding({ left: 18, right: 18, bottom: 10 })
       }
 
+      if (this.hasError && this.tasks.length > 0) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+            .fontSize(16)
+            .fontColor([Constants.COLOR_SUCCESS])
+          Text('已保留上一版计划，可以继续执行或重新生成')
+            .layoutWeight(1)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        .width('100%')
+        .padding({ left: 18, right: 18, bottom: 12 })
+      }
+
       if (this.loading) {
         this.PlanSkeleton()
       } else if (this.tasks.length > 0) {
         if (this.agentTrace.length > 0) {
-          this.AgentTraceCard()
+          this.ProcessTraceCard()
         }
+        this.PlanInsightCard()
         Row() {
           Column() {
             Text('今日起步')
@@ -427,6 +544,14 @@ struct PlanPage {
                   Text(this.taskReason(t))
                     .fontSize(11)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                    .lineHeight(17)
+                    .margin({ top: 5 })
+                    .maxLines(2)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(this.taskOutcome(t))
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Constants.COLOR_SUCCESS)
                     .lineHeight(17)
                     .margin({ top: 5 })
                     .maxLines(2)
@@ -529,8 +654,6 @@ struct PlanPage {
     this.loading = true;
     this.message = '';
     this.hasError = false;
-    this.tasks = [];
-    this.agentTrace = [];
     this.runLocalProgress();
     try {
       const req: PlanRequest = {

@@ -5618,3 +5618,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未安装新 HAP 到模拟器，未取得首页收束卡截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
 - 真机未验证。
 - Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.15计划页生成恢复与成果导向
+
+背景：继续推进 1.15 产品化路线中的“生成与评分进度可恢复”和“任务卡结果导向”。此前 `Plan.ets` 生成失败会让页面暂时丢失旧任务，任务卡也偏执行清单。本批次不改 API 契约，只在端侧 UI 层增强恢复、解释和下一步。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `Plan.ets` 生成新计划时不再清空已有任务和工作链；如果云端失败且本机已有计划，会提示“已保留上一版计划，可以继续执行或重新生成”。
+- 学生端可见标题从“Agent 工作链”改为“规划依据”，避免把内部编排术语暴露为主要学习文案；内部字段 `agentTrace` 不改。
+- 新增计划进度卡，显示计划完成百分比、下一步任务、任务数、总分钟和已完成数量。
+- 任务卡新增“完成后获得什么”的成果导向说明：主题掌握诊断、刷新错题和标签掌握度、降低同类错题、推进课程进度等。
+- 生成失败仍保留输入目标和周期；重试按钮继续使用同一输入，不写入空计划。
+
+验证：
+- `rg -n "Agent 工作链|多 Agent|RAG|Retrieval" apps/harmonyos/entry/src/main/ets/pages/Plan.ets`：exit 1，计划页学生端旧技术文案无命中。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 889 ms`；`CompileArkTS` 重新执行并通过；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得 Plan 新截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
+- 真机未验证。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
