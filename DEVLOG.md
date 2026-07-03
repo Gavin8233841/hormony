@@ -5773,8 +5773,10 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - DevEco MCP `check_ets_files` 对 `DataModels.ets`、`LearningMetadataModels.ets`、`LocalLearningRepository.ets`、`Profile.ets`、`ActivityRecords.ets`、`Quiz.ets` 返回 `no diagnostics`。
 - DevEco MCP `start_app`：模拟器 `Pura 90 Pro Max` 安装并启动当前 HAP 成功。
 - DevEco MCP `get_app_ui_tree`：保存 `.tmp/codex-ui-tree-20260703/simple_dump_hormony_20260703194653863.txt`，窗口 `bundleName:com.c4ai.hormony`、`WindowRect: [ 0, 0, 1256, 2760 ]`、`FirstFrameCallbackCalled: 1`、`IsVisible: true`；证据不提交仓库。
+- 推送后线上 `GET https://hormony-ruddy.vercel.app/api/health`：HTTP 200，`status=ready`，模型名为 `doubao-seed-2-1-pro-260628`。
+- 推送后线上 `POST https://hormony-ruddy.vercel.app/api/quiz`：HTTP 200，请求 `focusTag=边界条件`、`count=1`，返回 `focusTag=边界条件`、`questions=1`、`grading=1`，首题评分标签包含 `边界条件`。
 
 失败或未验证：
 - 本批次未完成“Profile/ActivityRecords 点击练这个标签 → Quiz 页面携带标签 → 端侧生成 AI 题 → 提交结果写回画像”的完整模拟器点击流，不能标记为该流程模拟器通过。
-- 推送部署前不能证明线上 Vercel 已采用 `focusTag` 和新解析逻辑；仍需部署后验证 Health、Quiz、Plan、Chat SSE 与端侧请求。
+- 线上已验证 Health 与 Quiz 重点标签；Plan、Chat SSE 与端侧真实点击请求仍需后续验证。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
