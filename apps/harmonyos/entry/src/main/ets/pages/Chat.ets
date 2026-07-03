@@ -27,6 +27,11 @@ interface MarkdownBlock {
   meta?: string;
 }
 
+interface CodeLine {
+  no: number;
+  text: string;
+}
+
 @Component
 export struct ChatContent {
   @Prop quickQuestion: string = '';
@@ -99,6 +104,17 @@ export struct ChatContent {
         continue;
       }
       if (trimmed.length === 0) continue;
+      if (this.isDivider(trimmed)) {
+        blocks.push({ type: 'divider', text: '' });
+        continue;
+      }
+      if (this.isTableRow(trimmed)) {
+        const tableText = this.tableText(trimmed);
+        if (tableText.length > 0) {
+          blocks.push({ type: 'table', text: tableText });
+        }
+        continue;
+      }
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
         blocks.push({ type: 'heading', text: headingText });
@@ -116,13 +132,6 @@ export struct ChatContent {
         blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
       } else if (this.numberedText(trimmed).length > 0) {
         blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
-      } else if (this.isTableRow(trimmed)) {
-        const tableText = this.tableText(trimmed);
-        if (tableText.length > 0) {
-          blocks.push({ type: 'table', text: tableText });
-        }
-      } else if (this.isDivider(trimmed)) {
-        blocks.push({ type: 'divider', text: '' });
       } else {
         blocks.push({ type: 'paragraph', text: this.cleanInline(line) });
       }
@@ -211,6 +220,47 @@ export struct ChatContent {
   private codeLanguage(block: MarkdownBlock): string {
     const language = block.meta ?? '';
     return language.length > 0 ? language : 'code';
+  }
+
+  private codeRows(block: MarkdownBlock): CodeLine[] {
+    const rows: CodeLine[] = [];
+    const lines = block.text.length > 0 ? block.text.split('\n') : [''];
+    for (let i = 0; i < lines.length; i += 1) {
+      rows.push({ no: i + 1, text: lines[i] });
+    }
+    return rows;
+  }
+
+  private codeBlockWidth(block: MarkdownBlock): number {
+    let longest = 0;
+    for (const line of block.text.split('\n')) {
+      longest = Math.max(longest, line.length);
+    }
+    return Math.max(280, Math.min(980, longest * 7 + 76));
+  }
+
+  private codeSnippet(block: MarkdownBlock): string {
+    const lines = block.text.split('\n');
+    const picked: string[] = [];
+    let total = 0;
+    for (const line of lines) {
+      if (picked.length >= 10 || total + line.length > 720) {
+        break;
+      }
+      picked.push(line);
+      total += line.length + 1;
+    }
+    return picked.join('\n');
+  }
+
+  private codeFollowUpQuestion(block: MarkdownBlock): string {
+    return '帮我解释这段 ' + this.codeLanguage(block) + ' 代码的关键思路，并指出每一步状态如何变化：\n```' +
+      this.codeLanguage(block) + '\n' + this.codeSnippet(block) + '\n```';
+  }
+
+  private prefillCodeQuestion(block: MarkdownBlock): void {
+    this.inputText = this.codeFollowUpQuestion(block);
+    this.scrollToBottom();
   }
 
   private taskDone(block: MarkdownBlock): boolean {
@@ -558,25 +608,25 @@ export struct ChatContent {
   }
 
   private agentLabel(agent: string): string {
-    if (agent === 'Profile') return '画像';
-    if (agent === 'Retrieval') return '检索';
+    if (agent === 'Profile') return '学情';
+    if (agent === 'Retrieval') return '资料';
     if (agent === 'Tutor') return '讲解';
-    if (agent === 'Planner') return '规划';
-    if (agent === 'Quiz') return '出题';
-    if (agent === 'Evaluator') return '评估';
-    if (agent === 'Safety') return '安全';
-    return agent;
+    if (agent === 'Planner') return '路线';
+    if (agent === 'Quiz') return '练习';
+    if (agent === 'Evaluator') return '诊断';
+    if (agent === 'Safety') return '校验';
+    return '步骤';
   }
 
   private agentDescription(agent: string): string {
-    if (agent === 'Profile') return '读取本地画像';
-    if (agent === 'Retrieval') return '检索课程证据';
+    if (agent === 'Profile') return '结合你的本地学习记录';
+    if (agent === 'Retrieval') return '查找课程里的可靠依据';
     if (agent === 'Tutor') return '组织解释路径';
-    if (agent === 'Planner') return '拆解学习计划';
-    if (agent === 'Quiz') return '生成分层题目';
-    if (agent === 'Evaluator') return '评估薄弱点';
-    if (agent === 'Safety') return '检查安全与依据';
-    return '执行 Agent 步骤';
+    if (agent === 'Planner') return '拆成下一步学习动作';
+    if (agent === 'Quiz') return '准备分层练习题';
+    if (agent === 'Evaluator') return '定位薄弱点和复习建议';
+    if (agent === 'Safety') return '确认回答边界和依据';
+    return '处理当前回答步骤';
   }
 
   private agentSeen(msg: DisplayMessage, agent: string): boolean {
@@ -591,6 +641,21 @@ export struct ChatContent {
     const splitIndex = trace.indexOf(':');
     if (splitIndex <= 0) return '';
     return trace.slice(0, splitIndex);
+  }
+
+  private traceContent(trace: string): string {
+    const splitIndex = trace.indexOf(':');
+    if (splitIndex < 0 || splitIndex >= trace.length - 1) return trace;
+    return trace.slice(splitIndex + 1).trim();
+  }
+
+  private traceDisplayText(trace: string): string {
+    const agent = this.traceAgent(trace);
+    const content = this.traceContent(trace)
+      .replace(/RAG/g, '课程资料')
+      .replace(/Retrieval/g, '资料检索')
+      .replace(/Agent/g, '处理步骤');
+    return this.agentLabel(agent) + '：' + content;
   }
 
   private appendAgent(flow: string[], agent: string): void {
@@ -617,7 +682,7 @@ export struct ChatContent {
 
   private agentSummary(msg: DisplayMessage): string {
     const count = this.agentFlow(msg).length;
-    if (msg.content.length === 0) return '正在协作 · ' + count.toString() + ' 步';
+    if (msg.content.length === 0) return '正在处理 · ' + count.toString() + ' 步';
     return '已完成 · ' + count.toString() + ' 步 · ' + msg.citations.length.toString() + ' 条依据';
   }
 
@@ -670,7 +735,7 @@ export struct ChatContent {
               if (msg.thinking.length === 0 && msg.agentTrace.length === 0) {
                 Row({ space: 8 }) {
                   LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
-                  Text('正在启动多 Agent 工作台')
+                  Text('正在整理回答过程')
                     .fontSize(13)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
                 }
@@ -769,7 +834,7 @@ export struct ChatContent {
             .fontColor([Constants.COLOR_SUCCESS])
         }
         Column({ space: 2 }) {
-          Text('多 Agent 工作台')
+          Text('回答生成过程')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -799,7 +864,7 @@ export struct ChatContent {
       if (msg.agentExpanded) {
         Column({ space: 6 }) {
           ForEach(msg.agentTrace, (trace: string): void => {
-            Text(trace)
+            Text(this.traceDisplayText(trace))
               .width('100%')
               .fontSize(11)
               .lineHeight(17)
@@ -907,22 +972,61 @@ export struct ChatContent {
         } else if (block.type === 'code') {
           Column({ space: 8 }) {
             Row() {
-              Text(this.codeLanguage(block))
+              Row({ space: 6 }) {
+                Text(this.codeLanguage(block))
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                  .backgroundColor(Constants.COLOR_MAP_LINE)
+                  .borderRadius(9)
+                Text(this.codeRows(block).length.toString() + ' 行')
+                  .fontSize(11)
+                  .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+              }
+              .alignItems(VerticalAlign.Center)
+              Button('追问这段')
                 .fontSize(11)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-              Text('代码块')
-                .fontSize(11)
-                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .height(28)
+                .padding({ left: 10, right: 10 })
+                .backgroundColor(this.cloudAgentReady && !this.loading ? Constants.COLOR_BRAND : Constants.COLOR_MAP_LINE)
+                .borderRadius(14)
+                .enabled(this.cloudAgentReady && !this.loading)
+                .onClick((): void => {
+                  this.prefillCodeQuestion(block);
+                })
             }
             .width('100%')
             .justifyContent(FlexAlign.SpaceBetween)
-            Text(block.text)
+            Scroll() {
+              Column({ space: 2 }) {
+                ForEach(this.codeRows(block), (row: CodeLine): void => {
+                  Row({ space: 10 }) {
+                    Text(row.no.toString())
+                      .width(28)
+                      .fontSize(11)
+                      .lineHeight(20)
+                      .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                      .textAlign(TextAlign.End)
+                      .fontFamily('monospace')
+                    Text(row.text.length > 0 ? row.text : ' ')
+                      .fontSize(12)
+                      .lineHeight(20)
+                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                      .fontFamily('monospace')
+                      .maxLines(1)
+                  }
+                  .width('100%')
+                  .alignItems(VerticalAlign.Top)
+                })
+              }
+              .width(this.codeBlockWidth(block))
+            }
               .width('100%')
-              .fontSize(12)
-              .lineHeight(20)
-              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-              .fontFamily('monospace')
+              .constraintSize({ maxHeight: 260 })
+              .scrollable(ScrollDirection.Horizontal)
+              .scrollBar(BarState.Auto)
           }
           .width('100%')
           .padding(11)

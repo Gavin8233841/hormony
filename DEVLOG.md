@@ -5558,3 +5558,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 因 hdc 当前无连接目标，本批次未安装 HAP、未抓取 Chat 页面 UI 树或截图；证据等级为构建通过。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：打磨端侧学伴回答阅读体验
+
+模型名称：GPT-5 Codex
+
+时间戳：
+- UTC：2026-07-03 11:01:42
+- 北京时间：2026-07-03 19:01:42
+
+背景：资源图谱与成熟学习产品拆解已指出 Chat 阅读体验是端侧产品化 P0，当前回答仍暴露技术编排词和原始 Markdown 表格噪声。本批次继续在 `Chat.ets` 零依赖渲染器内小步增强，不引入 OHPM 依赖，不改 Chat SSE 协议。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- 将对用户可见的生成过程从“多 Agent 工作台”等技术词改为“回答生成过程”“学情/资料/讲解/路线/练习/诊断/校验”等学习语义文案。
+- agent trace 展示时将 `RAG`、`Retrieval`、`Agent` 等内部词转换为面向学生的表述；内部协议字符串仍保留用于流程识别。
+- 代码块增加语言标签、行数、行号、横向滚动和“追问这段”按钮；按钮只预填带代码片段的追问，不自动发送。
+- Markdown 表格/分隔线判断提前，真实历史回答中的原始 `|---|` 分隔线和表格竖线不再直接暴露，表格行转为移动端可读的浅色信息行。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 974 ms`；仍提示未配置 signingConfigs。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe -t 127.0.0.1:5555 install -r C:\Users\guo82\.codex\worktrees\5cba\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap`：exit 0，安装输出显示当前工作树 HAP 路径并成功安装。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe -t 127.0.0.1:5555 shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，`start ability successfully`。
+- DevEco UI 树：`C:\Users\guo82\.codex\worktrees\5cba\Hormony\.tmp\harmony-1.16-chat-codeblock\simple_dump_hormony_20260703185758799.txt`，设备 `Pura 90 Pro Max`，窗口 `1256x2760`，Chat 页可见“学伴”“基于课程资料，为每个问题给出依据”，历史回答表格行显示为“对比维度  ·  数组（顺序表）  ·  链表”。
+- DevEco 截图：`C:\Users\guo82\.codex\worktrees\5cba\Hormony\.tmp\harmony-1.16-chat-codeblock\chat-table-readable-20260703.png`，模拟器上确认 Chat 页面进入成功，表格噪声已转为浅色信息行。
+
+未验证：
+- 本批次未重新发起真实 Chat SSE 生成请求，因此“回答生成过程”的流式中间态和新代码块视觉仍为构建通过/源码确认，未标记为模拟器通过。
+- 未执行真机、横屏、平板、OCR、TTS、Lottie、distributedKVStore 验证。
