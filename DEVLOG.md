@@ -5593,3 +5593,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未安装新 HAP 到模拟器，未取得 ActivityRecords/Achievements 新截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
 - 真机未验证。
 - Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.15首页每日收束闭环
+
+背景：继续推进 1.15 产品化路线中的“每日收束仪式”。此前首页能显示今日任务完成，但完成后缺少复盘入口和真实学习节奏反馈。本批次只用本地计划、学习事件和画像统计，不引入动效库或静态演示数据。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `HomeContent.ets` 新增 `loadHomeStats()`，读取 `LocalLearningRepository.getProfile()` 和 `getStudyEvents()`，得到连续学习天数与今日本地事件数。
+- 今日计划全部完成后显示“今日已收束”卡，展示完成任务数、计划分钟、今日记录数和连续学习提示。
+- 收束卡提供“看学习记录”和“复盘错题”两个动作，分别进入 `pages/ActivityRecords` 与 `pages/MistakeBook`，形成完成任务后的复盘闭环。
+- 任务完成/取消后刷新首页统计，避免完成任务后收束卡和今日事件数停留在旧状态。
+- 未新增 OHPM 依赖、未改数据 schema、未改 API 契约。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 355 ms`；`CompileArkTS` 重新执行并通过；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得首页收束卡截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
+- 真机未验证。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。

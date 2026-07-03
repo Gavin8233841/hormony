@@ -1,5 +1,5 @@
 import { Constants } from '../common/Constants';
-import { Course, PlanTask, StudyPlan } from '../model/DataModels';
+import { Course, PlanTask, StudyPlan, UserProfile } from '../model/DataModels';
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -27,11 +27,14 @@ export struct HomeContent {
   @State notificationOpen: boolean = false;
   @State pressedTask: number = -1;
   @State notificationMessage: string = '学习计划已同步，完成任务会自动更新进度';
+  @State streakDays: number = 0;
+  @State todayEventCount: number = 0;
   @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [];
 
   aboutToAppear(): void {
     this.loadCourses();
     this.loadPlan();
+    this.loadHomeStats();
   }
 
   private async loadCourses(): Promise<void> {
@@ -51,6 +54,20 @@ export struct HomeContent {
       if (plan !== null) this.planTasks = plan.tasks;
     } catch (e) {
       // 保留首屏默认任务，等待下次本地读取。
+    }
+  }
+
+  private async loadHomeStats(): Promise<void> {
+    try {
+      const profile: UserProfile | null = await LocalLearningRepository.getProfile();
+      this.streakDays = profile?.stats.streakDays ?? 0;
+      const today = this.todayDate();
+      const events = await LocalLearningRepository.getStudyEvents();
+      this.todayEventCount = events.filter((event: StudyEvent): boolean =>
+        event.timestamp.slice(0, 10) === today).length;
+    } catch (e) {
+      this.streakDays = 0;
+      this.todayEventCount = 0;
     }
   }
 
@@ -111,6 +128,7 @@ export struct HomeContent {
         await LocalLearningRepository.appendStudyEvent(event);
       }
       this.planTasks = nextTasks;
+      await this.loadHomeStats();
     } catch (e) {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'HomeContent local task update failed');
@@ -136,6 +154,26 @@ export struct HomeContent {
     return this.todayTasks().length === 0 ? '今天没有安排' : '今日任务已完成';
   }
 
+  private todayDoneCount(): number {
+    return this.todayTasks().filter((task: PlanTask): boolean => task.done === true).length;
+  }
+
+  private allTodayTasksDone(): boolean {
+    const tasks = this.todayTasks();
+    return tasks.length > 0 && tasks.every((task: PlanTask): boolean => task.done === true);
+  }
+
+  private todayTotalMinutes(): number {
+    let total = 0;
+    for (const task of this.todayTasks()) total += task.estimatedMin;
+    return total;
+  }
+
+  private wrapUpHint(): string {
+    if (this.streakDays > 1) return '连续 ' + this.streakDays.toString() + ' 天保持学习，明天继续从复习开始。';
+    return '今天已经收束，明天先看错题再进入新内容。';
+  }
+
   private submitQuickAsk(): void {
     const question = this.quickAsk.trim();
     if (question.length === 0) {
@@ -151,6 +189,13 @@ export struct HomeContent {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Plan' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'HomeContent router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
+  private openPage(url: string): void {
+    this.getUIContext().getRouter().pushUrl({ url: url }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'HomeContent page navigation failed: %{public}s', err.message);
     });
   }
 
@@ -508,6 +553,101 @@ export struct HomeContent {
   }
 
   @Builder
+  DailyWrapUp() {
+    if (this.allTodayTasksDone()) {
+      Column({ space: 12 }) {
+        Row({ space: 10 }) {
+          Stack({ alignContent: Alignment.Center }) {
+            Column()
+              .width(42)
+              .height(42)
+              .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+              .borderRadius(14)
+            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+              .fontSize(24)
+              .fontColor([Constants.COLOR_SUCCESS])
+          }
+          Column({ space: 3 }) {
+            Text('今日已收束')
+              .fontSize(17)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text(this.wrapUpHint())
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_TERTIARY)
+              .lineHeight(18)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+
+        Row({ space: 8 }) {
+          Column({ space: 3 }) {
+            Text(this.todayDoneCount().toString() + '/' + this.todayTasks().length.toString())
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_SUCCESS)
+            Text('任务完成')
+              .fontSize(10)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .layoutWeight(1)
+          Column({ space: 3 }) {
+            Text(this.todayTotalMinutes().toString())
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text('计划分钟')
+              .fontSize(10)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .layoutWeight(1)
+          Column({ space: 3 }) {
+            Text(this.todayEventCount.toString())
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_BRAND)
+            Text('今日记录')
+              .fontSize(10)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .layoutWeight(1)
+        }
+        .width('100%')
+        .padding({ top: 10, bottom: 10 })
+        .backgroundColor(Constants.COLOR_SURFACE_TINT)
+        .borderRadius(Constants.RADIUS_MD)
+
+        Row({ space: 10 }) {
+          Button('看学习记录')
+            .layoutWeight(1)
+            .height(40)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_BRAND)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.openPage('pages/ActivityRecords'); })
+          Button('复盘错题')
+            .layoutWeight(1)
+            .height(40)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.openPage('pages/MistakeBook'); })
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .borderRadius(Constants.RADIUS_LG)
+      .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 3 })
+    }
+  }
+
+  @Builder
   QuickAsk() {
     Row({ space: 10 }) {
       Stack({ alignContent: Alignment.Center }) {
@@ -568,6 +708,7 @@ export struct HomeContent {
         this.Header()
         this.ContinueCard()
         this.TodayPlan()
+        this.DailyWrapUp()
         this.QuickAsk()
       }
       .width('100%')
