@@ -24,6 +24,7 @@ interface DisplayMessage {
 interface MarkdownBlock {
   type: string;
   text: string;
+  meta?: string;
 }
 
 @Component
@@ -77,14 +78,18 @@ export struct ChatContent {
   private markdownBlocks(content: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
+    let codeLanguage = '';
     let inCode = false;
     for (const rawLine of content.split('\n')) {
       const line = rawLine.trimEnd();
       const trimmed = line.trim();
       if (trimmed.startsWith('```')) {
         if (inCode) {
-          blocks.push({ type: 'code', text: codeLines.join('\n') });
+          blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage });
           codeLines.splice(0, codeLines.length);
+          codeLanguage = '';
+        } else {
+          codeLanguage = trimmed.slice(3).trim();
         }
         inCode = !inCode;
         continue;
@@ -97,6 +102,16 @@ export struct ChatContent {
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
         blocks.push({ type: 'heading', text: headingText });
+      } else if (trimmed.startsWith('>')) {
+        const quote = this.cleanInline(trimmed.slice(1));
+        if (quote.length > 0) {
+          blocks.push({ type: 'quote', text: quote });
+        }
+      } else if (trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ')) {
+        blocks.push({ type: 'task', text: this.cleanInline(trimmed.slice(6)), meta: 'open' });
+      } else if (trimmed.startsWith('- [x] ') || trimmed.startsWith('- [X] ') ||
+        trimmed.startsWith('* [x] ') || trimmed.startsWith('* [X] ')) {
+        blocks.push({ type: 'task', text: this.cleanInline(trimmed.slice(6)), meta: 'done' });
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
         blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
       } else if (this.numberedText(trimmed).length > 0) {
@@ -113,7 +128,7 @@ export struct ChatContent {
       }
     }
     if (codeLines.length > 0) {
-      blocks.push({ type: 'code', text: codeLines.join('\n') });
+      blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage });
     }
     if (blocks.length === 0 && content.length > 0) {
       blocks.push({ type: 'paragraph', text: content });
@@ -188,8 +203,18 @@ export struct ChatContent {
       .replace(/<[^>]+>/g, '')
       .replace(/\*\*/g, '')
       .replace(/__/g, '')
+      .replace(/\*/g, '')
       .replace(/`/g, '')
       .trim();
+  }
+
+  private codeLanguage(block: MarkdownBlock): string {
+    const language = block.meta ?? '';
+    return language.length > 0 ? language : 'code';
+  }
+
+  private taskDone(block: MarkdownBlock): boolean {
+    return block.meta === 'done';
   }
 
   private async loadLocalHistory(): Promise<void> {
@@ -824,6 +849,43 @@ export struct ChatContent {
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+        } else if (block.type === 'quote') {
+          Row({ space: 9 }) {
+            Column()
+              .width(3)
+              .height('100%')
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(2)
+            Text(block.text)
+              .layoutWeight(1)
+              .fontSize(13)
+              .lineHeight(21)
+              .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_TERTIARY)
+          }
+          .width('100%')
+          .padding({ left: 9, right: 9, top: 8, bottom: 8 })
+          .backgroundColor(Constants.COLOR_SURFACE_TINT)
+          .borderRadius(Constants.RADIUS_SM)
+          .alignItems(VerticalAlign.Top)
+        } else if (block.type === 'task') {
+          Row({ space: 8 }) {
+            Text(this.taskDone(block) ? '✓' : '○')
+              .width(20)
+              .height(20)
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.taskDone(block) ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(this.taskDone(block) ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(10)
+            Text(block.text)
+              .layoutWeight(1)
+              .fontSize(14)
+              .lineHeight(22)
+              .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
         } else if (block.type === 'bullet' || block.type === 'numbered') {
           Row({ space: 7 }) {
             Text(block.type === 'numbered' ? block.text.split(' ')[0] : '•')
@@ -843,15 +905,29 @@ export struct ChatContent {
             .color(Constants.COLOR_BORDER)
             .margin({ top: 4, bottom: 4 })
         } else if (block.type === 'code') {
-          Text(block.text)
+          Column({ space: 8 }) {
+            Row() {
+              Text(this.codeLanguage(block))
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+              Text('代码块')
+                .fontSize(11)
+                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+            }
             .width('100%')
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .fontFamily('monospace')
-            .padding(10)
-            .backgroundColor(Constants.COLOR_MAP_SURFACE)
-            .borderRadius(Constants.RADIUS_SM)
+            .justifyContent(FlexAlign.SpaceBetween)
+            Text(block.text)
+              .width('100%')
+              .fontSize(12)
+              .lineHeight(20)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .fontFamily('monospace')
+          }
+          .width('100%')
+          .padding(11)
+          .backgroundColor(Constants.COLOR_MAP_SURFACE)
+          .borderRadius(Constants.RADIUS_SM)
         } else if (block.type === 'table') {
           Text(block.text)
             .width('100%')

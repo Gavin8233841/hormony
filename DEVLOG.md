@@ -5534,3 +5534,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 本批次没有安装 HAP 到模拟器，因此不能证明 HarmonyOS 端真实点击 Plan/Quiz/Chat 流程通过。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：增强端侧学伴 Markdown 结构化渲染
+
+背景：用户指出云端学伴 Markdown 文本没有正确渲染，且不希望通过未验证 OHPM 包或 ArkWeb 草率承载。当前项目目标仍为 API 12，`@luvi/lv-markdown-in` / FluidMarkdown 等第三方 Markdown 方向尚未完成 API 12 包源与运行验证。本批次在 `Chat.ets` 现有零依赖解析器上增强结构化渲染，优先解决真实回答可读性。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- Markdown 代码围栏保留语言标记，代码块显示语言与“代码块”标题栏，正文继续使用等宽字体和深色代码背景。
+- 新增 `>` 引用块渲染，使用左侧品牌竖线和浅色底卡表达引用/重点提醒。
+- 新增 `- [ ]` / `- [x]` 任务列表渲染，用圆点和勾选状态表达步骤完成感。
+- 继续支持标题、普通列表、编号列表、分隔线、表格行折叠和基础段落；不引入第三方依赖，不改变 Chat SSE 协议。
+
+验证：
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：exit 0，输出为空，当前未连接模拟器目标。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 12 s 793 ms`；仍提示未配置 signingConfigs。
+
+未验证：
+- 因 hdc 当前无连接目标，本批次未安装 HAP、未抓取 Chat 页面 UI 树或截图；证据等级为构建通过。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
