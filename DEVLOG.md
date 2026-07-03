@@ -5283,3 +5283,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 真机未验证。
 - 当前层级仅基于本地历史聚合即时推导，没有新增长期掌握状态迁移表；后续如要做 Khan 式升降级，需要单独设计 schema 与迁移。
+
+---
+
+## 2026-07-03 Codex：学习星图方向与局部关系强化
+
+背景：继续落实端侧产品模式基准中对 LearningMap 的 P0 要求。参考 Obsidian Graph 的节点/链接/方向/局部关系表达，本批次把现有星图从“有先修线”推进到“能读出先修方向、当前节点上下游和下一步动作”的知识图，不引入 D3、WebView、图谱库或新素材。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- LearningMap 的边增加箭头，箭头方向从前置主题指向后继主题，图例新增“箭头表示先修方向”。
+- 选中节点后只强化当前节点、一跳前置和一跳后继；无关节点降透明，直接后继节点显示“后继”关系标记。
+- 节点详情区补充练习证据、前置完成度、下一步建议、前置主题列表、后继主题列表，并说明“大小=练习次数”。
+- 保留现有颜色和 ArkUI 原生 `Line`/`Stack` 实现，没有新增 OHPM 依赖、Canvas runtime 或外部图谱资源。
+- 冒烟脚本增强：`Get-UiTree()` 对 `uitest dumpLayout` 做 4 次有限重试；启动后仅在读到非首页页面时才发送 Back，避免空 `pagePath` 误回退。
+- 冒烟脚本练习流程升级为状态机：每题确认 `1 / 5` 到 `5 / 5` 的题号推进，最后提交后等待“本轮已完成”，不再把单次点击当作练习完成。
+- 冒烟脚本新增 LearningMap 方向图例断言，覆盖本批新增语义。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 13 s 441 ms`。
+- `.\scripts\harmonyos-app-smoke.ps1`：exit 0，76 passed / 0 failed；脚本内增量构建 exit 0，`BUILD SUCCESSFUL in 2 s 891 ms`。
+- 冒烟覆盖：HAP 构建、安装、启动、首页、课程详情、5 题精选练习逐题推进、提交评分、本轮闭环、错题追问学伴、Chat、Profile、学习记录、错题本、成就、LearningMap 方向图例、三门课程学习星图、回到首页。
+- 模拟器视觉复核：Pura 90 Pro Max，`127.0.0.1:5555`；截图 `screenshots/trae-smoke-20260703-212646/12-learning-map-数据结构.jpeg` 显示方向箭头、直接后继标记、无关节点降透明和“箭头表示先修方向”图例，首屏无明显遮挡。
+
+未验证：
+- 真机未验证。
+- 详情区新增的前置/后继分组随构建和 UI 流程通过，但本批截图只覆盖 LearningMap 首屏，没有单独截图滚动后的详情区。

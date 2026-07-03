@@ -45,12 +45,16 @@ function Invoke-HdcShell([string[]]$arguments) {
 }
 
 function Get-UiTree() {
-    $dumpResult = Invoke-HdcShell @("uitest", "dumpLayout")
-    if ($dumpResult -notmatch 'DumpLayout saved to:(\S+)') {
-        throw "dumpLayout did not return a device JSON path: $dumpResult"
+    $dumpResult = ""
+    for ($attempt = 0; $attempt -lt 4; $attempt++) {
+        $dumpResult = Invoke-HdcShell @("uitest", "dumpLayout")
+        if ($dumpResult -match 'DumpLayout saved to:(\S+)') {
+            $json = Invoke-HdcShell @("cat", $Matches[1])
+            return $json | ConvertFrom-Json
+        }
+        Start-Sleep -Milliseconds 750
     }
-    $json = Invoke-HdcShell @("cat", $Matches[1])
-    return $json | ConvertFrom-Json
+    throw "dumpLayout did not return a device JSON path: $dumpResult"
 }
 
 function Find-ElementByText($uiTree, $text) {
@@ -171,13 +175,13 @@ function Take-Screenshot($name) {
 
 function Verify-Page($pagePath, $description) {
     $actual = ""
-    for ($attempt = 0; $attempt -lt 4; $attempt++) {
+    for ($attempt = 0; $attempt -lt 8; $attempt++) {
         $actual = Get-PagePath (Get-UiTree)
         if ($actual -eq $pagePath) {
             Write-Step "Page: $description" "PASS" $actual
             return $true
         }
-        Start-Sleep -Milliseconds 500
+        Start-Sleep -Milliseconds 750
     }
     Write-Step "Page: $description" "FAIL" "expected=$pagePath actual=$actual"
     return $false
@@ -265,6 +269,43 @@ function Verify-TextExistsWithScroll($textPattern, $description, $maxSwipes = 2)
     return $false
 }
 
+function Test-TextVisible($textPattern) {
+    try {
+        $uiTree = Get-UiTree
+        if (-not $uiTree) { return $false }
+        $elements = Find-ElementByText $uiTree $textPattern
+        return $elements.Count -gt 0
+    } catch {
+        return $false
+    }
+}
+
+function Wait-TextVisible($textPattern, $attempts = 8, $sleepMs = 500) {
+    for ($attempt = 0; $attempt -lt $attempts; $attempt++) {
+        if (Test-TextVisible $textPattern) { return $true }
+        Start-Sleep -Milliseconds $sleepMs
+    }
+    return $false
+}
+
+function Click-And-WaitText($buttonText, $expectedText, $description) {
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        if (Try-ClickElement $buttonText "$description attempt=$attempt") {
+            if (Wait-TextVisible $expectedText 6 500) {
+                Write-Step $description "PASS" "Reached $expectedText"
+                return $true
+            }
+        }
+        if ($attempt -eq 0) {
+            Swipe-Viewport "up" | Out-Null
+        } elseif ($attempt -eq 1) {
+            Swipe-Viewport "down" | Out-Null
+        }
+    }
+    Write-Step $description "FAIL" "Expected after click: $expectedText"
+    return $false
+}
+
 # ==================== 主流程 ====================
 
 Write-Output "========================================"
@@ -323,9 +364,12 @@ if ($installExit -eq 0 -and (($installResult -join "`n") -match "success")) {
 Write-Output "`n[INFO] Starting app..."
 Invoke-HdcShell @("aa", "start", "-a", "EntryAbility", "-b", $BUNDLE_NAME) | Out-Null
 Start-Sleep -Seconds 3
-for ($attempt = 0; $attempt -lt 8; $attempt++) {
-    if ((Get-PagePath (Get-UiTree)) -eq 'pages/Index') { break }
-    Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
+for ($attempt = 0; $attempt -lt 10; $attempt++) {
+    $currentPage = Get-PagePath (Get-UiTree)
+    if ($currentPage -eq 'pages/Index') { break }
+    if ($currentPage) {
+        Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
+    }
     Start-Sleep -Milliseconds 500
 }
 Take-Screenshot "01-launch"
@@ -383,28 +427,21 @@ if (-not (Verify-TextExists "离线精选题库" "Practice question")) { exit 1 
 Take-Screenshot "04-practice"
 
 # 8. 完成练习并进入逐题复盘
-$submittedPractice = $false
-for ($questionIndex = 0; $questionIndex -lt 8; $questionIndex++) {
+$practiceQuestionCount = 5
+for ($questionIndex = 0; $questionIndex -lt $practiceQuestionCount; $questionIndex++) {
+    $currentProgressText = "$($questionIndex + 1) / $practiceQuestionCount"
+    if (-not (Wait-TextVisible $currentProgressText 6 500)) {
+        Write-Step "Practice progress" "FAIL" "Expected $currentProgressText"
+        exit 1
+    }
     if (-not (Click-FirstOptionA)) { exit 1 }
-    if (Try-ClickElement "提交评分" "Submit practice") {
-        $submittedPractice = $true
-        break
+    if ($questionIndex -lt ($practiceQuestionCount - 1)) {
+        $nextProgressText = "$($questionIndex + 2) / $practiceQuestionCount"
+        if (-not (Click-And-WaitText "下一题" $nextProgressText "Next practice question")) { exit 1 }
+    } else {
+        if (-not (Click-And-WaitText "提交评分" "本轮已完成" "Submit practice")) { exit 1 }
     }
-    if (Try-ClickElement "下一题" "Next question") {
-        continue
-    }
-    if (-not (Swipe-Viewport "up")) { exit 1 }
-    if (Try-ClickElement "提交评分" "Submit practice after scroll") {
-        $submittedPractice = $true
-        break
-    }
-    if (-not (Click-Element "下一题" "Next question after scroll")) { exit 1 }
 }
-if (-not $submittedPractice) {
-    Write-Step "Submit practice" "FAIL" "No submit button reached"
-    exit 1
-}
-if (-not (Verify-TextExists "本轮已完成" "Practice result")) { exit 1 }
 if (-not (Verify-TextExists "本轮闭环" "Practice learning loop")) { exit 1 }
 if (-not (Verify-TextExists "逐题复盘" "Question review")) { exit 1 }
 Take-Screenshot "05-practice-result"
@@ -459,6 +496,7 @@ foreach ($profilePage in @(
 # 17. 验证学习星图三门课程
 if (-not (Click-Element "学习星图" "Learning map")) { exit 1 }
 if (-not (Verify-Page "pages/LearningMap" "Learning map")) { exit 1 }
+if (-not (Verify-TextExists "箭头表示先修方向" "Learning map direction legend")) { exit 1 }
 $mapIndex = 12
 foreach ($courseName in @('数据结构', '操作系统', '计算机网络')) {
     if (-not (Click-Element $courseName "Learning map: $courseName")) { exit 1 }
