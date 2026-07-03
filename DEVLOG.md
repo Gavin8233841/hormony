@@ -5595,3 +5595,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次为文档与规格产出，未执行 Web/HarmonyOS 构建；原因是未修改源码、配置、依赖或资源目录。
 - 未进行模拟器 UI 树/截图验收，未进行真机验证。
 - 所有第三方素材、OHPM 包、Lottie、音效、字体加载和 ArkUI SVG 渲染仍为未验证，不得据此直接进入 HAP。
+
+---
+
+## 2026-07-03 Codex：增强 Chat 生成反馈与模拟器网关启动可靠性
+
+背景：用户指出云端学伴 Markdown 与等待反馈仍不够真实可用，发送按钮灰色会让用户误认为不可点击，且模拟器内 AI 能力必须尽量恢复到真实可用链路。本批次不引入未验证 OHPM 依赖，继续复用 ArkUI 原生组件和已有固定目标模拟器 API 网关。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `scripts/start-simulator-gateway.ps1`
+
+行为变化：
+- Chat 发送后空白等待态改为 `StagedProgress` 阶段卡，展示“理解 → 查证 → 讲解 → 核对”，第一秒即可看到回答生成过程，不再只显示空白或单个转圈。
+- 学生可见的“多 Agent 工作台”“Profile / Retrieval”等工程词改为“回答生成过程”“理解你的学习情况”“查找课程依据”“组织讲解”等学习过程语言；展开调试轨迹时也用中文步骤前缀展示。
+- 发送按钮取消 ArkUI 禁用态渲染，空输入或云端未就绪时保持浅蓝可恢复状态；云端未就绪时点击发送按钮会触发重新探测，避免系统灰色禁用态带来的误解。
+- 既有 Markdown 渲染继续复用本地解析器；模拟器截图确认历史回答中的表格行已被折叠为浅色信息块，不再裸露成破碎竖线。
+- `scripts/start-simulator-gateway.ps1` 的运行期输出改为 ASCII，避免 Windows PowerShell 5 按非 UTF-8 解析脚本中的中文字符串导致网关无法启动。
+
+验证：
+- `git status --short`：exit 0，确认仅本批次文件与既有未提交 `.trae/progress.json`、`.tmp/`、`assets/` 等未跟踪资产并存。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 13 s 344 ms`；仍提示未配置 signingConfigs。
+- `scripts/start-simulator-gateway.ps1` 通过 `System.Management.Automation.Language.Parser.ParseFile` 语法解析：exit 0，`parse OK`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：二次 exit 0，`BUILD SUCCESSFUL in 4 s 64 ms`；仍提示未配置 signingConfigs。
+- `GET https://hormony-ruddy.vercel.app/api/health`：HTTP 200，`status=ready`，模型名为 `doubao-seed-2-1-pro-260628`。
+- 通过 `node --use-env-proxy scripts/simulator-api-gateway.mjs` 启动本地模拟器 API 网关，`GET http://127.0.0.1:3001/api/health`：HTTP 200，`status=ready`；网关日志显示 `/api/health -> 200`。
+- DevEco MCP `start_app`：模拟器 `127.0.0.1:5555` 安装并启动 `entry-default-unsigned.hap` 成功。
+- DevEco MCP `get_app_ui_tree` + 截图：`.tmp/codex-chat-progress-20260703/chat-current-bounds-click.png` 展示 Chat 页、Markdown 表格折叠效果、浅蓝发送按钮和“云端学伴暂不可用/重试”状态；证据不提交仓库。
+
+失败或未验证：
+- `mcp__deveco_mcp.check_ets_files` 对 `Chat.ets` 返回 `wait for diagnostics failed: Failed to flush stdin`，未取得 DevEco 单文件诊断结论；以 hvigor `CompileArkTS` 通过作为本批次静态构建证据。
+- `scripts/harmonyos-app-smoke.ps1` 首次 exit 1：`uitest dumpLayout` 返回 `Wait for subscribe ... timeout`；第二次 exit 1：脚本未找到当前课程页上的 `进入课程` 元素，完整冒烟不能标记通过。
+- 模拟器端完成一次新 Chat SSE 问答尚未通过；本批次只证明线上 Health、模拟器网关 Health、HAP 安装启动和 Chat 页面局部视觉状态。Plan/Quiz 端侧真实点击链路仍需后续稳定 UI 树后继续验收。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

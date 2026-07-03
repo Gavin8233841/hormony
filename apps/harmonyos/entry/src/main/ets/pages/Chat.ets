@@ -8,6 +8,7 @@ import { HttpClient } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { Citation, StreamEvent, ChatRequest, ChatMessage, HealthResponse } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { StagedProgress, WorkStep } from '../common/Builders';
 
 interface DisplayMessage {
   role: string;
@@ -47,6 +48,12 @@ export struct ChatContent {
     'TCP 三次握手的过程',
     '动态规划的基本思想',
     '进程和线程的区别',
+  ];
+  private answerSteps: WorkStep[] = [
+    { title: '理解', description: '识别问题和课程上下文' },
+    { title: '查证', description: '检索课程资料与依据' },
+    { title: '讲解', description: '组织例子、步骤和代码' },
+    { title: '核对', description: '补充引用并检查表达' }
   ];
 
   aboutToAppear(): void {
@@ -215,6 +222,30 @@ export struct ChatContent {
 
   private taskDone(block: MarkdownBlock): boolean {
     return block.meta === 'done';
+  }
+
+  private answerProgressIndex(msg: DisplayMessage): number {
+    if (msg.content.length > 0 || msg.citations.length > 0) return 3;
+    if (this.agentSeen(msg, 'Tutor') || this.agentSeen(msg, 'Planner') ||
+      this.agentSeen(msg, 'Quiz') || this.agentSeen(msg, 'Evaluator')) return 2;
+    if (this.agentSeen(msg, 'Retrieval')) return 1;
+    return 0;
+  }
+
+  private answerProgressTitle(msg: DisplayMessage): string {
+    if (msg.content.length > 0) return '回答已生成';
+    const index = this.answerProgressIndex(msg);
+    if (index >= 2) return '正在组织讲解';
+    if (index === 1) return '正在查找课程依据';
+    return '正在理解你的问题';
+  }
+
+  private answerProgressSubtitle(msg: DisplayMessage): string {
+    const index = this.answerProgressIndex(msg);
+    if (msg.content.length > 0) {
+      return '已把解释、例子和参考资料整理到回答中';
+    }
+    return this.answerSteps[index].description;
   }
 
   private async loadLocalHistory(): Promise<void> {
@@ -404,9 +435,12 @@ export struct ChatContent {
           .height(44)
           .backgroundColor(this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
           .borderRadius(22)
-          .enabled(this.canSend)
           .onClick(() => {
-            this.sendMessage();
+            if (this.canSend) {
+              this.sendMessage();
+            } else if (!this.probing && !this.cloudAgentReady) {
+              this.probeCloudAgent();
+            }
           })
       }
       .width('100%')
@@ -558,25 +592,25 @@ export struct ChatContent {
   }
 
   private agentLabel(agent: string): string {
-    if (agent === 'Profile') return '画像';
-    if (agent === 'Retrieval') return '检索';
-    if (agent === 'Tutor') return '讲解';
-    if (agent === 'Planner') return '规划';
-    if (agent === 'Quiz') return '出题';
-    if (agent === 'Evaluator') return '评估';
-    if (agent === 'Safety') return '安全';
+    if (agent === 'Profile') return '理解你的学习情况';
+    if (agent === 'Retrieval') return '查找课程依据';
+    if (agent === 'Tutor') return '组织讲解';
+    if (agent === 'Planner') return '拆解学习路径';
+    if (agent === 'Quiz') return '生成练习';
+    if (agent === 'Evaluator') return '定位薄弱点';
+    if (agent === 'Safety') return '核对安全与依据';
     return agent;
   }
 
   private agentDescription(agent: string): string {
-    if (agent === 'Profile') return '读取本地画像';
-    if (agent === 'Retrieval') return '检索课程证据';
-    if (agent === 'Tutor') return '组织解释路径';
-    if (agent === 'Planner') return '拆解学习计划';
-    if (agent === 'Quiz') return '生成分层题目';
-    if (agent === 'Evaluator') return '评估薄弱点';
-    if (agent === 'Safety') return '检查安全与依据';
-    return '执行 Agent 步骤';
+    if (agent === 'Profile') return '结合本地学习记录';
+    if (agent === 'Retrieval') return '从课程资料中找证据';
+    if (agent === 'Tutor') return '把概念转成例子和步骤';
+    if (agent === 'Planner') return '给出可执行学习顺序';
+    if (agent === 'Quiz') return '补充适合当前难度的练习';
+    if (agent === 'Evaluator') return '标出需要回头补的知识点';
+    if (agent === 'Safety') return '检查表达是否可靠';
+    return '处理当前步骤';
   }
 
   private agentSeen(msg: DisplayMessage, agent: string): boolean {
@@ -617,8 +651,17 @@ export struct ChatContent {
 
   private agentSummary(msg: DisplayMessage): string {
     const count = this.agentFlow(msg).length;
-    if (msg.content.length === 0) return '正在协作 · ' + count.toString() + ' 步';
-    return '已完成 · ' + count.toString() + ' 步 · ' + msg.citations.length.toString() + ' 条依据';
+    if (msg.content.length === 0) return '正在生成 · ' + count.toString() + ' 个步骤';
+    return '已完成 · ' + count.toString() + ' 个步骤 · ' + msg.citations.length.toString() + ' 条依据';
+  }
+
+  private traceDisplayText(trace: string): string {
+    const splitIndex = trace.indexOf(':');
+    if (splitIndex <= 0) return trace;
+    const agent = trace.slice(0, splitIndex);
+    const content = trace.slice(splitIndex + 1).trim();
+    if (content.length === 0) return this.agentLabel(agent);
+    return this.agentLabel(agent) + '：' + content;
   }
 
   @Builder
@@ -654,7 +697,7 @@ export struct ChatContent {
 
           Column() {
             if (msg.thinking.length > 0 || msg.agentTrace.length > 0) {
-              this.AgentWorkbench(msg)
+              this.AnswerProcessCard(msg)
             }
 
             if (msg.content.length > 0) {
@@ -668,16 +711,7 @@ export struct ChatContent {
                 .width('100%')
             } else {
               if (msg.thinking.length === 0 && msg.agentTrace.length === 0) {
-                Row({ space: 8 }) {
-                  LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
-                  Text('正在启动多 Agent 工作台')
-                    .fontSize(13)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                }
-                .width('100%')
-                .padding(12)
-                .backgroundColor(Constants.COLOR_BG_CARD)
-                .borderRadius(Constants.RADIUS_MD)
+                this.AnswerProcessCard(msg)
               }
             }
 
@@ -753,8 +787,12 @@ export struct ChatContent {
   }
 
   @Builder
-  AgentWorkbench(msg: DisplayMessage) {
+  AnswerProcessCard(msg: DisplayMessage) {
     Column({ space: 10 }) {
+      if (msg.content.length === 0) {
+        StagedProgress(this.answerProgressTitle(msg), this.answerProgressSubtitle(msg),
+          this.answerProgressIndex(msg), this.answerSteps)
+      }
       Row({ space: 8 }) {
         if (msg.content.length === 0) {
           LoadingProgress()
@@ -769,7 +807,7 @@ export struct ChatContent {
             .fontColor([Constants.COLOR_SUCCESS])
         }
         Column({ space: 2 }) {
-          Text('多 Agent 工作台')
+          Text('回答生成过程')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -799,7 +837,7 @@ export struct ChatContent {
       if (msg.agentExpanded) {
         Column({ space: 6 }) {
           ForEach(msg.agentTrace, (trace: string): void => {
-            Text(trace)
+            Text(this.traceDisplayText(trace))
               .width('100%')
               .fontSize(11)
               .lineHeight(17)
