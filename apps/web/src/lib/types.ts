@@ -72,6 +72,7 @@ export interface Quiz {
   quizId: string;
   courseId: string;
   topic: string;
+  focusTag?: string;
   questions: QuizQuestion[];
 }
 
@@ -88,6 +89,7 @@ export interface QuizView {
   quizId: string;
   courseId: string;
   topic: string;
+  focusTag?: string;
   questions: QuizQuestionView[];
 }
 

@@ -8,6 +8,7 @@ import { requestJson, getErrorMessage, isEndpointDisabled } from "@/lib/client-a
 export default function QuizPage() {
   const [courseId, setCourseId] = useState("cs101");
   const [topic, setTopic] = useState("");
+  const [focusTag, setFocusTag] = useState("");
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
@@ -67,6 +68,7 @@ export default function QuizPage() {
           userId: "demo",
           courseId,
           topic: topic.trim() || undefined,
+          focusTag: focusTag.trim() || undefined,
           count,
           difficulty,
         }),
@@ -150,6 +152,17 @@ export default function QuizPage() {
               />
             </div>
           </div>
+          <div>
+            <label className="text-sm text-slate-400">重点标签（可选）</label>
+            <input
+              value={focusTag}
+              onChange={(e) => setFocusTag(e.target.value)}
+              maxLength={12}
+              placeholder="如：边界条件、代码推演"
+              className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
+            />
+            <p className="mt-1 text-xs text-slate-500">用于让 AI 围绕指定能力标签生成题目，题目标签也会记录到画像。</p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm text-slate-400">题目数量</label>
@@ -196,6 +209,11 @@ export default function QuizPage() {
               <Brain size={18} className="text-brand-100" />
               <span className="font-semibold">测验进行中</span>
               <span className="text-sm text-slate-400">· {quiz.questions.length} 题</span>
+              {quiz.focusTag && (
+                <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs text-brand-100">
+                  重点：{quiz.focusTag}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm text-slate-400">已答 {answeredCount}/{quiz.questions.length}</span>

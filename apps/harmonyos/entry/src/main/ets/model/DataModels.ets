@@ -91,6 +91,7 @@ export interface QuizView {
   quizId: string;
   courseId: string;
   topic: string;
+  focusTag?: string;
   questions: QuizQuestionView[];
 }
 
@@ -112,6 +113,7 @@ export interface QuizRequest {
   topic: string;
   count: number;
   difficulty: string;
+  focusTag?: string;
 }
 
 export interface QuizAnswer {

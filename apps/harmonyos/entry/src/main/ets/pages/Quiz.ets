@@ -39,6 +39,7 @@ struct QuizPage {
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '综合';
+  @State focusTag: string = '';
   @State quizId: string = '';
   @State questions: QuizQuestionView[] = [];
   @State answers: string[] = [];
@@ -91,6 +92,11 @@ struct QuizPage {
       this.topic = selectedTopic.trim();
       AppStorage.setOrCreate<string>('selectedQuizTopic', '');
     }
+    const selectedFocusTag = AppStorage.get<string>('selectedQuizFocusTag') ?? '';
+    if (selectedFocusTag.trim().length > 0) {
+      this.focusTag = selectedFocusTag.trim().substring(0, 12);
+      AppStorage.setOrCreate<string>('selectedQuizFocusTag', '');
+    }
   }
 
   private currentAnswerText(): string {
@@ -102,6 +108,11 @@ struct QuizPage {
     const nextAnswers = this.answers.slice();
     nextAnswers[this.currentIndex] = answer;
     this.answers = nextAnswers;
+  }
+
+  private selectTopic(nextTopic: string): void {
+    this.topic = nextTopic;
+    this.focusTag = '';
   }
 
   private askTutor(detail: QuizResultDetail): void {
@@ -150,6 +161,7 @@ struct QuizPage {
       topic: this.topic,
       count: 5,
       difficulty: this.difficulty,
+      focusTag: this.focusTag.length > 0 ? this.focusTag : undefined,
     };
     try {
       const response = await HttpClient.post<QuizPackage>(
@@ -503,7 +515,7 @@ struct QuizPage {
           .fontColor(this.topic === '综合' ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
           .backgroundColor(this.topic === '综合' ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
           .borderRadius(Constants.RADIUS_MD)
-          .onClick(() => { this.topic = '综合'; })
+          .onClick(() => { this.selectTopic('综合'); })
         ForEach(this.suggestions, (suggestion: string): void => {
           Button(suggestion)
             .width('100%')
@@ -512,10 +524,40 @@ struct QuizPage {
             .fontColor(this.topic === suggestion ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
             .backgroundColor(this.topic === suggestion ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
             .borderRadius(Constants.RADIUS_MD)
-            .onClick(() => { this.topic = suggestion; })
+            .onClick(() => { this.selectTopic(suggestion); })
         })
       }
       .width('100%')
+
+      if (this.focusTag.length > 0) {
+        Row({ space: 9 }) {
+          SymbolGlyph($r('sys.symbol.rays'))
+            .fontSize(18)
+            .fontColor([Constants.COLOR_BRAND])
+          Column({ space: 3 }) {
+            Text('本轮重点标签：' + this.focusTag)
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text('AI 会围绕这个薄弱标签出题，完成后继续写入标签画像')
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          Button('取消')
+            .height(30)
+            .fontSize(11)
+            .fontColor(Constants.COLOR_BRAND)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(Constants.RADIUS_SM)
+            .onClick((): void => { this.focusTag = ''; })
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Constants.COLOR_SURFACE_TINT)
+        .borderRadius(Constants.RADIUS_MD)
+      }
 
       Column({ space: 8 }) {
         Text('难度分层')
@@ -575,7 +617,8 @@ struct QuizPage {
         (this.progressStep === 1 ? '正在控制难度与题型' : '正在检索课程依据'),
       this.progressStep >= 2 ? '校验 A-D 选项、解析和能力标签' :
         (this.progressStep === 1 ? '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + '题组' :
-          '先查课程资料，再让 AI 出题，避免凭空编题'),
+          (this.focusTag.length > 0 ? '先查课程资料，再聚焦“' + this.focusTag + '”出题' :
+            '先查课程资料，再让 AI 出题，避免凭空编题')),
       this.progressStep,
       this.generationSteps
     )
@@ -738,6 +781,11 @@ struct QuizPage {
           Text('本次难度：' + this.difficultyLabel())
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          if (this.focusTag.length > 0) {
+            Text('重点标签：' + this.focusTag)
+              .fontSize(11)
+              .fontColor(Constants.COLOR_BRAND)
+          }
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)

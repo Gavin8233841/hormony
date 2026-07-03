@@ -5696,3 +5696,85 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未完成端侧 Quiz 页面点击生成的一整轮模拟器视觉截图；证据等级为静态诊断通过、构建通过和安装启动成功，非 Quiz 页面模拟器通过。
 - `/api/quiz` 曾出现一次 502，说明线上仍存在偶发模型输出或平台链路失败；本批次通过端侧错误恢复降低用户感知损害，未改 Web Agent 路由。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：Quiz Agent 模型输出稳健解析
+
+背景：上一批次线上 `/api/quiz` 曾出现一次 HTTP 502，随后同主题重试返回 HTTP 200。继续推进真实可用性时，优先加固真实模型输出的结构容错，而不是用本地题库或静态模板伪造 AI 出题。现有 API 契约保持不变：展示题 `questions` 不泄露答案和解析，端侧评分所需 `grading` 继续独立返回。
+
+文件：
+- `DEVLOG.md`
+- `apps/web/src/lib/agents/quiz-agent.ts`
+- `apps/web/src/app/api/quiz/quiz-flow.test.ts`
+- `apps/web/src/lib/agents/orchestrator.ts`
+
+行为变化：
+- Quiz Agent 提示词要求模型只输出 JSON、不要 Markdown、不要额外说明，并把解析长度控制到 50-90 字，降低长回答截断和格式漂移风险。
+- Quiz Agent 单次模型输出 token 上限从 1500 提升到 2048，仍使用真实模型生成，不引入本地伪造回退。
+- 解析器继续接受原 JSON 数组，同时接受本项目已有 API 契约字段名 `questions` 包装的数组，减少模型多包一层导致的无效响应。
+- 选项仍要求 A-D 顺序前缀，但会把 `A、`、`B：`、`C)`、`D．` 等中文标号归一为 `A. ...` 形式；无 A-D 标号的选项仍拒绝。
+- `answer` 字段继续归一到 A-D；当真实模型返回 `A. 选项文本`、`A、选项文本`、`A：选项文本` 或完整选项正文时，服务端归一为 `A` 后再进入现有评分结构。
+- 当模型数组前部夹杂坏题时，解析器会继续遍历后续题目，收集到请求数量的有效题后返回；仍不足时继续抛出 `MODEL_INVALID_RESPONSE`。
+- 保持选项 A-D 前缀校验，缺少 A-D 顺序前缀的模型输出仍会被拒绝，不放宽展示题契约。
+- 修正 `orchestrator.ts` 的旧调用签名：Chat 中触发 Quiz 意图时显式传入空重点标签，再传入 `AbortSignal`，避免取消信号被误当作标签参数。
+
+验证：
+- `cd apps/web; pnpm test -- src/app/api/quiz/quiz-flow.test.ts`：exit 0，Vitest 实际执行 13 个测试文件、162 个测试全部通过。
+- `cd apps/web; pnpm typecheck`：首次 exit 1，发现 `orchestrator.ts` 将 `AbortSignal` 传给 `focusTag` 参数；已修复。
+- `cd apps/web; pnpm test -- src/app/api/quiz/quiz-flow.test.ts`：二次 exit 0，Vitest 实际执行 13 个测试文件、165 个测试全部通过；新增覆盖 `questions` 包装、中文选项标号、答案正文映射、跳过坏题继续收集有效题。
+- `cd apps/web; pnpm typecheck`：二次 exit 0。
+- `cd apps/web; pnpm lint`：exit 0，`No ESLint warnings or errors`。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 成功，`/api/quiz` 仍为动态路由。
+
+失败或未验证：
+- 本批次未部署到 Vercel 前无法证明线上已采用新解析逻辑；需要推送后等待部署并再次验证 Health、Quiz、Plan、Chat SSE。
+- HarmonyOS 端标签专项练习闭环见下一节；本节不单独标记端侧 Quiz 页面完整点击生成通过。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：标签化专项出题闭环
+
+背景：用户明确要求每题标签化，并在记录页形成可量化学习洞察，同时 AI 出题要能面向薄弱标签做专项练习。本批次在不迁移端侧私有状态到云端、不伪造 AI 题目的前提下，把 Web Quiz 的重点标签参数、HarmonyOS 标签洞察和端侧 Quiz 生成请求贯通。
+
+文件：
+- `DEVLOG.md`
+- `apps/web/src/app/api/quiz/route.ts`
+- `apps/web/src/app/api/quiz/quiz-flow.test.ts`
+- `apps/web/src/app/api/request-validation.test.ts`
+- `apps/web/src/app/quiz/page.tsx`
+- `apps/web/src/lib/agents/quiz-agent.ts`
+- `apps/web/src/lib/agents/orchestrator.ts`
+- `apps/web/src/lib/types.ts`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/model/LearningMetadataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+
+行为变化：
+- `/api/quiz` 支持可选 `focusTag`，服务端校验类型、长度和安全内容；非法类型返回 `INVALID_FOCUS_TAG`，命中输入安全拦截返回 `INPUT_REJECTED`。
+- Quiz Agent 提示词会要求每题标签包含重点标签；服务端解析阶段也会把合法重点标签补入题目标签，确保画像统计可用。
+- `Quiz` / `QuizView` 类型增加 `focusTag`，成功响应会返回本轮重点标签，但展示题仍不泄露答案和解析。
+- Web Quiz 页面新增“重点标签”输入，用于验证云端 API 和调试专项出题。
+- HarmonyOS 本地标签洞察增加课程、主题、掌握值和掌握层级；掌握值基于正确率、证据量、难度和错题惩罚计算。
+- Profile 与 ActivityRecords 的标签洞察卡显示掌握层级、课程主题、掌握值，并提供“练这个标签”入口。
+- 端侧点击“练这个标签”后通过 `AppStorage` 传递课程、主题和重点标签到 Quiz 页面；Quiz 生成请求携带 `focusTag`，页面生成进度和结果摘要都会显示本轮重点标签。
+- 端侧切换题目主题会清空重点标签，避免用户以为仍在做专项练习但请求已经变成普通主题练习。
+
+验证：
+- `cd apps/web; pnpm test`：exit 0，13 个测试文件、165 个测试全部通过；覆盖重点标签写入题目与评分标签、非法 `focusTag` 请求校验、模型输出格式容错。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm lint`：exit 0，`No ESLint warnings or errors`。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 成功，`/api/quiz` 仍为动态路由。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 24 s 582 ms`；仍提示未配置 signingConfigs。
+- DevEco MCP `check_ets_files` 对 `DataModels.ets`、`LearningMetadataModels.ets`、`LocalLearningRepository.ets`、`Profile.ets`、`ActivityRecords.ets`、`Quiz.ets` 返回 `no diagnostics`。
+- DevEco MCP `start_app`：模拟器 `Pura 90 Pro Max` 安装并启动当前 HAP 成功。
+- DevEco MCP `get_app_ui_tree`：保存 `.tmp/codex-ui-tree-20260703/simple_dump_hormony_20260703194653863.txt`，窗口 `bundleName:com.c4ai.hormony`、`WindowRect: [ 0, 0, 1256, 2760 ]`、`FirstFrameCallbackCalled: 1`、`IsVisible: true`；证据不提交仓库。
+
+失败或未验证：
+- 本批次未完成“Profile/ActivityRecords 点击练这个标签 → Quiz 页面携带标签 → 端侧生成 AI 题 → 提交结果写回画像”的完整模拟器点击流，不能标记为该流程模拟器通过。
+- 推送部署前不能证明线上 Vercel 已采用 `focusTag` 和新解析逻辑；仍需部署后验证 Health、Quiz、Plan、Chat SSE 与端侧请求。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

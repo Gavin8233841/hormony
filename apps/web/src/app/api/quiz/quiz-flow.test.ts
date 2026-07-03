@@ -57,6 +57,30 @@ describe("题库与资源 API 闭环", () => {
     expect(quiz.grading[0]).toMatchObject({ answer: "A", difficulty: "medium", tags: ["概念理解"] });
   });
 
+  it("生成接口应把重点标签写入题目与评分标签", async () => {
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "api_focus_user",
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 5,
+          difficulty: "medium",
+          focusTag: "边界条件",
+        }),
+      })
+    );
+    const quiz = (await response.json()) as QuizPackage;
+
+    expect(response.status).toBe(200);
+    expect(quiz.focusTag).toBe("边界条件");
+    expect(quiz.questions).toHaveLength(5);
+    expect(quiz.questions.every((question) => question.tags.includes("边界条件"))).toBe(true);
+    expect(quiz.grading.every((item) => item.tags.includes("边界条件"))).toBe(true);
+  });
+
   it("Web 生成测验后应可立即提交服务端评分", async () => {
     const generateResponse = await generateQuiz(
       new Request("http://localhost/api/quiz", {
@@ -137,6 +161,76 @@ describe("题库与资源 API 闭环", () => {
 
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
+  it("应接受 questions 包装、中文选项标号和答案正文", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify({
+      questions: [{
+        type: "choice",
+        stem: "二叉搜索树中序遍历的结果通常具有什么特征？",
+        options: ["A、升序序列", "B：随机序列", "C) 层序序列", "D．逆拓扑序列"],
+        answer: "升序序列",
+        explanation: "根据二叉搜索树左小右大的性质，中序遍历先访问左子树、根节点、右子树，因此结果通常是升序序列。",
+        tags: ["BST性质"],
+      }],
+    });
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 1,
+          difficulty: "medium",
+        }),
+      })
+    );
+    const quiz = (await response.json()) as QuizPackage;
+
+    expect(response.status).toBe(200);
+    expect(quiz.questions).toHaveLength(1);
+    expect(quiz.questions[0]).not.toHaveProperty("answer");
+    expect(quiz.questions[0].options).toEqual(["A. 升序序列", "B. 随机序列", "C. 层序序列", "D. 逆拓扑序列"]);
+    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["BST性质"] });
+  });
+
+  it("应跳过坏题并继续收集后续有效题", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([
+      {
+        type: "choice",
+        stem: "坏题",
+        options: ["选项一", "选项二", "选项三", "选项四"],
+        answer: "A",
+        explanation: "缺少 A-D 前缀。",
+      },
+      {
+        type: "choice",
+        stem: "完全二叉树顺序存储中，下标为 i 的左孩子下标是什么？",
+        options: ["A. 2i+1", "B. 2i+2", "C. i/2", "D. i-1"],
+        answer: "A",
+        explanation: "在 0 基址顺序存储中，完全二叉树节点 i 的左孩子下标为 2i+1，右孩子下标为 2i+2。",
+        tags: ["公式应用"],
+      },
+    ]);
+    const response = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          count: 1,
+          difficulty: "medium",
+        }),
+      })
+    );
+    const quiz = (await response.json()) as QuizPackage;
+
+    expect(response.status).toBe(200);
+    expect(quiz.questions).toHaveLength(1);
+    expect(quiz.questions[0].stem).toContain("完全二叉树");
+    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["公式应用"] });
   });
 
   it("应拒绝缺少 A-D 顺序前缀的 AI 选项", async () => {

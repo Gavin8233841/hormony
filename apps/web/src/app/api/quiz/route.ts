@@ -77,9 +77,16 @@ export async function POST(req: Request) {
   if (typeof difficulty !== "string") {
     return Response.json({ error: "不支持的难度", code: "INVALID_DIFFICULTY" }, { status: 400 });
   }
+  if (body.focusTag !== undefined && typeof body.focusTag !== "string") {
+    return Response.json({ error: "重点标签必须是字符串", code: "INVALID_FOCUS_TAG" }, { status: 400 });
+  }
+  const focusTag = typeof body.focusTag === "string" ? body.focusTag.trim() : "";
 
   if (topic.length === 0 || topic.length > 100) {
     return Response.json({ error: "主题长度必须为 1-100 字符", code: "INVALID_TOPIC" }, { status: 400 });
+  }
+  if (focusTag.length > 12) {
+    return Response.json({ error: "重点标签长度必须为 1-12 字符", code: "INVALID_FOCUS_TAG" }, { status: 400 });
   }
   if (!isQuizDifficulty(difficulty)) {
     return Response.json({ error: "不支持的难度", code: "INVALID_DIFFICULTY" }, { status: 400 });
@@ -90,13 +97,26 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  if (focusTag.length > 0 && validateUserInput(focusTag).length > 0) {
+    return Response.json(
+      { error: "重点标签内容不符合安全要求", code: "INPUT_REJECTED" },
+      { status: 400 }
+    );
+  }
 
   if (!getModelRuntimeInfo().configured) {
     return modelErrorResponse(new ModelUnavailableError());
   }
 
   try {
-    const quiz = await runQuizAgent(userId, courseId, topic, count.value, difficulty);
+    const quiz = await runQuizAgent(
+      userId,
+      courseId,
+      topic,
+      count.value,
+      difficulty,
+      focusTag.length > 0 ? focusTag : undefined
+    );
     await assertSafeQuiz(quiz);
     store.saveQuiz(quiz);
     return Response.json(toQuizPackage(quiz));
@@ -111,6 +131,7 @@ function toQuizPackage(quiz: Quiz): QuizPackage {
     quizId: quiz.quizId,
     courseId: quiz.courseId,
     topic: quiz.topic,
+    focusTag: quiz.focusTag,
     questions: quiz.questions.map((question) => ({
       id: question.id,
       type: question.type,
@@ -142,12 +163,15 @@ export async function OPTIONS() {
 }
 
 async function assertSafeQuiz(quiz: Quiz): Promise<void> {
-  const outputText = quiz.questions.flatMap((question) => [
-    question.stem,
-    ...(question.options ?? []),
-    question.explanation,
-    ...(question.tags ?? []),
-  ]).join("\n");
+  const outputText = [
+    quiz.focusTag ?? "",
+    ...quiz.questions.flatMap((question) => [
+      question.stem,
+      ...(question.options ?? []),
+      question.explanation,
+      ...(question.tags ?? []),
+    ]),
+  ].join("\n");
   const safety = await runSafetyAgent(outputText, []);
   if (!safety.passed) {
     throw new SafetyBlockedError();

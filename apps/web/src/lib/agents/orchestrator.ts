@@ -132,6 +132,7 @@ async function routeMainAgent(
           req.message,
           5,
           "medium",
+          undefined,
           signal
         );
         return {

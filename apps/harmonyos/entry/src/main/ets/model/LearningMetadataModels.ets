@@ -10,10 +10,14 @@ import {
 } from './DataModels';
 
 export interface LearningTagInsight extends TagInsight {
+  courseId: string;
+  topic: string;
   easyQuestions: number;
   mediumQuestions: number;
   hardQuestions: number;
   lastDifficulty: string;
+  masteryLevel: string;
+  masteryPoints: number;
   weakReason: string;
   nextStep: string;
 }

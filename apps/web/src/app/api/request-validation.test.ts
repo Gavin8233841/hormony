@@ -130,6 +130,12 @@ describe("API request validation", () => {
       code: "INVALID_COUNT",
     },
     {
+      name: "quiz invalid focusTag",
+      handler: postQuiz,
+      body: { courseId: "cs101", topic: "二叉树与BST", focusTag: ["边界条件"] },
+      code: "INVALID_FOCUS_TAG",
+    },
+    {
       name: "quiz answer invalid userAnswer",
       handler: submitQuiz,
       body: { quizId: "quiz_test", answers: [{ questionId: "q1", userAnswer: 1 }] },

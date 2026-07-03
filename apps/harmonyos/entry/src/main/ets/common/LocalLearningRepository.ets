@@ -485,6 +485,8 @@ export class LocalLearningRepository {
           if (item === undefined) {
             item = {
               tag: normalized,
+              courseId: result.courseId,
+              topic: result.topic,
               totalQuestions: 0,
               correctQuestions: 0,
               accuracy: 0,
@@ -494,6 +496,8 @@ export class LocalLearningRepository {
               mediumQuestions: 0,
               hardQuestions: 0,
               lastDifficulty: detail.difficulty ?? result.difficulty ?? 'medium',
+              masteryLevel: '尝试',
+              masteryPoints: 0,
               weakReason: '',
               nextStep: ''
             };
@@ -508,7 +512,11 @@ export class LocalLearningRepository {
           item.wrongQuestions = item.totalQuestions - item.correctQuestions;
           item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
           item.lastPracticedAt = result.submittedAt;
+          item.courseId = result.courseId;
+          item.topic = result.topic;
           item.lastDifficulty = difficulty;
+          item.masteryPoints = LocalLearningRepository.tagMasteryPoints(item);
+          item.masteryLevel = LocalLearningRepository.tagMasteryLevel(item.masteryPoints);
           item.weakReason = LocalLearningRepository.tagWeakReason(item);
           item.nextStep = LocalLearningRepository.tagNextStep(item);
         }
@@ -534,6 +542,23 @@ export class LocalLearningRepository {
       }
     }
     return tags.slice(0, 6);
+  }
+
+  private static tagMasteryPoints(item: TagInsight): number {
+    if (item.totalQuestions <= 0) return 0;
+    const evidenceBonus = Math.min(item.totalQuestions * 6, 18);
+    const difficultyBonus = item.hardQuestions > 0 ? 10 : (item.mediumQuestions > 0 ? 6 : 2);
+    const accuracyPoints = Math.round(item.accuracy * 72);
+    const penalty = Math.min(item.wrongQuestions * 8, 24);
+    return Math.max(0, Math.min(100, accuracyPoints + evidenceBonus + difficultyBonus - penalty));
+  }
+
+  private static tagMasteryLevel(points: number): string {
+    if (points >= 88) return '掌握';
+    if (points >= 72) return '熟练';
+    if (points >= 48) return '熟悉';
+    if (points >= 20) return '尝试';
+    return '未开始';
   }
 
   private static tagWeakReason(item: TagInsight): string {

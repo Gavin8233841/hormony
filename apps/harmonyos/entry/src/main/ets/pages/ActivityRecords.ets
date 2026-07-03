@@ -57,6 +57,31 @@ struct ActivityRecordsPage {
     return '进阶';
   }
 
+  private courseTitle(courseId: string): string {
+    if (courseId === 'cs101') return '数据结构';
+    if (courseId === 'cs102') return '操作系统';
+    if (courseId === 'cs103') return '计算机网络';
+    return '课程';
+  }
+
+  private masteryColor(item: TagInsight): string {
+    if (item.masteryPoints >= 88) return Constants.COLOR_SUCCESS;
+    if (item.masteryPoints >= 72) return Constants.COLOR_BRAND;
+    if (item.masteryPoints >= 48) return Constants.COLOR_WARNING;
+    return Constants.COLOR_ERROR;
+  }
+
+  private openFocusedQuiz(item: TagInsight): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', item.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(item.courseId));
+    AppStorage.setOrCreate<string>('selectedQuizTopic', item.topic);
+    AppStorage.setOrCreate<string>('selectedQuizFocusTag', item.tag);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ActivityRecordsPage focused quiz navigation failed: %{public}s', error.message);
+    });
+  }
+
   private icon(event: StudyEvent): Resource {
     if (event.type === 'task_completed' || event.type === 'lesson_completed') {
       return $r('sys.symbol.checkmark_circle_fill');
@@ -137,13 +162,19 @@ struct ActivityRecordsPage {
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
                 ForEach(this.tagInsights, (item: TagInsight): void => {
-                  Column({ space: 6 }) {
+                  Column({ space: 8 }) {
                     Row({ space: 10 }) {
                       Text(item.tag)
                         .fontSize(12)
                         .fontColor(Constants.COLOR_BRAND)
                         .padding({ left: 9, right: 9, top: 4, bottom: 4 })
                         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                        .borderRadius(Constants.RADIUS_SM)
+                      Text(item.masteryLevel)
+                        .fontSize(10)
+                        .fontColor(this.masteryColor(item))
+                        .padding({ left: 7, right: 7, top: 3, bottom: 3 })
+                        .backgroundColor(Constants.COLOR_SURFACE_TINT)
                         .borderRadius(Constants.RADIUS_SM)
                       Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
                         .layoutWeight(1)
@@ -163,6 +194,21 @@ struct ActivityRecordsPage {
                       .fontSize(11)
                       .fontWeight(FontWeight.Medium)
                       .fontColor(Constants.COLOR_BRAND)
+                    Row({ space: 8 }) {
+                      Text(this.courseTitle(item.courseId) + ' · ' + item.topic + ' · 掌握值 ' +
+                        item.masteryPoints.toString())
+                        .layoutWeight(1)
+                        .fontSize(10)
+                        .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
+                      Button('练这个标签')
+                        .height(30)
+                        .fontSize(11)
+                        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                        .backgroundColor(Constants.COLOR_BRAND)
+                        .borderRadius(Constants.RADIUS_SM)
+                        .onClick((): void => { this.openFocusedQuiz(item); })
+                    }
+                    .width('100%')
                   }
                   .width('100%')
                 })
