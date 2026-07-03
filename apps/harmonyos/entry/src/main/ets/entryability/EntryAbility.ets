@@ -33,8 +33,10 @@ export default class EntryAbility extends UIAbility {
   }
 
   private async initializeRepositories(): Promise<void> {
-    await LearningContentRepository.initialize(this.context.resourceManager);
-    await LocalLearningRepository.initialize(this.context);
+    const contentInit = LearningContentRepository.initialize(this.context.resourceManager);
+    const localInit = LocalLearningRepository.initialize(this.context);
+    await contentInit;
+    await localInit;
     const catalog: Course[] = [
       this.buildCourse('cs101', '数据结构'),
       this.buildCourse('cs102', '操作系统'),

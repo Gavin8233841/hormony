@@ -200,6 +200,42 @@ function Click-ElementByTextPrefix($textPrefix, $description) {
     return $true
 }
 
+function Click-BottomElement($textPattern, $description) {
+    $uiTree = Get-UiTree
+    if (-not $uiTree) {
+        Write-Step "Click: $description" "FAIL" "UI tree not available"
+        return $false
+    }
+    $elements = Find-ElementByText $uiTree $textPattern
+    if ($elements.Count -eq 0) {
+        Write-Step "Click: $description" "FAIL" "Element not found: $textPattern"
+        return $false
+    }
+    $target = $null
+    $targetCenter = $null
+    $targetY = -1
+    foreach ($element in $elements) {
+        $center = Get-BoundsCenter $element.attributes.bounds
+        if (-not $center) { continue }
+        $parts = $center -split ' '
+        $cy = [int]$parts[1]
+        if ($cy -gt $targetY) {
+            $targetY = $cy
+            $target = $element
+            $targetCenter = $center
+        }
+    }
+    if ($target -eq $null -or -not $targetCenter) {
+        Write-Step "Click: $description" "FAIL" "Cannot parse bottom element bounds"
+        return $false
+    }
+    $clickParts = $targetCenter -split ' '
+    Invoke-HdcShell @("uitest", "uiInput", "click", $clickParts[0], $clickParts[1]) | Out-Null
+    Start-Sleep -Seconds 1
+    Write-Step "Click: $description" "PASS" "at ($($clickParts[0]), $($clickParts[1]))"
+    return $true
+}
+
 function Take-Screenshot($name) {
     $devicePath = "/data/local/tmp/smoke_screenshot.jpeg"
     $snapshotOutput = Invoke-HdcShell @("snapshot_display", "-f", $devicePath)
@@ -218,6 +254,32 @@ function Take-Screenshot($name) {
 
 function Verify-Page($pagePath, $description) {
     return Wait-Page $pagePath $description
+}
+
+function Ensure-RootPage($description) {
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        $actual = Get-PagePath (Get-UiTree)
+        if ($actual -eq 'pages/Index') {
+            Write-Step "Page: $description" "PASS" $actual
+            return $true
+        }
+        Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
+        Start-Sleep -Milliseconds 600
+    }
+    $final = Get-PagePath (Get-UiTree)
+    Write-Step "Page: $description" "FAIL" "expected=pages/Index actual=$final"
+    return $false
+}
+
+function Open-ProfileRoot($description) {
+    if (-not (Ensure-RootPage "$description root")) { return $false }
+    if ((Test-TextExists "学习记录") -and (Test-TextExists "学习星图")) {
+        Write-Step "Profile root: $description" "PASS" "Already visible"
+        return $true
+    }
+    if (-not (Click-BottomElement "我的" "$description profile tab")) { return $false }
+    if (-not (Wait-TextExists "学习记录" "$description profile entry")) { return $false }
+    return $true
 }
 
 function Wait-Page($pagePath, $description, $timeoutMs = 5000) {
@@ -508,7 +570,7 @@ if (-not (Verify-TextExists "基于课程资料，为每个问题给出依据" "
 
 # 15. 点击"我的" Tab
 Write-Output "`n[INFO] Navigating to Profile tab..."
-if (-not (Click-Element "我的" "Profile tab")) { exit 1 }
+if (-not (Click-BottomElement "我的" "Profile tab")) { exit 1 }
 Start-Sleep -Seconds 2
 Take-Screenshot "08-profile-tab"
 if (-not (Swipe-Viewport "up")) { exit 1 }
@@ -521,6 +583,7 @@ foreach ($profilePage in @(
     @{ Text = '错题本'; Path = 'pages/MistakeBook'; Shot = '10-mistake-book'; Content = '查看解析' },
     @{ Text = '成就'; Path = 'pages/Achievements'; Shot = '11-achievements'; Content = '里程碑进度' }
 )) {
+    if (-not (Open-ProfileRoot $profilePage.Text)) { exit 1 }
     if (-not (Click-Element $profilePage.Text $profilePage.Text)) { exit 1 }
     if (-not (Verify-Page $profilePage.Path $profilePage.Text)) { exit 1 }
     if (-not (Verify-TextExists $profilePage.Text $profilePage.Text)) { exit 1 }
@@ -531,6 +594,7 @@ foreach ($profilePage in @(
 }
 
 # 17. 验证学习星图三门课程
+if (-not (Open-ProfileRoot "Learning map")) { exit 1 }
 if (-not (Click-Element "学习星图" "Learning map")) { exit 1 }
 if (-not (Verify-Page "pages/LearningMap" "Learning map")) { exit 1 }
 $mapIndex = 12

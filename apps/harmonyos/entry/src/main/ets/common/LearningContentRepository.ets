@@ -55,13 +55,16 @@ export class LearningContentRepository {
   static async initialize(manager: resourceManager.ResourceManager): Promise<void> {
     if (LearningContentRepository.manager !== null) return;
     LearningContentRepository.manager = manager;
-    LearningContentRepository.knowledge = await LearningContentRepository.readJson<CuratedKnowledgeChunk[]>(KNOWLEDGE_PATH);
-    LearningContentRepository.questions = await LearningContentRepository.readJson<CuratedQuestion[]>(QUIZZES_PATH);
-    LearningContentRepository.resources = await LearningContentRepository.readJson<ExternalLearningResource[]>(RESOURCES_PATH);
-    LearningContentRepository.topicRelations =
-      await LearningContentRepository.readJson<TopicRelation[]>(TOPIC_RELATIONS_PATH);
-    LearningContentRepository.lessonExperiences =
-      await LearningContentRepository.readJson<LessonExperience[]>(LESSON_EXPERIENCES_PATH);
+    const knowledgePromise = LearningContentRepository.readJson<CuratedKnowledgeChunk[]>(KNOWLEDGE_PATH);
+    const questionsPromise = LearningContentRepository.readJson<CuratedQuestion[]>(QUIZZES_PATH);
+    const resourcesPromise = LearningContentRepository.readJson<ExternalLearningResource[]>(RESOURCES_PATH);
+    const topicRelationsPromise = LearningContentRepository.readJson<TopicRelation[]>(TOPIC_RELATIONS_PATH);
+    const lessonExperiencesPromise = LearningContentRepository.readJson<LessonExperience[]>(LESSON_EXPERIENCES_PATH);
+    LearningContentRepository.knowledge = await knowledgePromise;
+    LearningContentRepository.questions = await questionsPromise;
+    LearningContentRepository.resources = await resourcesPromise;
+    LearningContentRepository.topicRelations = await topicRelationsPromise;
+    LearningContentRepository.lessonExperiences = await lessonExperiencesPromise;
     LearningContentRepository.buildIndexes();
   }
 

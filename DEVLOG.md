@@ -5308,3 +5308,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 未注册真实服务卡片验证后台 `LearningFormUpdater.refreshAll()` 成功路径；本批次只验证页面状态不再被卡片刷新阻塞。
 - 未用 DevEco Profiler 量化课程详情重绘 CPU/内存收益。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.12 冷启动内容初始化与 Profile 冒烟加固
+
+背景：继续只围绕 HarmonyOS 端侧 App 推进。审计确认 `LearningContentRepository.initialize()` 串行读取 5 个 rawfile，`EntryAbility.initializeRepositories()` 也串行等待内容仓库和本地仓库；同时新增本地记录后 Profile 子页冒烟暴露出返回/滚动状态依赖，脚本会点错页面。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/LearningContentRepository.ets
+- apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets
+- scripts/harmonyos-app-smoke.ps1
+
+行为变化：
+- 内容仓库初始化时并行发起 `knowledge-chunks.json`、`quizzes.json`、`external-resources.json`、`topic-relations.json`、`lesson-experiences.json` 读取，再按原字段赋值并构建索引。
+- `EntryAbility` 同时启动内容仓库和本地仓库初始化，仍在两者都完成后同步课程目录并加载首页。
+- 冒烟脚本新增 `Click-BottomElement()`，当页面标题和底部 Tab 同名时点击最靠下的 Tab 文本，避免点到标题。
+- 冒烟脚本新增 `Ensure-RootPage()` 与 `Open-ProfileRoot()`，每个 Profile 子页入口前都确认回到主框架和 Profile 根视图，避免前一次返回或滚动状态污染下一步。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 12 s 858 ms`；仍提示未配置 signingConfigs。
+- 第一次 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；启动、课程、课程详情、练习、学伴、Profile、学习记录通过，随后未找到 `错题本` 入口。截图证据位于 `screenshots/trae-smoke-20260703-153513/`，不提交。
+- 第二次 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；启动到 Profile 通过，点击 `学习记录` 后实际进入 `pages/CourseDetail`，确认脚本 Profile 导航状态不稳。截图证据位于 `screenshots/trae-smoke-20260703-153854/`，不提交。
+- 加固 Profile 导航后 `pwsh -NoProfile -Command '[scriptblock]::Create((Get-Content -Raw -Path "scripts/harmonyos-app-smoke.ps1")) | Out-Null'`：exit 0。
+- 加固 Profile 导航后 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，86 passed / 0 failed；覆盖启动、课程、课程详情、精选练习、复盘追问、学伴页、Profile 三个子页、学习星图三门课程和回首页。截图证据位于 `screenshots/trae-smoke-20260703-154236/`，不提交。
+
+未验证：
+- 真机未验证。
+- 未用启动 trace 量化 `onWindowStageCreate` 到首页可见的耗时收益；本批次性能收益为源码确认、构建通过和模拟器通过。
