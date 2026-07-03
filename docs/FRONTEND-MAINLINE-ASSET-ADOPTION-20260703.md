@@ -1,6 +1,35 @@
 # 端侧前端资产主线接入说明（2026-07-03）
 
-本文件给主线程使用，记录本轮已下载到 `.tmp/` 做初步验证的具体资产、验证结论和接入步骤。本轮没有修改端侧源码、依赖或资源目录；`.tmp/asset-mainline-validation-20260703/` 只作本地证据，不提交。
+本文件给主线程使用，记录本轮已下载到 `.tmp/` 做初步验证的具体资产、验证结论和接入步骤。最初验证批次没有修改端侧源码、依赖或资源目录；后续接入批次已将 6 个 Fluent SVG 与许可证文本落入 HarmonyOS `rawfile`，并在端侧页面做小范围真实使用。
+
+## 主线接入更新（2026-07-03）
+
+已加入主线资源：
+
+- `apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_code_24_regular.svg`
+- `apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_branch_24_regular.svg`
+- `apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_trophy_24_regular.svg`
+- `apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_target_arrow_24_regular.svg`
+- `apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_book_24_regular.svg`
+- `apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_brain_circuit_24_regular.svg`
+- `apps/harmonyos/entry/src/main/resources/rawfile/licenses/fluentui-system-icons-LICENSE`
+
+端侧使用位置：
+
+| 页面 | 图标 | 作用 |
+|---|---|---|
+| `Lesson.ets` | `fluent_target_arrow_24_regular.svg` | “本节掌握标准”从纯文本标题升级为目标语义提示 |
+| `Lesson.ets` | `fluent_code_24_regular.svg` | 代码阅读区标题标识，强化“先读代码再作答”的学习动作 |
+| `LearningMap.ets` | `fluent_branch_24_regular.svg` | “下一节点”提示表达路径和先修分支关系 |
+| `Achievements.ets` | `fluent_trophy_24_regular.svg` | “下一目标”提示表达里程碑和成就推进 |
+| `Knowledge.ets` | `fluent_book_24_regular.svg` | 资料搜索结果来源标识 |
+| `Chat.ets` | `fluent_brain_circuit_24_regular.svg` | 学伴头像表达智能讲解和知识结构 |
+
+验证等级：
+
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` exit 0，`BUILD SUCCESSFUL in 22 s 8 ms`。
+- **模拟器通过（局部）**：Pura 90 Pro Max 模拟器 `127.0.0.1:5555` 安装 `entry-default-unsigned.hap` 成功；Chat 页截图显示 brain SVG 非空、品牌色生效。证据在 `.tmp/codex-fluent-ui-validation-20260703/` 与本地 `screenshots/trae-smoke-20260703-183607/`，不提交。
+- **未验证**：Lesson、LearningMap、Achievements、Knowledge 的 SVG 视觉效果本轮未逐页截图确认；真机未验证。
 
 ## 结论摘要
 

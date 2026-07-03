@@ -183,9 +183,10 @@ struct KnowledgePage {
               Column() {
                 Row() {
                   Row({ space: 8 }) {
-                    SymbolGlyph($r('sys.symbol.book_pages_fill_1'))
-                      .fontSize(16)
-                      .fontColor([Constants.COLOR_BRAND])
+                    Image($rawfile('icons/fluent_book_24_regular.svg'))
+                      .width(16)
+                      .height(16)
+                      .fillColor(Constants.COLOR_BRAND)
                     Text(item.source)
                       .fontSize(13)
                       .fontWeight(FontWeight.Medium)

@@ -265,13 +265,19 @@ export struct ChatContent {
         // 欢迎引导
         Column() {
           // AI 头像
-          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
+          Stack({ alignContent: Alignment.Center }) {
+            Column()
+              .width(56)
+              .height(56)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(28)
+            Image($rawfile('icons/fluent_brain_circuit_24_regular.svg'))
+              .width(27)
+              .height(27)
+              .fillColor(Constants.COLOR_BRAND)
+          }
             .width(56)
             .height(56)
-            .fontSize(26)
-            .fontColor([Constants.COLOR_BRAND])
-            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-            .borderRadius(28)
             .shadow({ radius: 12, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 4 })
 
           Text('你好，我是鸿学伴 AI 助教')
@@ -619,13 +625,19 @@ export struct ChatContent {
         // AI 消息（带头像）
         Row({ space: 8 }) {
           // AI 头像
-          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
+          Stack({ alignContent: Alignment.Center }) {
+            Column()
+              .width(32)
+              .height(32)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(16)
+            Image($rawfile('icons/fluent_brain_circuit_24_regular.svg'))
+              .width(17)
+              .height(17)
+              .fillColor(Constants.COLOR_BRAND)
+          }
             .width(32)
             .height(32)
-            .fontSize(16)
-            .fontColor([Constants.COLOR_BRAND])
-            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-            .borderRadius(16)
 
           Column() {
             if (msg.thinking.length > 0 || msg.agentTrace.length > 0) {

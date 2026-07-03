@@ -230,10 +230,17 @@ struct LessonPage {
   private MasteryBrief() {
     Column({ space: 12 }) {
       Row() {
-        Text('本节掌握标准')
-          .fontSize(12)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_BRAND)
+        Row({ space: 6 }) {
+          Image($rawfile('icons/fluent_target_arrow_24_regular.svg'))
+            .width(16)
+            .height(16)
+            .fillColor(Constants.COLOR_BRAND)
+          Text('本节掌握标准')
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_BRAND)
+        }
+        .layoutWeight(1)
         Text(this.activityProgressText())
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -287,10 +294,17 @@ struct LessonPage {
   private CodeBlock(activity: LearningActivity) {
     Column({ space: 8 }) {
       Row() {
-        Text(activity.language.length > 0 ? activity.language : 'code')
-          .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+        Row({ space: 6 }) {
+          Image($rawfile('icons/fluent_code_24_regular.svg'))
+            .width(15)
+            .height(15)
+            .fillColor(Constants.COLOR_MAP_TEXT_MUTED)
+          Text(activity.language.length > 0 ? activity.language : 'code')
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+        }
+        .layoutWeight(1)
         Text('阅读后再作答')
           .fontSize(11)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)

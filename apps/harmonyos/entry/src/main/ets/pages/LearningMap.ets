@@ -357,9 +357,18 @@ struct LearningMapPage {
         Text('已掌握 ' + this.masteredCount().toString() + ' / ' + this.nodes.length.toString() + ' 个主题')
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Text('下一节点：' + this.nextTopicLabel())
-          .fontSize(11)
-          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        Row({ space: 6 }) {
+          Image($rawfile('icons/fluent_branch_24_regular.svg'))
+            .width(14)
+            .height(14)
+            .fillColor(Constants.COLOR_TEXT_TERTIARY)
+          Text('下一节点：' + this.nextTopicLabel())
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .width('100%')
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)

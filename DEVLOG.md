@@ -5156,3 +5156,44 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `.tmp/asset-mainline-validation-20260703/` 证据文件未提交。
 - 未把 SVG 或字体复制进 `apps/harmonyos/entry/src/main/resources`，因此未执行 HAP 构建、模拟器截图或真机验证。
 - JetBrains Mono 仍需单独验证 HAP 体积、中文混排和页面截图后才能留在主线。
+
+---
+
+## 2026-07-03 Codex：Fluent SVG 图标首批接入端侧主线
+
+背景：继续推动已验证资源进入端侧 App 主线，先落体积小、许可证明确、ArkUI 可直接加载的 Fluent UI System Icons SVG，避免继续停留在审计文档。
+
+文件：
+- apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_code_24_regular.svg
+- apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_branch_24_regular.svg
+- apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_trophy_24_regular.svg
+- apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_target_arrow_24_regular.svg
+- apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_book_24_regular.svg
+- apps/harmonyos/entry/src/main/resources/rawfile/icons/fluent_brain_circuit_24_regular.svg
+- apps/harmonyos/entry/src/main/resources/rawfile/licenses/fluentui-system-icons-LICENSE
+- apps/harmonyos/entry/src/main/ets/pages/Lesson.ets
+- apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets
+- apps/harmonyos/entry/src/main/ets/pages/Achievements.ets
+- apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets
+- docs/FRONTEND-MAINLINE-ASSET-ADOPTION-20260703.md
+
+行为变化：
+- Lesson 的“本节掌握标准”标题新增 target arrow 图标，代码阅读区新增 code 图标。
+- LearningMap 的“下一节点”新增 branch 图标，表达学习路径和先修分支。
+- Achievements 的“下一目标”新增 trophy 图标，表达里程碑推进。
+- Knowledge 搜索结果来源新增 book 图标。
+- Chat 欢迎态和助手消息头像改为 brain circuit 图标，保留原有品牌浅底、圆形和阴影。
+- 6 个 SVG 与 Fluent MIT 许可证文本进入 `rawfile`，没有新增 OHPM 依赖，没有引入字体、Lottie、IRA 插画或 Web runtime。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 22 s 8 ms`；ArkTS 编译、资源编译和 HAP 打包通过。
+- `.\scripts\harmonyos-app-smoke.ps1` 第一次：exit 1；设备连接、增量构建、安装通过，启动后 `uitest dumpLayout` 返回 `Wait for subscribe uitest.broadcast.command.reply timeout`，未作为模拟器流程通过证据。
+- DevEco MCP `get_app_ui_tree`：Pura 90 Pro Max 模拟器可导出 full UI tree 到 `.tmp/codex-fluent-ui-validation-20260703/`。
+- DevEco MCP `perform_ui_action` 截图：Pura 90 Pro Max 模拟器启动页截图保存到 `.tmp/codex-fluent-ui-validation-20260703/launch_screen.png`。
+- `.\scripts\harmonyos-app-smoke.ps1` 第二次：exit 1；设备连接、增量构建、安装、首页、课程详情、练习、错题追问、Chat 截图均通过，最后 Profile 页 `连续天数` 断言未找到。Chat 截图显示 brain SVG 非空、品牌色生效；证据位于 `screenshots/trae-smoke-20260703-183607/`，不提交仓库。
+
+未验证：
+- Lesson、LearningMap、Achievements、Knowledge 的 SVG 视觉效果本轮未逐页截图确认。
+- 真机未验证。
+- JetBrains Mono、Lottie、OHPM Markdown 组件仍未进入主线。

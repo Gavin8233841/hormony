@@ -81,9 +81,10 @@ struct AchievementsPage {
 
               if (this.nextAchievementTitle().length > 0) {
                 Row({ space: 7 }) {
-                  SymbolGlyph($r('sys.symbol.star_fill'))
-                    .fontSize(15)
-                    .fontColor([Constants.COLOR_WARNING])
+                  Image($rawfile('icons/fluent_trophy_24_regular.svg'))
+                    .width(15)
+                    .height(15)
+                    .fillColor(Constants.COLOR_WARNING)
                   Text('下一目标 · ' + this.nextAchievementTitle())
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
