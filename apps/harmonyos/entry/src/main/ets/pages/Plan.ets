@@ -144,23 +144,32 @@ struct PlanPage {
       if (current === null) throw new Error('本地计划不存在');
       current.tasks = nextTasks;
       await LocalLearningRepository.savePlan(current);
-      await LearningFormUpdater.refreshAll();
-      if (nextDone) {
-        const event: StudyEvent = {
-          id: 'event_' + Date.now().toString(),
-          type: 'task_completed',
-          timestamp: new Date().toISOString(),
-          taskId: task.id
-        };
-        await LocalLearningRepository.appendStudyEvent(event);
-      }
       this.tasks = nextTasks;
       this.message = nextDone ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成';
       this.hasError = false;
+      this.syncTaskSideEffects(task, nextDone);
     } catch (e) {
       this.message = '任务状态保存失败，请稍后重试';
       this.hasError = true;
     }
+  }
+
+  private syncTaskSideEffects(task: PlanTask, nextDone: boolean): void {
+    LearningFormUpdater.refreshAll().catch((): void => {
+      this.message = '任务状态已保存，服务卡片稍后同步';
+      this.hasError = false;
+    });
+    if (!nextDone) return;
+    const event: StudyEvent = {
+      id: 'event_' + Date.now().toString(),
+      type: 'task_completed',
+      timestamp: new Date().toISOString(),
+      taskId: task.id
+    };
+    LocalLearningRepository.appendStudyEvent(event).catch((): void => {
+      this.message = '任务状态已保存，学习记录稍后同步';
+      this.hasError = false;
+    });
   }
 
   @Builder

@@ -98,22 +98,31 @@ export struct HomeContent {
       };
       plan.tasks = nextTasks;
       await LocalLearningRepository.savePlan(plan);
-      await LearningFormUpdater.refreshAll();
-      const changedTask = nextTasks.find((item: PlanTask): boolean => item.id === task.id);
-      if (changedTask?.done === true) {
-        const event: StudyEvent = {
-          id: 'event_' + Date.now().toString(),
-          type: 'task_completed',
-          timestamp: new Date().toISOString(),
-          taskId: task.id
-        };
-        await LocalLearningRepository.appendStudyEvent(event);
-      }
       this.planTasks = nextTasks;
+      const changedTask = nextTasks.find((item: PlanTask): boolean => item.id === task.id);
+      this.syncTaskSideEffects(task, changedTask?.done === true);
     } catch (e) {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'HomeContent local task update failed');
     }
+  }
+
+  private syncTaskSideEffects(task: PlanTask, nextDone: boolean): void {
+    LearningFormUpdater.refreshAll().catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'HomeContent form refresh failed after task update: %{public}s', error.message);
+    });
+    if (!nextDone) return;
+    const event: StudyEvent = {
+      id: 'event_' + Date.now().toString(),
+      type: 'task_completed',
+      timestamp: new Date().toISOString(),
+      taskId: task.id
+    };
+    LocalLearningRepository.appendStudyEvent(event).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'HomeContent study event append failed after task update: %{public}s', error.message);
+    });
   }
 
   private async publishReminder(): Promise<void> {

@@ -5,12 +5,19 @@ import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { Course } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
+interface TopicStat {
+  topic: string;
+  knowledgeCount: number;
+  questionCount: number;
+}
+
 @Entry
 @Component
 struct CourseDetailPage {
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topics: string[] = [];
+  @State topicStats: TopicStat[] = [];
   @State completedTopics: string[] = [];
   @State progress: number = 0;
   @State message: string = '';
@@ -19,7 +26,26 @@ struct CourseDetailPage {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topics = LearningContentRepository.getTopics(this.courseId);
+    this.topicStats = this.buildTopicStats(this.topics);
     this.loadProgress();
+  }
+
+  private buildTopicStats(topics: string[]): TopicStat[] {
+    const stats: TopicStat[] = [];
+    for (const topic of topics) {
+      stats.push({
+        topic: topic,
+        knowledgeCount: LearningContentRepository.getKnowledge(this.courseId, topic).length,
+        questionCount: LearningContentRepository.getQuestions(this.courseId, topic).length
+      });
+    }
+    return stats;
+  }
+
+  private topicMeta(topic: string): string {
+    const stat = this.topicStats.find((item: TopicStat): boolean => item.topic === topic);
+    if (stat === undefined) return '0 个知识切片 · 0 道练习';
+    return stat.knowledgeCount.toString() + ' 个知识切片 · ' + stat.questionCount.toString() + ' 道练习';
   }
 
   private async loadProgress(): Promise<void> {
@@ -121,8 +147,7 @@ struct CourseDetailPage {
                       .fontSize(16)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                    Text(LearningContentRepository.getKnowledge(this.courseId, topic).length.toString() +
-                      ' 个知识切片 · ' + LearningContentRepository.getQuestions(this.courseId, topic).length.toString() + ' 道练习')
+                    Text(this.topicMeta(topic))
                       .fontSize(11)
                       .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   }

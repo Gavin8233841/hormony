@@ -5281,3 +5281,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未搭建 5xx 首地址 + 正常备用地址的真实网关组合；SSE 备用地址切换为源码确认与构建通过。
 - 资料检索页入口当前来自 AI 测验复盘薄弱主题跳转，本轮未做 UI 脚本覆盖；本地先展示行为为源码确认与构建通过。
 - 真机未验证，未用网络代理或 Profiler 量化超时缩短后的等待时间。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.12 打卡响应与课程详情渲染效率
+
+背景：继续只服务 HarmonyOS 端侧 App。只读审计确认首页和计划页打卡时先等待服务卡片刷新与学习事件写入，页面状态最后才更新；课程详情在渲染每个 Topic 时重复调用资料和题目查询。评审现场这些点会表现为点击反馈迟钝和列表重绘额外开销。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets
+
+行为变化：
+- 首页今日计划点击任务后，`savePlan()` 成功即更新 `planTasks`，UI 立即显示完成/恢复状态；服务卡片刷新和学习事件写入改为后续异步步骤。
+- 计划页任务按钮同样在保存计划成功后立即更新 `tasks` 与页面提示；服务卡片或学习记录同步失败时只提示稍后同步，不回滚已保存的本地任务状态。
+- 课程详情新增 `topicStats`，进入页面时一次性预计算每个 Topic 的知识切片数和练习数；渲染列表时不再重复调用 `LearningContentRepository.getKnowledge()` / `getQuestions()`。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 899 ms`；仍提示未配置 signingConfigs。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，78 passed / 0 failed；主端侧路径完成课程详情、精选练习、复盘追问、学伴页、画像页、学习记录、错题本、成就和学习星图三门课。截图证据位于 `screenshots/trae-smoke-20260703-151002/`，不提交。
+- 窄路径打卡验证：先点击首页今日计划任务标题，350ms 检查命令 exit 1，检查窗口过短；随后 UI 树 dump exit 0，显示 `今日任务已完成` 与 `已完成`。
+- 回到主框架后点击底部 `今日` 并重新读取 UI 树：exit 0，`doneCount=1`、`currentTitleCount=1`，确认已保存的完成状态回到首页后仍可见。
+
+未验证：
+- 真机未验证。
+- 未注册真实服务卡片验证后台 `LearningFormUpdater.refreshAll()` 成功路径；本批次只验证页面状态不再被卡片刷新阻塞。
+- 未用 DevEco Profiler 量化课程详情重绘 CPU/内存收益。
