@@ -5280,3 +5280,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 未验证：
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex：学习记录薄弱标签可行动化
+
+背景：ActivityRecords 已能展示“最近薄弱标签”，但仍是只读洞察；成熟学习产品应把记录页直接变成下一步行动入口。本批次把薄弱标签接入课程资料复习和 AI 测验，不改本地数据 schema。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets
+- DEVLOG.md
+
+行为变化：
+- ActivityRecords 加载本地课程列表和 QuizResult，按每个 `TagInsight` 最近出现的测验结果构建 `TagReviewTarget`。
+- “最近薄弱标签”副标题从“用于安排下一次复习”改为“可直接复习”。
+- 每个薄弱标签展示错题数和最近练习日期，并新增“复习”“再测”两个行动按钮。
+- “复习”写入 `selectedCourseId`、`selectedCourseTitle`、`knowledgePrefillQuery` 后进入 `pages/Knowledge`。
+- “再测”写入 `selectedCourseId`、`selectedCourseTitle`、`selectedQuizTopic` 后进入 `pages/Quiz`。
+- 学习记录条目进入课程详情时不再维护硬编码课程标题数组，改为从本地 Course 列表读取标题。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 13 s 396 ms`；`CompileArkTS`、`PackageHap`、`SignHap` 均完成。
+- HAP 覆盖安装：`hdc file send ...entry-default-unsigned.hap /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0；`hdc shell bm install -r -p /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。UI 树确认 ActivityRecords 出现“最近薄弱标签”“可直接复习”“复习”“再测”。
+- 模拟器动作验证：点击“复习”进入 `pages/Knowledge`，UI 树出现“搜课程资料”；点击“再测”进入 `pages/Quiz`，UI 树出现“课程测验”。
+- 完整 CLI 冒烟：`.\scripts\harmonyos-app-smoke.ps1` exit 0，76 passed / 0 failed。
+- 证据目录：`.tmp/codex-learning-loop-20260703/activity-records-tag-actions/` 与 `screenshots/trae-smoke-20260703-202358/`，均不提交仓库。
+
+未验证：
+- 真机未验证。

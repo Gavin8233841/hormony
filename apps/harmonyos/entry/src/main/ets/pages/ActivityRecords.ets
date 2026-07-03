@@ -1,14 +1,23 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { StudyEvent, TagInsight } from '../model/DataModels';
+import { Course, QuizResult, QuizResultDetail, StudyEvent, TagInsight } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+
+interface TagReviewTarget {
+  tag: string;
+  courseId: string;
+  courseTitle: string;
+  topic: string;
+}
 
 @Entry
 @Component
 struct ActivityRecordsPage {
   @State events: StudyEvent[] = [];
   @State tagInsights: TagInsight[] = [];
+  @State tagReviewTargets: TagReviewTarget[] = [];
+  @State courses: Course[] = [];
   @State loading: boolean = true;
   @State message: string = '';
 
@@ -20,6 +29,9 @@ struct ActivityRecordsPage {
     try {
       this.events = (await LocalLearningRepository.getStudyEvents()).slice().reverse();
       this.tagInsights = await LocalLearningRepository.getTagInsights(4);
+      this.courses = await LocalLearningRepository.getCourses() ?? [];
+      const results = await LocalLearningRepository.getQuizResults();
+      this.tagReviewTargets = this.buildTagReviewTargets(this.tagInsights, results);
     } catch (error) {
       this.message = '学习记录读取失败';
     } finally {
@@ -75,13 +87,89 @@ struct ActivityRecordsPage {
     return date.slice(5, 7) + '月' + date.slice(8, 10) + '日';
   }
 
+  private courseTitleFor(courseId: string): string {
+    for (const course of this.courses) {
+      if (course.id === courseId) return course.title;
+    }
+    return '课程';
+  }
+
+  private detailHasTag(detail: QuizResultDetail, tag: string): boolean {
+    for (const value of detail.tags ?? []) {
+      if (value.trim() === tag) return true;
+    }
+    return false;
+  }
+
+  private buildTagReviewTargets(insights: TagInsight[], results: QuizResult[]): TagReviewTarget[] {
+    const targets: TagReviewTarget[] = [];
+    const recentResults = results.slice().reverse();
+    for (const insight of insights) {
+      for (const result of recentResults) {
+        let matched = false;
+        for (const detail of result.details) {
+          if (this.detailHasTag(detail, insight.tag)) {
+            matched = true;
+            break;
+          }
+        }
+        if (matched) {
+          targets.push({
+            tag: insight.tag,
+            courseId: result.courseId,
+            courseTitle: this.courseTitleFor(result.courseId),
+            topic: result.topic
+          });
+          break;
+        }
+      }
+    }
+    return targets;
+  }
+
+  private targetForTag(tag: string): TagReviewTarget | null {
+    for (const target of this.tagReviewTargets) {
+      if (target.tag === tag) return target;
+    }
+    return null;
+  }
+
+  private reviewTag(tag: string): void {
+    const target = this.targetForTag(tag);
+    if (target === null) {
+      this.message = '暂时无法定位标签来源';
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', target.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', target.courseTitle);
+    AppStorage.setOrCreate<string>('knowledgePrefillQuery', target.tag);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ActivityRecordsPage knowledge navigation failed: %{public}s', error.message);
+      this.message = '无法打开资料检索，请重试';
+    });
+  }
+
+  private quizTag(tag: string): void {
+    const target = this.targetForTag(tag);
+    if (target === null) {
+      this.message = '暂时无法定位标签来源';
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', target.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', target.courseTitle);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', target.topic.length > 0 ? target.topic : '综合');
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ActivityRecordsPage quiz navigation failed: %{public}s', error.message);
+      this.message = '无法打开 AI 测验，请重试';
+    });
+  }
+
   private openEvent(event: StudyEvent): void {
     if (event.courseId === undefined) return;
-    const titles: string[] = ['数据结构', '操作系统', '计算机网络'];
-    const ids: string[] = ['cs101', 'cs102', 'cs103'];
-    const index = ids.indexOf(event.courseId);
     AppStorage.setOrCreate<string>('selectedCourseId', event.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', index >= 0 ? titles[index] : '课程');
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitleFor(event.courseId));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/CourseDetail' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ActivityRecordsPage navigation failed: %{public}s', error.message);
@@ -117,28 +205,52 @@ struct ActivityRecordsPage {
                     .fontSize(15)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                  Text('用于安排下一次复习')
+                  Text('可直接复习')
                     .fontSize(11)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
                 ForEach(this.tagInsights, (item: TagInsight): void => {
-                  Row({ space: 10 }) {
-                    Text(item.tag)
-                      .fontSize(12)
-                      .fontColor(Constants.COLOR_BRAND)
-                      .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-                      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                      .borderRadius(Constants.RADIUS_SM)
-                    Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
-                      .layoutWeight(1)
-                      .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-                      .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-                      .borderRadius(4)
-                    Text(Math.round(item.accuracy * 100).toString() + '%')
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  Column({ space: 8 }) {
+                    Row({ space: 10 }) {
+                      Text(item.tag)
+                        .fontSize(12)
+                        .fontColor(Constants.COLOR_BRAND)
+                        .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                        .borderRadius(Constants.RADIUS_SM)
+                      Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
+                        .layoutWeight(1)
+                        .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+                        .borderRadius(4)
+                      Text(Math.round(item.accuracy * 100).toString() + '%')
+                        .fontSize(11)
+                        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    }
+                    .width('100%')
+                    Row({ space: 8 }) {
+                      Text('错 ' + item.wrongQuestions.toString() + ' 题 · 最近 ' + this.dateLabel(item.lastPracticedAt))
+                        .layoutWeight(1)
+                        .fontSize(11)
+                        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                      Button('复习')
+                        .height(32)
+                        .fontSize(12)
+                        .fontColor(Constants.COLOR_BRAND)
+                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                        .borderRadius(Constants.RADIUS_SM)
+                        .onClick((): void => { this.reviewTag(item.tag); })
+                      Button('再测')
+                        .height(32)
+                        .fontSize(12)
+                        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                        .backgroundColor(Constants.COLOR_BRAND)
+                        .borderRadius(Constants.RADIUS_SM)
+                        .onClick((): void => { this.quizTag(item.tag); })
+                    }
+                    .width('100%')
                   }
                   .width('100%')
                 })
