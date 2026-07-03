@@ -69,18 +69,50 @@ function Find-ElementByText($uiTree, $text) {
     return Search-Node $uiTree $text
 }
 
-function Find-OptionA($uiTree) {
-    function Search-Node($node) {
+function Find-ClickableElementByText($uiTree, $text) {
+    function Search-Node($node, $exactText, $clickableAncestor) {
         $results = @()
-        if ($node.attributes.text -eq 'A' -and $node.attributes.visible -eq 'true') {
-            $results += $node
+        $currentClickable = $clickableAncestor
+        if ($node.attributes.visible -eq 'true' -and $node.attributes.clickable -eq 'true') {
+            $currentClickable = $node
+        }
+        if ($node.attributes.text -eq $exactText -and $node.attributes.visible -eq 'true') {
+            if ($currentClickable) {
+                $results += $currentClickable
+            } else {
+                $results += $node
+            }
         }
         if ($node.children) {
-            foreach ($child in $node.children) { $results += Search-Node $child }
+            foreach ($child in $node.children) {
+                $results += Search-Node $child $exactText $currentClickable
+            }
         }
         return $results
     }
-    return Search-Node $uiTree
+    return Search-Node $uiTree $text $null
+}
+
+function Find-OptionA($uiTree) {
+    function Search-Node($node, $clickableAncestor) {
+        $results = @()
+        $currentClickable = $clickableAncestor
+        if ($node.attributes.visible -eq 'true' -and $node.attributes.clickable -eq 'true') {
+            $currentClickable = $node
+        }
+        if ($node.attributes.text -eq 'A' -and $node.attributes.visible -eq 'true') {
+            if ($currentClickable) {
+                $results += $currentClickable
+            } else {
+                $results += $node
+            }
+        }
+        if ($node.children) {
+            foreach ($child in $node.children) { $results += Search-Node $child $currentClickable }
+        }
+        return $results
+    }
+    return Search-Node $uiTree $null
 }
 
 function Get-PagePath($uiTree) {
@@ -123,7 +155,7 @@ function Click-Element($textPattern, $description) {
         Write-Step "Click: $description" "FAIL" "UI tree not available"
         return $false
     }
-    $elements = Find-ElementByText $uiTree $textPattern
+    $elements = Find-ClickableElementByText $uiTree $textPattern
     if ($elements.Count -eq 0) {
         Write-Step "Click: $description" "FAIL" "Element not found: $textPattern"
         return $false
@@ -166,8 +198,13 @@ function Verify-Page($pagePath, $description) {
 }
 
 function Click-FirstOptionA() {
-    $uiTree = Get-UiTree
-    $elements = Find-OptionA $uiTree
+    $elements = @()
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        $uiTree = Get-UiTree
+        $elements = Find-OptionA $uiTree
+        if ($elements.Count -gt 0) { break }
+        if (-not (Swipe-Viewport "down")) { return $false }
+    }
     if ($elements.Count -eq 0) {
         Write-Step "Choose option A" "FAIL" "No visible A. option"
         return $false

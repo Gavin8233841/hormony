@@ -5255,3 +5255,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - `scripts/harmonyos-app-smoke.ps1` 完整长流程仍未通过：更新安装方式后，Practice 前四题即时反馈均通过，后续长循环在第 5 题前找不到可见 `A`，需后续把脚本的滚动/等待策略继续收紧；本批次不把完整脚本标为通过。
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex：精选练习冒烟脚本稳定性补齐
+
+背景：上一批次已完成 Practice 单题即时反馈，但完整 `scripts/harmonyos-app-smoke.ps1` 长流程仍在 Practice 连续答题后段偶发找不到可见 `A`，导致验证链路没有收口。本批次只修复脚本点击稳定性，不改产品页面和数据契约。
+
+文件：
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- `Click-Element` 改为优先点击包含目标文本的可点击父节点，避免只点到 Text 子节点导致按钮命中不稳定。
+- `Find-OptionA` 同步返回选项文字所在的可点击父按钮，确保精选练习选项点击落在整张选项卡。
+- `Click-FirstOptionA` 在未找到可见 `A` 时最多向下滚动 3 次回到题面，处理从长解析区域进入下一题后的滚动位置波动。
+
+验证：
+- `.\scripts\harmonyos-app-smoke.ps1`：exit 0，76 passed / 0 failed。
+- 脚本内构建：`hvigorw assembleHap --no-daemon` exit 0，`BUILD SUCCESSFUL in 5 s 500 ms`。
+- 脚本内安装：`file send` + `bm install -r -p /data/local/tmp/codex-smoke-entry-default-unsigned.hap` 成功。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。完整流程覆盖首页、课程、CourseDetail、Practice 五题即时反馈、结果复盘、错题追问进入 Chat、Profile 子页、三门课程学习星图和返回首页。
+- 截图证据目录：`screenshots/trae-smoke-20260703-200659/`，不提交仓库。
+
+未验证：
+- 真机未验证。
