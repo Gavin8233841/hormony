@@ -5197,3 +5197,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Lesson、LearningMap、Achievements、Knowledge 的 SVG 视觉效果本轮未逐页截图确认。
 - 真机未验证。
 - JetBrains Mono、Lottie、OHPM Markdown 组件仍未进入主线。
+
+---
+
+## 2026-07-03 Codex：精选练习闭环与冒烟稳定性增强
+
+背景：继续把端侧学习体验从“做完题看分数”推进到明确学习闭环。结合只读审计结论，精选练习已有 `QuizResultDetail.tags`、错题队列和 Profile 标签洞察聚合能力，但 curated 练习提交未写标签，导致画像洞察长期缺少真实来源；同时冒烟脚本对 Practice 和 Profile 的布局过于脆弱。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/model/DataModels.ets
+- apps/harmonyos/entry/src/main/ets/pages/Practice.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- `CuratedQuestion` 增加可选 `tags` 字段，兼容未来题库细粒度标签。
+- Practice 提交时为每道精选题写入 `question.tags ?? [question.topic]`，`QuizResultDetail.tags` 会进入错题队列和 Profile 标签洞察聚合。
+- Practice 修正弱项兜底，避免无主题练习失败时写入空字符串弱项。
+- Practice 结果页新增“本轮闭环”卡片，明确答题记录已保存、错题已进入错题本或无需复习，并提供下一步动作。
+- 有错题时，闭环卡片提供唯一按钮“让学伴讲这题”，直接追问首个错题；全对时提供“继续新主题”返回课程。
+- 冒烟脚本练习流程改为状态驱动：每题选 A 后优先尝试提交，找不到提交再点下一题，必要时滚动寻找按钮，不再硬依赖固定 5 题和固定可见位置。
+- 冒烟脚本 Profile 连续天数验证改为有限滚动重试，并新增滚动后截图，避免底部导航遮挡导致误失败。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 16 s 46 ms`。
+- `.\scripts\harmonyos-app-smoke.ps1`：exit 0，71 passed / 0 failed。
+- 冒烟覆盖：HAP 增量构建、安装、首页、课程列表、课程详情、精选练习答题、结果页“本轮闭环”、闭环卡片追问学伴、Chat、Profile 连续天数、学习记录、错题本、成就、三门课程学习星图、回到首页。
+- 证据截图目录：`screenshots/trae-smoke-20260703-193547/`，不提交仓库。
+
+未验证：
+- 真机未验证。
+- 本批次未给 165 道题补充细粒度多标签，只先用真实 topic 打通标签洞察链路。
+- Chat 代码块 V2、证据卡和“多 Agent 工作台”去技术化文案留到下一批单独处理。

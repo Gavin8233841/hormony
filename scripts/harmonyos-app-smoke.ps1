@@ -142,6 +142,20 @@ function Click-Element($textPattern, $description) {
     return $true
 }
 
+function Try-ClickElement($textPattern, $description) {
+    $uiTree = Get-UiTree
+    if (-not $uiTree) { return $false }
+    $elements = Find-ElementByText $uiTree $textPattern
+    if ($elements.Count -eq 0) { return $false }
+    $center = Get-BoundsCenter $elements[0].attributes.bounds
+    if (-not $center) { return $false }
+    $parts = $center -split ' '
+    Invoke-HdcShell @("uitest", "uiInput", "click", $parts[0], $parts[1]) | Out-Null
+    Start-Sleep -Seconds 1
+    Write-Step "Click: $description" "PASS" "at ($($parts[0]), $($parts[1]))"
+    return $true
+}
+
 function Take-Screenshot($name) {
     $devicePath = "/data/local/tmp/smoke_screenshot.jpeg"
     Invoke-HdcShell @("snapshot_display", "-f", $devicePath) | Out-Null
@@ -166,22 +180,29 @@ function Verify-Page($pagePath, $description) {
 }
 
 function Click-FirstOptionA() {
-    $uiTree = Get-UiTree
-    $elements = Find-OptionA $uiTree
-    if ($elements.Count -eq 0) {
-        Write-Step "Choose option A" "FAIL" "No visible A. option"
-        return $false
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        $uiTree = Get-UiTree
+        $elements = Find-OptionA $uiTree
+        if ($elements.Count -gt 0) {
+            $center = Get-BoundsCenter $elements[0].attributes.bounds
+            if (-not $center) {
+                Write-Step "Choose option A" "FAIL" "Invalid bounds"
+                return $false
+            }
+            $parts = $center -split ' '
+            Invoke-HdcShell @("uitest", "uiInput", "click", $parts[0], $parts[1]) | Out-Null
+            Start-Sleep -Milliseconds 500
+            Write-Step "Choose option A" "PASS" "$($elements[0].attributes.text) attempt=$attempt"
+            return $true
+        }
+        if ($attempt -eq 0) {
+            if (-not (Swipe-Viewport "down")) { return $false }
+        } elseif ($attempt -eq 1) {
+            if (-not (Swipe-Viewport "up")) { return $false }
+        }
     }
-    $center = Get-BoundsCenter $elements[0].attributes.bounds
-    if (-not $center) {
-        Write-Step "Choose option A" "FAIL" "Invalid bounds"
-        return $false
-    }
-    $parts = $center -split ' '
-    Invoke-HdcShell @("uitest", "uiInput", "click", $parts[0], $parts[1]) | Out-Null
-    Start-Sleep -Milliseconds 500
-    Write-Step "Choose option A" "PASS" $elements[0].attributes.text
-    return $true
+    Write-Step "Choose option A" "FAIL" "No visible A. option"
+    return $false
 }
 
 function Swipe-Viewport($direction) {
@@ -220,6 +241,24 @@ function Verify-TextExists($textPattern, $description) {
         Write-Step "Verify: $description" "FAIL" "Not found: $textPattern"
         return $false
     }
+}
+
+function Verify-TextExistsWithScroll($textPattern, $description, $maxSwipes = 2) {
+    for ($attempt = 0; $attempt -le $maxSwipes; $attempt++) {
+        $uiTree = Get-UiTree
+        if ($uiTree) {
+            $elements = Find-ElementByText $uiTree $textPattern
+            if ($elements.Count -gt 0) {
+                Write-Step "Verify: $description" "PASS" "Found: $textPattern attempt=$attempt"
+                return $true
+            }
+        }
+        if ($attempt -lt $maxSwipes) {
+            if (-not (Swipe-Viewport "up")) { return $false }
+        }
+    }
+    Write-Step "Verify: $description" "FAIL" "Not found after scroll: $textPattern"
+    return $false
 }
 
 # ==================== 主流程 ====================
@@ -339,21 +378,38 @@ if (-not (Verify-Page "pages/Practice" "Practice")) { exit 1 }
 if (-not (Verify-TextExists "离线精选题库" "Practice question")) { exit 1 }
 Take-Screenshot "04-practice"
 
-# 8. 完成五题并进入逐题复盘
-for ($questionIndex = 0; $questionIndex -lt 5; $questionIndex++) {
+# 8. 完成练习并进入逐题复盘
+$submittedPractice = $false
+for ($questionIndex = 0; $questionIndex -lt 8; $questionIndex++) {
     if (-not (Click-FirstOptionA)) { exit 1 }
-    if ($questionIndex -lt 4) {
-        if (-not (Click-Element "下一题" "Next question")) { exit 1 }
-    } else {
-        if (-not (Click-Element "提交评分" "Submit practice")) { exit 1 }
+    if (Try-ClickElement "提交评分" "Submit practice") {
+        $submittedPractice = $true
+        break
     }
+    if (Try-ClickElement "下一题" "Next question") {
+        continue
+    }
+    if (-not (Swipe-Viewport "up")) { exit 1 }
+    if (Try-ClickElement "提交评分" "Submit practice after scroll") {
+        $submittedPractice = $true
+        break
+    }
+    if (-not (Click-Element "下一题" "Next question after scroll")) { exit 1 }
+}
+if (-not $submittedPractice) {
+    Write-Step "Submit practice" "FAIL" "No submit button reached"
+    exit 1
 }
 if (-not (Verify-TextExists "本轮已完成" "Practice result")) { exit 1 }
+if (-not (Verify-TextExists "本轮闭环" "Practice learning loop")) { exit 1 }
 if (-not (Verify-TextExists "逐题复盘" "Question review")) { exit 1 }
 Take-Screenshot "05-practice-result"
 
 # 9. 从错题解析进入真实学伴，再返回主框架
-if (-not (Click-Element "向学伴追问" "Ask tutor from review")) { exit 1 }
+if (-not (Click-Element "让学伴讲这题" "Ask tutor from loop card")) {
+    if (-not (Swipe-Viewport "up")) { exit 1 }
+    if (-not (Click-Element "向学伴追问" "Ask tutor from review")) { exit 1 }
+}
 if (-not (Verify-Page "pages/Chat" "Tutor follow-up")) { exit 1 }
 Take-Screenshot "06-review-chat"
 Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
@@ -378,8 +434,8 @@ Write-Output "`n[INFO] Navigating to Profile tab..."
 if (-not (Click-Element "我的" "Profile tab")) { exit 1 }
 Start-Sleep -Seconds 2
 Take-Screenshot "08-profile-tab"
-if (-not (Swipe-Viewport "up")) { exit 1 }
-if (-not (Verify-TextExists "连续天数" "Learning streak")) { exit 1 }
+if (-not (Verify-TextExistsWithScroll "连续天数" "Learning streak" 2)) { exit 1 }
+Take-Screenshot "08-profile-tab-scrolled"
 if (-not (Swipe-Viewport "down")) { exit 1 }
 
 # 16. 验证三个 Profile 子页面

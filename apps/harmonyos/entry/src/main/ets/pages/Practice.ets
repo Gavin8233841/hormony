@@ -100,10 +100,54 @@ struct PracticePage {
     return this.answers.length > 0 && this.answers.every((answer: string): boolean => answer.length > 0);
   }
 
+  private questionTags(question: CuratedQuestion, fallbackTopic: string): string[] {
+    const rawTags = question.tags ?? [];
+    const tags: string[] = [];
+    for (const tag of rawTags) {
+      const normalized = tag.trim();
+      if (normalized.length > 0 && !tags.includes(normalized)) tags.push(normalized);
+    }
+    const topicTag = question.topic.trim().length > 0 ? question.topic.trim() : fallbackTopic;
+    if (topicTag.length > 0 && !tags.includes(topicTag)) tags.push(topicTag);
+    return tags;
+  }
+
+  private wrongCount(): number {
+    return this.details.filter((detail: QuizResultDetail): boolean => !detail.isCorrect).length;
+  }
+
+  private firstWrongDetail(): QuizResultDetail | null {
+    return this.details.find((detail: QuizResultDetail): boolean => !detail.isCorrect) ?? null;
+  }
+
+  private reviewPlanText(): string {
+    const missed = this.wrongCount();
+    if (missed === 0) return '本轮没有新增错题，继续推进下一个主题。';
+    return missed.toString() + ' 道错题已进入错题本，明天会按间隔复习再次出现。';
+  }
+
+  private nextActionText(): string {
+    return this.wrongCount() === 0 ? '继续新主题' : '追问首个错题';
+  }
+
+  private nextActionButtonText(): string {
+    return this.wrongCount() === 0 ? '继续新主题' : '让学伴讲这题';
+  }
+
+  private runNextAction(): void {
+    const detail = this.firstWrongDetail();
+    if (detail !== null) {
+      this.askTutor(detail);
+      return;
+    }
+    this.getUIContext().getRouter().back();
+  }
+
   private async submit(): Promise<void> {
     if (this.saving || !this.allAnswered()) return;
     this.saving = true;
     const nextDetails: QuizResultDetail[] = [];
+    const resultTopic = this.topic.length > 0 ? this.topic : '综合';
     let totalCorrect = 0;
     for (let index = 0; index < this.questions.length; index++) {
       const question = this.questions[index];
@@ -116,21 +160,22 @@ struct PracticePage {
         userAnswer: userAnswer,
         correctAnswer: this.findCorrectOption(question),
         isCorrect: correct,
-        explanation: question.explanation
+        explanation: question.explanation,
+        tags: this.questionTags(question, resultTopic)
       });
     }
     const result: QuizResult = {
       quizId: 'curated-' + Date.now().toString(),
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
-      topic: this.topic.length > 0 ? this.topic : '综合',
+      topic: resultTopic,
       source: 'curated',
       totalQuestions: this.questions.length,
       correctCount: totalCorrect,
       accuracy: totalCorrect / this.questions.length,
       details: nextDetails,
       evaluation: totalCorrect === this.questions.length ? '本组精选练习全部答对。' : '已记录错题，可根据解析继续巩固。',
-      weakTopics: totalCorrect < this.questions.length ? [this.topic] : [],
+      weakTopics: totalCorrect < this.questions.length ? [resultTopic] : [],
       submittedAt: new Date().toISOString()
     };
     try {
@@ -231,6 +276,105 @@ struct PracticePage {
   }
 
   @Builder
+  private LoopStep(order: string, title: string, subtitle: string, color: ResourceColor) {
+    Row({ space: 10 }) {
+      Text(order)
+        .width(24)
+        .height(24)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(color)
+        .borderRadius(12)
+      Column({ space: 2 }) {
+        Text(title)
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(subtitle)
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .lineHeight(17)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private LearningLoopCard() {
+    Column({ space: 13 }) {
+      Row({ space: 8 }) {
+        if (this.wrongCount() === 0) {
+          Image($rawfile('icons/fluent_trophy_24_regular.svg'))
+            .width(18)
+            .height(18)
+            .fillColor(Constants.COLOR_SUCCESS)
+        } else {
+          Image($rawfile('icons/fluent_target_arrow_24_regular.svg'))
+            .width(18)
+            .height(18)
+            .fillColor(Constants.COLOR_WARNING)
+        }
+        Text('本轮闭环')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      }
+      .width('100%')
+
+      Text(this.reviewPlanText())
+        .width('100%')
+        .fontSize(12)
+        .lineHeight(19)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+
+      Column({ space: 10 }) {
+        this.LoopStep('1', '答题记录已保存', '正确率、累计答题和学习记录会同步更新', Constants.COLOR_BRAND)
+        this.LoopStep('2', this.wrongCount() === 0 ? '本轮无需错题复习' : '错题已加入错题本',
+          this.wrongCount() === 0 ? '保持节奏，继续挑战新主题' : '未掌握题目会按 1 天间隔进入复习队列',
+          this.wrongCount() === 0 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+        this.LoopStep('3', this.nextActionText(),
+          this.wrongCount() === 0 ? '回到课程，选择下一节学习内容' : '让学伴解释第一道错题的判断步骤',
+          this.wrongCount() === 0 ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+      }
+      .width('100%')
+
+      Button({ type: ButtonType.Normal }) {
+        Row({ space: 7 }) {
+          if (this.wrongCount() === 0) {
+            Image($rawfile('icons/fluent_branch_24_regular.svg'))
+              .width(16)
+              .height(16)
+              .fillColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          } else {
+            Image($rawfile('icons/fluent_brain_circuit_24_regular.svg'))
+              .width(16)
+              .height(16)
+              .fillColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          }
+          Text(this.nextActionButtonText())
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+        }
+      }
+      .width('100%')
+      .height(42)
+      .backgroundColor(Constants.COLOR_BRAND)
+      .borderRadius(Constants.RADIUS_MD)
+      .onClick((): void => { this.runNextAction(); })
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .borderRadius(Constants.RADIUS_LG)
+  }
+
+  @Builder
   ResultView() {
     Column({ space: 16 }) {
       Row({ space: 18 }) {
@@ -263,6 +407,8 @@ struct PracticePage {
       .padding(18)
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
+
+      this.LearningLoopCard()
 
       Text('逐题复盘')
         .width('100%')

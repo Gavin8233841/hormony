@@ -257,6 +257,7 @@ export interface CuratedQuestion {
   options: string[];
   answer: string;
   explanation: string;
+  tags?: string[];
 }
 
 export interface ExternalLearningResource {
