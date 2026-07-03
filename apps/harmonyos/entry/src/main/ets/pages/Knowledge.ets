@@ -159,7 +159,7 @@ struct KnowledgePage {
       }
 
       // 加载中
-      if (this.loading) {
+      if (this.loading && this.results.length === 0) {
         this.SearchSkeleton()
       } else if (this.results.length > 0) {
         // 结果列表
@@ -302,7 +302,9 @@ struct KnowledgePage {
     this.loading = true;
     this.message = '';
     this.hasError = false;
-    this.results = [];
+    const localResults = this.searchLocal(q);
+    this.results = localResults;
+    this.message = localResults.length > 0 ? '正在同步云端资料，先展示本地课程资料' : '正在检索云端资料';
     const request: KnowledgeSearchRequest = {
       userId: Constants.DEMO_USER_ID,
       query: q,
@@ -311,16 +313,25 @@ struct KnowledgePage {
     };
 
     try {
-      const response = await HttpClient.post<KnowledgeSearchResponse>(Constants.API_KNOWLEDGE_SEARCH, JSON.stringify(request));
+      const response = await HttpClient.post<KnowledgeSearchResponse>(
+        Constants.API_KNOWLEDGE_SEARCH,
+        JSON.stringify(request),
+        Constants.REQUEST_TIMEOUT
+      );
+      if (this.query.toLowerCase().trim() !== q) {
+        return;
+      }
       this.results = response.chunks;
       if (this.results.length === 0) {
-        this.results = this.searchLocal(q);
+        this.results = localResults;
         this.message = this.results.length > 0 ? '云端未命中，以下来自本地课程资料' : '未找到相关资料，试试更具体的关键词';
+      } else {
+        this.message = '已同步云端资料';
       }
     } catch (e) {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage API failed: %{public}s', (e as Error).message);
-      this.results = this.searchLocal(q);
+      this.results = localResults;
       this.message = this.results.length > 0 ? '云端检索暂不可用，以下来自本地课程资料' :
         '云端检索暂不可用，本地课程资料也未命中';
       this.hasError = this.results.length === 0;

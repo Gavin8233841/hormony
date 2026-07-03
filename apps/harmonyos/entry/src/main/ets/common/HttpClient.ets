@@ -96,7 +96,7 @@ export class HttpClient {
    * 发送 POST 请求
    * body 参数为 JSON 字符串（调用方负责 JSON.stringify）
    */
-  static async post<T>(path: string, body: string): Promise<T> {
+  static async post<T>(path: string, body: string, readTimeout: number = Constants.MODEL_REQUEST_TIMEOUT): Promise<T> {
     let lastNetworkError: Error = new Error('Network request failed');
     for (const baseUrl of Constants.API_BASE_URLS) {
       const httpRequest = http.createHttp();
@@ -106,11 +106,16 @@ export class HttpClient {
           header: { 'Content-Type': 'application/json' },
           extraData: body,
           connectTimeout: Constants.CONNECT_TIMEOUT,
-          readTimeout: Constants.MODEL_REQUEST_TIMEOUT,
+          readTimeout: readTimeout,
           expectDataType: http.HttpDataType.STRING,
         });
         if (response.responseCode !== 200) {
-          throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+          const httpError = new Error('HTTP ' + response.responseCode + ': ' + response.result);
+          if (response.responseCode >= 500) {
+            lastNetworkError = httpError;
+            continue;
+          }
+          throw httpError;
         }
         const result = response.result;
         if (typeof result !== 'string') {
@@ -252,8 +257,12 @@ export class HttpClient {
         readTimeout: Constants.SSE_TIMEOUT,
       }).then((responseCode: number) => {
         if (responseCode !== 200) {
-          onError(new Error('HTTP ' + responseCode));
           cleanup();
+          if (responseCode >= 500 && !receivedData && baseIndex + 1 < Constants.API_BASE_URLS.length) {
+            startRequest(baseIndex + 1);
+            return;
+          }
+          onError(new Error('HTTP ' + responseCode));
           return;
         }
         if (!doneCalled) {

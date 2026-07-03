@@ -5255,3 +5255,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 真机未验证。
 - 未用 DevEco Profiler 量化学习星图切课耗时；本批次证据等级为构建通过与模拟器通过。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.12 云端失败快速兜底
+
+背景：继续推进端侧核心可用性。只读审计确认普通 POST 统一使用 120 秒模型超时，资料检索页只有云端失败后才显示本地结果；SSE 在首个 base URL 返回 5xx 时不会尝试模拟器网关备用地址。评审现场网络波动时，这会让资料检索、AI 出题、计划和学伴长时间转圈或直接失败。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/HttpClient.ets
+- apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets
+
+行为变化：
+- `HttpClient.post()` 增加 `readTimeout` 参数，默认仍为 `MODEL_REQUEST_TIMEOUT`，保持 Plan/Quiz 等模型生成路径的长超时能力。
+- 普通 POST 收到 5xx 时记录错误并继续尝试下一个 `API_BASE_URLS`，4xx、非字符串响应和 JSON 解析错误仍立即抛出，保留真实契约错误。
+- Chat SSE 收到 5xx 且尚未收到任何流数据时，清理当前请求并尝试下一个 base URL；已经开始收流或 4xx 时继续按错误边界返回。
+- 资料检索页先同步展示本地课程资料命中结果，并显示“正在同步云端资料”；云端返回后用云端结果替换，云端无命中或失败时保留本地结果。
+- `/api/knowledge/search` 调用改用 `REQUEST_TIMEOUT`，不再沿用 120 秒模型请求超时。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 17 s 151 ms`；仍提示未配置 signingConfigs。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，78 passed / 0 failed；主端侧路径完成构建、安装、启动、课程详情、精选练习、复盘追问、学伴页、画像页、学习记录、错题本、成就、学习星图三门课和回到首页。截图证据位于 `screenshots/trae-smoke-20260703-003710/`，不提交。
+
+未验证：
+- 未搭建 5xx 首地址 + 正常备用地址的真实网关组合；SSE 备用地址切换为源码确认与构建通过。
+- 资料检索页入口当前来自 AI 测验复盘薄弱主题跳转，本轮未做 UI 脚本覆盖；本地先展示行为为源码确认与构建通过。
+- 真机未验证，未用网络代理或 Profiler 量化超时缩短后的等待时间。
