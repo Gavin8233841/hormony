@@ -5229,3 +5229,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 本批次未给 165 道题补充细粒度多标签，只先用真实 topic 打通标签洞察链路。
 - Chat 代码块 V2、证据卡和“多 Agent 工作台”去技术化文案留到下一批单独处理。
+
+---
+
+## 2026-07-03 Codex：学伴代码块与依据展示产品化
+
+背景：继续落实端侧前端资源猎采结论，把 Chat 页从“纯文本答案气泡”推进到更接近 GitHub Markdown / 代码 review 的阅读结构。本批次只改 HarmonyOS 端侧 Chat 展示和冒烟脚本稳定性，不改 Web API、Agent 编排、模型配置或 OHPM 依赖。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Chat.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- Chat Markdown 分块保留 fenced code 的语言标识，代码块升级为标题栏、代码图标、语言标签、行数、行号和等宽正文。
+- 代码块底部新增“追问此段”动作，预填“请解释这段代码：”和截断后的代码片段，不自动发送，保留用户确认。
+- 折叠引用从单行文本升级为“依据来源”卡片，展示来源序号、标题和最多三行片段，提升证据扫描性。
+- 学生端文案把“多 Agent 工作台”改为“回答生成过程”，等待态改为“正在组织回答过程”，通用步骤兜底改为“执行回答步骤”，避免直接暴露技术术语。
+- 冒烟脚本 `Verify-Page()` 对页面路径增加 4 次、每次 500ms 的有限重试，降低 UI 树短暂空 `pagePath` 导致的误失败。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 2 s 917 ms`；ArkTS 编译、资源引用和 HAP 打包通过。
+- `.\scripts\harmonyos-app-smoke.ps1`：exit 0，71 passed / 0 failed；脚本内增量构建 exit 0，`BUILD SUCCESSFUL in 2 s 868 ms`。
+- 冒烟环境：Pura 90 Pro Max 模拟器，`127.0.0.1:5555`；覆盖 HAP 安装启动、首页、课程详情、精选练习、结果页闭环、错题追问学伴、Chat tab、Profile 连续天数、学习记录、错题本、成就、三门课程学习星图、回到首页。
+- 证据截图目录：`screenshots/trae-smoke-20260703-201911/`，不提交仓库。
+
+未验证：
+- 真机未验证。
+- 本轮冒烟没有触发真实包含 fenced code 的学伴回复，因此代码块 V2 的专项视觉仍未验证；当前证据等级为构建通过。
+- 本批次没有引入 `@luvi/lv-markdown-in`、JetBrains Mono、Lottie 或其他新依赖。

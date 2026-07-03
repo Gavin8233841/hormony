@@ -170,13 +170,17 @@ function Take-Screenshot($name) {
 }
 
 function Verify-Page($pagePath, $description) {
-    $actual = Get-PagePath (Get-UiTree)
-    if ($actual -ne $pagePath) {
-        Write-Step "Page: $description" "FAIL" "expected=$pagePath actual=$actual"
-        return $false
+    $actual = ""
+    for ($attempt = 0; $attempt -lt 4; $attempt++) {
+        $actual = Get-PagePath (Get-UiTree)
+        if ($actual -eq $pagePath) {
+            Write-Step "Page: $description" "PASS" $actual
+            return $true
+        }
+        Start-Sleep -Milliseconds 500
     }
-    Write-Step "Page: $description" "PASS" $actual
-    return $true
+    Write-Step "Page: $description" "FAIL" "expected=$pagePath actual=$actual"
+    return $false
 }
 
 function Click-FirstOptionA() {

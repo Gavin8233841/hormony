@@ -24,6 +24,12 @@ interface DisplayMessage {
 interface MarkdownBlock {
   type: string;
   text: string;
+  language?: string;
+}
+
+interface CodeLine {
+  lineNumber: string;
+  text: string;
 }
 
 @Component
@@ -78,13 +84,17 @@ export struct ChatContent {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
     let inCode = false;
+    let codeLanguage = '';
     for (const rawLine of content.split('\n')) {
       const line = rawLine.trimEnd();
       const trimmed = line.trim();
       if (trimmed.startsWith('```')) {
         if (inCode) {
-          blocks.push({ type: 'code', text: codeLines.join('\n') });
+          blocks.push({ type: 'code', text: codeLines.join('\n'), language: codeLanguage });
           codeLines.splice(0, codeLines.length);
+          codeLanguage = '';
+        } else {
+          codeLanguage = this.cleanInline(trimmed.slice(3)).toLowerCase();
         }
         inCode = !inCode;
         continue;
@@ -113,7 +123,7 @@ export struct ChatContent {
       }
     }
     if (codeLines.length > 0) {
-      blocks.push({ type: 'code', text: codeLines.join('\n') });
+      blocks.push({ type: 'code', text: codeLines.join('\n'), language: codeLanguage });
     }
     if (blocks.length === 0 && content.length > 0) {
       blocks.push({ type: 'paragraph', text: content });
@@ -190,6 +200,29 @@ export struct ChatContent {
       .replace(/__/g, '')
       .replace(/`/g, '')
       .trim();
+  }
+
+  private codeLanguageLabel(language?: string): string {
+    const value = (language ?? '').trim();
+    return value.length > 0 ? value : 'code';
+  }
+
+  private codeLineRows(code: string): CodeLine[] {
+    const rows: CodeLine[] = [];
+    const lines = code.length > 0 ? code.split('\n') : [''];
+    for (let index = 0; index < lines.length; index++) {
+      rows.push({
+        lineNumber: (index + 1).toString(),
+        text: lines[index].length > 0 ? lines[index] : ' '
+      });
+    }
+    return rows;
+  }
+
+  private prepareFollowUp(prefix: string, text: string): void {
+    const clipped = text.length > 600 ? text.slice(0, 600) + '...' : text;
+    this.inputText = prefix + '：\n' + clipped;
+    this.scrollToBottom();
   }
 
   private async loadLocalHistory(): Promise<void> {
@@ -557,7 +590,7 @@ export struct ChatContent {
     if (agent === 'Quiz') return '生成分层题目';
     if (agent === 'Evaluator') return '评估薄弱点';
     if (agent === 'Safety') return '检查安全与依据';
-    return '执行 Agent 步骤';
+    return '执行回答步骤';
   }
 
   private agentSeen(msg: DisplayMessage, agent: string): boolean {
@@ -657,7 +690,7 @@ export struct ChatContent {
               if (msg.thinking.length === 0 && msg.agentTrace.length === 0) {
                 Row({ space: 8 }) {
                   LoadingProgress().width(16).height(16).color(Constants.COLOR_BRAND)
-                  Text('正在启动多 Agent 工作台')
+                  Text('正在组织回答过程')
                     .fontSize(13)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
                 }
@@ -686,7 +719,7 @@ export struct ChatContent {
             // 引用（折叠式）
             if (msg.citations.length > 0) {
               Row() {
-                Text('参考资料 (' + msg.citations.length + ')')
+                Text('依据来源 (' + msg.citations.length + ')')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_BRAND)
                   .padding({ left: 4, right: 4, top: 4, bottom: 4 })
@@ -715,16 +748,13 @@ export struct ChatContent {
               })
 
               if (msg.citationExpanded) {
-                Column() {
+                Column({ space: 8 }) {
                   ForEach(msg.citations, (c: Citation, i: number) => {
-                    Text('[' + (i + 1) + '] ' + c.doc + (c.snippet ? ' — ' + c.snippet : ''))
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      .margin({ bottom: 2 })
+                    this.CitationCard(c, i)
                   })
                 }
                 .width('100%')
-                .padding({ left: 4, top: 4 })
+                .padding({ left: 4, right: 4, top: 4 })
               }
             }
           }
@@ -737,6 +767,43 @@ export struct ChatContent {
     }
     .width('100%')
     .padding({ top: 8, bottom: 8 })
+  }
+
+  @Builder
+  CitationCard(citation: Citation, index: number) {
+    Column({ space: 6 }) {
+      Row({ space: 8 }) {
+        Text('依据 ' + (index + 1).toString())
+          .fontSize(10)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND)
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(9)
+        Text(citation.doc)
+          .layoutWeight(1)
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .width('100%')
+      if ((citation.snippet ?? '').length > 0) {
+        Text(citation.snippet ?? '')
+          .width('100%')
+          .fontSize(11)
+          .lineHeight(17)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          .maxLines(3)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+    }
+    .width('100%')
+    .padding(10)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .borderRadius(Constants.RADIUS_SM)
   }
 
   @Builder
@@ -756,7 +823,7 @@ export struct ChatContent {
             .fontColor([Constants.COLOR_SUCCESS])
         }
         Column({ space: 2 }) {
-          Text('多 Agent 工作台')
+          Text('回答生成过程')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -827,6 +894,79 @@ export struct ChatContent {
   }
 
   @Builder
+  CodeBlockView(block: MarkdownBlock) {
+    Column() {
+      Row() {
+        Row({ space: 6 }) {
+          Image($rawfile('icons/fluent_code_24_regular.svg'))
+            .width(14)
+            .height(14)
+            .fillColor(Constants.COLOR_MAP_TEXT_MUTED)
+          Text(this.codeLanguageLabel(block.language))
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+        }
+        .layoutWeight(1)
+        Text(this.codeLineRows(block.text).length.toString() + ' 行')
+          .fontSize(10)
+          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+      }
+      .width('100%')
+      .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+      .backgroundColor(Constants.COLOR_MAP_LINE)
+
+      Column({ space: 0 }) {
+        ForEach(this.codeLineRows(block.text), (line: CodeLine): void => {
+          Row({ space: 8 }) {
+            Text(line.lineNumber)
+              .width(28)
+              .fontSize(11)
+              .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+              .textAlign(TextAlign.End)
+            Text(line.text)
+              .layoutWeight(1)
+              .fontSize(12)
+              .lineHeight(19)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .fontFamily('monospace')
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+          .padding({ left: 8, right: 10, top: 2, bottom: 2 })
+        })
+      }
+      .width('100%')
+      .padding({ top: 8, bottom: 8 })
+
+      Button({ type: ButtonType.Normal }) {
+        Row({ space: 6 }) {
+          Image($rawfile('icons/fluent_brain_circuit_24_regular.svg'))
+            .width(14)
+            .height(14)
+            .fillColor(Constants.COLOR_BRAND)
+          Text('追问此段')
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_BRAND)
+        }
+      }
+      .height(34)
+      .padding({ left: 10, right: 10 })
+      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+      .borderRadius(Constants.RADIUS_SM)
+      .alignSelf(ItemAlign.End)
+      .margin({ right: 8, bottom: 8 })
+      .onClick((): void => {
+        this.prepareFollowUp('请解释这段代码', block.text);
+      })
+    }
+    .width('100%')
+    .backgroundColor(Constants.COLOR_MAP_SURFACE)
+    .borderRadius(Constants.RADIUS_SM)
+  }
+
+  @Builder
   MarkdownContent(content: string, failed: boolean) {
     Column({ space: 7 }) {
       ForEach(this.markdownBlocks(content), (block: MarkdownBlock): void => {
@@ -855,15 +995,7 @@ export struct ChatContent {
             .color(Constants.COLOR_BORDER)
             .margin({ top: 4, bottom: 4 })
         } else if (block.type === 'code') {
-          Text(block.text)
-            .width('100%')
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .fontFamily('monospace')
-            .padding(10)
-            .backgroundColor(Constants.COLOR_MAP_SURFACE)
-            .borderRadius(Constants.RADIUS_SM)
+          this.CodeBlockView(block)
         } else if (block.type === 'table') {
           Text(block.text)
             .width('100%')
