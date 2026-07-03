@@ -5130,3 +5130,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未下载任何 SVG、字体、插画、Lottie 或 Rive 文件；未进行 ArkUI 渲染、HAP 体积、模拟器或真机验证。
 - Web/JS 资源只作为模式参考，未作为 HarmonyOS 依赖验证。
+
+---
+
+## 2026-07-03 Codex：主线可接入资产验证说明
+
+背景：用户要求继续推动资源验证，并在确认可进主线时创建文档告知主线程如何加入。本批次下载少量具体文件到 `.tmp/asset-mainline-validation-20260703/` 做本地验证，仍不修改端侧源码、依赖或资源目录。
+
+文件：
+- docs/FRONTEND-MAINLINE-ASSET-ADOPTION-20260703.md
+
+行为变化：
+- 确认 6 个 Fluent UI System Icons SVG 可作为主线程第一批语义补缺图标：code、branch、trophy、target arrow、book、brain circuit。
+- 记录每个 SVG 的原始 URL、字节数、SHA-256、用途、许可证和 ArkUI 接入步骤。
+- 验证 JetBrains Mono Regular TTF 文件与 OFL 1.1 许可证，记录为可做单独接入验证的代码字体。
+- 验证 IRA Design 两个 SVG 部件与 MIT 许可证，但因不是完整空态插画，明确暂不接入主线。
+
+验证：
+- Fluent SVG：6 个文件均为 24×24、`viewBox="0 0 24 24"`，无 `<script>`、无 `<foreignObject>`、无外部 `http/https href`、无 `<image>`，填充值仅 `#212121` 与 `none`，合计 9126 字节。
+- Fluent LICENSE：本机下载许可证文本，首行为 `MIT License`。
+- JetBrains Mono：`JetBrainsMono-Regular.ttf` 下载成功，270224 字节，SHA-256 为 `E6FD0D7E91550B3ED2B735D4312474362C4716EDC4FC0577A0F61ED782D5AED1`，TTF 签名为 `00 01 00 00`；OFL 文本确认。
+- SDK 声明确认：`ImageInterface` 接收 `ResourceStr`，`ImageAttribute.fillColor` 注释说明适用于 SVG；`UIContext.getFont().registerFont(options)`、`FontOptions.familyName`、`FontOptions.familySrc`、`Text.fontFamily(value)` 均在本机 SDK 声明中确认。
+
+未验证：
+- `.tmp/asset-mainline-validation-20260703/` 证据文件未提交。
+- 未把 SVG 或字体复制进 `apps/harmonyos/entry/src/main/resources`，因此未执行 HAP 构建、模拟器截图或真机验证。
+- JetBrains Mono 仍需单独验证 HAP 体积、中文混排和页面截图后才能留在主线。
