@@ -5849,8 +5849,10 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - DevEco MCP `check_ets_files` 对 `LocalLearningRepository.ets`、`Lesson.ets`、`Quiz.ets` 返回 `no diagnostics`。
 - `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 570 ms`；仍提示未配置 signingConfigs。
 - DevEco MCP `start_app`：模拟器 `Pura 90 Pro Max` 安装并启动当前 HAP 成功。
+- 推送后线上 `GET https://hormony-ruddy.vercel.app/api/health`：HTTP 200，`status=ready`，模型名为 `doubao-seed-2-1-pro-260628`。
+- 推送后线上 `POST https://hormony-ruddy.vercel.app/api/quiz`：HTTP 200，请求 `count=6`、`focusTag=边界条件`，返回 `questions=6`、`grading=6`、`focusTag=边界条件`，首题评分标签包含 `边界条件`。
 
 失败或未验证：
-- 本批次尚未等待 Vercel 部署后验证线上 `count=10/15` 分批出题；推送后需验证 Health、Quiz、Plan、Chat SSE。
+- 线上已验证 Health 与 `count=6` 分批出题；`count=10/15`、Plan、Chat SSE 仍需后续验证。
 - 未完成端侧模拟器中“Lesson 互动 → 问学伴讲解/同标签测验 → 生成长题组 → 提交写回画像”的完整点击流，不能标记为该流程模拟器通过。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
