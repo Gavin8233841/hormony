@@ -5158,6 +5158,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-03 Codex 鸿蒙1.13：记录页标签洞察直达练习
+
+背景：继续对照成熟学习产品和行业 UX 标准自查。参考 NN/g dashboard 可行动信息原则（https://www.nngroup.com/articles/dashboards-preattentive/）、Khan Academy Course Mastery / Mastery Challenges（https://support.khanacademy.org/hc/en-us/articles/360010939592-What-are-Course-and-Unit-Mastery）和 Duolingo 间隔重复/个性化练习思路（https://blog.duolingo.com/spaced-repetition-for-learning/），学习记录页的薄弱标签不应停留在“看见问题”，还应能直接进入下一次练习。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+
+行为变化：
+- ActivityRecords 顶部“最近薄弱标签”复用标签洞察中的 `lastCourseId` 和 `lastTopic`，在存在关联主题时显示“去练习”入口。
+- 进入练习前调用 `LearningContentRepository.getQuestions(courseId, topic)` 校验本地精选题；主题有题时进入主题练习，无题时进入课程综合练习，和 Profile 的标签练习入口保持一致。
+- 记录页从“流水账 + 静态建议”推进为“复盘记录 + 薄弱标签 + 即刻练习”的闭环入口。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 366 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 当前未新增模拟器截图；需要有真实标签洞察数据后复验记录页“去练习”按钮可见性和跳转。
+- 真机未验证。
+
+---
+
 ## 2026-07-03 Codex 鸿蒙1.13：综合练习错题按真实主题归因
 
 背景：继续自审“真实答题记录 -> 薄弱点 -> 下一步练习”链路。画像页标签洞察已能跳练习后，发现课程综合精选练习中 `Practice` 会把提交结果显示为“综合”，但错题弱项仍使用空 `selectedPracticeTopic`，导致画像弱项可能出现空主题，复习项和标签洞察也无法指向题目真实 Topic。
