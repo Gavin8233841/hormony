@@ -1,12 +1,15 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { AchievementProgress } from '../model/DataModels';
+import { AchievementProgress, Course } from '../model/DataModels';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Entry
 @Component
 struct AchievementsPage {
   @State achievements: AchievementProgress[] = [];
+  @State courses: Course[] = [];
   @State loading: boolean = true;
   @State message: string = '';
 
@@ -17,6 +20,7 @@ struct AchievementsPage {
   private async loadAchievements(): Promise<void> {
     try {
       this.achievements = await LocalLearningRepository.getAchievements();
+      this.courses = await LocalLearningRepository.getCourses() ?? [];
     } catch (error) {
       this.message = '成就进度读取失败';
     } finally {
@@ -35,6 +39,106 @@ struct AchievementsPage {
   private nextAchievementTitle(): string {
     const item = this.achievements.find((achievement: AchievementProgress): boolean => !this.isUnlocked(achievement));
     return item !== undefined ? item.title : '';
+  }
+
+  private nextAchievement(): AchievementProgress | null {
+    const item = this.achievements.find((achievement: AchievementProgress): boolean => !this.isUnlocked(achievement));
+    return item !== undefined ? item : null;
+  }
+
+  private activeCourse(): Course | null {
+    const course = this.courses.find((item: Course): boolean => item.progress < 1);
+    if (course !== undefined) return course;
+    return this.courses.length > 0 ? this.courses[0] : null;
+  }
+
+  private firstTopic(course: Course): string {
+    const topics = LearningContentRepository.getTopics(course.id);
+    if (topics.length > 0) return topics[0];
+    return course.topics.length > 0 ? course.topics[0] : '';
+  }
+
+  private nextActionLabel(): string {
+    const item = this.nextAchievement();
+    if (item === null) return '查看学习记录';
+    if (item.id === 'first_quiz') return '去做第一次练习';
+    if (item.id === 'task_5') return '继续完成学习任务';
+    if (item.id === 'mastery_3') return '去做 AI 测验';
+    return '继续学习';
+  }
+
+  private nextActionHint(): string {
+    const item = this.nextAchievement();
+    if (item === null) return '所有里程碑已点亮，可回看学习记录和薄弱标签。';
+    const remaining = Math.max(item.target - item.current, 0);
+    if (item.id === 'first_quiz') return '还差 ' + remaining.toString() + ' 次练习，先完成一组精选题。';
+    if (item.id === 'task_5') return '还差 ' + remaining.toString() + ' 项任务，回到课程继续推进。';
+    if (item.id === 'mastery_3') return '还差 ' + remaining.toString() + ' 个知识点，用 AI 测验验证掌握。';
+    return '还差 ' + remaining.toString() + ' 次记录，继续完成真实学习动作。';
+  }
+
+  private setCourseContext(course: Course): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', course.id);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
+  }
+
+  private pushPage(url: string, failureMessage: string): void {
+    this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'AchievementsPage navigation failed: %{public}s', error.message);
+      this.message = failureMessage;
+    });
+  }
+
+  private openCourseDetail(course: Course): void {
+    this.setCourseContext(course);
+    this.pushPage('pages/CourseDetail', '无法打开课程详情，请重试');
+  }
+
+  private openPractice(course: Course): void {
+    const topic = this.firstTopic(course);
+    if (topic.length === 0) {
+      this.message = '当前课程没有可练习主题';
+      return;
+    }
+    this.setCourseContext(course);
+    AppStorage.setOrCreate<string>('selectedPracticeTopic', topic);
+    this.pushPage('pages/Practice', '无法打开精选练习，请重试');
+  }
+
+  private openQuiz(course: Course): void {
+    const topic = this.firstTopic(course);
+    if (topic.length === 0) {
+      this.message = '当前课程没有可测验主题';
+      return;
+    }
+    this.setCourseContext(course);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
+    this.pushPage('pages/Quiz', '无法打开 AI 测验，请重试');
+  }
+
+  private openActivityRecords(): void {
+    this.pushPage('pages/ActivityRecords', '无法打开学习记录，请重试');
+  }
+
+  private openNextAchievement(): void {
+    const item = this.nextAchievement();
+    if (item === null) {
+      this.openActivityRecords();
+      return;
+    }
+    const course = this.activeCourse();
+    if (course === null) {
+      this.message = '暂时没有可继续学习的课程';
+      return;
+    }
+    if (item.id === 'first_quiz') {
+      this.openPractice(course);
+    } else if (item.id === 'mastery_3') {
+      this.openQuiz(course);
+    } else {
+      this.openCourseDetail(course);
+    }
   }
 
   build() {
@@ -96,6 +200,29 @@ struct AchievementsPage {
                   .fontSize(12)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(Constants.COLOR_SUCCESS)
+              }
+
+              Text(this.nextActionHint())
+                .width('100%')
+                .fontSize(12)
+                .lineHeight(18)
+                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+
+              Button(this.nextActionLabel())
+                .width('100%')
+                .height(42)
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.openNextAchievement(); })
+
+              if (this.message.length > 0) {
+                Text(this.message)
+                  .width('100%')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_ERROR)
               }
             }
             .width('100%')

@@ -5309,3 +5309,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 未验证：
 - 真机未验证。
+
+---
+
+## 2026-07-03 Codex：成就下一目标可行动化
+
+背景：继续推进 HarmonyOS 端成熟学习闭环；成就页原本只能展示里程碑进度，用户看到“下一目标”后仍需自行返回课程或练习。本批次把成就页接入现有课程、精选练习、AI 测验和学习记录入口，不改 ArkData schema。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Achievements.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- Achievements 加载本地 Course 列表，并根据 `LocalLearningRepository.getAchievements()` 的精确里程碑 ID 映射下一步动作。
+- “初次练习”未解锁时，按钮进入当前未完成课程的第一个真实 Topic 精选练习。
+- “稳步前进”未解锁时，按钮进入当前未完成课程详情，继续完成学习任务。
+- “掌握新知”未解锁时，按钮进入当前未完成课程第一个真实 Topic 的 AI 测验。
+- 全部解锁时，按钮进入学习记录，回看真实学习轨迹和薄弱标签。
+- 成就页首屏新增“还差 X 项/次/个”的差距提示和主按钮，避免里程碑只停留在静态展示。
+- 冒烟脚本新增 `dumpLayout` 重试，并在安装后先 `aa force-stop` 再启动应用，避免沿用旧任务栈导致截图和 UI 树不同步。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 938 ms`；`CompileArkTS`、`PackageHap`、`SignHap` 均完成，仍为 unsigned HAP，签名未配置。
+- HAP 覆盖安装：`hdc file send ...entry-default-unsigned.hap /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0；`hdc shell bm install -r -p /data/local/tmp/codex-worktree-entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+- 模拟器：Pura 90 Pro Max，`127.0.0.1:5555`。UI 树确认 `pages/Achievements` 出现“下一目标 · 稳步前进”和“继续完成学习任务”；点击该按钮后进入 `pages/CourseDetail`。
+- 成就页视觉证据位于 `.tmp/codex-learning-loop-20260703/achievements-next-action/`，包括 `03-achievements-page.jpeg/json`、`05-after-action.jpeg/json` 和 `verification-log.txt`，不提交仓库。
+- 窄流程复核：从课程页进入 CourseDetail -> Practice -> 选择 A -> 查看本题反馈 -> 进入下一题，最终仍在 `pages/Practice`，确认脚本失败修补前不是产品按钮不可达。
+- 完整 CLI 冒烟：`.\scripts\harmonyos-app-smoke.ps1` exit 0，76 passed / 0 failed；脚本内构建 exit 0，安装成功，覆盖首页、课程、CourseDetail、Practice 五题即时反馈、结果复盘、错题追问进入 Chat、Profile 子页、成就页、三门课程学习星图和返回首页。截图目录 `screenshots/trae-smoke-20260703-212023/`，不提交仓库。
+
+未验证：
+- 真机未验证。

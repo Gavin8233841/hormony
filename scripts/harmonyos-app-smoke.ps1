@@ -45,12 +45,18 @@ function Invoke-HdcShell([string[]]$arguments) {
 }
 
 function Get-UiTree() {
-    $dumpResult = Invoke-HdcShell @("uitest", "dumpLayout")
-    if ($dumpResult -notmatch 'DumpLayout saved to:(\S+)') {
-        throw "dumpLayout did not return a device JSON path: $dumpResult"
+    $lastDumpResult = ""
+    for ($attempt = 1; $attempt -le 4; $attempt++) {
+        $dumpResult = Invoke-HdcShell @("uitest", "dumpLayout")
+        $lastDumpResult = $dumpResult
+        if ($dumpResult -match 'DumpLayout saved to:(\S+)') {
+            $deviceJsonPath = $Matches[1]
+            $json = Invoke-HdcShell @("cat", $deviceJsonPath)
+            return $json | ConvertFrom-Json
+        }
+        Start-Sleep -Milliseconds (400 * $attempt)
     }
-    $json = Invoke-HdcShell @("cat", $Matches[1])
-    return $json | ConvertFrom-Json
+    throw "dumpLayout did not return a device JSON path: $lastDumpResult"
 }
 
 function Find-ElementByText($uiTree, $text) {
@@ -150,12 +156,17 @@ function Get-BoundsCenter($bounds) {
 }
 
 function Click-Element($textPattern, $description) {
-    $uiTree = Get-UiTree
-    if (-not $uiTree) {
-        Write-Step "Click: $description" "FAIL" "UI tree not available"
-        return $false
+    $elements = @()
+    for ($attempt = 1; $attempt -le 4; $attempt++) {
+        $uiTree = Get-UiTree
+        if (-not $uiTree) {
+            Start-Sleep -Milliseconds 500
+            continue
+        }
+        $elements = Find-ClickableElementByText $uiTree $textPattern
+        if ($elements.Count -gt 0) { break }
+        Start-Sleep -Milliseconds 500
     }
-    $elements = Find-ClickableElementByText $uiTree $textPattern
     if ($elements.Count -eq 0) {
         Write-Step "Click: $description" "FAIL" "Element not found: $textPattern"
         return $false
@@ -321,6 +332,8 @@ if ($installExit -eq 0 -and (($installResult -join "`n") -match "success")) {
 
 # 3. 启动 App
 Write-Output "`n[INFO] Starting app..."
+Invoke-HdcShell @("aa", "force-stop", $BUNDLE_NAME) | Out-Null
+Start-Sleep -Milliseconds 500
 Invoke-HdcShell @("aa", "start", "-a", "EntryAbility", "-b", $BUNDLE_NAME) | Out-Null
 Start-Sleep -Seconds 3
 for ($attempt = 0; $attempt -lt 8; $attempt++) {
