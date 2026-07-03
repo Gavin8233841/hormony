@@ -52,11 +52,13 @@ struct PracticePage {
     const reviewIds: string[] = [];
     const attemptedIds: string[] = [];
     for (const review of reviews) {
-      if (review.courseId === this.courseId && review.topic === this.topic) reviewIds.push(review.questionId);
+      if (review.courseId === this.courseId && this.isInPracticeScope(review.topic)) reviewIds.push(review.questionId);
     }
     for (const result of results) {
-      if (result.courseId !== this.courseId || result.topic !== this.topic) continue;
+      if (result.courseId !== this.courseId) continue;
       for (const detail of result.details) {
+        const detailTopic = detail.topic ?? result.topic;
+        if (!this.isInPracticeScope(detailTopic)) continue;
         if (!attemptedIds.includes(detail.questionId)) attemptedIds.push(detail.questionId);
       }
     }
@@ -75,6 +77,10 @@ struct PracticePage {
     this.questions = selectedQuestions;
     this.activeQuestion = selectedQuestions.length > 0 ? selectedQuestions[0] : EMPTY_QUESTION;
     this.message = selectedQuestions.length > 0 ? '' : '这个主题还没有精选练习';
+  }
+
+  private isInPracticeScope(topic: string): boolean {
+    return this.topic.length === 0 || topic === this.topic;
   }
 
   private choose(option: string): void {
