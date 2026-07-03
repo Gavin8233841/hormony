@@ -5528,7 +5528,7 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `git status --short`：exit 0，启动时显示 6 个页面修改和未跟踪 `.tmp/` 证据目录；未发现其他待提交生产文件。
 - `git log -5 --oneline`：exit 0，确认当前分支基于 `d72aa0f docs: 深化端侧前端资源产品化规格` 等最近提交。
 - `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 898 ms`；`CompileArkTS` 为 up-to-date；仍提示未配置 signingConfigs，生成 unsigned HAP。
-- `rg -n "candidate|多 Agent|RAG|Retrieval|Agent 工作台|Agent" ...`：exit 0，只命中 `Chat.ets` 内部字段、Builder 名和 `Retrieval` 映射分支；未命中学生端旧文案“多 Agent 工作台”。
+- `rg -n "多 Agent|RAG|Retrieval|Agent 工作台|Agent" ...`：exit 0，只命中 `Chat.ets` 内部字段、Builder 名和 `Retrieval` 映射分支；未命中学生端旧文案“多 Agent 工作台”。
 - DevEco MCP 模拟器：Pura 90 Pro Max，竖屏 `1256x2760`。截图证据保存在 `.tmp/harmony-1.15-p0-ui/`，不提交仓库：
   - `chat-screen.png`：云端学伴回答渲染，表格分隔线未作为原始 Markdown 暴露。
   - `profile-tab-from-chat.png`：画像页首屏显示学习记录、错题本、成就和学习星图入口。
@@ -5540,3 +5540,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Quiz/Practice 新增“本轮标签下一步”卡片已构建通过，但本轮未稳定取得结果页截图；需后续用固定本地结果流程补模拟器截图。
 - Profile 标签洞察区有 UI 树证据，但本轮滚动截图未稳定停在该区；视觉结论暂不标为完整模拟器通过。
 - 本批次未运行 Web 检查；原因是未修改 `apps/web` 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-03 Codex：鸿蒙1.15错题本标签聚类复盘
+
+背景：继续推进 1.15 端侧前端产品化路线中“错题本按标签聚类”的 P1 项。此前 `MistakeBook.ets` 仍按错题逐条流水展示，本批次不改 schema，只用现有 `ReviewItem.tags`、`nextReviewAt`、`attempts`、`topic` 做复习组，让用户优先看到该先处理哪类错题。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+- `DEVLOG.md`
+
+行为变化：
+- 新增页面内 `ReviewGroup`，按“今日到期/继续巩固 + 主标签”聚合错题；组级标题显示主标签、优先/巩固状态、今日复习数、错题数和累计错误次数。
+- 错题本列表从单条流水改为“标签组 → 错题卡”结构；到期错题组优先排序，同组按已有本地队列顺序展示。
+- 错题卡增加“今日复习/下次复习 MM-DD”时间标签，保留题目标签、解析展开和重练主题。
+- 新增“问学伴”动作，把错题题干、用户答案、正确答案和主标签写入 `pendingChatQuestion` 后进入 `Chat`，不自动发送。
+- `retry()` 复用 `courseTitleFor()`，避免在错题重练和学伴追问中重复课程标题映射。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，第一次命令无详细回显但退出成功。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon 2>&1 | Tee-Object -FilePath "..\..\.tmp\harmony-1.15-mistakebook-build.log"`：exit 0，`BUILD SUCCESSFUL in 3 s 476 ms`；`CompileArkTS` 为 up-to-date；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得新错题本 UI 截图；原因是当前 PATH 未提供 `hdc`，未修改用户级 DevEco/SDK 环境来补路径。
+- 真机未验证。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
