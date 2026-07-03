@@ -5780,3 +5780,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未完成“Profile/ActivityRecords 点击练这个标签 → Quiz 页面携带标签 → 端侧生成 AI 题 → 提交结果写回画像”的完整模拟器点击流，不能标记为该流程模拟器通过。
 - 线上已验证 Health 与 Quiz 重点标签；Plan、Chat SSE 与端侧真实点击请求仍需后续验证。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-03 Codex：AI 测验结果页学习闭环
+
+背景：用户指出鸿学伴距离成熟学习产品仍缺少“答完之后知道下一步怎么学”的闭环。本批次参考掌握学习、即时反馈、标签化复盘等成熟学习产品思路，在不修改数据库 schema、不新增依赖、不伪造 AI 结果的前提下，增强 HarmonyOS 端 AI 测验结果页：从单纯分数与逐题解析，升级为掌握判定、错因标签、复习行动和学伴复盘入口。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+
+行为变化：
+- AI 测验提交后根据正确率和错题数生成“掌握判定”：可以前进、接近掌握、需要巩固或先补基础。
+- 结果页展示学习建议卡，说明本轮结果已写入本地画像、错题本和间隔复习队列，并给出下一步行动。
+- 结果页新增“问学伴复盘”入口，会把课程、主题、正确率、错题数和薄弱标签写入 `pendingChatQuestion`，跳转 Chat 后由真实学伴继续复盘。
+- 结果页新增“错因标签”卡，把本轮题目按标签聚合为错题数、掌握进度条和行动建议。
+- 每个错因标签提供“练这个标签”按钮，直接沿用当前 `/api/quiz` 的 `focusTag` 专项出题能力重新生成一组同主题标签题，不引入本地假题回退。
+- 保留原有逐题解析、复习资料和再练一组入口；展示题答案与解析仍只来自端侧评分数据，不改变云端 API 契约。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 13 s 82 ms`；仍提示未配置 signingConfigs。
+- DevEco MCP `check_ets_files` 对 `C:\Users\guo82\Desktop\Hormony\apps\harmonyos\entry\src\main\ets\pages\Quiz.ets` 返回 `no diagnostics`。
+
+失败或未验证：
+- 本批次未完成模拟器中“生成 AI 题 → 答题 → 提交 → 点击问学伴复盘/练这个标签”的完整视觉点击流，不能标记为模拟器通过。
+- 本批次未修改 Web API，未重新验证线上 Health、Plan、Chat SSE、Quiz。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

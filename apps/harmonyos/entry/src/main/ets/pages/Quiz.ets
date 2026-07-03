@@ -25,12 +25,26 @@ interface DifficultyOption {
   description: string;
 }
 
+interface QuizLengthOption {
+  value: number;
+  label: string;
+  description: string;
+}
+
 interface QuizValidationResult {
   valid: boolean;
   message: string;
   quizId: string;
   questions: QuizQuestionView[];
   grading: QuizGradingItem[];
+}
+
+interface QuizTagSummary {
+  tag: string;
+  totalQuestions: number;
+  wrongQuestions: number;
+  accuracy: number;
+  action: string;
 }
 
 @Entry
@@ -47,6 +61,7 @@ struct QuizPage {
   @State loading: boolean = false;
   @State submitting: boolean = false;
   @State difficulty: string = 'medium';
+  @State questionCount: number = 5;
   @State message: string = '';
   @State hasError: boolean = false;
   @State resultReady: boolean = false;
@@ -57,6 +72,9 @@ struct QuizPage {
   @State expandedResultId: string = '';
   @State evaluation: string = '';
   @State weakTopics: string[] = [];
+  @State resultCoachTitle: string = '';
+  @State resultCoachBody: string = '';
+  @State resultTagSummaries: QuizTagSummary[] = [];
   @State progressStep: number = 0;
   private grading: QuizGradingItem[] = [];
   private answerLabels: string[] = ['A', 'B', 'C', 'D'];
@@ -65,6 +83,11 @@ struct QuizPage {
     { value: 'easy', label: '基础', description: '概念识别' },
     { value: 'medium', label: '进阶', description: '场景判断' },
     { value: 'hard', label: '挑战', description: '多步推理' }
+  ];
+  private quizLengthOptions: QuizLengthOption[] = [
+    { value: 5, label: '速练', description: '5题 · 快速校准' },
+    { value: 10, label: '标准', description: '10题 · 稳定证据' },
+    { value: 15, label: '挑战', description: '15题 · 深度检验' }
   ];
   private generationSteps: WorkStep[] = [
     { title: '检索', description: '匹配课程资料' },
@@ -137,6 +160,9 @@ struct QuizPage {
     this.expandedResultId = '';
     this.evaluation = '';
     this.weakTopics = [];
+    this.resultCoachTitle = '';
+    this.resultCoachBody = '';
+    this.resultTagSummaries = [];
     this.grading = [];
   }
 
@@ -159,7 +185,7 @@ struct QuizPage {
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
       topic: this.topic,
-      count: 5,
+      count: this.questionCount,
       difficulty: this.difficulty,
       focusTag: this.focusTag.length > 0 ? this.focusTag : undefined,
     };
@@ -237,7 +263,9 @@ struct QuizPage {
       details.push(detail);
     }
 
-    const weakTopics: string[] = correctCount < this.questions.length ? [this.topic] : [];
+    const wrongCount = this.questions.length - correctCount;
+    const weakTopics: string[] = wrongCount > 0 ? [this.topic] : [];
+    const accuracy = this.questions.length > 0 ? correctCount / this.questions.length : 0;
     const result: QuizResult = {
       quizId: this.quizId,
       userId: Constants.DEMO_USER_ID,
@@ -247,10 +275,9 @@ struct QuizPage {
       difficulty: this.difficulty,
       totalQuestions: this.questions.length,
       correctCount: correctCount,
-      accuracy: this.questions.length > 0 ? correctCount / this.questions.length : 0,
+      accuracy: accuracy,
       details: details,
-      evaluation: correctCount === this.questions.length ? '本组题目全部答对，继续保持。' :
-        '已记录本次答题结果，可从薄弱知识点进入课程资料复习。',
+      evaluation: this.learningEvaluation(correctCount, this.questions.length),
       weakTopics: weakTopics,
       submittedAt: new Date().toISOString()
     };
@@ -264,6 +291,9 @@ struct QuizPage {
       this.expandedResultId = result.details.find((detail: QuizResultDetail): boolean => !detail.isCorrect)?.questionId ?? '';
       this.evaluation = result.evaluation;
       this.weakTopics = result.weakTopics;
+      this.resultCoachTitle = this.coachTitle(result.accuracy, wrongCount);
+      this.resultCoachBody = this.coachBody(result.accuracy, wrongCount);
+      this.resultTagSummaries = this.buildTagSummaries(result.details);
       this.resultReady = true;
     } catch (e) {
       this.message = '答题结果保存失败，请稍后重试';
@@ -427,6 +457,109 @@ struct QuizPage {
     return trimmed.substring(0, 1);
   }
 
+  private learningEvaluation(correctCount: number, totalQuestions: number): string {
+    if (totalQuestions === 0) return '本轮暂无可评分题目。';
+    if (correctCount === totalQuestions) {
+      return '本组题目全部答对，已形成一次高质量掌握证据。';
+    }
+    const wrongCount = totalQuestions - correctCount;
+    if (correctCount / totalQuestions >= 0.8) {
+      return '整体掌握稳定，建议只复盘 ' + wrongCount.toString() + ' 道失误题。';
+    }
+    return '已记录本次答题结果，建议先按错因标签复盘，再做同标签短练。';
+  }
+
+  private coachTitle(accuracy: number, wrongCount: number): string {
+    if (wrongCount === 0) return '掌握判定：可以前进';
+    if (accuracy >= 0.8) return '掌握判定：接近掌握';
+    if (accuracy >= 0.6) return '掌握判定：需要巩固';
+    return '掌握判定：先补基础';
+  }
+
+  private coachBody(accuracy: number, wrongCount: number): string {
+    if (wrongCount === 0) {
+      return '这轮题已经写入本地画像。你可以挑战更高难度，或去学习星图解锁下一个主题。';
+    }
+    if (accuracy >= 0.8) {
+      return '错题会进入错题本和间隔复习队列。建议先看解析，再用最弱标签加练一组。';
+    }
+    if (accuracy >= 0.6) {
+      return '当前不是简单刷题问题，更像概念条件没有稳定提取。先复习资料，再练同标签题。';
+    }
+    return '先降低难度复盘核心定义，确认关键词和边界条件后，再回到本主题进阶题。';
+  }
+
+  private buildTagSummaries(details: QuizResultDetail[]): QuizTagSummary[] {
+    const summaries: QuizTagSummary[] = [];
+    for (const detail of details) {
+      const sourceTags = (detail.tags ?? []).length > 0 ? (detail.tags ?? []) : [this.topic];
+      for (const tag of sourceTags) {
+        const normalized = tag.trim();
+        if (normalized.length === 0) continue;
+        let item = summaries.find((value: QuizTagSummary): boolean => value.tag === normalized);
+        if (item === undefined) {
+          item = {
+            tag: normalized,
+            totalQuestions: 0,
+            wrongQuestions: 0,
+            accuracy: 0,
+            action: ''
+          };
+          summaries.push(item);
+        }
+        item.totalQuestions += 1;
+        if (!detail.isCorrect) item.wrongQuestions += 1;
+        item.accuracy = item.totalQuestions > 0 ?
+          (item.totalQuestions - item.wrongQuestions) / item.totalQuestions : 0;
+        item.action = this.tagAction(item);
+      }
+    }
+    summaries.sort((left: QuizTagSummary, right: QuizTagSummary): number => {
+      const wrongDelta = right.wrongQuestions - left.wrongQuestions;
+      if (wrongDelta !== 0) return wrongDelta;
+      const totalDelta = right.totalQuestions - left.totalQuestions;
+      if (totalDelta !== 0) return totalDelta;
+      return left.accuracy - right.accuracy;
+    });
+    return summaries.slice(0, 4);
+  }
+
+  private tagAction(item: QuizTagSummary): string {
+    if (item.wrongQuestions === 0) return '保持节奏，挑战高难度';
+    if (item.accuracy < 0.6) return '先看资料，再练基础题';
+    if (item.wrongQuestions >= 2) return '集中复盘错因';
+    return '短练一组巩固';
+  }
+
+  private tagProgressColor(item: QuizTagSummary): string {
+    if (item.wrongQuestions === 0) return Constants.COLOR_SUCCESS;
+    if (item.accuracy >= 0.6) return Constants.COLOR_WARNING;
+    return Constants.COLOR_ERROR;
+  }
+
+  private askTutorForResult(): void {
+    const weakTags = this.resultTagSummaries
+      .filter((item: QuizTagSummary): boolean => item.wrongQuestions > 0)
+      .map((item: QuizTagSummary): string => item.tag)
+      .join('、');
+    const question = '请帮我复盘这次《' + this.courseTitle + '》' + this.topic +
+      '测验：正确率 ' + Math.round(this.resultAccuracy * 100).toString() + '%，' +
+      '错题 ' + (this.resultTotalQuestions - this.resultCorrectCount).toString() + ' 道。' +
+      (weakTags.length > 0 ? '薄弱标签是：' + weakTags + '。' : '') +
+      '请给我一个三步复习方案，并说明下一组题应该怎么练。';
+    AppStorage.setOrCreate<string>('pendingChatQuestion', question);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
+      this.message = '无法打开学伴，请重试';
+    });
+  }
+
+  private startFocusedTagDrill(tag: string): void {
+    const normalized = tag.trim().substring(0, 12);
+    if (normalized.length === 0) return;
+    this.focusTag = normalized;
+    this.generateQuiz();
+  }
+
   private runGenerationProgress(): void {
     this.progressStep = 0;
     setTimeout((): void => {
@@ -477,6 +610,10 @@ struct QuizPage {
     return '进阶';
   }
 
+  private questionCountLabel(): string {
+    return this.questionCount.toString() + ' 题';
+  }
+
   @Builder
   LoadingState() {
     Column({ space: 14 }) {
@@ -500,7 +637,7 @@ struct QuizPage {
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('每组 5 道选择题，按难度生成并立即查看解析')
+        Text('按题量、难度和标签生成真实 AI 题组，完成后立即查看解析')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
       }
@@ -560,6 +697,36 @@ struct QuizPage {
       }
 
       Column({ space: 8 }) {
+        Text('挑战长度')
+          .width('100%')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Row({ space: 8 }) {
+          ForEach(this.quizLengthOptions, (option: QuizLengthOption): void => {
+            Button({ type: ButtonType.Normal }) {
+              Column({ space: 3 }) {
+                Text(option.label)
+                  .fontSize(13)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(this.questionCount === option.value ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+                Text(option.description)
+                  .fontSize(10)
+                  .fontColor(this.questionCount === option.value ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
+              }
+            }
+            .layoutWeight(1)
+            .height(58)
+            .backgroundColor(this.questionCount === option.value ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.questionCount = option.value; })
+          })
+        }
+        .width('100%')
+      }
+      .width('100%')
+
+      Column({ space: 8 }) {
         Text('难度分层')
           .width('100%')
           .fontSize(13)
@@ -616,7 +783,7 @@ struct QuizPage {
       this.progressStep >= 2 ? '正在整理题目标签' :
         (this.progressStep === 1 ? '正在控制难度与题型' : '正在检索课程依据'),
       this.progressStep >= 2 ? '校验 A-D 选项、解析和能力标签' :
-        (this.progressStep === 1 ? '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + '题组' :
+        (this.progressStep === 1 ? '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + ' · ' + this.questionCountLabel() :
           (this.focusTag.length > 0 ? '先查课程资料，再聚焦“' + this.focusTag + '”出题' :
             '先查课程资料，再让 AI 出题，避免凭空编题')),
       this.progressStep,
@@ -795,6 +962,107 @@ struct QuizPage {
       .padding(18)
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
+
+      if (this.resultCoachTitle.length > 0) {
+        Column({ space: 10 }) {
+          Row({ space: 8 }) {
+            SymbolGlyph($r(this.resultAccuracy >= 0.8 ? 'sys.symbol.sparkles' : 'sys.symbol.lightbulb_fill'))
+              .fontSize(18)
+              .fontColor([this.resultAccuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING])
+            Text(this.resultCoachTitle)
+              .layoutWeight(1)
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          }
+          .width('100%')
+          Text(this.resultCoachBody)
+            .width('100%')
+            .fontSize(13)
+            .lineHeight(21)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.evaluation)
+            .width('100%')
+            .fontSize(12)
+            .lineHeight(19)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          Row({ space: 10 }) {
+            Button('问学伴复盘')
+              .layoutWeight(1)
+              .height(42)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.askTutorForResult(); })
+            Button('复习资料')
+              .layoutWeight(1)
+              .height(42)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.reviewTopic(this.topic); })
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(Constants.COLOR_SURFACE_TINT)
+        .borderRadius(Constants.RADIUS_MD)
+      }
+
+      if (this.resultTagSummaries.length > 0) {
+        Column({ space: 12 }) {
+          Text('错因标签')
+            .width('100%')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          ForEach(this.resultTagSummaries, (item: QuizTagSummary): void => {
+            Column({ space: 8 }) {
+              Row() {
+                Text(item.tag)
+                  .fontSize(13)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                Text('错 ' + item.wrongQuestions.toString() + ' / ' + item.totalQuestions.toString())
+                  .fontSize(11)
+                  .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_ERROR : Constants.COLOR_SUCCESS)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.SpaceBetween)
+              Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
+                .width('100%')
+                .color(this.tagProgressColor(item))
+                .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+                .borderRadius(4)
+              Row({ space: 8 }) {
+                Text(item.action)
+                  .layoutWeight(1)
+                  .fontSize(11)
+                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                Button('练这个标签')
+                  .height(30)
+                  .fontSize(11)
+                  .fontColor(Constants.COLOR_BRAND)
+                  .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                  .borderRadius(Constants.RADIUS_SM)
+                  .onClick((): void => { this.startFocusedTagDrill(item.tag); })
+              }
+              .width('100%')
+            }
+            .width('100%')
+            .padding(12)
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(Constants.RADIUS_MD)
+          })
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(Constants.COLOR_BG_CARD)
+        .borderRadius(Constants.RADIUS_LG)
+      }
 
       if (this.weakTopics.length > 0) {
         Column({ space: 10 }) {
