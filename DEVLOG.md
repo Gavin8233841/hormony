@@ -5629,3 +5629,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `scripts/harmonyos-app-smoke.ps1` 首次 exit 1：`uitest dumpLayout` 返回 `Wait for subscribe ... timeout`；第二次 exit 1：脚本未找到当前课程页上的 `进入课程` 元素，完整冒烟不能标记通过。
 - 模拟器端完成一次新 Chat SSE 问答尚未通过；本批次只证明线上 Health、模拟器网关 Health、HAP 安装启动和 Chat 页面局部视觉状态。Plan/Quiz 端侧真实点击链路仍需后续稳定 UI 树后继续验收。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：Chat Markdown 代码块与表格 V2
+
+背景：继续推进端侧前端资源深猎路线中的 P0-1，不引入 OHPM Markdown 依赖，不改 Chat SSE 协议，先把现有 ArkUI 白名单 Markdown 渲染做成更接近真实学习产品的移动端体验。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- `Chat.ets` 的 Markdown 解析保留代码行数组，代码块新增语言条、行号列、横向滚动代码区和行数提示，长行不再撑破消息气泡。
+- 代码块下方新增“解释这段”“预测输出”两个学习入口，只预填输入框，不自动发送，避免把端侧误导成任意代码执行环境。
+- 连续 Markdown 表格行合并为结构化表格块，首行作为表头渲染，单元格使用网格样式并支持横向滚动，不再把表格压成单行纯文本。
+- 行内反引号内容转为中文括注显示，减少模型 Markdown 标记直接裸露。
+
+验证：
+- `git status --short`：exit 0，启动时工作区干净。
+- `git log -5 --oneline`：exit 0，确认当前 HEAD 为 `532053f docs: add HarmonyOS frontend deep hunt`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 27 s 967 ms`；仍提示未配置 signingConfigs。
+- `hdc list targets`：exit 0，模拟器 `127.0.0.1:5555` 在线。
+- `hdc install -r entry-default-unsigned.hap` + `hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，安装与启动成功。
+- `hdc shell uitest dumpLayout`：首次 exit 0 但返回 `DumpLayout failed:Wait for subscribe uitest.broadcast.command.reply timeout`；重试 exit 0，成功生成 `/data/local/tmp/layout_719766109.json`。
+- `hdc shell snapshot_display` + `hdc file recv`：exit 0，截图保存到 `screenshots/codex-chat-tab-20260704.jpeg`，不纳入提交。
+- UI 树确认 Chat 页可见文本 `基于课程资料，为每个问题给出依据`；历史回答中的表格已渲染为表头与多个单元格文本。
+
+未验证：
+- 本批次未完成一次新的 Chat SSE 问答，因此新代码块的真实模型回复截图未取得；代码块 V2 证据等级为构建通过。
+- 表格 V2 已有模拟器截图证据，但未做平板横屏和真机验收。
+- 真机、OCR、TTS、Lottie、音效、第三方 Markdown 包仍未验证。

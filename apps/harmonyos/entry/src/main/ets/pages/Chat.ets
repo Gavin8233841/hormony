@@ -26,6 +26,8 @@ interface MarkdownBlock {
   type: string;
   text: string;
   meta?: string;
+  lines?: string[];
+  tableRows?: string[][];
 }
 
 @Component
@@ -85,14 +87,16 @@ export struct ChatContent {
   private markdownBlocks(content: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
+    const tableRows: string[][] = [];
     let codeLanguage = '';
     let inCode = false;
     for (const rawLine of content.split('\n')) {
       const line = rawLine.trimEnd();
       const trimmed = line.trim();
       if (trimmed.startsWith('```')) {
+        this.appendTableBlock(blocks, tableRows);
         if (inCode) {
-          blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage });
+          blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage, lines: codeLines.slice() });
           codeLines.splice(0, codeLines.length);
           codeLanguage = '';
         } else {
@@ -105,7 +109,18 @@ export struct ChatContent {
         codeLines.push(line);
         continue;
       }
-      if (trimmed.length === 0) continue;
+      if (trimmed.length === 0) {
+        this.appendTableBlock(blocks, tableRows);
+        continue;
+      }
+      if (this.isTableRow(trimmed)) {
+        const cells = this.tableCells(trimmed);
+        if (cells.length > 0) {
+          tableRows.push(cells);
+        }
+        continue;
+      }
+      this.appendTableBlock(blocks, tableRows);
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
         blocks.push({ type: 'heading', text: headingText });
@@ -123,24 +138,30 @@ export struct ChatContent {
         blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
       } else if (this.numberedText(trimmed).length > 0) {
         blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
-      } else if (this.isTableRow(trimmed)) {
-        const tableText = this.tableText(trimmed);
-        if (tableText.length > 0) {
-          blocks.push({ type: 'table', text: tableText });
-        }
       } else if (this.isDivider(trimmed)) {
         blocks.push({ type: 'divider', text: '' });
       } else {
         blocks.push({ type: 'paragraph', text: this.cleanInline(line) });
       }
     }
+    this.appendTableBlock(blocks, tableRows);
     if (codeLines.length > 0) {
-      blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage });
+      blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage, lines: codeLines.slice() });
     }
     if (blocks.length === 0 && content.length > 0) {
       blocks.push({ type: 'paragraph', text: content });
     }
     return blocks;
+  }
+
+  private appendTableBlock(blocks: MarkdownBlock[], rows: string[][]): void {
+    if (rows.length === 0) return;
+    const copiedRows: string[][] = [];
+    for (const row of rows) {
+      copiedRows.push(row.slice());
+    }
+    blocks.push({ type: 'table', text: '', tableRows: copiedRows });
+    rows.splice(0, rows.length);
   }
 
   private headingText(line: string): string {
@@ -183,7 +204,7 @@ export struct ChatContent {
     return line.indexOf('|') >= 0 && line.indexOf('|') !== line.lastIndexOf('|');
   }
 
-  private tableText(line: string): string {
+  private tableCells(line: string): string[] {
     const cells: string[] = [];
     for (const cell of line.split('|')) {
       const cleaned = this.cleanInline(cell.trim());
@@ -191,7 +212,7 @@ export struct ChatContent {
         cells.push(cleaned);
       }
     }
-    if (cells.length === 0) return '';
+    if (cells.length === 0) return [];
     let divider = true;
     for (const cell of cells) {
       for (const ch of cell) {
@@ -200,12 +221,12 @@ export struct ChatContent {
         }
       }
     }
-    if (divider) return '';
-    return cells.join('  ·  ');
+    if (divider) return [];
+    return cells;
   }
 
   private cleanInline(text: string): string {
-    return text
+    return this.formatInlineCode(text)
       .replace(/<br\s*\/?\s*>/g, '；')
       .replace(/<[^>]+>/g, '')
       .replace(/\*\*/g, '')
@@ -215,6 +236,27 @@ export struct ChatContent {
       .trim();
   }
 
+  private formatInlineCode(text: string): string {
+    let result = '';
+    let segment = '';
+    let inCode = false;
+    for (let index = 0; index < text.length; index++) {
+      const ch = text.charAt(index);
+      if (ch === '`') {
+        if (inCode) {
+          result += '「' + segment + '」';
+        } else {
+          result += segment;
+        }
+        segment = '';
+        inCode = !inCode;
+      } else {
+        segment += ch;
+      }
+    }
+    return result + segment;
+  }
+
   private codeLanguage(block: MarkdownBlock): string {
     const language = block.meta ?? '';
     return language.length > 0 ? language : 'code';
@@ -222,6 +264,65 @@ export struct ChatContent {
 
   private taskDone(block: MarkdownBlock): boolean {
     return block.meta === 'done';
+  }
+
+  private codeLines(block: MarkdownBlock): string[] {
+    if (block.lines !== undefined && block.lines.length > 0) return block.lines;
+    return block.text.split('\n');
+  }
+
+  private codeContentWidth(block: MarkdownBlock): number {
+    let maxLength = 24;
+    for (const line of this.codeLines(block)) {
+      maxLength = Math.max(maxLength, line.length);
+    }
+    return Math.min(Math.max(maxLength * 8 + 16, 260), 720);
+  }
+
+  private tableRows(block: MarkdownBlock): string[][] {
+    return block.tableRows ?? [];
+  }
+
+  private tableColumnCount(block: MarkdownBlock): number {
+    let count = 1;
+    for (const row of this.tableRows(block)) {
+      count = Math.max(count, row.length);
+    }
+    return count;
+  }
+
+  private tableWidth(block: MarkdownBlock): number {
+    return Math.min(Math.max(this.tableColumnCount(block) * 118, 260), 708);
+  }
+
+  private tableCellText(row: string[], index: number): string {
+    return index < row.length ? row[index] : '';
+  }
+
+  private tableColumnIndexes(block: MarkdownBlock): number[] {
+    const indexes: number[] = [];
+    for (let index = 0; index < this.tableColumnCount(block); index++) {
+      indexes.push(index);
+    }
+    return indexes;
+  }
+
+  private codeQuestion(block: MarkdownBlock, mode: string): string {
+    let snippet = block.text;
+    if (snippet.length > 680) {
+      snippet = snippet.substring(0, 680) + '\n...';
+    }
+    const language = this.codeLanguage(block);
+    if (mode === 'output') {
+      return '请帮我预测这段 ' + language + ' 代码的输出，并按步骤解释变量或状态变化：\n\n```' +
+        language + '\n' + snippet + '\n```';
+    }
+    return '请用适合学生理解的步骤解释这段 ' + language + ' 代码，指出关键语句和容易错的地方：\n\n```' +
+      language + '\n' + snippet + '\n```';
+  }
+
+  private prefillCodeQuestion(block: MarkdownBlock, mode: string): void {
+    this.inputText = this.codeQuestion(block, mode);
   }
 
   private answerProgressIndex(msg: DisplayMessage): number {
@@ -943,38 +1044,9 @@ export struct ChatContent {
             .color(Constants.COLOR_BORDER)
             .margin({ top: 4, bottom: 4 })
         } else if (block.type === 'code') {
-          Column({ space: 8 }) {
-            Row() {
-              Text(this.codeLanguage(block))
-                .fontSize(11)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-              Text('代码块')
-                .fontSize(11)
-                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.SpaceBetween)
-            Text(block.text)
-              .width('100%')
-              .fontSize(12)
-              .lineHeight(20)
-              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-              .fontFamily('monospace')
-          }
-          .width('100%')
-          .padding(11)
-          .backgroundColor(Constants.COLOR_MAP_SURFACE)
-          .borderRadius(Constants.RADIUS_SM)
+          this.MarkdownCodeBlock(block)
         } else if (block.type === 'table') {
-          Text(block.text)
-            .width('100%')
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
-            .padding(9)
-            .backgroundColor(Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_SM)
+          this.MarkdownTable(block)
         } else {
           Text(block.text)
             .width('100%')
@@ -985,6 +1057,119 @@ export struct ChatContent {
       })
     }
     .width('100%')
+  }
+
+  @Builder
+  MarkdownCodeBlock(block: MarkdownBlock) {
+    Column({ space: 9 }) {
+      Row() {
+        Text(this.codeLanguage(block))
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(Constants.COLOR_MAP_LINE)
+          .borderRadius(Constants.RADIUS_SM)
+        Text(this.codeLines(block).length.toString() + ' 行')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Row({ space: 8 }) {
+        Column({ space: 0 }) {
+          ForEach(this.codeLines(block), (_line: string, index: number): void => {
+            Text((index + 1).toString())
+              .width(30)
+              .fontSize(11)
+              .lineHeight(20)
+              .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+              .textAlign(TextAlign.End)
+          })
+        }
+        .padding({ right: 4 })
+        .border({ width: 1, color: Constants.COLOR_MAP_LINE })
+        .borderRadius(Constants.RADIUS_SM)
+
+        Scroll() {
+          Column({ space: 0 }) {
+            ForEach(this.codeLines(block), (line: string): void => {
+              Text(line.length > 0 ? line : ' ')
+                .width(this.codeContentWidth(block))
+                .fontSize(12)
+                .lineHeight(20)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .fontFamily('monospace')
+                .maxLines(1)
+            })
+          }
+          .width(this.codeContentWidth(block))
+        }
+        .layoutWeight(1)
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Auto)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+      .constraintSize({ maxHeight: 260 })
+
+      Row({ space: 8 }) {
+        Button('解释这段')
+          .height(32)
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_SM)
+          .padding({ left: 10, right: 10 })
+          .onClick((): void => { this.prefillCodeQuestion(block, 'explain'); })
+        Button('预测输出')
+          .height(32)
+          .fontSize(11)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .padding({ left: 10, right: 10 })
+          .onClick((): void => { this.prefillCodeQuestion(block, 'output'); })
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.End)
+    }
+    .width('100%')
+    .padding(11)
+    .backgroundColor(Constants.COLOR_MAP_SURFACE)
+    .borderRadius(Constants.RADIUS_SM)
+  }
+
+  @Builder
+  MarkdownTable(block: MarkdownBlock) {
+    Scroll() {
+      Column({ space: 0 }) {
+        ForEach(this.tableRows(block), (row: string[], rowIndex: number): void => {
+          Row() {
+            ForEach(this.tableColumnIndexes(block), (cellIndex: number): void => {
+              Text(this.tableCellText(row, cellIndex))
+                .width(118)
+                .constraintSize({ minHeight: 34 })
+                .fontSize(11)
+                .lineHeight(17)
+                .fontWeight(rowIndex === 0 ? FontWeight.Bold : FontWeight.Normal)
+                .fontColor(rowIndex === 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_TERTIARY)
+                .padding({ left: 8, right: 8, top: 7, bottom: 7 })
+                .backgroundColor(rowIndex === 0 ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_CARD)
+                .border({ width: 0.5, color: Constants.COLOR_BORDER })
+            })
+          }
+          .width(this.tableWidth(block))
+        })
+      }
+      .width(this.tableWidth(block))
+    }
+    .width('100%')
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Auto)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_SM)
   }
 
 }
