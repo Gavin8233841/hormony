@@ -5479,3 +5479,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未强制制造 `/api/plan` 慢响应或失败来实测 15 秒本地草案触发；本批次兜底为源码确认与构建通过。
 - 全量模拟器冒烟未最终通过；真机未验证。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.12 学习星图入口与模拟器闭环
+
+背景：继续只服务 HarmonyOS 端侧 App。上一轮全量冒烟已深入 Profile 和学习星图，但失败点集中在 Profile 进入星图、星图首个 Topic 文本读取不稳定。截图复核显示深色星图卡片标题对比不足，且星图入口只在下方大卡片中，不利于评审现场快速找到“知识关系/掌握状态”主功能。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Profile.ets
+- apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- Profile 快捷入口列表新增“学习星图”，与学习记录、错题本、成就处于同一可点击区域，减少滑动后误点下方大卡片的风险。
+- 深色星图大卡片的标题和箭头改为浅色文本，解决截图中标题几乎隐入深色背景的问题。
+- 学习星图摘要新增“当前节点：...”文本，把选中的首个 Topic 提升到顶部摘要区，用户无需只依赖图中小标签或下方详情卡。
+- 冒烟脚本对三门课程首 Topic 改为 8 秒包含匹配，绑定到页面上更稳定的“当前节点”/Topic 文本，而不是只做瞬时精确匹配。
+
+验证：
+- `pwsh -NoProfile -Command "[scriptblock]::Create((Get-Content -Raw -Path 'scripts/harmonyos-app-smoke.ps1')) | Out-Null"`：exit 0。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 12 s 845 ms`；仍提示未配置 signingConfigs。
+- 修改 Profile 入口前复跑 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；已通过构建、安装、首页、课程、AI 出题入口、课程详情、精选练习、复盘追问、学伴页、Profile 子页，点击“学习星图”后实际停在 `pages/MistakeBook`，证据截图位于 `screenshots/trae-smoke-20260704-214120/`，不提交。
+- 最终复跑 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，98 passed / 0 failed；覆盖构建、安装、启动、首页、课程页、AI 出题入口设置页、课程详情、精选练习、复盘追问进入学伴页、Profile 三个子页、学习星图三门课程首 Topic（数据结构/数组与线性表、操作系统/进程与线程、计算机网络/OSI与TCP/IP模型）和回首页。截图证据位于 `screenshots/trae-smoke-20260704-214907/`，不提交。
+
+未验证：
+- 真机未验证。

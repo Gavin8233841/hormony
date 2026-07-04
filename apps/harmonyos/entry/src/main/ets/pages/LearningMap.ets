@@ -191,6 +191,10 @@ struct LearningMapPage {
     return next?.topic ?? '本课程已全部点亮';
   }
 
+  private selectedTopicLabel(): string {
+    return this.selectedTopic.length > 0 ? this.selectedTopic : this.nextTopicLabel();
+  }
+
   private prerequisiteLabel(node: MapNode): string {
     if (node.prerequisiteIds.length === 0) return '课程起点，无先修主题';
     const topics: string[] = [];
@@ -387,6 +391,10 @@ struct LearningMapPage {
         Text('已掌握 ' + this.masteredCount().toString() + ' / ' + this.nodes.length.toString() + ' 个主题')
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Text('当前节点：' + this.selectedTopicLabel())
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND)
         Text('下一节点：' + this.nextTopicLabel())
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_TERTIARY)

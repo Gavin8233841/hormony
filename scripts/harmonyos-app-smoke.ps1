@@ -677,7 +677,7 @@ foreach ($mapCourse in @(
 )) {
     if (-not (Wait-TextContains $mapCourse.Name "Learning map course visible: $($mapCourse.Name)" 8000)) { exit 1 }
     if (-not (Click-ElementContaining $mapCourse.Name "Learning map: $($mapCourse.Name)" 8000)) { exit 1 }
-    if (-not (Verify-TextExists $mapCourse.FirstTopic "Learning map first topic: $($mapCourse.Name)")) { exit 1 }
+    if (-not (Wait-TextContains $mapCourse.FirstTopic "Learning map first topic: $($mapCourse.Name)" 8000)) { exit 1 }
     if (-not (Verify-TextExists "Level 0" "Learning map graph level")) { exit 1 }
     Take-Screenshot (("{0:D2}-learning-map-{1}" -f $mapIndex, $mapCourse.Name))
     $mapIndex++

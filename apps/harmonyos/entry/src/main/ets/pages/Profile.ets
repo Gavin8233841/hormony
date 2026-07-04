@@ -177,6 +177,8 @@ export struct ProfileContent {
             .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
 
             Column() {
+              this.GrowthEntry('学习星图', '查看知识联系与掌握状态', $r('sys.symbol.book_open_fill'), 'pages/LearningMap')
+              Divider().color(Constants.COLOR_BORDER).margin({ left: 50 })
               this.GrowthEntry('学习记录', '按时间回看练习与任务', $r('sys.symbol.clock'), 'pages/ActivityRecords')
               Divider().color(Constants.COLOR_BORDER).margin({ left: 50 })
               this.GrowthEntry('错题本', '集中复习尚未解决的问题', $r('sys.symbol.xmark_circle_fill'), 'pages/MistakeBook')
@@ -241,7 +243,7 @@ export struct ProfileContent {
                 Text('学习星图')
                   .fontSize(19)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                 Text('查看知识之间的联系与掌握状态')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
@@ -251,7 +253,7 @@ export struct ProfileContent {
 
               SymbolGlyph($r('sys.symbol.chevron_right'))
                 .fontSize(20)
-                .fontColor([Constants.COLOR_TEXT_PRIMARY])
+                .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
                 .position({ x: 292, y: 137 })
             }
             .width('100%')
