@@ -5506,3 +5506,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 未验证：
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.12 计划生成纳入模拟器闭环
+
+背景：继续只服务 HarmonyOS 端侧 App。Plan 本地草案兜底已构建通过，但缺少模拟器端“进入计划 -> 设目标 -> 生成任务 -> 看到可执行动作”的证据。首轮把 Plan 生成直接加入冒烟后，脚本从“查看全部”进入 Plan 并点击生成，70 秒内未看到“今日起步”；源码复核确认旧计划存在时目标建议只在空态显示，脚本无法强制设定本次目标。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- `PlanPage` 新增 `GoalSuggestionChips()`，把“两周复习数据结构 / 一周掌握 TCP 基础 / 三周准备操作系统考试”常驻在目标输入卡片内。
+- 旧计划存在时也能一键切换目标重新生成，不必手动键盘输入；空态区域不再重复展示同一组建议。
+- 冒烟脚本在 Home 后新增 Plan 验证：从“制定计划”或“查看全部”进入 Plan，点击固定建议目标，触发生成，等待“今日起步”、任务数量和学习/练习/测验/复盘/阅读/复习任一可执行动作。
+
+验证：
+- 首次加入 Plan 生成段后运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；通过进入 Plan、识别“学习目标”和“生成学习计划”，但 70 秒内未读取到“今日起步”。截图目录 `screenshots/trae-smoke-20260704-224559/`，不提交。
+- `pwsh -NoProfile -Command "[scriptblock]::Create((Get-Content -Raw -Path 'scripts/harmonyos-app-smoke.ps1')) | Out-Null"`：exit 0。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 39 ms`；仍提示未配置 signingConfigs。
+- 最终复跑 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，109 passed / 0 failed；新增覆盖 Plan 进入、目标建议“一周掌握 TCP 基础”、生成任务、“今日起步”、任务数量和可执行“学习”动作；后续课程、AI 出题入口、精选练习、复盘追问、学伴页、Profile 子页、学习星图三门课程和回首页仍通过。截图证据位于 `screenshots/trae-smoke-20260704-225021/`，不提交。
+
+未验证：
+- 真机未验证。

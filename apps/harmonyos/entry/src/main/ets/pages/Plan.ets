@@ -219,6 +219,25 @@ struct PlanPage {
     return this.planSteps[this.currentPlanStepIndex()].description;
   }
 
+  @Builder
+  GoalSuggestionChips() {
+    Flex({ wrap: FlexWrap.Wrap }) {
+      ForEach(this.goalSuggestions, (suggestion: string) => {
+        Button(suggestion)
+          .height(34)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(17)
+          .margin({ right: 6, bottom: 6 })
+          .onClick(() => {
+            this.goal = suggestion;
+          })
+      })
+    }
+    .width('100%')
+  }
+
   private pad2(value: number): string {
     return value < 10 ? '0' + value.toString() : value.toString();
   }
@@ -400,6 +419,7 @@ struct PlanPage {
             .borderRadius(Constants.RADIUS_MD)
             .onChange((v: string) => { this.goal = v; })
             .onSubmit(() => { this.generate(); })
+          this.GoalSuggestionChips()
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -622,22 +642,6 @@ struct PlanPage {
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .textAlign(TextAlign.Center)
-          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
-            ForEach(this.goalSuggestions, (suggestion: string) => {
-              Button(suggestion)
-                .height(40)
-                .fontSize(12)
-                .fontColor(Constants.COLOR_BRAND)
-                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                .borderRadius(20)
-                .margin({ right: 6, bottom: 6 })
-                .onClick(() => {
-                  this.goal = suggestion;
-                })
-            })
-          }
-          .width('100%')
-          .margin({ top: 8 })
         }
         .width('100%')
         .layoutWeight(1)

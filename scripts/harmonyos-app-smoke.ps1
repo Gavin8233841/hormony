@@ -413,6 +413,33 @@ function Wait-TextContains($textPart, $description, $timeoutMs = 5000) {
     return $false
 }
 
+function Wait-AnyTextExists([string[]]$textPatterns, $description, $timeoutMs = 5000) {
+    $deadline = (Get-Date).AddMilliseconds($timeoutMs)
+    $lastError = ""
+    do {
+        try {
+            $uiTree = Get-UiTree
+            if ($uiTree) {
+                foreach ($textPattern in $textPatterns) {
+                    $elements = Find-ElementByText $uiTree $textPattern
+                    if ($elements.Count -gt 0) {
+                        Write-Step "Verify: $description" "PASS" "Found: $textPattern"
+                        return $true
+                    }
+                }
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    $detail = "Not found any of: $($textPatterns -join ', ')"
+    if ($lastError) { $detail = "$detail lastError=$lastError" }
+    Write-Step "Verify: $description" "FAIL" $detail
+    return $false
+}
+
 function Test-TextExists($textPattern) {
     try {
         $uiTree = Get-UiTree
@@ -549,6 +576,28 @@ if ($uiTree) {
 } else {
     Write-Step "Home tab (今日)" "FAIL" "UI tree unavailable"
 }
+
+# 4.5 验证计划生成页与可执行任务
+Write-Output "`n[INFO] Verifying study plan generation..."
+if (Test-TextExists "制定计划") {
+    if (-not (Click-Element "制定计划" "Open plan from empty state")) { exit 1 }
+} else {
+    if (-not (Click-Element "查看全部" "Open full plan")) { exit 1 }
+}
+if (-not (Verify-Page "pages/Plan" "Study plan")) { exit 1 }
+if (-not (Verify-TextExists "学习目标" "Plan goal input")) { exit 1 }
+if (-not (Verify-TextExists "生成学习计划" "Plan generate action")) { exit 1 }
+if (Test-TextExists "一周掌握 TCP 基础") {
+    if (-not (Click-Element "一周掌握 TCP 基础" "Plan goal suggestion")) { exit 1 }
+}
+if (-not (Click-Element "生成学习计划" "Generate study plan")) { exit 1 }
+if (-not (Wait-TextExists "今日起步" "Generated plan section" 70000)) { exit 1 }
+if (-not (Wait-TextContains "项任务" "Generated plan task count" 5000)) { exit 1 }
+if (-not (Wait-AnyTextExists @("学习", "练习", "测验", "复盘", "阅读", "复习") "Generated plan executable action" 5000)) { exit 1 }
+Take-Screenshot "02-plan-generated"
+Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
+Start-Sleep -Milliseconds 500
+if (-not (Verify-Page "pages/Index" "Root after plan generation")) { exit 1 }
 
 # 5. 点击"课程" Tab
 Write-Output "`n[INFO] Navigating to Course tab..."
