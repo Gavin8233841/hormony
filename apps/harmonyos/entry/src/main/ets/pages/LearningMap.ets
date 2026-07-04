@@ -212,6 +212,23 @@ struct LearningMapPage {
     return '推荐路径：' + topics.join(' -> ');
   }
 
+  private recommendedPathNodes(): MapNode[] {
+    return this.nodes.filter((node: MapNode): boolean => node.recommendedPath)
+      .sort((left: MapNode, right: MapNode): number => {
+        if (left.level !== right.level) return left.level - right.level;
+        return left.order - right.order;
+      });
+  }
+
+  private pathStepLabel(node: MapNode): string {
+    if (node.recommended) return '当前推荐';
+    if (node.mastery?.mastered === true) return '已满足先修';
+    if (node.mastery !== null) return '需继续巩固';
+    if (node.lessonCompleted) return '已学习待练';
+    if (node.unlocked) return '可开始';
+    return '未解锁';
+  }
+
   private findRecommendedNode(nodes: MapNode[]): MapNode | null {
     const openNodes = nodes.filter((node: MapNode): boolean => node.mastery?.mastered !== true && node.unlocked);
     if (openNodes.length === 0) return null;
@@ -263,6 +280,23 @@ struct LearningMapPage {
     return '先修：' + topics.join(' · ');
   }
 
+  private prerequisiteNodes(node: MapNode): MapNode[] {
+    const items: MapNode[] = [];
+    for (const id of node.prerequisiteIds) {
+      const prerequisite = this.nodes.find((item: MapNode): boolean => item.id === id);
+      if (prerequisite !== undefined) items.push(prerequisite);
+    }
+    return items;
+  }
+
+  private prerequisiteStateLabel(node: MapNode): string {
+    if (node.mastery?.mastered === true) return '已掌握';
+    if (node.mastery !== null) return '学习中 ' + Math.round(node.mastery.accuracy * 100).toString() + '%';
+    if (node.lessonCompleted) return '已学习待练';
+    if (node.unlocked) return '可开始';
+    return '未解锁';
+  }
+
   private unlockedAfterLabel(node: MapNode): string {
     const topics = this.nodes.filter((item: MapNode): boolean => item.prerequisiteIds.includes(node.id))
       .map((item: MapNode): string => item.topic);
@@ -280,6 +314,17 @@ struct LearningMapPage {
     if (!node.unlocked) return '暂未解锁：先完成前置主题并达到掌握';
     if (node.mastery?.mastered === true) return '已掌握：可作为后续节点的先修支撑';
     return '可学习：按当前节奏安排到后续练习';
+  }
+
+  private actionLessonLabel(node: MapNode): string {
+    if (node.lessonCompleted) return '回看主题';
+    return '学习主题';
+  }
+
+  private actionPracticeLabel(node: MapNode): string {
+    if (node.mastery !== null && !node.mastery.mastered) return '巩固练习';
+    if (node.lessonCompleted) return '去练习';
+    return '主题练习';
   }
 
   private openPractice(topic: string): void {
@@ -481,6 +526,18 @@ struct LearningMapPage {
               .backgroundColor(Constants.COLOR_MAP_LINE)
               .borderRadius(8)
               .position({ x: 0, y: 43 })
+          } else {
+            Text(node.topic)
+              .width(NODE_WIDTH)
+              .fontSize(node.topic.length > 7 ? 8 : 9)
+              .fontWeight(node.recommendedPath ? FontWeight.Bold : FontWeight.Medium)
+              .fontColor(node.recommendedPath ? Constants.COLOR_WARNING :
+                (node.unlocked ? Constants.COLOR_MAP_CORE : Constants.COLOR_MAP_TEXT_MUTED))
+              .textAlign(TextAlign.Center)
+              .maxLines(2)
+              .wordBreak(WordBreak.BREAK_ALL)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .position({ x: 0, y: 45 })
           }
         }
         .width(NODE_WIDTH)
@@ -536,6 +593,60 @@ struct LearningMapPage {
     .borderRadius(Constants.RADIUS_LG)
   }
 
+  @Builder
+  RecommendedPathSteps() {
+    Column({ space: 10 }) {
+      Row() {
+        Text('推荐路径')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text('先修 -> 下一步')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      if (this.recommendedPathNodes().length === 0) {
+        Text('本课程已全部点亮，可回到课程页继续复盘')
+          .fontSize(12)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      } else {
+        ForEach(this.recommendedPathNodes(), (node: MapNode, index: number): void => {
+          Row({ space: 10 }) {
+            Text((index + 1).toString())
+              .width(24)
+              .height(24)
+              .fontSize(11)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(node.recommended ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_ON_GRADIENT)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(node.recommended ? Constants.COLOR_WARNING : this.nodeColor(node))
+              .borderRadius(12)
+            Column({ space: 2 }) {
+              Text(node.topic)
+                .fontSize(13)
+                .fontWeight(node.recommended ? FontWeight.Bold : FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text(this.pathStepLabel(node))
+                .fontSize(11)
+                .fontColor(node.recommended ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY)
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+          }
+          .width('100%')
+        })
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
+  }
+
   build() {
     Column() {
       TitleBar('学习星图', '练习越充分，知识节点越清晰', () => this.getUIContext().getRouter().back())
@@ -559,6 +670,7 @@ struct LearningMapPage {
             .justifyContent(FlexAlign.Center)
           } else {
             this.MapSummary()
+            this.RecommendedPathSteps()
             Scroll() {
               this.MapCanvas()
             }
@@ -574,8 +686,8 @@ struct LearningMapPage {
             this.LegendDot('学习中', Constants.COLOR_WARNING)
             this.LegendDot('已掌握', Constants.COLOR_SUCCESS)
             this.LegendDot('未解锁', Constants.COLOR_MAP_LINE)
-            this.LegendLine('推荐路径', Constants.COLOR_WARNING)
-            this.LegendLine('已满足先修', Constants.COLOR_MAP_LINE_ACTIVE)
+            this.LegendLine('推荐路径 -> 下一步', Constants.COLOR_WARNING)
+            this.LegendLine('已满足先修 -> 后续', Constants.COLOR_MAP_LINE_ACTIVE)
           }
           .width('100%')
 
@@ -597,6 +709,34 @@ struct LearningMapPage {
                     .fontSize(12)
                     .lineHeight(19)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                  if (this.prerequisiteNodes(node).length > 0) {
+                    Column({ space: 6 }) {
+                      ForEach(this.prerequisiteNodes(node), (prerequisite: MapNode): void => {
+                        Row({ space: 8 }) {
+                          Column()
+                            .width(8)
+                            .height(8)
+                            .backgroundColor(this.nodeColor(prerequisite))
+                            .borderRadius(4)
+                          Text(prerequisite.topic)
+                            .fontSize(12)
+                            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                            .layoutWeight(1)
+                            .maxLines(1)
+                            .textOverflow({ overflow: TextOverflow.Ellipsis })
+                          Text(this.prerequisiteStateLabel(prerequisite))
+                            .fontSize(11)
+                            .fontColor(prerequisite.mastery?.mastered === true ? Constants.COLOR_SUCCESS :
+                              Constants.COLOR_TEXT_SECONDARY)
+                        }
+                        .width('100%')
+                      })
+                    }
+                    .width('100%')
+                    .padding(10)
+                    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+                    .borderRadius(Constants.RADIUS_MD)
+                  }
                   Text(this.unlockedAfterLabel(node))
                     .width('100%')
                     .fontSize(12)
@@ -617,8 +757,8 @@ struct LearningMapPage {
                   }
                   Row({ space: 10 }) {
                     Button({ type: ButtonType.Normal }) {
-                      Text('学习主题').fontSize(14).fontColor(node.unlocked ? Constants.COLOR_TEXT_ON_GRADIENT :
-                        Constants.COLOR_BUTTON_DISABLED_TEXT)
+                      Text(this.actionLessonLabel(node)).fontSize(14).fontColor(node.unlocked ?
+                        Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
                     }
                       .layoutWeight(1)
                       .height(48)
@@ -627,8 +767,8 @@ struct LearningMapPage {
                       .borderRadius(Constants.RADIUS_MD)
                       .onClick((): void => { this.openLesson(this.selectedTopic); })
                     Button({ type: ButtonType.Normal }) {
-                      Text('主题练习').fontSize(14).fontColor(node.unlocked ? Constants.COLOR_BRAND :
-                        Constants.COLOR_BUTTON_DISABLED_TEXT)
+                      Text(this.actionPracticeLabel(node)).fontSize(14).fontColor(node.unlocked ?
+                        Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_TEXT)
                     }
                       .layoutWeight(1)
                       .height(48)

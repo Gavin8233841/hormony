@@ -5431,3 +5431,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未新增模拟器截图；本批次为错题本排序与状态文本，证据等级为构建通过。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：学习星图节点与路径说明增强
+
+背景：根据只读星图审计继续推进“高级感来自信息结构”。LearningMap 已有真实先修关系、掌握状态和推荐路径，但图上未选中节点主要显示编号，推荐路径摘要容易被两行省略，选中节点的先修关系也没有拆成逐项状态。用户需要更少点击就能理解“这个点是什么、为什么推荐、先修卡在哪里”。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+
+行为变化：
+- 图上非选中节点也显示短 Topic 标签；推荐路径节点使用更强字重和警告色，未解锁节点保持低对比，避免只靠编号理解星图。
+- MapSummary 下新增“推荐路径”步骤条，用“已满足先修 / 当前推荐 / 已学习待练 / 需继续巩固”等状态解释路径。
+- 选中节点详情增加逐项先修清单，每个前置主题显示掌握状态、学习中正确率或已学习待练状态。
+- 详情区按钮根据节点状态显示“回看主题 / 学习主题”和“巩固练习 / 去练习 / 主题练习”，让下一步动作更贴合当前掌握状态。
+- 图例文案补充方向语义，明确路径线从先修指向后续节点。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 354 ms`；仍为 unsigned HAP，签名未配置。
+- HDC 设备：`127.0.0.1:5555`。
+- HAP 安装：`hdc install -r apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap` exit 0，返回 `install bundle successfully`。
+- 启动：`hdc shell aa start -a EntryAbility -b com.c4ai.hormony` exit 0，返回 `start ability successfully`。
+- 产物只读检查：`entry-default-unsigned.hap` 的 `ets/modules.abc` 包含 `推荐路径 -> 下一步`、`推荐路径`、`荐`、`锁` 等本批次文案。
+
+未验证：
+- 模拟器新星图 UI 未验证通过。DevEco MCP 返回 `MCP client is shut down`；HDC `uitest dumpLayout` 在重启后出现 `Wait for subscribe uitest.broadcast.command.reply timeout`。后续截图 `.tmp/harmony-1.13-learning-map-labels/learning-map-current.jpeg` 仍显示旧星图文案，不能证明本批次新 UI 已在设备渲染。
+- 真机未验证。
