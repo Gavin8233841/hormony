@@ -5740,3 +5740,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未安装新 HAP 到模拟器，未取得 Quiz/Practice 结果页新截图；需后续用固定答题流程补模拟器 UI 树与截图。
 - 真机未验证。
 - Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.15学伴表格阅读与回答思路收束
+
+背景：继续推进 1.15 产品化路线中的 Chat Markdown + 代码块 V2。此前 `Chat.ets` 已支持标题、列表、引用、代码块和逐行表格，但表格按每行独立渲染，表头与数据行关系不稳定；展开“回答生成过程”时也会展示原始过程字符串，存在把内部链路内容暴露给学生的风险。本批次只改端侧渲染与文案，不改 Chat API、SSE 事件、历史数据结构或模型编排。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `MarkdownBlock` 增加 `tableColumns` 和 `tableRows`，`markdownBlocks()` 将连续 Markdown 表格合并为一个表格块，表头和数据行分开渲染；单行带 `|` 的普通文本不再直接误渲染成表格。
+- 表格最多展示 8 列和 20 行，超出时显示折叠提示；单元格增加 `maxLines` 与省略策略，降低长 URL、长标识符或长中文句子撑破气泡的风险。
+- 代码块超过 80 行时，折叠提示独立显示在代码区底部，不再作为带行号的伪代码行。
+- “解释这段”预填问题改为“请用推演方式解释这段代码的思路、状态变化和可能输出”，与 Lesson 代码学习口径一致。
+- 学伴欢迎文案从“AI 助教”改为“鸿学伴学伴”；欢迎说明从“检索并给出带引用的回答”改为“查找课程资料并附上出处”。
+- 学生端可见标题从“回答生成过程”收束为“回答思路”；展开后使用 `traceSummary()` 展示“第 n 步：学习语义标题 · 说明”，不再原样显示 `agentTrace`。
+- 本批次未新增 OHPM 依赖、未引入 Markdown 包、未使用 ArkWeb、未下载或写入外部资产。
+
+协作审计：
+- 派发两个只读 explorer 子代理审计 Chat Markdown/trace 和页面技术化文案；两者均未编辑文件。已采纳低风险建议：表格行列折叠、单元格溢出、代码折叠提示独立显示、解释文案收束、回答思路不展示原始过程文本。字段命名大迁移、长文本压测和全局文案收束保留给后续批次。
+
+验证：
+- `git status --short`：exit 0，启动时仅显示未跟踪 `.tmp/`。
+- `git log -5 --oneline`：exit 0，确认当前分支 HEAD 为 `258fce0 feat: 补齐测验练习复盘入口`。
+- 禁用英文词与旧技术文案扫描：exit 0，仅命中内部字段、函数名、事件调用和内部 agent 名称分支；学生端旧文案无命中。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：首次变更后 exit 0，`BUILD SUCCESSFUL in 15 s 600 ms`，`CompileArkTS` 重新执行并通过；提交前复跑 exit 0，`BUILD SUCCESSFUL in 5 s 18 ms`，`CompileArkTS` 为 up-to-date；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得 Chat 长表格、长代码、引用和 trace 展开截图；需后续用固定测试消息补 UI 树和截图。
+- 真机未验证。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。

@@ -1,6 +1,6 @@
 /**
- * AI 辅导页
- * 浅色主题 · 渐变标题栏 · SSE 流式接收 · 欢迎引导
+ * 学伴辅导页
+ * 浅色主题 · 渐变标题栏 · 流式接收 · 欢迎引导
  */
 
 import http from '@ohos.net.http';
@@ -27,6 +27,8 @@ interface MarkdownBlock {
   language?: string;
   rows?: string[];
   cells?: string[];
+  tableColumns?: string[];
+  tableRows?: string[][];
   level?: number;
 }
 
@@ -81,12 +83,17 @@ export struct ChatContent {
   private markdownBlocks(content: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
+    let pendingTableCells: string[] = [];
     let codeLanguage = '';
     let inCode = false;
+    let tableOpen = false;
     for (const rawLine of content.split('\n')) {
       const line = rawLine.trimEnd();
       const trimmed = line.trim();
       if (trimmed.startsWith('```')) {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
         if (inCode) {
           blocks.push({ type: 'code', text: codeLines.join('\n'), language: codeLanguage, rows: codeLines.slice() });
           codeLines.splice(0, codeLines.length);
@@ -101,30 +108,74 @@ export struct ChatContent {
         codeLines.push(line);
         continue;
       }
-      if (trimmed.length === 0) continue;
+      if (trimmed.length === 0) {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
+        continue;
+      }
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
         blocks.push({ type: 'heading', text: headingText });
       } else if (trimmed.startsWith('>')) {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
         const quoteText = this.quoteText(trimmed);
         if (quoteText.length > 0) {
           blocks.push({ type: 'quote', text: quoteText, level: this.quoteLevel(trimmed) });
         }
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
         blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)), level: this.listLevel(line) });
       } else if (this.numberedText(trimmed).length > 0) {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
         blocks.push({ type: 'numbered', text: this.numberedText(trimmed), level: this.listLevel(line) });
       } else if (this.isTableRow(trimmed)) {
         const cells = this.tableCells(trimmed);
         if (cells.length > 0 && !this.isTableDivider(cells)) {
-          blocks.push({ type: 'table', text: cells.join('  ·  '), cells: cells });
+          const lastIndex = blocks.length - 1;
+          const lastBlock = lastIndex >= 0 ? blocks[lastIndex] : null;
+          if (tableOpen && lastBlock !== null && lastBlock.type === 'table') {
+            const rows = lastBlock.tableRows ?? [];
+            rows.push(cells);
+            lastBlock.tableRows = rows;
+            lastBlock.text = this.tableText(lastBlock);
+          } else if (pendingTableCells.length > 0) {
+            blocks.push({
+              type: 'table',
+              text: pendingTableCells.join('  ·  '),
+              cells: pendingTableCells,
+              tableColumns: pendingTableCells,
+              tableRows: [cells]
+            });
+            pendingTableCells = [];
+            tableOpen = true;
+          } else {
+            pendingTableCells = cells;
+            tableOpen = false;
+          }
         }
       } else if (this.isDivider(trimmed)) {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
         blocks.push({ type: 'divider', text: '' });
       } else {
+        this.flushPendingTable(blocks, pendingTableCells);
+        pendingTableCells = [];
+        tableOpen = false;
         blocks.push({ type: 'paragraph', text: this.cleanInline(line) });
       }
     }
+    this.flushPendingTable(blocks, pendingTableCells);
     if (codeLines.length > 0) {
       blocks.push({ type: 'code', text: codeLines.join('\n'), language: codeLanguage, rows: codeLines.slice() });
     }
@@ -132,6 +183,12 @@ export struct ChatContent {
       blocks.push({ type: 'paragraph', text: content });
     }
     return blocks;
+  }
+
+  private flushPendingTable(blocks: MarkdownBlock[], pendingCells: string[]): void {
+    if (pendingCells.length > 0) {
+      blocks.push({ type: 'paragraph', text: pendingCells.join(' | ') });
+    }
   }
 
   private codeFenceLanguage(line: string): string {
@@ -215,7 +272,7 @@ export struct ChatContent {
       const cleaned = this.cleanInline(rawCells[index].trim());
       cells.push(cleaned.length > 0 ? cleaned : ' ');
     }
-    return cells.slice(0, 8);
+    return cells;
   }
 
   private isTableDivider(cells: string[]): boolean {
@@ -231,6 +288,36 @@ export struct ChatContent {
     return divider;
   }
 
+  private tableText(block: MarkdownBlock): string {
+    const columns = block.tableColumns ?? block.cells ?? [];
+    const rows = block.tableRows ?? [];
+    return columns.join('  ·  ') + (rows.length > 0 ? ' · ' + rows.length.toString() + ' 行' : '');
+  }
+
+  private tableColumns(block: MarkdownBlock): string[] {
+    const columns = block.tableColumns ?? block.cells ?? [];
+    return columns.slice(0, 8);
+  }
+
+  private tableRows(block: MarkdownBlock): string[][] {
+    const rows = block.tableRows ?? [];
+    return rows.slice(0, 20);
+  }
+
+  private tableCell(row: string[], index: number): string {
+    const value = row[index] ?? ' ';
+    return value.length > 0 ? value : ' ';
+  }
+
+  private tableOverflowText(block: MarkdownBlock): string {
+    const rows = block.tableRows ?? [];
+    const rowText = rows.length > 20 ? '其余 ' + (rows.length - 20).toString() + ' 行已折叠' : '';
+    const columns = block.tableColumns ?? block.cells ?? [];
+    const columnText = columns.length > 8 ? '其余 ' + (columns.length - 8).toString() + ' 列已折叠' : '';
+    if (rowText.length > 0 && columnText.length > 0) return rowText + '，' + columnText;
+    return rowText.length > 0 ? rowText : columnText;
+  }
+
   private codeLanguageLabel(block: MarkdownBlock): string {
     const language = block.language ?? '';
     return language.length > 0 ? language : '代码片段';
@@ -243,16 +330,17 @@ export struct ChatContent {
 
   private codeRows(block: MarkdownBlock): string[] {
     const rows = block.rows ?? [];
-    const visibleRows = rows.length > 0 ? rows.slice(0, 80) : [block.text];
-    if (rows.length > 80) {
-      visibleRows.push('... 其余代码已折叠');
-    }
-    return visibleRows;
+    return rows.length > 0 ? rows.slice(0, 80) : [block.text];
+  }
+
+  private codeOverflowText(block: MarkdownBlock): string {
+    const rows = block.rows ?? [];
+    return rows.length > 80 ? '其余 ' + (rows.length - 80).toString() + ' 行代码已折叠' : '';
   }
 
   private codeExplainPrompt(block: MarkdownBlock): string {
     const clipped = block.text.length > 800 ? block.text.slice(0, 800) + '\n...' : block.text;
-    return '请解释这段代码的执行过程和关键状态：\n```' + (block.language ?? '') + '\n' + clipped + '\n```';
+    return '请用推演方式解释这段代码的思路、状态变化和可能输出：\n```' + (block.language ?? '') + '\n' + clipped + '\n```';
   }
 
   private cleanInline(text: string): string {
@@ -337,7 +425,7 @@ export struct ChatContent {
       if (this.messages.length === 0) {
         // 欢迎引导
         Column() {
-          // AI 头像
+          // 学伴头像
           SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
             .width(56)
             .height(56)
@@ -347,13 +435,13 @@ export struct ChatContent {
             .borderRadius(28)
             .shadow({ radius: 12, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 4 })
 
-          Text('你好，我是鸿学伴 AI 助教')
+          Text('你好，我是鸿学伴学伴')
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .margin({ top: 16 })
 
-          Text('可以问我任何学习相关的问题，我会从课程资料中检索并给出带引用的回答')
+          Text('可以问我任何学习相关的问题，我会查找课程资料并附上出处')
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 8, left: 32, right: 32 })
@@ -613,7 +701,7 @@ export struct ChatContent {
     if (agent === 'Quiz') return '生成练习';
     if (agent === 'Evaluator') return '分析薄弱点';
     if (agent === 'Safety') return '内容核对';
-    return agent;
+    return '整理回答';
   }
 
   private agentDescription(agent: string): string {
@@ -639,6 +727,13 @@ export struct ChatContent {
     const splitIndex = trace.indexOf(':');
     if (splitIndex <= 0) return '';
     return trace.slice(0, splitIndex);
+  }
+
+  private traceSummary(trace: string, index: number): string {
+    const agent = this.traceAgent(trace);
+    const title = this.agentLabel(agent);
+    const detail = this.agentDescription(agent);
+    return '第 ' + (index + 1).toString() + ' 步：' + title + ' · ' + detail;
   }
 
   private appendAgent(flow: string[], agent: string): void {
@@ -689,9 +784,9 @@ export struct ChatContent {
         .width('100%')
         .justifyContent(FlexAlign.End)
       } else {
-        // AI 消息（带头像）
+        // 学伴消息（带头像）
         Row({ space: 8 }) {
-          // AI 头像
+          // 学伴头像
           SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
             .width(32)
             .height(32)
@@ -817,7 +912,7 @@ export struct ChatContent {
             .fontColor([Constants.COLOR_SUCCESS])
         }
         Column({ space: 2 }) {
-          Text('回答生成过程')
+          Text('回答思路')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -846,8 +941,8 @@ export struct ChatContent {
 
       if (msg.agentExpanded) {
         Column({ space: 6 }) {
-          ForEach(msg.agentTrace, (trace: string): void => {
-            Text(trace)
+          ForEach(msg.agentTrace, (trace: string, index: number): void => {
+            Text(this.traceSummary(trace, index))
               .width('100%')
               .fontSize(11)
               .lineHeight(17)
@@ -974,6 +1069,13 @@ export struct ChatContent {
             .scrollable(ScrollDirection.Horizontal)
             .scrollBar(BarState.Auto)
 
+            if (this.codeOverflowText(block).length > 0) {
+              Text(this.codeOverflowText(block))
+                .fontSize(10)
+                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+            }
+
             Button({ type: ButtonType.Normal }) {
               Text('解释这段')
                 .fontSize(11)
@@ -995,17 +1097,43 @@ export struct ChatContent {
           .borderRadius(Constants.RADIUS_SM)
         } else if (block.type === 'table') {
           Scroll() {
-            Row({ space: 6 }) {
-              ForEach(block.cells ?? [], (cell: string): void => {
-                Text(cell)
-                  .constraintSize({ minWidth: 68, maxWidth: 160 })
-                  .fontSize(11)
-                  .lineHeight(18)
-                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                  .padding({ left: 8, right: 8, top: 7, bottom: 7 })
-                  .backgroundColor(Constants.COLOR_SURFACE_TINT)
-                  .borderRadius(Constants.RADIUS_SM)
+            Column({ space: 6 }) {
+              Row({ space: 6 }) {
+                ForEach(this.tableColumns(block), (cell: string): void => {
+                  Text(cell)
+                    .constraintSize({ minWidth: 82, maxWidth: 170 })
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Bold)
+                    .lineHeight(18)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                    .maxLines(3)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .padding({ left: 8, right: 8, top: 7, bottom: 7 })
+                    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                    .borderRadius(Constants.RADIUS_SM)
+                })
+              }
+              ForEach(this.tableRows(block), (row: string[], rowIndex: number): void => {
+                Row({ space: 6 }) {
+                  ForEach(this.tableColumns(block), (_: string, cellIndex: number): void => {
+                    Text(this.tableCell(row, cellIndex))
+                      .constraintSize({ minWidth: 82, maxWidth: 170 })
+                      .fontSize(11)
+                      .lineHeight(18)
+                      .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                      .maxLines(3)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .padding({ left: 8, right: 8, top: 7, bottom: 7 })
+                      .backgroundColor(rowIndex % 2 === 0 ? Constants.COLOR_SURFACE_TINT : Constants.COLOR_BG_CARD)
+                      .borderRadius(Constants.RADIUS_SM)
+                  })
+                }
               })
+              if (this.tableOverflowText(block).length > 0) {
+                Text(this.tableOverflowText(block))
+                  .fontSize(10)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              }
             }
             .padding({ left: 2, right: 2 })
           }
