@@ -5363,3 +5363,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未执行真实云端 Chat 发送并测量首 token 时间；本批次 Chat 去阻塞为源码确认、构建通过和模拟器主流程通过。
 - 未在模拟器中执行 Plan 云端生成；Plan 请求前画像去阻塞为源码确认与构建通过。
 - 真机未验证，未用 DevEco Profiler 量化请求发起前等待时间变化。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.12 AI 出题入口与本地兜底
+
+背景：继续只服务 HarmonyOS 端侧 App。只读审计确认课程页有“AI 出题”入口，但全量冒烟只覆盖离线精选练习；`Quiz.ets` 在 `/api/quiz` 不可用时只显示错误，评审现场网络或模型抖动会让课程测验页没有可继续操作的题组。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- AI 出题页在云端生成失败时，从 `LearningContentRepository.getQuestions()` 读取当前课程真实精选题，构造同一答题/评分结构继续答题。
+- 本地兜底题组的 `quizSource` 记录为 `curated`，结果页显示“本地精选题库”，不把兜底题伪装成 AI 成功。
+- AI 成功路径继续记录 `quizSource = ai`，结果页显示“AI 动态出题”。
+- Quiz 页消息增加错误/普通提示区分：云端失败但本地兜底成功显示普通提示；本地也无题时才显示错误。
+- 冒烟脚本新增课程列表“AI 出题”入口验证：进入 `pages/Quiz`，检查“选择本次练习主题”和“开始答题”，不触发云端模型生成。
+- 冒烟脚本对 `uitest dumpLayout` 增加 3 次短重试，并修正 `Ensure-RootPage()`：空 `pagePath` 只等待重读，只有明确位于非首页页面时才按 Back，避免 UI 树瞬时不完整时误退到系统桌面。
+
+验证：
+- `pwsh -NoProfile -Command '[scriptblock]::Create((Get-Content -Raw -Path "scripts/harmonyos-app-smoke.ps1")) | Out-Null'`：exit 0。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 325 ms`；仍提示未配置 signingConfigs。
+- 第一次新增入口后运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；新增 AI 出题入口段通过，后续学伴页 UI dump 返回 `Wait for subscribe uitest.broadcast.command.reply timeout`。
+- 第二次加长学伴等待后运行同一脚本：exit 1；首页校验阶段遇到同类 UI dump 超时。
+- 加固 `Get-UiTree()` dump 重试后第三次运行同一脚本：exit 1；主流程到 Profile 子页时空 `pagePath` 被 `Ensure-RootPage()` 连续 Back 误退到系统桌面。
+- 修正 `Ensure-RootPage()` 后最终运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 0，93 passed / 0 failed；覆盖构建、安装、启动、课程列表、AI 出题入口设置页、课程详情、精选练习、复盘追问进入学伴页、Profile 子页、学习星图三门课程和回首页。截图证据位于 `screenshots/trae-smoke-20260704-123753/`，不提交。
+
+未验证：
+- 未在模拟器中强制断网或劫持 `/api/quiz` 来执行本地兜底分支；兜底分支证据等级为源码确认与构建通过。
+- 未执行真实云端 AI 出题完整生成；本批次只验证入口设置页，避免把外部模型稳定性绑定到全量端侧冒烟。
+- 真机未验证。

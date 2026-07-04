@@ -7,6 +7,7 @@ import { Constants } from '../common/Constants';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
+  CuratedQuestion,
   QuizGradingItem,
   QuizPackage,
   QuizQuestionView,
@@ -15,6 +16,7 @@ import {
   QuizResultDetail,
 } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 
 interface DifficultyOption {
   value: string;
@@ -36,6 +38,7 @@ struct QuizPage {
   @State submitting: boolean = false;
   @State difficulty: string = 'medium';
   @State message: string = '';
+  @State messageIsError: boolean = false;
   @State resultReady: boolean = false;
   @State resultAccuracy: number = 0;
   @State resultCorrectCount: number = 0;
@@ -45,6 +48,7 @@ struct QuizPage {
   @State evaluation: string = '';
   @State weakTopics: string[] = [];
   @State progressStep: number = 0;
+  @State quizSource: string = 'ai';
   private grading: QuizGradingItem[] = [];
   private suggestions: string[] = ['二叉树与BST', '图的遍历', '动态规划'];
   private difficultyOptions: DifficultyOption[] = [
@@ -98,6 +102,7 @@ struct QuizPage {
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';
+      this.messageIsError = true;
     });
   }
 
@@ -107,12 +112,14 @@ struct QuizPage {
     this.answers = [];
     this.currentIndex = 0;
     this.message = '';
+    this.messageIsError = false;
     this.resultReady = false;
     this.resultDetails = [];
     this.expandedResultId = '';
     this.evaluation = '';
     this.weakTopics = [];
     this.grading = [];
+    this.quizSource = 'ai';
   }
 
   private reviewTopic(topic: string): void {
@@ -149,20 +156,75 @@ struct QuizPage {
       }
       const nextAnswers = new Array<string>(response.questions.length).fill('');
       this.quizId = response.quizId;
+      this.quizSource = 'ai';
       this.grading = response.grading;
       // 先提交答案槽位，最后提交题目，避免 ArkUI 在两次状态更新之间读取未初始化答案。
       this.answers = nextAnswers;
       this.questions = response.questions;
       if (this.questions.length === 0) {
         this.message = '当前主题暂时没有可用题目';
+        this.messageIsError = true;
       }
     } catch (e) {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'QuizPage API failed: %{public}s', (e as Error).message);
-      this.message = '云端学伴暂不可用，请检查网络后重试';
+      if (!this.useLocalFallbackQuiz()) {
+        this.message = '云端学伴暂不可用，本地精选题也未找到可用题目';
+        this.messageIsError = true;
+      }
     } finally {
       this.loading = false;
     }
+  }
+
+  private useLocalFallbackQuiz(): boolean {
+    const fallbackQuestions = this.findLocalFallbackQuestions();
+    if (fallbackQuestions.length === 0) return false;
+
+    const nextQuestions: QuizQuestionView[] = [];
+    const nextGrading: QuizGradingItem[] = [];
+    for (const question of fallbackQuestions) {
+      const tags: string[] = [question.topic];
+      nextQuestions.push({
+        id: question.id,
+        type: 'single_choice',
+        stem: question.question,
+        options: question.options,
+        tags: tags
+      });
+      nextGrading.push({
+        questionId: question.id,
+        answer: question.answer,
+        explanation: question.explanation,
+        tags: tags
+      });
+    }
+
+    this.quizId = 'curated-fallback-' + Date.now().toString();
+    this.quizSource = 'curated';
+    this.grading = nextGrading;
+    this.answers = new Array<string>(nextQuestions.length).fill('');
+    this.questions = nextQuestions;
+    this.currentIndex = 0;
+    this.message = '云端出题暂不可用，已切换到本地精选题组';
+    this.messageIsError = false;
+    return true;
+  }
+
+  private findLocalFallbackQuestions(): CuratedQuestion[] {
+    const topicText = this.topic.trim();
+    if (topicText.length > 0 && topicText !== '综合') {
+      const exactTopicQuestions = LearningContentRepository.getQuestions(this.courseId, topicText);
+      if (exactTopicQuestions.length > 0) return exactTopicQuestions.slice(0, 5);
+    }
+
+    const courseQuestions = LearningContentRepository.getQuestions(this.courseId);
+    if (topicText.length === 0 || topicText === '综合') return courseQuestions.slice(0, 5);
+
+    const query = topicText.toLowerCase();
+    const matched: CuratedQuestion[] = courseQuestions.filter((question: CuratedQuestion): boolean =>
+      question.topic.toLowerCase().includes(query) || question.question.toLowerCase().includes(query));
+    return (matched.length > 0 ? matched : courseQuestions).slice(0, 5);
   }
 
   async submitQuiz(): Promise<void> {
@@ -196,7 +258,7 @@ struct QuizPage {
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
       topic: this.topic,
-      source: 'ai',
+      source: this.quizSource,
       totalQuestions: this.questions.length,
       correctCount: correctCount,
       accuracy: this.questions.length > 0 ? correctCount / this.questions.length : 0,
@@ -219,6 +281,7 @@ struct QuizPage {
       this.resultReady = true;
     } catch (e) {
       this.message = '答题结果保存失败，请稍后重试';
+      this.messageIsError = true;
     } finally {
       this.submitting = false;
     }
@@ -249,6 +312,10 @@ struct QuizPage {
       if (option.value === this.difficulty) return option.label;
     }
     return '进阶';
+  }
+
+  private quizSourceLabel(): string {
+    return this.quizSource === 'ai' ? 'AI 动态出题' : '本地精选题库';
   }
 
   @Builder
@@ -373,10 +440,16 @@ struct QuizPage {
   QuestionState() {
     Column({ space: 16 }) {
       Row() {
-        Text('第 ' + (this.currentIndex + 1).toString() + ' 题')
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_BRAND)
+        Column({ space: 2 }) {
+          Text('第 ' + (this.currentIndex + 1).toString() + ' 题')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_BRAND)
+          Text(this.quizSourceLabel())
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .alignItems(HorizontalAlign.Start)
         Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -485,7 +558,7 @@ struct QuizPage {
           Text(this.resultAccuracy >= 0.8 ? '掌握得很好，可以进入下一主题' : '查看解析后，再练一组巩固薄弱点')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text('本次难度：' + this.difficultyLabel())
+          Text('本次来源：' + this.quizSourceLabel() + ' · 难度：' + this.difficultyLabel())
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
@@ -566,7 +639,7 @@ struct QuizPage {
         Text(this.message)
           .width('100%')
           .fontSize(12)
-          .fontColor(Constants.COLOR_ERROR)
+          .fontColor(this.messageIsError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
           .padding({ left: 18, right: 18, bottom: 10 })
       }
 

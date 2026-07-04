@@ -45,12 +45,17 @@ function Invoke-HdcShell([string[]]$arguments) {
 }
 
 function Get-UiTree() {
-    $dumpResult = Invoke-HdcShell @("uitest", "dumpLayout")
-    if ($dumpResult -notmatch 'DumpLayout saved to:(\S+)') {
-        throw "dumpLayout did not return a device JSON path: $dumpResult"
+    $lastDumpResult = ""
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $dumpResult = Invoke-HdcShell @("uitest", "dumpLayout")
+        if ($dumpResult -match 'DumpLayout saved to:(\S+)') {
+            $json = Invoke-HdcShell @("cat", $Matches[1])
+            return $json | ConvertFrom-Json
+        }
+        $lastDumpResult = $dumpResult
+        Start-Sleep -Milliseconds 500
     }
-    $json = Invoke-HdcShell @("cat", $Matches[1])
-    return $json | ConvertFrom-Json
+    throw "dumpLayout did not return a device JSON path: $lastDumpResult"
 }
 
 function Find-ElementByText($uiTree, $text) {
@@ -257,11 +262,15 @@ function Verify-Page($pagePath, $description) {
 }
 
 function Ensure-RootPage($description) {
-    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+    for ($attempt = 0; $attempt -lt 8; $attempt++) {
         $actual = Get-PagePath (Get-UiTree)
         if ($actual -eq 'pages/Index') {
             Write-Step "Page: $description" "PASS" $actual
             return $true
+        }
+        if ([string]::IsNullOrEmpty($actual)) {
+            Start-Sleep -Milliseconds 500
+            continue
         }
         Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
         Start-Sleep -Milliseconds 600
@@ -518,6 +527,18 @@ if ($uiTree) {
     Write-Step "Course list" "FAIL" "UI tree unavailable"
 }
 
+# 6.5 验证 AI 出题入口设置页，不触发云端生成
+Write-Output "`n[INFO] Verifying AI quiz entry..."
+if (-not (Click-Element "AI 出题" "AI quiz entry")) { exit 1 }
+if (-not (Verify-Page "pages/Quiz" "AI quiz setup")) { exit 1 }
+if (-not (Verify-TextExists "选择本次练习主题" "AI quiz topic setup")) { exit 1 }
+if (-not (Verify-TextExists "开始答题" "AI quiz start action")) { exit 1 }
+Take-Screenshot "03-ai-quiz-setup"
+Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
+Start-Sleep -Milliseconds 500
+if (-not (Verify-Page "pages/Index" "Root after AI quiz setup")) { exit 1 }
+if (-not (Verify-TextExists "数据结构" "Course tab restored after AI quiz")) { exit 1 }
+
 # 7. 进入课程详情与精选练习
 Write-Output "`n[INFO] Entering course detail and practice..."
 if (-not (Click-Element "进入课程" "First course")) { exit 1 }
@@ -566,7 +587,7 @@ Start-Sleep -Seconds 2
 Take-Screenshot "07-chat-tab"
 
 # 14. 验证 AI 学伴页面
-if (-not (Verify-TextExists "基于课程资料，为每个问题给出依据" "Chat status area")) { exit 1 }
+if (-not (Wait-TextExists "基于课程资料，为每个问题给出依据" "Chat status area" 15000)) { exit 1 }
 
 # 15. 点击"我的" Tab
 Write-Output "`n[INFO] Navigating to Profile tab..."
