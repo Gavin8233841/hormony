@@ -1,5 +1,6 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { ReviewItem } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -32,13 +33,19 @@ struct MistakeBookPage {
     }
   }
 
+  private courseTitle(courseId: string): string {
+    if (courseId === 'cs101') return '数据结构';
+    if (courseId === 'cs102') return '操作系统';
+    if (courseId === 'cs103') return '计算机网络';
+    return '课程';
+  }
+
   private retry(item: ReviewItem): void {
-    const titles: string[] = ['数据结构', '操作系统', '计算机网络'];
-    const ids: string[] = ['cs101', 'cs102', 'cs103'];
-    const index = ids.indexOf(item.courseId);
+    const topicQuestions = LearningContentRepository.getQuestions(item.courseId, item.topic);
+    const practiceTopic = topicQuestions.length > 0 ? item.topic : '';
     AppStorage.setOrCreate<string>('selectedCourseId', item.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', index >= 0 ? titles[index] : '课程');
-    AppStorage.setOrCreate<string>('selectedPracticeTopic', item.topic);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(item.courseId));
+    AppStorage.setOrCreate<string>('selectedPracticeTopic', practiceTopic);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'MistakeBookPage navigation failed: %{public}s', error.message);

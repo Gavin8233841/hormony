@@ -5367,3 +5367,24 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未新增模拟器截图；本批次为本地状态清洗逻辑，证据等级为构建通过。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：错题本重练入口兜底
+
+背景：继续自审“错题 -> 下一步练习”的闭环。Profile 与 ActivityRecords 的标签练习入口已在进入练习前校验本地精选题，但错题本仍直接把 `ReviewItem.topic` 写入 `selectedPracticeTopic`。旧 AI 综合测验、历史“综合”范围或课程目录外 Topic 可能因此进入空主题练习页。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+
+行为变化：
+- 错题本“重练主题”进入 Practice 前调用 `LearningContentRepository.getQuestions(courseId, topic)` 校验本地精选题。
+- 该 Topic 有精选题时进入主题练习；没有精选题时进入同课程综合练习，避免把用户带到“该主题暂无精选练习题”的空页。
+- 课程标题映射收敛为 `courseTitle(courseId)`，和画像页/记录页的标签练习入口保持同样的兜底语义。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 16 s 514 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未新增模拟器截图；本批次为错题本跳转参数保护，证据等级为构建通过。
+- 真机未验证。
