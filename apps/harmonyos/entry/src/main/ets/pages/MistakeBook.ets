@@ -23,7 +23,13 @@ struct MistakeBookPage {
       const dueItems = await LocalLearningRepository.getDueReviewItems();
       const activeItems = await LocalLearningRepository.getReviewItems();
       const dueIds = dueItems.map((item: ReviewItem): string => item.id);
-      this.items = dueItems.concat(activeItems.filter((item: ReviewItem): boolean => !dueIds.includes(item.id)));
+      const pendingItems = activeItems.filter((item: ReviewItem): boolean => !dueIds.includes(item.id))
+        .sort((left: ReviewItem, right: ReviewItem): number => {
+          const timeGap = new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime();
+          if (timeGap !== 0) return timeGap;
+          return right.attempts - left.attempts;
+        });
+      this.items = dueItems.concat(pendingItems);
       this.reviewSummary = this.items.length.toString() + ' 道待巩固 · ' +
         dueItems.length.toString() + ' 道今日复习';
     } catch (error) {
@@ -31,6 +37,15 @@ struct MistakeBookPage {
     } finally {
       this.loading = false;
     }
+  }
+
+  private isDue(item: ReviewItem): boolean {
+    return new Date(item.nextReviewAt).getTime() <= new Date().getTime();
+  }
+
+  private reviewDueText(item: ReviewItem): string {
+    if (this.isDue(item)) return '今日复习';
+    return '下次 ' + item.nextReviewAt.slice(5, 7) + '月' + item.nextReviewAt.slice(8, 10) + '日';
   }
 
   private courseTitle(courseId: string): string {
@@ -87,9 +102,14 @@ struct MistakeBookPage {
                     .padding({ left: 9, right: 9, top: 4, bottom: 4 })
                     .backgroundColor(Constants.COLOR_ERROR_LIGHT)
                     .borderRadius(Constants.RADIUS_SM)
-                  Text('错 ' + item.attempts.toString() + ' 次')
-                    .fontSize(11)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  Row({ space: 6 }) {
+                    Text(this.reviewDueText(item))
+                      .fontSize(11)
+                      .fontColor(this.isDue(item) ? Constants.COLOR_WARNING : Constants.COLOR_TEXT_SECONDARY)
+                    Text('错 ' + item.attempts.toString() + ' 次')
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  }
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
