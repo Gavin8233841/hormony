@@ -5676,3 +5676,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 外部资源只作为课程内延伸阅读文本展示，未验证系统浏览器打开、深链、复制链接或网络可达性。
 - Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.15课程页概念推演与练习反馈升级
+
+背景：继续推进 1.15 产品化路线中的 Lesson 概念玩具与固定示例推演。此前 `Lesson.ets` 已有 `LessonExperience.visualSteps`、`workedExampleSteps`、`activities` 和代码推演器雏形，但概念区仍偏静态流程，代码阅读缺少行号结构，主动练习反馈没有明确区分“你的推演 / 参考答案 / 差异点”，开放题自评也没有记录掌握和巩固差异。本批次只改页面 UI 与页面内状态，不改数据 schema、rawfile、依赖或 API。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `Lesson.ets` 新增 `conceptStepIndex` 和概念推演卡，将 `experience.visualSteps` 渲染为可横向滚动的“入口 / 状态 / 结果”链路，提供单一主动作“演示下一步 / 再演示一遍”，并显示当前步骤解释。
+- 代码阅读块升级为语言条、行数、行号和横向滚动结构；无语言时显示“代码片段”，避免英文兜底文案。
+- `activity.content` 为空但 `language` 为“代码阅读”时，阅读面板回退使用 `experience.workedExampleSteps`，避免部分代码阅读活动完全没有推演材料。
+- 练习反馈拆成三联面板：“你的推演”“参考答案”“差异点”，并使用 `activity.feedback` 做进一步解释；`activity.answer` 为空时回退到反馈要点，不显示空白参考答案。
+- 单选和排序练习会按正确与否记录到页面内 `masteredActivityIds` 或 `reviewActivityIds`；开放题的“还需巩固 / 我答对了”也写入不同页面状态，顶部练习进度可显示已掌握和需巩固数量。
+- 底部主按钮在最后一页且互动练习未完成时直接禁用，并在按钮上方显示原因；完成后仍进入 `Practice` 题组，不改变路由参数。
+- 学生端文案收束为“开始推演 / 继续推演 / 推演完成”，不使用容易让用户误解为执行任意代码的表达。
+
+协作审计：
+- 派发两个只读 explorer 子代理审计 Lesson 和 1.15 剩余产品化机会；两者均未编辑文件。已采纳低风险建议：单主动作、推演按钮文案、空内容回退、空答案回退、自评差异、底部禁用原因。主题专属画面、全局文案统一、Chat 表格结构化等建议保留给后续批次。
+
+验证：
+- `git status --short`：exit 0，启动时仅显示未跟踪 `.tmp/`。
+- `git log -5 --oneline`：exit 0，确认当前分支 HEAD 为 `41649b1 feat: 优化课程资料检索闭环`。
+- 读取 `lesson-experiences.json`：确认 33 个 Topic 已有 `LessonExperience`；活动总数 59；其中 23 个活动 `content` 为空，6 个活动 `answer` 为空，本批次在页面层提供回退展示。
+- 学生端旧技术文案与禁用英文词扫描：exit 1，无命中。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 18 s 694 ms`；`CompileArkTS` 重新执行并通过；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得 Lesson 页新截图；视觉验收仍需后续用 DevEco MCP 或可用设备流程补充。
+- 真机未验证。
+- 主题专属玩具画面未落地；本批次是 33 个 Topic 通用的可步进概念推演。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。

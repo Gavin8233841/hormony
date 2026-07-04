@@ -33,7 +33,10 @@ struct LessonPage {
   @State responseText: string = '';
   @State feedbackVisible: boolean = false;
   @State attemptedActivityIds: string[] = [];
+  @State masteredActivityIds: string[] = [];
+  @State reviewActivityIds: string[] = [];
   @State codeRunStepIndex: number = -1;
+  @State conceptStepIndex: number = 0;
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -67,6 +70,7 @@ struct LessonPage {
     this.currentIndex = index;
     this.activeChunk = this.chunks[index];
     this.message = '';
+    this.conceptStepIndex = 0;
     this.contentScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
   }
 
@@ -91,7 +95,7 @@ struct LessonPage {
     if (activity === null || this.feedbackVisible) return;
     this.selectedIndexes = [index];
     this.feedbackVisible = true;
-    this.markActivityAttempted(activity.id);
+    this.selfAssess(activity.id, this.activityIsCorrect());
   }
 
   private chooseOrderStep(index: number): void {
@@ -103,7 +107,7 @@ struct LessonPage {
     const activity = this.activeActivity();
     if (activity === null || this.selectedIndexes.length !== activity.options.length) return;
     this.feedbackVisible = true;
-    this.markActivityAttempted(activity.id);
+    this.selfAssess(activity.id, this.activityIsCorrect());
   }
 
   private revealFreeResponse(): void {
@@ -115,8 +119,19 @@ struct LessonPage {
     this.feedbackVisible = true;
   }
 
-  private selfAssess(activityId: string): void {
+  private selfAssess(activityId: string, mastered: boolean): void {
     this.markActivityAttempted(activityId);
+    if (mastered) {
+      if (!this.masteredActivityIds.includes(activityId)) {
+        this.masteredActivityIds = this.masteredActivityIds.concat([activityId]);
+      }
+      this.reviewActivityIds = this.reviewActivityIds.filter((id: string): boolean => id !== activityId);
+    } else {
+      if (!this.reviewActivityIds.includes(activityId)) {
+        this.reviewActivityIds = this.reviewActivityIds.concat([activityId]);
+      }
+      this.masteredActivityIds = this.masteredActivityIds.filter((id: string): boolean => id !== activityId);
+    }
   }
 
   private markActivityAttempted(activityId: string): void {
@@ -136,6 +151,19 @@ struct LessonPage {
     if (this.experience === null) return true;
     return this.experience.activities.every((activity: LearningActivity): boolean =>
       this.attemptedActivityIds.includes(activity.id));
+  }
+
+  private canCompleteCurrent(): boolean {
+    if (this.saving) return false;
+    if (this.currentIndex === this.chunks.length - 1 && !this.allActivitiesAttempted()) return false;
+    return true;
+  }
+
+  private completionBlockReason(): string {
+    if (this.currentIndex === this.chunks.length - 1 && !this.allActivitiesAttempted()) {
+      return '完成本主题的互动练习后，才能进入题组练习。';
+    }
+    return '';
   }
 
   private showIntroExperience(): boolean {
@@ -187,17 +215,119 @@ struct LessonPage {
 
   private activityProgressText(): string {
     if (this.experience === null || this.experience.activities.length === 0) return '无互动练习';
-    return this.attemptedActivityIds.length.toString() + '/' + this.experience.activities.length.toString() + ' 已练';
+    let text = this.attemptedActivityIds.length.toString() + '/' + this.experience.activities.length.toString() + ' 已练';
+    if (this.masteredActivityIds.length > 0) text += ' · ' + this.masteredActivityIds.length.toString() + ' 已掌握';
+    if (this.reviewActivityIds.length > 0) text += ' · ' + this.reviewActivityIds.length.toString() + ' 需巩固';
+    return text;
+  }
+
+  private conceptStepCount(): number {
+    return this.experience === null ? 0 : this.experience.visualSteps.length;
+  }
+
+  private conceptStepLabel(index: number): string {
+    if (index === 0) return '入口';
+    if (index === this.conceptStepCount() - 1) return '结果';
+    return '状态';
+  }
+
+  private conceptStepActive(index: number): boolean {
+    return index <= this.conceptStepIndex;
+  }
+
+  private conceptProgressText(): string {
+    const total = this.conceptStepCount();
+    if (total === 0) return '0/0';
+    return (Math.min(this.conceptStepIndex + 1, total)).toString() + '/' + total.toString();
+  }
+
+  private conceptInsightText(): string {
+    if (this.experience === null || this.experience.visualSteps.length === 0) {
+      return '先把概念拆成入口、状态和结果，再进入正文。';
+    }
+    const current = this.experience.visualSteps[this.conceptStepIndex] ?? this.experience.visualSteps[0];
+    if (this.conceptStepIndex >= this.experience.visualSteps.length - 1) {
+      return '完整链路已走到「' + current + '」，下一步用正文判断每一步为什么成立。';
+    }
+    const next = this.experience.visualSteps[this.conceptStepIndex + 1] ?? current;
+    return '当前在「' + current + '」，下一步会进入「' + next + '」。';
+  }
+
+  private conceptActionLabel(): string {
+    if (this.experience === null || this.experience.visualSteps.length === 0) return '暂无步骤';
+    if (this.conceptStepIndex >= this.experience.visualSteps.length - 1) return '再演示一遍';
+    return '演示下一步';
+  }
+
+  private advanceConcept(): void {
+    const total = this.conceptStepCount();
+    if (total === 0) return;
+    if (this.conceptStepIndex >= total - 1) {
+      this.conceptStepIndex = 0;
+    } else {
+      this.conceptStepIndex += 1;
+    }
+  }
+
+  private readingLines(activity: LearningActivity): string[] {
+    if (activity.content.trim().length > 0) return activity.content.split('\n');
+    if (this.experience !== null && this.experience.workedExampleSteps.length > 0 &&
+      activity.language === '代码阅读') {
+      return this.experience.workedExampleSteps;
+    }
+    return [];
+  }
+
+  private hasReadingPanel(activity: LearningActivity): boolean {
+    return this.readingLines(activity).length > 0;
+  }
+
+  private codeLines(activity: LearningActivity): string[] {
+    return this.readingLines(activity);
+  }
+
+  private codeLineCount(activity: LearningActivity): string {
+    return this.codeLines(activity).length.toString() + ' 行';
+  }
+
+  private selectedAnswerText(activity: LearningActivity): string {
+    if (activity.interactionMode === 'free_response') {
+      const value = this.responseText.trim();
+      return value.length > 0 ? value : '未填写';
+    }
+    if (this.selectedIndexes.length === 0) return '未选择';
+    const values = this.selectedIndexes.map((index: number): string => activity.options[index] ?? '');
+    return values.filter((value: string): boolean => value.length > 0).join(
+      activity.interactionMode === 'ordered_choice' ? ' → ' : '、'
+    );
+  }
+
+  private answerDifferenceText(activity: LearningActivity): string {
+    if (activity.interactionMode === 'free_response') {
+      return '把自己的推演和参考答案逐句对照，重点看遗漏条件和边界情况。';
+    }
+    if (this.activityIsCorrect()) {
+      return '你的选择和参考答案一致，继续看解释里的关键状态变化。';
+    }
+    return '先找出分歧步骤，再回到代码或流程图复盘状态变化。';
+  }
+
+  private referenceAnswerText(activity: LearningActivity): string {
+    const answer = activity.answer.trim();
+    if (answer.length > 0) return answer;
+    const feedback = activity.feedback.trim();
+    if (feedback.length > 0) return feedback;
+    return '这类推演题按状态链自查：条件是否齐全、顺序是否正确、边界是否覆盖。';
   }
 
   private codeRunSteps(activity: LearningActivity): string[] {
-    const contentLines = activity.content
-      .split('\n')
+    const contentLines = this.readingLines(activity)
       .map((line: string): string => line.trim())
       .filter((line: string): boolean => line.length > 0 && line !== '代码：');
     const firstLine = contentLines.length > 0 ? contentLines[0] : '题干';
     const lastLine = contentLines.length > 1 ? contentLines[contentLines.length - 1] : firstLine;
-    const answer = activity.answer.length > 36 ? activity.answer.substring(0, 36) + '…' : activity.answer;
+    const reference = this.referenceAnswerText(activity);
+    const answer = reference.length > 36 ? reference.substring(0, 36) + '…' : reference;
     return [
       '入口：从「' + firstLine + '」开始，圈出输入、状态变量和输出位置。',
       '状态：逐行更新变量或指针，遇到空缺先写下自己的预测，不急着看答案。',
@@ -211,9 +341,9 @@ struct LessonPage {
   }
 
   private codeRunButtonLabel(activity: LearningActivity): string {
-    if (this.codeRunStepIndex < 0) return '运行推演';
-    if (this.codeRunStepIndex < this.codeRunSteps(activity).length - 1) return '下一步';
-    return '已完成推演';
+    if (this.codeRunStepIndex < 0) return '开始推演';
+    if (this.codeRunStepIndex < this.codeRunSteps(activity).length - 1) return '继续推演';
+    return '推演完成';
   }
 
   private advanceCodeRun(activity: LearningActivity): void {
@@ -320,34 +450,211 @@ struct LessonPage {
   }
 
   @Builder
+  private ConceptNode(step: string, index: number) {
+    Column({ space: 6 }) {
+      Text(this.conceptStepLabel(index))
+        .fontSize(10)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.conceptStepActive(index) ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
+        .padding({ left: 7, right: 7, top: 3, bottom: 3 })
+        .backgroundColor(this.conceptStepActive(index) ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+        .borderRadius(8)
+      Text(step)
+        .width('100%')
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .lineHeight(18)
+        .fontColor(this.conceptStepActive(index) ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_SECONDARY)
+        .textAlign(TextAlign.Center)
+        .maxLines(3)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width(108)
+    .constraintSize({ minHeight: 86 })
+    .padding({ left: 10, right: 10, top: 10, bottom: 10 })
+    .backgroundColor(this.conceptStepActive(index) ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_SURFACE_TINT)
+    .border({
+      width: 1,
+      color: index === this.conceptStepIndex ? Constants.COLOR_BRAND : Constants.COLOR_BORDER
+    })
+    .borderRadius(Constants.RADIUS_MD)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private ConceptToyCard() {
+    if (this.experience !== null) {
+      Column({ space: 12 }) {
+        Row() {
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.rays'))
+              .fontSize(17)
+              .fontColor([Constants.COLOR_WARNING])
+            Text('概念推演')
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          }
+          Text(this.conceptProgressText())
+            .fontSize(11)
+            .fontColor(Constants.COLOR_BRAND)
+            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(10)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(this.experience.visualSteps, (step: string, index: number): void => {
+              this.ConceptNode(step, index)
+              if (index < this.experienceStepCount() - 1) {
+                Text('→')
+                  .fontSize(18)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(index < this.conceptStepIndex ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER)
+              }
+            })
+          }
+          .padding({ left: 2, right: 2 })
+        }
+        .width('100%')
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+
+        Text(this.conceptInsightText())
+          .width('100%')
+          .fontSize(12)
+          .lineHeight(19)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          .padding(12)
+          .backgroundColor(Constants.COLOR_SURFACE_TINT)
+          .borderRadius(Constants.RADIUS_SM)
+
+        Button(this.conceptActionLabel())
+          .width('100%')
+          .height(40)
+          .fontSize(12)
+          .enabled(this.conceptStepCount() > 0)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.advanceConcept(); })
+        Text(this.conceptStepIndex === 0 ? '从入口开始，逐步推进。' : '点击主动作继续；走到结果后会自动回到入口。')
+          .width('100%')
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .textAlign(TextAlign.Center)
+      }
+      .width('100%')
+      .padding(14)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .border({ width: 1, color: Constants.COLOR_BORDER })
+      .borderRadius(Constants.RADIUS_MD)
+    }
+  }
+
+  @Builder
   private CodeBlock(activity: LearningActivity) {
     Column({ space: 8 }) {
       Row() {
-        Text(activity.language.length > 0 ? activity.language : 'code')
+        Text(activity.language.length > 0 ? activity.language : '代码片段')
           .fontSize(11)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-        Text('阅读后再作答')
+        Text(this.codeLineCount(activity) + ' · 阅读后再作答')
           .fontSize(11)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
       Scroll() {
-        Text(activity.content)
-          .width('100%')
-          .fontSize(12)
-          .fontFamily('monospace')
-          .lineHeight(20)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+        Column({ space: 0 }) {
+          ForEach(this.codeLines(activity), (line: string, index: number): void => {
+            Row({ space: 10 }) {
+              Text((index + 1).toString())
+                .width(28)
+                .fontSize(11)
+                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                .textAlign(TextAlign.End)
+              Text(line.length > 0 ? line : ' ')
+                .fontSize(12)
+                .lineHeight(20)
+                .fontFamily('monospace')
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            }
+            .constraintSize({ minHeight: 22 })
+          })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 10, right: 12, top: 10, bottom: 10 })
       }
       .width('100%')
       .constraintSize({ maxHeight: 220 })
+      .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Auto)
     }
     .width('100%')
-    .padding(14)
     .backgroundColor(Constants.COLOR_MAP_SURFACE)
+    .borderRadius(Constants.RADIUS_SM)
+  }
+
+  @Builder
+  private FeedbackFact(label: string, value: string, color: string, background: string) {
+    Column({ space: 5 }) {
+      Text(label)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(color)
+      Text(value)
+        .width('100%')
+        .fontSize(12)
+        .lineHeight(19)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        .maxLines(4)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(background)
+    .borderRadius(Constants.RADIUS_SM)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private FeedbackPanel(activity: LearningActivity) {
+    Column({ space: 10 }) {
+      Row() {
+        Text(activity.interactionMode === 'free_response' ? '对照答案' :
+          (this.activityIsCorrect() ? '回答正确' : '需要复盘'))
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(activity.interactionMode === 'free_response' || this.activityIsCorrect() ?
+            Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+        Text('来源：' + activity.source)
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      this.FeedbackFact('你的推演', this.selectedAnswerText(activity), Constants.COLOR_BRAND, Constants.COLOR_BRAND_LIGHT)
+      this.FeedbackFact('参考答案', this.referenceAnswerText(activity), Constants.COLOR_SUCCESS, Constants.COLOR_SUCCESS_LIGHT)
+      this.FeedbackFact('差异点', this.answerDifferenceText(activity), Constants.COLOR_WARNING, Constants.COLOR_BG_TAG)
+
+      Text(activity.feedback)
+        .width('100%')
+        .fontSize(12)
+        .lineHeight(20)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(activity.interactionMode === 'free_response' || this.activityIsCorrect() ?
+      Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_SURFACE_TINT)
     .borderRadius(Constants.RADIUS_SM)
   }
 
@@ -371,7 +678,7 @@ struct LessonPage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      Text('不是远程沙盒：它按“入口 → 状态 → 出口”帮你手动运行一遍，先形成预测，再对照答案。')
+      Text('入口 → 状态 → 出口三步推演：先形成预测，再对照答案。')
         .width('100%')
         .fontSize(12)
         .lineHeight(19)
@@ -491,23 +798,7 @@ struct LessonPage {
           .width('100%')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Row({ space: 6 }) {
-          ForEach(this.experience.visualSteps, (step: string, index: number): void => {
-            Text(step)
-              .layoutWeight(1)
-              .constraintSize({ minHeight: 44 })
-              .fontSize(11)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(index === this.experienceStepCount() - 1 ?
-                Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-              .textAlign(TextAlign.Center)
-              .padding({ left: 4, right: 4, top: 6, bottom: 6 })
-              .backgroundColor(index === this.experienceStepCount() - 1 ?
-                Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(Constants.RADIUS_SM)
-          })
-        }
-        .width('100%')
+        this.ConceptToyCard()
       }
       .width('100%')
 
@@ -604,7 +895,7 @@ struct LessonPage {
             .lineHeight(25)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
-          if (this.activeActivity()!.content.length > 0) {
+          if (this.hasReadingPanel(this.activeActivity()!)) {
             this.CodeBlock(this.activeActivity()!)
             this.CodeRunPanel(this.activeActivity()!)
           }
@@ -658,34 +949,7 @@ struct LessonPage {
           }
 
           if (this.feedbackVisible) {
-            Column({ space: 8 }) {
-              Text(this.activeActivity()!.interactionMode === 'free_response' ?
-                '标准答案' : (this.activityIsCorrect() ? '回答正确' : '对照正确答案'))
-                .fontSize(13)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
-                  Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-              Text(this.activeActivity()!.answer)
-                .width('100%')
-                .fontSize(13)
-                .lineHeight(21)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              Text(this.activeActivity()!.feedback)
-                .width('100%')
-                .fontSize(12)
-                .lineHeight(20)
-                .fontColor(Constants.COLOR_TEXT_TERTIARY)
-              Text('来源：' + this.activeActivity()!.source)
-                .width('100%')
-                .fontSize(11)
-                .lineHeight(18)
-                .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            }
-            .width('100%')
-            .padding(14)
-            .backgroundColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
-              Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_SM)
+            this.FeedbackPanel(this.activeActivity()!)
 
             if (this.activeActivity()!.interactionMode === 'free_response' &&
               !this.attemptedActivityIds.includes(this.activeActivity()!.id)) {
@@ -696,14 +960,14 @@ struct LessonPage {
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   .backgroundColor(Constants.COLOR_BG_TAG)
                   .borderRadius(Constants.RADIUS_MD)
-                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id); })
+                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id, false); })
                 Button('我答对了')
                   .layoutWeight(1)
                   .height(44)
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   .backgroundColor(Constants.COLOR_SUCCESS)
                   .borderRadius(Constants.RADIUS_MD)
-                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id); })
+                  .onClick((): void => { this.selfAssess(this.activeActivity()!.id, true); })
               }
               .width('100%')
             }
@@ -711,10 +975,10 @@ struct LessonPage {
 
           if (this.attemptedActivityIds.includes(this.activeActivity()!.id)) {
             Row() {
-              Text('本练习已完成')
+              Text(this.reviewActivityIds.includes(this.activeActivity()!.id) ? '已记录：需要巩固' : '本练习已完成')
                 .fontSize(12)
                 .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_SUCCESS)
+                .fontColor(this.reviewActivityIds.includes(this.activeActivity()!.id) ? Constants.COLOR_WARNING : Constants.COLOR_SUCCESS)
               if (this.activeActivityIndex < this.experience.activities.length - 1) {
                 Button('下一练习')
                   .height(40)
@@ -889,6 +1153,14 @@ struct LessonPage {
             .padding({ left: 18, right: 18, top: 8 })
         }
 
+        if (this.completionBlockReason().length > 0) {
+          Text(this.completionBlockReason())
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_WARNING)
+            .padding({ left: 18, right: 18, top: 8 })
+        }
+
         Row({ space: 10 }) {
           Button('上一篇')
             .width(92)
@@ -902,10 +1174,10 @@ struct LessonPage {
           Button(this.finalActionLabel())
             .layoutWeight(1)
             .height(48)
-            .enabled(!this.saving)
+            .enabled(this.canCompleteCurrent())
             .fontSize(14)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .backgroundColor(Constants.COLOR_BRAND)
+            .fontColor(this.canCompleteCurrent() ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            .backgroundColor(this.canCompleteCurrent() ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => { this.completeCurrent(); })
         }
