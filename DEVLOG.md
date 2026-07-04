@@ -5711,3 +5711,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 主题专属玩具画面未落地；本批次是 33 个 Topic 通用的可步进概念推演。
 - Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.15测验与练习结果复盘入口补齐
+
+背景：继续推进 1.15 产品化路线中的 Quiz/Practice 结果页下一步动作。此前结果页已有“查资料 / 问学伴”，但低分或部分错误后缺少直达错题本与重新学习主题的动作。本批次只在结果页补齐学习闭环，不改评分、错题写入、题库、API 或本地 schema。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `DEVLOG.md`
+
+行为变化：
+- `Quiz.ets` 结果页“本轮标签下一步”从两动作扩展为“查资料 / 学主题 / 复盘错题 / 问学伴”；`Practice.ets` 同步采用同一动作结构。
+- “学主题”仅在 `LearningContentRepository.getKnowledge(courseId, topic)` 能找到真实本地课程内容时启用，避免把“综合”或标签词当作课程主题写入 `selectedContentTopic`。
+- “复盘错题”直达 `pages/MistakeBook`，利用提交后已由 `LocalLearningRepository` 写入的错题队列，不新增空入口。
+- Quiz 生成阶段学生端文案从技术化表达收束为“正在生成练习题”；文件头说明同步去技术化。
+- 本批次未新增 OHPM 依赖、未修改 `oh-package.json5`、未修改题库源、未修改 API 契约或本地数据 schema。
+
+验证：
+- `git status --short`：exit 0，启动时仅显示未跟踪 `.tmp/`。
+- `git log -5 --oneline`：exit 0，确认当前分支 HEAD 为 `a5ab19a feat: 增强课程页概念推演体验`。
+- 学生端旧技术文案与禁用英文词扫描：exit 1，无命中。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 18 s 348 ms`；`CompileArkTS` 重新执行并通过；仍提示未配置 signingConfigs，生成 unsigned HAP。
+
+未验证：
+- 本批次未安装新 HAP 到模拟器，未取得 Quiz/Practice 结果页新截图；需后续用固定答题流程补模拟器 UI 树与截图。
+- 真机未验证。
+- Web 未运行；原因是只改 HarmonyOS 页面和 DEVLOG，未修改 Web 源码、配置、依赖或 API 契约。

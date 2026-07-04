@@ -1,5 +1,5 @@
 /**
- * 课程测验页 - 真实 AI 出题、本地评分与学习记录
+ * 课程测验页 - 真实生成练习、本地评分与学习记录
  */
 
 import { AnswerOption, GradientHeader, ReviewDetailRow, StagedProgress, WorkStep } from '../common/Builders';
@@ -7,6 +7,7 @@ import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { HttpClient } from '../common/HttpClient';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import {
   QuizPackage,
   QuizRequest,
@@ -125,6 +126,32 @@ struct QuizPage {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'QuizPage knowledge router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
+  private openLessonFromResult(): void {
+    if (!this.hasResultLessonTopic()) {
+      this.message = '当前主题暂无课程内容，先查看资料或复盘错题';
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedContentTopic', this.topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Lesson' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'QuizPage lesson router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
+  private hasResultLessonTopic(): boolean {
+    return this.topic.trim().length > 0 &&
+      LearningContentRepository.getKnowledge(this.courseId, this.topic).length > 0;
+  }
+
+  private openMistakeBook(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeBook' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'QuizPage mistake book router.pushUrl failed: %{public}s', err.message);
     });
   }
 
@@ -391,7 +418,7 @@ struct QuizPage {
   @Builder
   GenerationProgress() {
     StagedProgress(
-      this.progressStep >= 2 ? '正在整理题目标签' : 'AI 正在生成题目',
+      this.progressStep >= 2 ? '正在整理题目标签' : '正在生成练习题',
       this.progressStep >= 2 ? '校验 A-D 选项、解析和能力标签' : '检索课程资料、匹配难度、生成可评分题组',
       this.progressStep,
       this.generationSteps
@@ -603,6 +630,26 @@ struct QuizPage {
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .borderRadius(Constants.RADIUS_MD)
               .onClick((): void => { this.reviewTopic(this.topic); })
+            Button('学主题')
+              .layoutWeight(1)
+              .height(40)
+              .fontSize(13)
+              .enabled(this.hasResultLessonTopic())
+              .fontColor(this.hasResultLessonTopic() ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .backgroundColor(this.hasResultLessonTopic() ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BUTTON_DISABLED_BG)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.openLessonFromResult(); })
+          }
+          .width('100%')
+          Row({ space: 10 }) {
+            Button('复盘错题')
+              .layoutWeight(1)
+              .height(40)
+              .fontSize(13)
+              .fontColor(this.resultCorrectCount < this.resultTotalQuestions ? Constants.COLOR_WARNING : Constants.COLOR_TEXT_SECONDARY)
+              .backgroundColor(Constants.COLOR_BG_TAG)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.openMistakeBook(); })
             Button('问学伴')
               .layoutWeight(1)
               .height(40)

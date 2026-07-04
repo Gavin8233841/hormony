@@ -118,6 +118,30 @@ struct PracticePage {
     });
   }
 
+  private openLessonFromResult(): void {
+    if (!this.hasResultLessonTopic()) {
+      this.message = '当前主题暂无课程内容，先查看资料或复盘错题';
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedContentTopic', this.topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Lesson' }).catch((): void => {
+      this.message = '无法打开课程内容，请重试';
+    });
+  }
+
+  private hasResultLessonTopic(): boolean {
+    return this.topic.trim().length > 0 &&
+      LearningContentRepository.getKnowledge(this.courseId, this.topic).length > 0;
+  }
+
+  private openMistakeBook(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeBook' }).catch((): void => {
+      this.message = '无法打开错题本，请重试';
+    });
+  }
+
   private askAboutResultTags(): void {
     const tags = this.resultFocusTags();
     const tagText = tags.length > 0 ? tags.join('、') : (this.topic.length > 0 ? this.topic : '本轮精选练习');
@@ -380,6 +404,26 @@ struct PracticePage {
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .borderRadius(Constants.RADIUS_MD)
               .onClick((): void => { this.reviewTopic(); })
+            Button('学主题')
+              .layoutWeight(1)
+              .height(40)
+              .fontSize(13)
+              .enabled(this.hasResultLessonTopic())
+              .fontColor(this.hasResultLessonTopic() ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .backgroundColor(this.hasResultLessonTopic() ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BUTTON_DISABLED_BG)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.openLessonFromResult(); })
+          }
+          .width('100%')
+          Row({ space: 10 }) {
+            Button('复盘错题')
+              .layoutWeight(1)
+              .height(40)
+              .fontSize(13)
+              .fontColor(this.correctCount < this.questions.length ? Constants.COLOR_WARNING : Constants.COLOR_TEXT_SECONDARY)
+              .backgroundColor(Constants.COLOR_BG_TAG)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.openMistakeBook(); })
             Button('问学伴')
               .layoutWeight(1)
               .height(40)
