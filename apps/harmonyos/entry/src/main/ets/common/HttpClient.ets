@@ -144,28 +144,38 @@ export class HttpClient {
     let eventBuffer: string = '';
     const decoder = util.TextDecoder.create('utf-8');
 
-    const consumeText = (text: string): void => {
-      eventBuffer += text;
+    const consumeText = (text: string): boolean => {
+      eventBuffer += text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       const frames = eventBuffer.split('\n\n');
       eventBuffer = frames.pop() ?? '';
+      let sawDoneEvent: boolean = false;
 
       for (const frame of frames) {
-        const trimmed = frame.trim();
-        if (!trimmed.startsWith('data:')) {
+        const dataLines: string[] = [];
+        for (const rawLine of frame.split('\n')) {
+          const line = rawLine.trimEnd();
+          if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).trimStart());
+          }
+        }
+        if (dataLines.length === 0) {
           continue;
         }
-        const jsonStr = trimmed.replace(/^data:\s*/, '');
+        const jsonStr = dataLines.join('\n').trim();
+        if (jsonStr.length === 0) continue;
         try {
           const evt: StreamEvent = JSON.parse(jsonStr);
           onEvent(evt);
           if (evt.type === 'done' && !doneCalled) {
             doneCalled = true;
             onDone();
+            sawDoneEvent = true;
           }
         } catch (e) {
           // 完整 SSE 帧无法解析时跳过，避免单条异常数据中断整个对话。
         }
       }
+      return sawDoneEvent;
     };
 
     const startRequest = (baseIndex: number): void => {
@@ -185,16 +195,38 @@ export class HttpClient {
           // 监听器可能已移除，忽略
         }
         try {
+          httpRequest.off('dataEnd');
+        } catch (e) {
+          // 监听器可能已移除，忽略
+        }
+        try {
           httpRequest.destroy();
         } catch (e) {
           // 请求可能已销毁，忽略
         }
       };
 
+      const finishStream = (): void => {
+        if (eventBuffer.trim().length > 0) {
+          consumeText('\n\n');
+        }
+        if (!doneCalled) {
+          doneCalled = true;
+          onDone();
+        }
+        cleanup();
+      };
+
       httpRequest.on('dataReceive', (data: ArrayBuffer) => {
         receivedData = true;
         const text = decoder.decodeToString(new Uint8Array(data), { stream: true });
-        consumeText(text);
+        if (consumeText(text)) {
+          cleanup();
+        }
+      });
+
+      httpRequest.on('dataEnd', () => {
+        finishStream();
       });
 
       httpRequest.requestInStream(Constants.API_BASE_URLS[baseIndex] + path, {
@@ -212,12 +244,14 @@ export class HttpClient {
           cleanup();
           return;
         }
-        if (!doneCalled) {
-          doneCalled = true;
-          onDone();
+        if (!receivedData) {
+          finishStream();
         }
-        cleanup();
       }).catch((e: Error) => {
+        if (doneCalled) {
+          cleanup();
+          return;
+        }
         cleanup();
         if (!receivedData && baseIndex + 1 < Constants.API_BASE_URLS.length) {
           startRequest(baseIndex + 1);

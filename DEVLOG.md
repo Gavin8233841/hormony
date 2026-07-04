@@ -5892,6 +5892,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-04 Codex：Chat SSE 流式接收稳健化
+
+背景：继续处理云端学伴真实可用性。端侧 Chat 已能打开学伴页并具备 Markdown 阅读卡，但 SSE 客户端仍存在过早完成和帧解析不够稳健的风险：不能只把 `requestInStream` 的 200 当成回答完成信号，必须按 SSE 的 `data:` 帧和服务端 `done` 事件收尾。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`
+
+行为变化：
+- `HttpClient.postSSE()` 支持 `\r\n`/`\r` 归一化，避免不同换行格式导致帧分割失败。
+- 支持一个 SSE frame 内多行 `data:` 拼接，再统一 JSON 解析。
+- 收到服务端 `done` 事件后会触发 `onDone()` 并清理请求，避免请求悬挂到超时。
+- 新增 `dataEnd` 监听；流结束时会尝试处理残留 buffer，再按未收到 `done` 的情况完成收尾。
+- `requestInStream` 返回 200 时不再直接销毁已有流式请求；只有无数据返回时才按空响应收尾。
+- 请求被 `done` 正常清理后，后续销毁引发的 catch 不再上报业务错误。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `HttpClient.ets`、`Chat.ets`：`no diagnostics`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 13 s 680 ms`；仍提示未配置 signingConfigs。
+- 线上 `POST https://hormony-ruddy.vercel.app/api/chat`：curl SSE 请求返回 `LEN=2595`、`HAS_DELTA=True`、`HAS_DONE=True`、`HAS_TABLE=True`、`HAS_CODE=True`，请求内容要求 Markdown 表格和 Java 代码，证明云端真实返回流式 Markdown/代码内容。
+- `hdc shell aa force-stop com.c4ai.hormony && hdc install entry-default-unsigned.hap && hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，安装和启动成功。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，证据 `.tmp/codex-chat-sse-20260704-ui/simple_dump_hormony_20260704182511044.txt` 包含 `bundleName:com.c4ai.hormony`、`学伴`、`基于课程资料，为每个问题给出依据`、输入框 hint `输入你的问题...`。
+- DevEco MCP `get_hilog_or_faultlog_recent` 针对 `bundle_name=com.c4ai.hormony`、`keyword=TypeError`：未发现新错误日志。
+
+失败或未验证：
+- 本批次仍未完成“端侧输入问题 → Chat SSE 返回真实 Markdown/代码/表格 → 端侧渲染截图”的完整模拟器点击链路，不能标记为端侧 Chat 问答模拟器通过。
+- 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
 ## 2026-07-04 Codex：学伴 Markdown 阅读卡增强
 
 背景：用户指出云端学伴 Markdown 文本仍不能正确渲染，不能把 AI 回答当作一坨纯文字。本批次在不新增 OHPM 依赖、不引入 ArkWeb 的前提下，继续增强 HarmonyOS 端 Chat 的零依赖 Markdown 渲染器，使标题、列表、任务项、引用、表格、链接清洗和代码块更接近真实学习产品的阅读体验。
