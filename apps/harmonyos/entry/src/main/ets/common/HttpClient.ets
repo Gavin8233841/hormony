@@ -10,12 +10,35 @@ import { Constants } from './Constants';
 import { HealthResponse, StreamEvent } from '../model/DataModels';
 
 export class HttpClient {
+  private static preferredBaseUrl: string = '';
+
+  private static orderedBaseUrls(): string[] {
+    const urls: string[] = [];
+    if (HttpClient.preferredBaseUrl.length > 0) {
+      for (const baseUrl of Constants.API_BASE_URLS) {
+        if (baseUrl === HttpClient.preferredBaseUrl) {
+          urls.push(baseUrl);
+        }
+      }
+    }
+    for (const baseUrl of Constants.API_BASE_URLS) {
+      if (!urls.includes(baseUrl)) {
+        urls.push(baseUrl);
+      }
+    }
+    return urls;
+  }
+
+  private static markPreferredBaseUrl(baseUrl: string): void {
+    HttpClient.preferredBaseUrl = baseUrl;
+  }
+
   /**
    * 发送 GET 请求
    */
   static async get<T>(path: string): Promise<T> {
     let lastNetworkError: Error = new Error('Network request failed');
-    for (const baseUrl of Constants.API_BASE_URLS) {
+    for (const baseUrl of HttpClient.orderedBaseUrls()) {
       const httpRequest = http.createHttp();
       try {
         const response = await httpRequest.request(baseUrl + path, {
@@ -33,6 +56,7 @@ export class HttpClient {
           throw new Error('Response is not a string');
         }
         const parsed: T = JSON.parse(result);
+        HttpClient.markPreferredBaseUrl(baseUrl);
         return parsed;
       } catch (e) {
         const error = e instanceof Error ? e : new Error('Network request failed');
@@ -55,7 +79,7 @@ export class HttpClient {
   static async getHealth(): Promise<HealthResponse> {
     let lastNetworkError: Error = new Error('Network request failed');
     let degradedResponse: HealthResponse | null = null;
-    for (const baseUrl of Constants.API_BASE_URLS) {
+    for (const baseUrl of HttpClient.orderedBaseUrls()) {
       const httpRequest = http.createHttp();
       try {
         const response = await httpRequest.request(baseUrl + Constants.API_HEALTH, {
@@ -71,6 +95,7 @@ export class HttpClient {
         }
         const parsed: HealthResponse = JSON.parse(result);
         if (response.responseCode === 200) {
+          HttpClient.markPreferredBaseUrl(baseUrl);
           return parsed;
         }
         if (response.responseCode === 503) {
@@ -98,7 +123,7 @@ export class HttpClient {
    */
   static async post<T>(path: string, body: string, readTimeout: number = Constants.MODEL_REQUEST_TIMEOUT): Promise<T> {
     let lastNetworkError: Error = new Error('Network request failed');
-    for (const baseUrl of Constants.API_BASE_URLS) {
+    for (const baseUrl of HttpClient.orderedBaseUrls()) {
       const httpRequest = http.createHttp();
       try {
         const response = await httpRequest.request(baseUrl + path, {
@@ -122,6 +147,7 @@ export class HttpClient {
           throw new Error('Response is not a string');
         }
         const parsed: T = JSON.parse(result);
+        HttpClient.markPreferredBaseUrl(baseUrl);
         return parsed;
       } catch (e) {
         const error = e instanceof Error ? e : new Error('Network request failed');
@@ -142,7 +168,7 @@ export class HttpClient {
    */
   static async patch<T>(path: string, body: string): Promise<T> {
     let lastNetworkError: Error = new Error('Network request failed');
-    for (const baseUrl of Constants.API_BASE_URLS) {
+    for (const baseUrl of HttpClient.orderedBaseUrls()) {
       const httpRequest = http.createHttp();
       try {
         const response = await httpRequest.request(baseUrl + path, {
@@ -161,6 +187,7 @@ export class HttpClient {
           throw new Error('Response is not a string');
         }
         const parsed: T = JSON.parse(result);
+        HttpClient.markPreferredBaseUrl(baseUrl);
         return parsed;
       } catch (e) {
         const error = e instanceof Error ? e : new Error('Network request failed');
@@ -191,6 +218,7 @@ export class HttpClient {
   ): void {
     let doneCalled: boolean = false;
     let eventBuffer: string = '';
+    const baseUrls = HttpClient.orderedBaseUrls();
     const decoder = util.TextDecoder.create('utf-8');
 
     const consumeText = (text: string): void => {
@@ -242,11 +270,12 @@ export class HttpClient {
 
       httpRequest.on('dataReceive', (data: ArrayBuffer) => {
         receivedData = true;
+        HttpClient.markPreferredBaseUrl(baseUrls[baseIndex]);
         const text = decoder.decodeToString(new Uint8Array(data), { stream: true });
         consumeText(text);
       });
 
-      httpRequest.requestInStream(Constants.API_BASE_URLS[baseIndex] + path, {
+      httpRequest.requestInStream(baseUrls[baseIndex] + path, {
         method: http.RequestMethod.POST,
         header: {
           'Content-Type': 'application/json',
@@ -258,7 +287,7 @@ export class HttpClient {
       }).then((responseCode: number) => {
         if (responseCode !== 200) {
           cleanup();
-          if (responseCode >= 500 && !receivedData && baseIndex + 1 < Constants.API_BASE_URLS.length) {
+          if (responseCode >= 500 && !receivedData && baseIndex + 1 < baseUrls.length) {
             startRequest(baseIndex + 1);
             return;
           }
@@ -269,10 +298,11 @@ export class HttpClient {
           doneCalled = true;
           onDone();
         }
+        HttpClient.markPreferredBaseUrl(baseUrls[baseIndex]);
         cleanup();
       }).catch((e: Error) => {
         cleanup();
-        if (!receivedData && baseIndex + 1 < Constants.API_BASE_URLS.length) {
+        if (!receivedData && baseIndex + 1 < baseUrls.length) {
           startRequest(baseIndex + 1);
           return;
         }

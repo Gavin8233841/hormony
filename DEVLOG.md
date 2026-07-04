@@ -5425,3 +5425,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未强制制造 `/api/quiz` 慢响应来观察 15 秒快速兜底实际触发；本批次快速兜底为源码确认与构建通过。
 - 全量模拟器冒烟本批次未最终通过；不能标记为模拟器通过。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.12 云端成功地址会话优先
+
+背景：继续只服务 HarmonyOS 端侧 App。只读审计确认 `HttpClient` 每次 GET、POST、PATCH 和 Chat SSE 都按固定 `BASE_URL -> SIMULATOR_GATEWAY_URL` 顺序尝试。如果模拟器或现场网络实际只适合后一个地址，每次请求都会重复先等前一个地址失败，放大学伴、资料检索、计划和出题入口的首包等待。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/HttpClient.ets
+- DEVLOG.md
+
+行为变化：
+- `HttpClient` 新增内存级 `preferredBaseUrl`，成功收到 200 或 SSE 数据后记录本会话成功地址。
+- 后续 GET、健康探测、POST、PATCH 和 Chat SSE 使用 `orderedBaseUrls()`，将上次成功地址排到最前，其余地址保持原顺序兜底。
+- 仍然是串行请求，不并发打两个模型端点，不重复生成 Plan/Quiz/Chat。
+- 不写入 ArkData、文件、环境变量或云端状态；App 重启后恢复 `Constants.API_BASE_URLS` 默认顺序。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 76 ms`；仍提示未配置 signingConfigs。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；设备连接、构建、安装、启动、首页、课程页和课程列表通过，AI 出题入口点击后 `pages/Quiz` 页面判断读到空 `pagePath` 退出。该失败未覆盖本批次 `HttpClient` 成功地址优先逻辑，不能作为端到端通过证据。
+
+未验证：
+- 未通过网络代理或日志证明成功地址优先减少了后续请求耗时；本批次收益为源码确认与构建通过。
+- 全量模拟器冒烟未最终通过；真机未验证。
