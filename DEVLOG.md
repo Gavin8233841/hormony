@@ -5949,3 +5949,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未成功完成“端侧输入问题 → Chat SSE 返回真实 Markdown/代码/表格 → 端侧渲染截图”的完整点击链路；一次模拟器坐标输入后页面焦点回到首页，未作为通过证据。
 - 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：学伴 Markdown 表格碎片收束
+
+背景：模拟器真实历史回答暴露了 raw Markdown 硬伤：AI 学伴返回的对比表仍以 `|...|`、`|----|`、`**粗体**` 和 `---` 形式出现在阅读区。该问题直接影响“云端学伴 Markdown 文本正确渲染”的真实可用性。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- Chat 渲染前新增 `readableMarkdown()` 归一化层，不改变模型原始回复和本地历史，只在显示前处理 Markdown。
+- 表格行在显示前被整理为“表格整理 + 对比维度要点”，避免端侧把 raw table delimiter 暴露给用户。
+- 表格行碎片会尝试合并到上一行，收束模型流式输出或窄屏换行造成的半行表格。
+- 分隔线 `---` 不再作为普通文本显示。
+- Markdown 粗体残留 `**...**` / `__...__` 会在显示前清洗，编号列表和表格单元格中也会生效。
+- 代码块围栏内文本不参与归一化清洗，继续交给现有代码块渲染器展示语言、行号和“解释这段”入口。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --no-incremental`：exit 0，`BUILD SUCCESSFUL in 18 s 331 ms`；仍提示未配置 signingConfigs。
+- `hdc shell aa force-stop com.c4ai.hormony`：exit 0，`force stop process successfully`。
+- `hdc install C:\Users\guo82\Desktop\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap`：exit 0，`install bundle successfully`。
+- `hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，`start ability successfully`。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，竖屏，窗口 `bundleName:com.c4ai.hormony`、`WindowRect: [ 0, 0, 1256, 2760 ]`，证据 `.tmp/codex-chat-table-fragment-20260704-ui/simple_dump_hormony_20260704223957337.txt` 包含“学伴”“基于课程资料”“数组和链表的核心区别是什么”“表格整理”“数组（顺序表）：”“链表：”“参考资料 (3)”和输入框 hint `输入你的问题...`。
+- 同一 UI 树负向扫描：`text: \| => 0`、`\|---- => 0`、`\|------- => 0`、`\*\* => 0`、`text: --- => 0`。
+- DevEco MCP `perform_ui_action screenshot`：模拟器 `Pura 90 Pro Max`，截图 `.tmp/codex-chat-table-fragment-20260704-ui/chat_table_fragment_fixed.png` 已保存，证据不提交仓库。
+
+失败或未验证：
+- DevEco MCP `check_ets_files` 本批次两次返回 `Failed to flush stdin: 管道正在被关闭。 (os error 232)`；该工具调用失败未作为源码诊断通过证据。HAP 构建已覆盖 ArkTS 编译。
+- 本批次使用已有真实 Chat 历史回答验证显示层；未重新完成“输入新问题 → SSE 流式返回 → 保存历史”的完整端侧链路。
+- 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

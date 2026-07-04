@@ -134,10 +134,10 @@ export struct ChatContent {
       } else if (this.numberedText(trimmed).length > 0) {
         this.pushTableBlock(blocks, tableRows);
         blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
-      } else if (this.isTableRow(trimmed)) {
+      } else if (this.looksLikeTableLine(trimmed)) {
         const tableText = this.tableText(trimmed);
         if (tableText.length > 0) {
-          tableRows.push(tableText);
+          this.appendTableRow(tableRows, tableText, trimmed);
         }
       } else if (this.isDivider(trimmed)) {
         this.pushTableBlock(blocks, tableRows);
@@ -155,6 +155,70 @@ export struct ChatContent {
       blocks.push({ type: 'paragraph', text: content });
     }
     return blocks;
+  }
+
+  private readableMarkdown(content: string): string {
+    const lines: string[] = [];
+    const tableRows: string[] = [];
+    let inCode = false;
+    for (const rawLine of content.split('\n')) {
+      const line = rawLine.trimEnd();
+      const trimmed = line.trim();
+      if (trimmed.startsWith('```')) {
+        this.pushReadableTable(lines, tableRows);
+        lines.push(line);
+        inCode = !inCode;
+        continue;
+      }
+      if (inCode) {
+        lines.push(line);
+        continue;
+      }
+      if (this.looksLikeTableLine(trimmed)) {
+        const tableText = this.tableText(trimmed);
+        if (tableText.length > 0) {
+          this.appendTableRow(tableRows, tableText, trimmed);
+        }
+        continue;
+      }
+      this.pushReadableTable(lines, tableRows);
+      if (this.isDivider(trimmed)) {
+        if (lines.length > 0 && lines[lines.length - 1].trim().length > 0) {
+          lines.push('');
+        }
+        continue;
+      }
+      lines.push(this.cleanInline(line));
+    }
+    this.pushReadableTable(lines, tableRows);
+    return lines.join('\n');
+  }
+
+  private pushReadableTable(lines: string[], tableRows: string[]): void {
+    if (tableRows.length === 0) return;
+    const header = this.tableCells(tableRows[0]);
+    if (header.length > 1 && tableRows.length > 1) {
+      lines.push('表格整理');
+      for (let rowIndex = 1; rowIndex < tableRows.length; rowIndex++) {
+        const cells = this.tableCells(tableRows[rowIndex]);
+        if (cells.length === header.length && cells.length > 1) {
+          lines.push('- ' + cells[0]);
+          for (let cellIndex = 1; cellIndex < cells.length; cellIndex++) {
+            lines.push('- ' + header[cellIndex] + '：' + cells[cellIndex]);
+          }
+        } else if (cells.length > 0) {
+          lines.push('- ' + cells.join(' / '));
+        }
+      }
+    } else {
+      for (const row of tableRows) {
+        const cells = this.tableCells(row);
+        if (cells.length > 0) {
+          lines.push('- ' + cells.join(' / '));
+        }
+      }
+    }
+    tableRows.splice(0, tableRows.length);
   }
 
   private pushTableBlock(blocks: MarkdownBlock[], tableRows: string[]): void {
@@ -228,6 +292,18 @@ export struct ChatContent {
     return line.indexOf('|') >= 0 && line.indexOf('|') !== line.lastIndexOf('|');
   }
 
+  private looksLikeTableLine(line: string): boolean {
+    if (this.isTableRow(line)) return true;
+    if (!line.startsWith('|')) return false;
+    const text = line.replace(/\|/g, '').trim();
+    if (text.length === 0) return true;
+    let divider = true;
+    for (const ch of text) {
+      if (ch !== '-' && ch !== ':' && ch !== ' ') divider = false;
+    }
+    return divider || text.length > 0;
+  }
+
   private tableText(line: string): string {
     const cells: string[] = [];
     for (const cell of line.split('|')) {
@@ -249,6 +325,20 @@ export struct ChatContent {
     return cells.join('|');
   }
 
+  private appendTableRow(tableRows: string[], tableText: string, rawLine: string): void {
+    const cells = this.tableCells(tableText);
+    if (cells.length === 0) return;
+    if (tableRows.length > 0 && rawLine.startsWith('|') && cells.length === 1) {
+      const lastIndex = tableRows.length - 1;
+      const lastCells = this.tableCells(tableRows[lastIndex]);
+      if (lastCells.length > 0 && lastCells.length < 3) {
+        tableRows[lastIndex] = tableRows[lastIndex] + '|' + cells[0];
+        return;
+      }
+    }
+    tableRows.push(tableText);
+  }
+
   private cleanInline(text: string): string {
     return text
       .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
@@ -260,6 +350,8 @@ export struct ChatContent {
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&amp;/g, '&')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
       .replace(/\*\*/g, '')
       .replace(/__/g, '')
       .replace(/\*/g, '')
@@ -802,7 +894,7 @@ export struct ChatContent {
 
             if (msg.content.length > 0) {
               Column() {
-                this.MarkdownContent(msg.content, msg.failed)
+                this.MarkdownContent(this.readableMarkdown(msg.content), msg.failed)
               }
                 .padding(12)
                 .backgroundColor(msg.failed ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_CARD)
