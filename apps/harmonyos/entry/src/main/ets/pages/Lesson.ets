@@ -32,6 +32,8 @@ struct LessonPage {
   @State responseText: string = '';
   @State feedbackVisible: boolean = false;
   @State attemptedActivityIds: string[] = [];
+  @State activeVisualStep: number = 0;
+  @State outputVisible: boolean = false;
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -65,6 +67,9 @@ struct LessonPage {
     this.currentIndex = index;
     this.activeChunk = this.chunks[index];
     this.message = '';
+    if (index === 0) {
+      this.activeVisualStep = 0;
+    }
     this.contentScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
   }
 
@@ -77,6 +82,7 @@ struct LessonPage {
     this.selectedIndexes = [];
     this.responseText = '';
     this.feedbackVisible = false;
+    this.outputVisible = false;
   }
 
   private experienceStepCount(): number {
@@ -182,9 +188,115 @@ struct LessonPage {
     return '把正文拆成判断点，逐条确认自己是否能复述。';
   }
 
+  private masteryExplain(): string {
+    if (this.experience !== null && this.experience.visualSteps.length > 1) {
+      return '说清「' + this.experience.visualSteps[0] + ' → ' +
+        this.experience.visualSteps[this.experience.visualSteps.length - 1] + '」';
+    }
+    return this.topic.length > 0 ? '说清' + this.topic + '的核心概念' : '说清本节核心概念';
+  }
+
+  private masteryJudge(): string {
+    if (this.showPracticeExperience()) return '判断练习里的关键条件';
+    return '判断案例里该用哪条规则';
+  }
+
+  private masteryStep(): string {
+    if (this.experience !== null && this.experience.activities.length > 0) {
+      return '完成 ' + this.experience.activities.length.toString() + ' 个互动练习';
+    }
+    return '写出一次下一步推演';
+  }
+
   private activityProgressText(): string {
     if (this.experience === null || this.experience.activities.length === 0) return '无互动练习';
     return this.attemptedActivityIds.length.toString() + '/' + this.experience.activities.length.toString() + ' 已练';
+  }
+
+  private safeVisualStepIndex(): number {
+    if (this.experience === null || this.experience.visualSteps.length === 0) return 0;
+    if (this.activeVisualStep < 0) return 0;
+    if (this.activeVisualStep >= this.experience.visualSteps.length) return this.experience.visualSteps.length - 1;
+    return this.activeVisualStep;
+  }
+
+  private visualStepTitle(): string {
+    if (this.experience === null || this.experience.visualSteps.length === 0) return '';
+    return this.experience.visualSteps[this.safeVisualStepIndex()];
+  }
+
+  private visualStepRelation(): string {
+    if (this.experience === null || this.experience.visualSteps.length === 0) return '暂无步骤可对照';
+    const index = this.safeVisualStepIndex();
+    const current = this.experience.visualSteps[index];
+    const previous = index > 0 ? this.experience.visualSteps[index - 1] : '';
+    const next = index < this.experience.visualSteps.length - 1 ? this.experience.visualSteps[index + 1] : '';
+    if (previous.length > 0 && next.length > 0) {
+      return '前一步是「' + previous + '」，当前确认「' + current + '」，下一步进入「' + next + '」。';
+    }
+    if (next.length > 0) {
+      return '从「' + current + '」开始观察，下一步进入「' + next + '」。';
+    }
+    if (previous.length > 0) {
+      return '从「' + previous + '」推进到「' + current + '」，这一步收束本节概念链。';
+    }
+    return '当前步骤是「' + current + '」。';
+  }
+
+  private choiceLabel(index: number): string {
+    const labels: string[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    if (index >= 0 && index < labels.length) return labels[index];
+    return (index + 1).toString();
+  }
+
+  private selectedAnswerText(activity: LearningActivity): string {
+    if (activity.interactionMode === 'free_response') {
+      const text = this.responseText.trim();
+      return text.length > 0 ? text : '未填写';
+    }
+    if (this.selectedIndexes.length === 0) return '未选择';
+    const parts: string[] = [];
+    for (let i = 0; i < this.selectedIndexes.length; i++) {
+      const optionIndex = this.selectedIndexes[i];
+      const option = activity.options[optionIndex] ?? '';
+      parts.push(this.choiceLabel(optionIndex) + '：' + option);
+    }
+    return parts.join(activity.interactionMode === 'ordered_choice' ? ' → ' : '；');
+  }
+
+  private standardAnswerText(activity: LearningActivity): string {
+    const answer = activity.answer.trim();
+    if (answer.length > 0) return answer;
+    if (activity.answerIndexes.length > 0 && activity.options.length > 0) {
+      const parts: string[] = [];
+      for (let i = 0; i < activity.answerIndexes.length; i++) {
+        const optionIndex = activity.answerIndexes[i];
+        const option = activity.options[optionIndex] ?? '';
+        parts.push(this.choiceLabel(optionIndex) + '：' + option);
+      }
+      return parts.join(activity.interactionMode === 'ordered_choice' ? ' → ' : '；');
+    }
+    return '见关键反馈';
+  }
+
+  private shouldShowOutputResult(activity: LearningActivity): boolean {
+    return activity.content.length > 0 ||
+      activity.type === 'output_predict' ||
+      activity.type === 'code_fill' ||
+      activity.type === 'state_trace';
+  }
+
+  private outputResultTitle(activity: LearningActivity): string {
+    if (activity.type === 'output_predict') return '运行结果';
+    if (activity.type === 'code_fill') return '标准填空';
+    if (activity.type === 'state_trace') return '状态结果';
+    return '对照结果';
+  }
+
+  private outputResultBody(activity: LearningActivity): string {
+    const answer = this.standardAnswerText(activity);
+    if (answer !== '见关键反馈') return answer;
+    return activity.feedback;
   }
 
   private async completeCurrent(): Promise<void> {
@@ -256,9 +368,9 @@ struct LessonPage {
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
       Row({ space: 8 }) {
-        this.MasterySignal('目标', this.topic.length > 0 ? this.topic : this.courseTitle)
-        this.MasterySignal('方法', this.currentLearningFocus())
-        this.MasterySignal('反馈', this.showPracticeExperience() ? '做完练习后进题组' : '完成本节后继续')
+        this.MasterySignal('能解释', this.masteryExplain())
+        this.MasterySignal('能判断', this.masteryJudge())
+        this.MasterySignal('能写出一步', this.masteryStep())
       }
       .width('100%')
     }
@@ -360,6 +472,185 @@ struct LessonPage {
   }
 
   @Builder
+  private ConceptToy() {
+    if (this.experience !== null) {
+      Column({ space: 12 }) {
+        Row() {
+          Row({ space: 7 }) {
+            SymbolGlyph($r('sys.symbol.book_open_fill'))
+              .fontSize(16)
+              .fontColor([Constants.COLOR_BRAND])
+            Text('概念玩具')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_BRAND)
+          }
+          .layoutWeight(1)
+          Text((this.safeVisualStepIndex() + 1).toString() + ' / ' + this.experience.visualSteps.length.toString())
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+
+        Progress({
+          value: this.safeVisualStepIndex() + 1,
+          total: this.experience.visualSteps.length,
+          type: ProgressType.Linear
+        })
+          .width('100%')
+          .color(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+
+        Column({ space: 8 }) {
+          ForEach(this.experience.visualSteps, (step: string, index: number): void => {
+            Row({ space: 10 }) {
+              Stack({ alignContent: Alignment.Center }) {
+                Column()
+                  .width(32)
+                  .height(32)
+                  .backgroundColor(index === this.safeVisualStepIndex() ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+                  .borderRadius(16)
+                Text((index + 1).toString())
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(index === this.safeVisualStepIndex() ?
+                    Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND)
+              }
+              Column({ space: 3 }) {
+                Text(step)
+                  .width('100%')
+                  .fontSize(13)
+                  .fontWeight(index === this.safeVisualStepIndex() ? FontWeight.Bold : FontWeight.Medium)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  .maxLines(2)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                Text(index === this.safeVisualStepIndex() ? '正在点亮这一步' : '等待对照')
+                  .width('100%')
+                  .fontSize(10)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+              if (index === this.safeVisualStepIndex()) {
+                SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+                  .fontSize(18)
+                  .fontColor([Constants.COLOR_SUCCESS])
+              }
+            }
+            .width('100%')
+            .padding(10)
+            .backgroundColor(index === this.safeVisualStepIndex() ?
+              Constants.COLOR_BRAND_LIGHT : Constants.COLOR_SURFACE_TINT)
+            .borderRadius(Constants.RADIUS_SM)
+            .onClick((): void => {
+              this.activeVisualStep = index;
+            })
+          })
+        }
+        .width('100%')
+
+        Column({ space: 6 }) {
+          Text('当前步骤：' + this.visualStepTitle())
+            .width('100%')
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.visualStepRelation())
+            .width('100%')
+            .fontSize(12)
+            .lineHeight(20)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+        .borderRadius(Constants.RADIUS_SM)
+      }
+      .width('100%')
+      .padding(14)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .border({ width: 1, color: Constants.COLOR_BORDER })
+      .borderRadius(Constants.RADIUS_MD)
+    }
+  }
+
+  @Builder
+  private CodeReadingTriad(activity: LearningActivity) {
+    Row({ space: 8 }) {
+      this.MasterySignal('题意', activity.title)
+      this.MasterySignal('代码', activity.language.length > 0 ? activity.language : '固定示例')
+      this.MasterySignal('输出或状态表', this.feedbackVisible ? this.standardAnswerText(activity) : '先预测')
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private FeedbackFact(label: string, value: string, strong: boolean) {
+    Column({ space: 5 }) {
+      Text(label)
+        .fontSize(10)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Text(value)
+        .width('100%')
+        .fontSize(12)
+        .fontWeight(strong ? FontWeight.Bold : FontWeight.Medium)
+        .lineHeight(19)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        .maxLines(4)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .layoutWeight(1)
+    .constraintSize({ minHeight: 76 })
+    .padding(10)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_SM)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private OutputResult(activity: LearningActivity) {
+    if (this.shouldShowOutputResult(activity)) {
+      Button(this.outputVisible ? '收起固定结果' : '查看' + this.outputResultTitle(activity))
+        .width('100%')
+        .height(42)
+        .fontSize(12)
+        .fontColor(this.outputVisible ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_ON_GRADIENT)
+        .backgroundColor(this.outputVisible ? Constants.COLOR_BG_TAG : Constants.COLOR_BRAND)
+        .borderRadius(Constants.RADIUS_SM)
+        .onClick((): void => {
+          this.outputVisible = !this.outputVisible;
+        })
+
+      if (this.outputVisible) {
+        Column({ space: 6 }) {
+          Row() {
+            Text(this.outputResultTitle(activity))
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_SUCCESS)
+            Text('固定示例，不执行用户代码')
+              .fontSize(10)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          Text(this.outputResultBody(activity))
+            .width('100%')
+            .fontSize(13)
+            .fontFamily('monospace')
+            .lineHeight(21)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+        .borderRadius(Constants.RADIUS_SM)
+      }
+    }
+  }
+
+  @Builder
   private IntroExperience() {
     if (this.experience !== null) {
       Column({ space: 14 }) {
@@ -377,23 +668,7 @@ struct LessonPage {
           .width('100%')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Row({ space: 6 }) {
-          ForEach(this.experience.visualSteps, (step: string, index: number): void => {
-            Text(step)
-              .layoutWeight(1)
-              .constraintSize({ minHeight: 44 })
-              .fontSize(11)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(index === this.experienceStepCount() - 1 ?
-                Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-              .textAlign(TextAlign.Center)
-              .padding({ left: 4, right: 4, top: 6, bottom: 6 })
-              .backgroundColor(index === this.experienceStepCount() - 1 ?
-                Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(Constants.RADIUS_SM)
-          })
-        }
-        .width('100%')
+        this.ConceptToy()
       }
       .width('100%')
 
@@ -491,6 +766,7 @@ struct LessonPage {
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
           if (this.activeActivity()!.content.length > 0) {
+            this.CodeReadingTriad(this.activeActivity()!)
             this.CodeBlock(this.activeActivity()!)
           }
 
@@ -543,23 +819,33 @@ struct LessonPage {
           }
 
           if (this.feedbackVisible) {
-            Column({ space: 8 }) {
+            Column({ space: 10 }) {
               Text(this.activeActivity()!.interactionMode === 'free_response' ?
-                '标准答案' : (this.activityIsCorrect() ? '回答正确' : '对照正确答案'))
+                '先预测再揭示' : (this.activityIsCorrect() ? '回答正确' : '对照正确答案'))
                 .fontSize(13)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
                   Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-              Text(this.activeActivity()!.answer)
-                .width('100%')
-                .fontSize(13)
-                .lineHeight(21)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              Text(this.activeActivity()!.feedback)
-                .width('100%')
-                .fontSize(12)
-                .lineHeight(20)
-                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+              Row({ space: 8 }) {
+                this.FeedbackFact('你的推演', this.selectedAnswerText(this.activeActivity()!), false)
+                this.FeedbackFact('标准答案', this.standardAnswerText(this.activeActivity()!), true)
+              }
+              .width('100%')
+              Column({ space: 5 }) {
+                Text('差异点')
+                  .fontSize(10)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                Text(this.activeActivity()!.feedback)
+                  .width('100%')
+                  .fontSize(12)
+                  .lineHeight(20)
+                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
+              }
+              .width('100%')
+              .padding(10)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .borderRadius(Constants.RADIUS_SM)
+              this.OutputResult(this.activeActivity()!)
               Text('来源：' + this.activeActivity()!.source)
                 .width('100%')
                 .fontSize(11)
@@ -759,7 +1045,7 @@ struct LessonPage {
           .width('100%')
           .constraintSize({ minHeight: '100%' })
           .justifyContent(FlexAlign.Start)
-          .padding({ left: 18, right: 18, top: 4, bottom: 24 })
+          .padding({ left: 18, right: 18, top: 4, bottom: 132 })
         }
         .width('100%')
         .layoutWeight(1)
