@@ -5982,3 +5982,40 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次使用已有真实 Chat 历史回答验证显示层；未重新完成“输入新问题 → SSE 流式返回 → 保存历史”的完整端侧链路。
 - 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：AI 出题等待反馈与入口可达性
+
+背景：用户指出 AI 出题期间页面缺少进度反馈，容易像卡住；同时模拟器核验时发现课程详情主题卡的第三个“AI 测验”入口在当前布局下不可见，影响从主题学习闭环进入真实 AI 出题。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+
+行为变化：
+- Quiz 生成等待态升级为可解释面板：显示“AI 正在生成题组”、课程/主题/难度/题量摘要、分阶段进度、检查点和等待说明。
+- 出题进度从 3 阶段扩展为 4 阶段：检索、构题、校验、装配；长等待时显示“页面没有卡住，返回后会自动进入答题”。
+- 等待态补充骨架答题卡，让用户知道正在准备题干、选项和标签，不再出现空白等待感。
+- CourseDetail 主题卡改为“AI 测验 · 生成标签化题组”主按钮，下面保留“学习内容 / 精选练习”两个次按钮，确保 AI 测验入口在当前设备宽度下可见。
+- AI 题组生成成功后仍进入现有题目页，并保留难度与标签展示。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --no-incremental`：exit 0，`BUILD SUCCESSFUL in 21 s 477 ms`；仍提示未配置 signingConfigs。
+- `hdc shell aa force-stop com.c4ai.hormony`：exit 0，`force stop process successfully`。
+- `hdc install C:\Users\guo82\Desktop\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap`：exit 0，`install bundle successfully`。
+- `hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，`start ability successfully`。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，竖屏，窗口 `bundleName:com.c4ai.hormony`、`WindowRect: [ 0, 0, 1256, 2760 ]`。
+- 课程列表 UI 树证据 `.tmp/codex-quiz-progress-20260704-ui/simple_dump_hormony_20260704225356777.txt` 包含“我的课程”“数据结构”“进入课程”“AI 出题”，证明课程列表 AI 出题入口可达。
+- Quiz 设置页 UI 树证据 `.tmp/codex-quiz-progress-20260704-ui/simple_dump_hormony_20260704225438735.txt` 包含“课程测验”“选择本次练习主题”“挑战长度”“速练”“标准”“挑战”“难度分层”“基础”“进阶”“开始答题”。
+- 点击“开始答题”后等待态 UI 树证据 `.tmp/codex-quiz-progress-20260704-ui/simple_dump_hormony_20260704225518765.txt` 包含“AI 正在生成题组”“正在检索课程依据”“课程依据”“题目生成”“结构校验”“答题卡装配”“长题组仍在云端生成中：页面没有卡住，返回后会自动进入答题。”
+- DevEco MCP `perform_ui_action screenshot`：等待态截图 `.tmp/codex-quiz-progress-20260704-ui/quiz_generation_progress.png` 已保存，证据不提交仓库。
+- 生成完成 UI 树证据 `.tmp/codex-quiz-progress-20260704-ui/simple_dump_hormony_20260704225545491.txt` 包含“题目已生成，完成后会按标签记录到本机”“第 1 题”“1 / 5”“进阶”“复杂度分析”，证明真实题组已进入可答题页面并显示难度/标签。
+- DevEco MCP `perform_ui_action screenshot`：首题截图 `.tmp/codex-quiz-progress-20260704-ui/quiz_generated_first_question.png` 已保存，证据不提交仓库。
+
+失败或未验证：
+- DevEco MCP `check_ets_files` 对 `Quiz.ets`、`CourseDetail.ets` 返回 `Failed to flush stdin: 管道正在被关闭。 (os error 232)`；该工具调用失败未作为静态诊断通过证据。HAP 构建已覆盖 ArkTS 编译。
+- 本批次验证了“课程列表 AI 出题入口 → Quiz 设置页 → 开始答题 → 等待态 → 首题生成”的模拟器路径；未完整提交答案、评分和写回画像。
+- 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

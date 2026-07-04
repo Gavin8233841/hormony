@@ -76,6 +76,7 @@ struct QuizPage {
   @State resultCoachBody: string = '';
   @State resultTagSummaries: QuizTagSummary[] = [];
   @State progressStep: number = 0;
+  @State progressTick: number = 0;
   private grading: QuizGradingItem[] = [];
   private answerLabels: string[] = ['A', 'B', 'C', 'D'];
   private suggestions: string[] = ['二叉树与BST', '图的遍历', '动态规划'];
@@ -91,8 +92,9 @@ struct QuizPage {
   ];
   private generationSteps: WorkStep[] = [
     { title: '检索', description: '匹配课程资料' },
-    { title: '生成', description: '控制难度与题型' },
-    { title: '标注', description: '整理标签与解析' }
+    { title: '构题', description: '控制难度与题型' },
+    { title: '校验', description: '检查 A-D 与解析' },
+    { title: '装配', description: '写入标签与答题卡' }
   ];
   private scoringSteps: WorkStep[] = [
     { title: '核对', description: '比对 A-D 答案' },
@@ -593,12 +595,30 @@ struct QuizPage {
 
   private runGenerationProgress(): void {
     this.progressStep = 0;
+    this.progressTick = 0;
     setTimeout((): void => {
-      if (this.loading) this.progressStep = 1;
+      if (this.loading) {
+        this.progressStep = 1;
+        this.progressTick = 1;
+      }
     }, 700);
     setTimeout((): void => {
-      if (this.loading) this.progressStep = 2;
+      if (this.loading) {
+        this.progressStep = 2;
+        this.progressTick = 2;
+      }
     }, 2200);
+    setTimeout((): void => {
+      if (this.loading) {
+        this.progressStep = 3;
+        this.progressTick = 3;
+      }
+    }, 5200);
+    setTimeout((): void => {
+      if (this.loading) {
+        this.progressTick = 4;
+      }
+    }, 9800);
   }
 
   private quizErrorMessage(error: Error): string {
@@ -645,19 +665,138 @@ struct QuizPage {
     return this.questionCount.toString() + ' 题';
   }
 
+  private generationTitle(): string {
+    if (this.progressStep >= 3) return '正在装配题组';
+    if (this.progressStep === 2) return '正在校验题目结构';
+    if (this.progressStep === 1) return '正在控制难度与题型';
+    return '正在检索课程依据';
+  }
+
+  private generationSubtitle(): string {
+    if (this.progressStep >= 3) return '把题干、选项、解析和标签整理成可答题卡';
+    if (this.progressStep === 2) return '检查 A-D 选项、答案、解析和标签是否完整';
+    if (this.progressStep === 1) {
+      return '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + ' · ' + this.questionCountLabel();
+    }
+    if (this.focusTag.length > 0) return '先查课程资料，再聚焦“' + this.focusTag + '”出题';
+    return '先查课程资料，再让 AI 出题，避免凭空编题';
+  }
+
+  private generationWaitHint(): string {
+    if (this.progressTick >= 4) return '长题组仍在云端生成中：页面没有卡住，返回后会自动进入答题。';
+    if (this.questionCount >= 10) return '题量越长，云端会分批生成并校验，等待时间会更久。';
+    return '保持在当前页，题组生成后会直接展示第一题。';
+  }
+
+  private generationRequestSummary(): string {
+    const focus = this.focusTag.length > 0 ? ' · 标签 ' + this.focusTag : '';
+    return this.courseTitle + ' · ' + this.topic + ' · ' + this.difficultyLabel() + ' · ' +
+      this.questionCountLabel() + focus;
+  }
+
   @Builder
   LoadingState() {
-    Column({ space: 14 }) {
+    Column({ space: 16 }) {
+      Row({ space: 12 }) {
+        SymbolGlyph($r('sys.symbol.rays'))
+          .width(42)
+          .height(42)
+          .fontSize(22)
+          .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(21)
+        Column({ space: 4 }) {
+          Text('AI 正在生成题组')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.generationRequestSummary())
+            .fontSize(12)
+            .lineHeight(18)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
       this.GenerationProgress()
-      Column().width('100%').height(72).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(14)
-      Column().width('100%').height(48).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
-      Column().width('100%').height(48).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
-      Column().width('100%').height(48).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+
+      Column({ space: 9 }) {
+        this.GenerationCheckpoint('课程依据', '检索课程资料和最近薄弱标签', this.progressStep >= 0)
+        this.GenerationCheckpoint('题目生成', '按难度分层组织题干和选项', this.progressStep >= 1)
+        this.GenerationCheckpoint('结构校验', '检查 A-D、答案、解析和标签', this.progressStep >= 2)
+        this.GenerationCheckpoint('答题卡装配', '准备首题、进度条和本地记录字段', this.progressStep >= 3)
+      }
+      .width('100%')
+      .padding(12)
+      .backgroundColor(Constants.COLOR_SURFACE_TINT)
+      .borderRadius(Constants.RADIUS_MD)
+
+      Row({ space: 8 }) {
+        LoadingProgress()
+          .width(18)
+          .height(18)
+          .color(Constants.COLOR_BRAND)
+        Text(this.generationWaitHint())
+          .layoutWeight(1)
+          .fontSize(12)
+          .lineHeight(18)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+      .borderRadius(Constants.RADIUS_MD)
+
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          Column().layoutWeight(2).height(14).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(7)
+          Column().layoutWeight(1).height(14).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(7)
+        }
+        .width('100%')
+        Column().width('100%').height(54).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+        Column().width('100%').height(42).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+        Column().width('92%').height(42).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+        Column().width('86%').height(42).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      }
+      .width('100%')
+      .padding(12)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .borderRadius(Constants.RADIUS_MD)
     }
     .width('100%')
     .padding(18)
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
+  }
+
+  @Builder
+  GenerationCheckpoint(title: string, detail: string, active: boolean) {
+    Row({ space: 9 }) {
+      Text(active ? '✓' : '·')
+        .width(22)
+        .height(22)
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(active ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PLACEHOLDER)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(active ? Constants.COLOR_BRAND : Constants.COLOR_BG_PROGRESS_TRACK)
+        .borderRadius(11)
+      Column({ space: 2 }) {
+        Text(title)
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(active ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_PLACEHOLDER)
+        Text(detail)
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
   }
 
   @Builder
@@ -811,12 +950,8 @@ struct QuizPage {
   @Builder
   GenerationProgress() {
     StagedProgress(
-      this.progressStep >= 2 ? '正在整理题目标签' :
-        (this.progressStep === 1 ? '正在控制难度与题型' : '正在检索课程依据'),
-      this.progressStep >= 2 ? '校验 A-D 选项、解析和能力标签' :
-        (this.progressStep === 1 ? '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + ' · ' + this.questionCountLabel() :
-          (this.focusTag.length > 0 ? '先查课程资料，再聚焦“' + this.focusTag + '”出题' :
-            '先查课程资料，再让 AI 出题，避免凭空编题')),
+      this.generationTitle(),
+      this.generationSubtitle(),
       this.progressStep,
       this.generationSteps
     )

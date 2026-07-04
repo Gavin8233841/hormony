@@ -212,43 +212,46 @@ struct CourseDetailPage {
                 }
                 .width('100%')
 
-                Row({ space: 10 }) {
+                Column({ space: 8 }) {
                   Column() {
-                    Text('学习')
-                      .fontSize(13)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor(Constants.COLOR_BRAND)
-                  }
-                    .layoutWeight(1)
-                    .height(44)
-                    .justifyContent(FlexAlign.Center)
-                    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                    .borderRadius(Constants.RADIUS_MD)
-                    .onClick((): void => { this.openTopic(topic); })
-                  Column() {
-                    Text('精选练习')
-                      .fontSize(13)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                  }
-                    .layoutWeight(1)
-                    .height(44)
-                    .justifyContent(FlexAlign.Center)
-                    .backgroundColor(Constants.COLOR_BG_TAG)
-                    .borderRadius(Constants.RADIUS_MD)
-                    .onClick((): void => { this.openPractice(topic); })
-                  Column() {
-                    Text('AI 测验')
+                    Text('AI 测验 · 生成标签化题组')
                       .fontSize(13)
                       .fontWeight(FontWeight.Medium)
                       .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   }
-                    .layoutWeight(1)
+                    .width('100%')
                     .height(44)
                     .justifyContent(FlexAlign.Center)
                     .backgroundColor(Constants.COLOR_BRAND)
                     .borderRadius(Constants.RADIUS_MD)
                     .onClick((): void => { this.openQuiz(topic); })
+                  Row({ space: 10 }) {
+                    Column() {
+                      Text('学习内容')
+                        .fontSize(13)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(Constants.COLOR_BRAND)
+                    }
+                      .layoutWeight(1)
+                      .height(42)
+                      .justifyContent(FlexAlign.Center)
+                      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                      .borderRadius(Constants.RADIUS_MD)
+                      .onClick((): void => { this.openTopic(topic); })
+                    Column() {
+                      Text('精选练习')
+                        .fontSize(13)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                    }
+                      .layoutWeight(1)
+                      .height(42)
+                      .justifyContent(FlexAlign.Center)
+                      .backgroundColor(Constants.COLOR_BG_TAG)
+                      .borderRadius(Constants.RADIUS_MD)
+                      .onClick((): void => { this.openPractice(topic); })
+                  }
+                  .width('100%')
                 }
                 .width('100%')
               }
