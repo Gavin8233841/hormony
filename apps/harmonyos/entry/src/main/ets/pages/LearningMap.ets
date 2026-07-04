@@ -21,6 +21,8 @@ interface MapNode {
 }
 
 interface MapEdge {
+  fromId: string;
+  toId: string;
   fromX: number;
   fromY: number;
   toX: number;
@@ -145,6 +147,8 @@ struct LearningMapPage {
         const source = nextNodes.find((item: MapNode): boolean => item.id === prerequisiteId);
         if (source === undefined) continue;
         nextEdges.push({
+          fromId: source.id,
+          toId: node.id,
           fromX: source.x + NODE_WIDTH / 2,
           fromY: source.y + 22,
           toX: node.x + NODE_WIDTH / 2,
@@ -240,6 +244,89 @@ struct LearningMapPage {
     if (!node.unlocked) return '暂未解锁：先完成前置主题并达到掌握';
     if (node.mastery?.mastered === true) return '已掌握：可作为后续节点的先修支撑';
     return '可学习：按当前节奏安排到后续练习';
+  }
+
+  private selectedNode(): MapNode | null {
+    if (this.selectedTopic.length === 0) return null;
+    return this.nodes.find((node: MapNode): boolean => node.topic === this.selectedTopic) ?? null;
+  }
+
+  private isSelectedNode(node: MapNode): boolean {
+    return node.topic === this.selectedTopic;
+  }
+
+  private isPrerequisiteOfSelected(node: MapNode): boolean {
+    const selected = this.selectedNode();
+    if (selected === null) return false;
+    return selected.prerequisiteIds.includes(node.id);
+  }
+
+  private isSuccessorOfSelected(node: MapNode): boolean {
+    const selected = this.selectedNode();
+    if (selected === null) return false;
+    return node.prerequisiteIds.includes(selected.id);
+  }
+
+  private isOneHopNode(node: MapNode): boolean {
+    const selected = this.selectedNode();
+    if (selected === null) return true;
+    return node.id === selected.id || this.isPrerequisiteOfSelected(node) || this.isSuccessorOfSelected(node);
+  }
+
+  private nodeRelationLabel(node: MapNode): string {
+    if (this.isSelectedNode(node)) return '当前';
+    if (this.isPrerequisiteOfSelected(node)) return '前置';
+    if (this.isSuccessorOfSelected(node)) return '后续';
+    return '旁支';
+  }
+
+  private nodeOpacity(node: MapNode): number {
+    if (this.selectedNode() === null) return node.unlocked ? 1 : 0.58;
+    if (this.isOneHopNode(node)) return node.unlocked ? 1 : 0.62;
+    return node.unlocked ? 0.28 : 0.18;
+  }
+
+  private edgeSelected(edge: MapEdge): boolean {
+    const selected = this.selectedNode();
+    if (selected === null) return false;
+    return edge.fromId === selected.id || edge.toId === selected.id;
+  }
+
+  private edgeColor(edge: MapEdge): ResourceColor {
+    const selected = this.selectedNode();
+    if (selected !== null && edge.fromId === selected.id) return Constants.COLOR_MAP_LINE_ACTIVE;
+    if (selected !== null && edge.toId === selected.id) return Constants.COLOR_WARNING;
+    return edge.active ? Constants.COLOR_MAP_LINE_ACTIVE : Constants.COLOR_MAP_LINE;
+  }
+
+  private edgeWidth(edge: MapEdge): number {
+    if (this.edgeSelected(edge)) return 2.6;
+    return edge.active ? 2.2 : 1;
+  }
+
+  private edgeOpacity(edge: MapEdge): number {
+    if (this.selectedNode() === null) return edge.active ? 0.86 : 0.52;
+    if (this.edgeSelected(edge)) return 0.92;
+    return 0.18;
+  }
+
+  private edgeArrowX(edge: MapEdge): number {
+    return Math.round((edge.fromX + edge.toX) / 2 - 7);
+  }
+
+  private edgeArrowY(edge: MapEdge): number {
+    return Math.round((edge.fromY + edge.toY) / 2 - 9);
+  }
+
+  private selectedPrerequisiteCount(): number {
+    const selected = this.selectedNode();
+    return selected === null ? 0 : selected.prerequisiteIds.length;
+  }
+
+  private selectedSuccessorCount(): number {
+    const selected = this.selectedNode();
+    if (selected === null) return 0;
+    return this.nodes.filter((node: MapNode): boolean => node.prerequisiteIds.includes(selected.id)).length;
   }
 
   private openPractice(topic: string): void {
@@ -341,9 +428,16 @@ struct LearningMapPage {
           .height(this.canvasHeight)
           .startPoint([edge.fromX, edge.fromY])
           .endPoint([edge.toX, edge.toY])
-          .stroke(edge.active ? Constants.COLOR_MAP_LINE_ACTIVE : Constants.COLOR_MAP_LINE)
-          .strokeWidth(edge.active ? 2.2 : 1)
-          .opacity(edge.active ? 0.86 : 0.52)
+          .stroke(this.edgeColor(edge))
+          .strokeWidth(this.edgeWidth(edge))
+          .opacity(this.edgeOpacity(edge))
+
+        Text('↓')
+          .fontSize(this.edgeSelected(edge) ? 13 : 10)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.edgeColor(edge))
+          .opacity(this.edgeOpacity(edge))
+          .position({ x: this.edgeArrowX(edge), y: this.edgeArrowY(edge) })
       })
 
       ForEach(this.nodes, (node: MapNode): void => {
@@ -353,7 +447,8 @@ struct LearningMapPage {
             .height(this.nodeSize(node) + 18)
             .backgroundColor(this.nodeColor(node))
             .borderRadius((this.nodeSize(node) + 18) / 2)
-            .opacity(this.selectedTopic === node.topic ? 0.28 : node.mastery === null ? 0.12 : 0.20)
+            .opacity(this.isSelectedNode(node) ? 0.34 :
+              (this.isOneHopNode(node) ? (node.mastery === null ? 0.16 : 0.24) : 0.06))
           Column()
             .width(this.nodeSize(node) + 8)
             .height(this.nodeSize(node) + 8)
@@ -379,7 +474,17 @@ struct LearningMapPage {
             .fontSize(9)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          if (this.selectedTopic === node.topic || node.recommended) {
+          if (this.selectedTopic.length > 0 && this.isOneHopNode(node)) {
+            Text(this.nodeRelationLabel(node))
+              .fontSize(8)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.isSelectedNode(node) ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_MAP_CORE)
+              .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+              .backgroundColor(this.isSelectedNode(node) ? Constants.COLOR_BRAND : Constants.COLOR_MAP_LINE)
+              .borderRadius(6)
+              .position({ x: 8, y: -2 })
+          }
+          if (this.selectedTopic === node.topic || node.recommended || this.isOneHopNode(node)) {
             Text(node.topic)
               .width(NODE_WIDTH)
               .fontSize(node.topic.length > 7 ? 9 : 10)
@@ -398,7 +503,7 @@ struct LearningMapPage {
         .width(NODE_WIDTH)
         .height(72)
         .position({ x: node.x, y: node.y })
-        .opacity(node.unlocked ? 1 : 0.58)
+        .opacity(this.nodeOpacity(node))
         .scale({ x: this.selectedTopic === node.topic ? 1.08 : (node.recommended ? 1.04 : 1),
           y: this.selectedTopic === node.topic ? 1.08 : (node.recommended ? 1.04 : 1) })
         .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
@@ -441,6 +546,71 @@ struct LearningMapPage {
     .padding(16)
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
+  }
+
+  @Builder
+  RelationLegend() {
+    Column({ space: 10 }) {
+      Text('关系图例')
+        .width('100%')
+        .fontSize(13)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      Row({ space: 10 }) {
+        this.RelationLegendItem('↓', Constants.COLOR_MAP_LINE_ACTIVE, '箭头从前置指向后续')
+        this.RelationLegendItem('亮线', Constants.COLOR_MAP_LINE_ACTIVE, '已掌握的先修路径')
+      }
+      .width('100%')
+      Row({ space: 10 }) {
+        this.RelationLegendItem('前置', Constants.COLOR_WARNING, '当前主题的直接基础')
+        this.RelationLegendItem('淡化', Constants.COLOR_TEXT_PLACEHOLDER, '非一跳旁支节点')
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_MD)
+  }
+
+  @Builder
+  RelationLegendItem(label: string, color: ResourceColor, description: string) {
+    Row({ space: 8 }) {
+      Text(label)
+        .width(46)
+        .height(24)
+        .fontSize(10)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(color)
+        .borderRadius(Constants.RADIUS_SM)
+      Text(description)
+        .layoutWeight(1)
+        .fontSize(11)
+        .lineHeight(17)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+    }
+    .layoutWeight(1)
+    .alignItems(VerticalAlign.Center)
+  }
+
+  @Builder
+  RelationBadge(label: string, value: string, color: ResourceColor) {
+    Column({ space: 3 }) {
+      Text(label)
+        .fontSize(10)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Text(value)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(color)
+    }
+    .layoutWeight(1)
+    .padding({ left: 10, right: 10, top: 9, bottom: 9 })
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_SM)
+    .alignItems(HorizontalAlign.Start)
   }
 
   build() {
@@ -496,6 +666,10 @@ struct LearningMapPage {
           .width('100%')
           .justifyContent(FlexAlign.Center)
 
+          if (!this.loading && this.nodes.length > 0) {
+            this.RelationLegend()
+          }
+
           if (this.selectedTopic.length > 0) {
             Column({ space: 12 }) {
               Text(this.selectedTopic)
@@ -505,10 +679,21 @@ struct LearningMapPage {
                 .fontColor(Constants.COLOR_TEXT_PRIMARY)
               ForEach(this.nodes.filter((node: MapNode): boolean => node.topic === this.selectedTopic),
                 (node: MapNode): void => {
+                  Row({ space: 8 }) {
+                    this.RelationBadge('前置主题', this.selectedPrerequisiteCount().toString(), Constants.COLOR_WARNING)
+                    this.RelationBadge('后续主题', this.selectedSuccessorCount().toString(), Constants.COLOR_MAP_LINE_ACTIVE)
+                    this.RelationBadge('节点状态', this.nodeRelationLabel(node), Constants.COLOR_BRAND)
+                  }
+                  .width('100%')
                   Text(this.masteryLabel(node))
                     .width('100%')
                     .fontSize(13)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  Text('图中已高亮该主题的一跳关系：前置主题、当前主题和后续主题。')
+                    .width('100%')
+                    .fontSize(12)
+                    .lineHeight(19)
+                    .fontColor(Constants.COLOR_TEXT_TERTIARY)
                   Text(this.prerequisiteLabel(node))
                     .width('100%')
                     .fontSize(12)

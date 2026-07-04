@@ -5660,3 +5660,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未完成一次新的 Chat SSE 问答，因此新代码块的真实模型回复截图未取得；代码块 V2 证据等级为构建通过。
 - 表格 V2 已有模拟器截图证据，但未做平板横屏和真机验收。
 - 真机、OCR、TTS、Lottie、音效、第三方 Markdown 包仍未验证。
+
+---
+
+## 2026-07-04 Codex：LearningMap 一跳关系与方向图例
+
+背景：继续推进端侧前端资源深猎路线中的 P0-5。参照 Obsidian Local Graph、Khan Mastery 和 Duolingo Path 的关系可读性要求，学习星图不能只呈现氛围，需要让学生看清当前主题、直接前置、直接后续和非一跳旁支。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+
+行为变化：
+- `MapEdge` 增加 `fromId`、`toId`，连线可根据当前选中节点区分前置方向、后续方向和旁支关系。
+- 选中主题后仅高亮一跳关系：当前节点标记为“当前”，直接前置标记为“前置”，直接后续标记为“后续”，非一跳节点降低透明度。
+- 先修边增加方向箭头提示，选中相关边加粗高亮；指向当前节点的边使用警示色，当前节点指向后续节点的边使用激活色。
+- 新增“关系图例”卡，解释箭头、亮线、前置和淡化节点的含义。
+- 详情卡新增“前置主题 / 后续主题 / 节点状态”三项关系摘要，并说明图中已高亮一跳关系。
+
+验证：
+- `git status --short`：exit 0，启动时仅 `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets` 修改，`.tmp/` 为本地验收证据目录，不纳入提交。
+- `git log -5 --oneline`：exit 0，确认当前 HEAD 为 `9a605c2 feat: enhance HarmonyOS chat markdown rendering`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 30 ms`；仍提示未配置 signingConfigs。
+- 为隔离底部导航坐标与锁屏干扰，临时将 `EntryAbility.ets` 入口改为 `pages/LearningMap` 后构建验证：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` exit 0，`BUILD SUCCESSFUL in 19 s 345 ms`；该临时入口改动已恢复，未纳入最终 diff。
+- `hdc install -r entry-default-unsigned.hap` + `hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，安装与启动成功。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，竖屏，窗口 `1256 x 2760`，UI 树确认 `学习星图`、`练习越充分，知识节点越清晰`、`关系图例`、`前置主题`、`后续主题`、`节点状态`、`图中已高亮该主题的一跳关系：前置主题、当前主题和后续主题。` 可见。
+- 同一 UI 树中未出现旧文案 `下一节点`、`箭头表示`、`未练习`。
+- DevEco MCP 截图：`.tmp/codex-learning-map-20260704/learning-map-direct-evidence.png`，本地证据不提交仓库。
+
+未验证：
+- 本批次未完成从底部导航进入 Profile 再点击星图卡片的完整冒烟；原因是模拟器锁屏和既有路由栈会干扰坐标点击，已通过临时直达入口证明 `LearningMap.ets` 运行态。
+- 未做三门课程横向切换截图、横屏、平板和真机验收。
+- 真机、OCR、TTS、Lottie、音效、第三方图谱或 Markdown 包仍未验证。
