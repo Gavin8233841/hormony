@@ -5341,3 +5341,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真机未验证。
 - 仓库版本冒烟脚本本轮未完成全流程通过；需要后续单独修复脚本对持久 Tab 状态、Practice 滚动位置和模拟器路由漂移的处理。
 - 本批没有执行任意用户代码，运行结果只展示题库固定答案；如后续要做真实端侧代码运行，需要单独设计沙箱、超时和资源限制。
+
+---
+
+## 2026-07-04 Codex：精选练习重入状态复位
+
+背景：上一批 Lesson 改造后，仓库版 `scripts/harmonyos-app-smoke.ps1` 在进入精选练习时偶发停留在上一轮结果页，无法看到 `离线精选题库`。复核 `Practice.ets` 后确认页面 `aboutToAppear()` 重新加载题目时没有清空 `submitted`、`currentIndex`、`details`、`activeAnswer` 等上一轮状态；这会让真实用户从课程、错题本或学习星图再次进入同一主题练习时看到旧结果页。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Practice.ets
+- DEVLOG.md
+
+行为变化：
+- Practice 每次进入时先执行 `resetPracticeState()`，清空题目列表、当前题、答案、提交状态、保存状态、成绩、复盘详情、展开项和消息，再按当前 `courseId/topic` 重新加载精选题。
+- 修复重复进入精选练习时旧结果页残留的问题，保证用户总是从新的题组作答态开始。
+- 不改本地 schema、题库、Repository、Web API、Agent 或 OHPM 依赖。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 13 s 90 ms`；ArkTS 编译和 HAP 打包通过。
+- `.\scripts\harmonyos-app-smoke.ps1`：exit 0，76 passed / 0 failed；脚本内增量构建 exit 0，`BUILD SUCCESSFUL in 2 s 474 ms`。
+- 冒烟环境：Pura 90 Pro Max 模拟器，`127.0.0.1:5555`；覆盖 HAP 安装启动、首页、课程列表、课程详情、精选练习 5 题推进、提交评分、本轮闭环、错题追问学伴、Chat、Profile 连续天数、学习记录、错题本、成就、三门课程学习星图、回到首页。
+- 证据截图目录：`screenshots/trae-smoke-20260704-183844/`，不提交仓库。
+
+未验证：
+- 真机未验证。
+- 本批只修复 Practice 重入状态，不新增题库标签、不调整错题间隔算法。

@@ -36,9 +36,24 @@ struct PracticePage {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topic = AppStorage.get<string>('selectedPracticeTopic') ?? '';
+    this.resetPracticeState();
     this.loadQuestions().catch((): void => {
       this.message = '本地练习加载失败，请重新进入';
     });
+  }
+
+  private resetPracticeState(): void {
+    this.questions = [];
+    this.activeQuestion = EMPTY_QUESTION;
+    this.answers = [];
+    this.activeAnswer = '';
+    this.currentIndex = 0;
+    this.submitted = false;
+    this.saving = false;
+    this.correctCount = 0;
+    this.details = [];
+    this.expandedDetailId = '';
+    this.message = '';
   }
 
   private async loadQuestions(): Promise<void> {
