@@ -66,6 +66,7 @@ struct QuizPage {
     { title: '归因', description: '统计错因标签' },
     { title: '记录', description: '写入本地画像' }
   ];
+  private generationSerial: number = 0;
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -137,6 +138,18 @@ struct QuizPage {
     this.resetQuiz();
     this.loading = true;
     this.progressStep = 1;
+    this.generationSerial += 1;
+    const activeGeneration = this.generationSerial;
+    const fallbackQuestions = this.findLocalFallbackQuestions();
+    if (fallbackQuestions.length > 0) {
+      setTimeout((): void => {
+        if (this.generationSerial !== activeGeneration || !this.loading || this.questions.length > 0) return;
+        if (this.useLocalFallbackQuiz('云端出题等待较久，已切换到本地精选题组', fallbackQuestions)) {
+          this.progressStep = 2;
+          this.loading = false;
+        }
+      }, Constants.QUIZ_FALLBACK_DELAY_MS);
+    }
     const request: QuizRequest = {
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
@@ -147,8 +160,10 @@ struct QuizPage {
     try {
       const response = await HttpClient.post<QuizPackage>(
         Constants.API_QUIZ,
-        JSON.stringify(request)
+        JSON.stringify(request),
+        Constants.QUIZ_REQUEST_TIMEOUT
       );
+      if (this.generationSerial !== activeGeneration || !this.loading) return;
       this.progressStep = 2;
       if (!Array.isArray(response.questions) || !Array.isArray(response.grading) ||
         response.questions.length === 0 || response.questions.length !== response.grading.length) {
@@ -166,24 +181,25 @@ struct QuizPage {
         this.messageIsError = true;
       }
     } catch (e) {
+      if (this.generationSerial !== activeGeneration || !this.loading) return;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'QuizPage API failed: %{public}s', (e as Error).message);
-      if (!this.useLocalFallbackQuiz()) {
+      if (!this.useLocalFallbackQuiz('云端出题暂不可用，已切换到本地精选题组', fallbackQuestions)) {
         this.message = '云端学伴暂不可用，本地精选题也未找到可用题目';
         this.messageIsError = true;
       }
     } finally {
-      this.loading = false;
+      if (this.generationSerial === activeGeneration && this.loading) this.loading = false;
     }
   }
 
-  private useLocalFallbackQuiz(): boolean {
-    const fallbackQuestions = this.findLocalFallbackQuestions();
-    if (fallbackQuestions.length === 0) return false;
+  private useLocalFallbackQuiz(message: string, fallbackQuestions?: CuratedQuestion[]): boolean {
+    const selectedQuestions = fallbackQuestions ?? this.findLocalFallbackQuestions();
+    if (selectedQuestions.length === 0) return false;
 
     const nextQuestions: QuizQuestionView[] = [];
     const nextGrading: QuizGradingItem[] = [];
-    for (const question of fallbackQuestions) {
+    for (const question of selectedQuestions) {
       const tags: string[] = [question.topic];
       nextQuestions.push({
         id: question.id,
@@ -206,7 +222,7 @@ struct QuizPage {
     this.answers = new Array<string>(nextQuestions.length).fill('');
     this.questions = nextQuestions;
     this.currentIndex = 0;
-    this.message = '云端出题暂不可用，已切换到本地精选题组';
+    this.message = message;
     this.messageIsError = false;
     return true;
   }

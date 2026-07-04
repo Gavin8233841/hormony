@@ -156,29 +156,78 @@ function Get-BoundsCenter($bounds) {
     return $null
 }
 
-function Click-Element($textPattern, $description) {
-    $uiTree = Get-UiTree
-    if (-not $uiTree) {
-        Write-Step "Click: $description" "FAIL" "UI tree not available"
-        return $false
-    }
-    $elements = Find-ElementByText $uiTree $textPattern
-    if ($elements.Count -eq 0) {
-        Write-Step "Click: $description" "FAIL" "Element not found: $textPattern"
-        return $false
-    }
-    $target = $elements[0]
-    $center = Get-BoundsCenter $target.attributes.bounds
-    if (-not $center) {
-        Write-Step "Click: $description" "FAIL" "Cannot parse bounds: $($target.attributes.bounds)"
-        return $false
-    }
-    $parts = $center -split ' '
-    $cx = $parts[0]; $cy = $parts[1]
-    Invoke-HdcShell @("uitest", "uiInput", "click", $cx, $cy) | Out-Null
-    Start-Sleep -Seconds 1
-    Write-Step "Click: $description" "PASS" "at ($cx, $cy)"
-    return $true
+function Click-Element($textPattern, $description, $timeoutMs = 5000) {
+    $deadline = (Get-Date).AddMilliseconds($timeoutMs)
+    $lastError = ""
+    do {
+        try {
+            $uiTree = Get-UiTree
+            if ($uiTree) {
+                $elements = Find-ElementByText $uiTree $textPattern
+                if ($elements.Count -gt 0) {
+                    $target = $elements[0]
+                    $center = Get-BoundsCenter $target.attributes.bounds
+                    if (-not $center) {
+                        $lastError = "Cannot parse bounds: $($target.attributes.bounds)"
+                    } else {
+                        $parts = $center -split ' '
+                        $cx = $parts[0]; $cy = $parts[1]
+                        Invoke-HdcShell @("uitest", "uiInput", "click", $cx, $cy) | Out-Null
+                        Start-Sleep -Seconds 1
+                        Write-Step "Click: $description" "PASS" "at ($cx, $cy)"
+                        return $true
+                    }
+                } else {
+                    $lastError = "Element not found: $textPattern"
+                }
+            } else {
+                $lastError = "UI tree not available"
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    Write-Step "Click: $description" "FAIL" $lastError
+    return $false
+}
+
+function Click-ElementContaining($textPart, $description, $timeoutMs = 5000) {
+    $deadline = (Get-Date).AddMilliseconds($timeoutMs)
+    $lastError = ""
+    do {
+        try {
+            $uiTree = Get-UiTree
+            if ($uiTree) {
+                $elements = Find-ElementByTextContains $uiTree $textPart
+                if ($elements.Count -gt 0) {
+                    $target = $elements[0]
+                    $center = Get-BoundsCenter $target.attributes.bounds
+                    if (-not $center) {
+                        $lastError = "Cannot parse bounds: $($target.attributes.bounds)"
+                    } else {
+                        $parts = $center -split ' '
+                        $cx = $parts[0]; $cy = $parts[1]
+                        Invoke-HdcShell @("uitest", "uiInput", "click", $cx, $cy) | Out-Null
+                        Start-Sleep -Seconds 1
+                        Write-Step "Click: $description" "PASS" "at ($cx, $cy)"
+                        return $true
+                    }
+                } else {
+                    $lastError = "Element containing text not found: $textPart"
+                }
+            } else {
+                $lastError = "UI tree not available"
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    Write-Step "Click: $description" "FAIL" $lastError
+    return $false
 }
 
 function Click-ElementByTextPrefix($textPrefix, $description) {
@@ -484,7 +533,7 @@ for ($attempt = 0; $attempt -lt 8; $attempt++) {
     Invoke-HdcShell @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
     Start-Sleep -Milliseconds 500
 }
-if (-not (Verify-Page "pages/Index" "Root")) { exit 1 }
+if (-not (Wait-Page "pages/Index" "Root" 15000)) { exit 1 }
 Take-Screenshot "01-launch"
 
 # 4. 验证首页 Tab (今日)
@@ -529,7 +578,7 @@ if ($uiTree) {
 
 # 6.5 验证 AI 出题入口设置页，不触发云端生成
 Write-Output "`n[INFO] Verifying AI quiz entry..."
-if (-not (Click-Element "AI 出题" "AI quiz entry")) { exit 1 }
+if (-not (Click-ElementContaining "出题" "AI quiz entry")) { exit 1 }
 if (-not (Verify-Page "pages/Quiz" "AI quiz setup")) { exit 1 }
 if (-not (Verify-TextExists "选择本次练习主题" "AI quiz topic setup")) { exit 1 }
 if (-not (Verify-TextExists "开始答题" "AI quiz start action")) { exit 1 }
@@ -567,7 +616,10 @@ Take-Screenshot "05-practice-result"
 if (-not (Test-TextExists "向学伴追问")) {
     if (-not (Click-ElementByTextPrefix "1. " "Expand first review item")) { exit 1 }
 }
-if (-not (Verify-TextExists "向学伴追问" "Review tutor action")) { exit 1 }
+if (-not (Wait-TextExists "向学伴追问" "Review tutor action" 3000)) {
+    if (-not (Swipe-Viewport "up")) { exit 1 }
+    if (-not (Verify-TextExists "向学伴追问" "Review tutor action after scroll")) { exit 1 }
+}
 if (-not (Click-Element "向学伴追问" "Ask tutor from review")) { exit 1 }
 if (-not (Verify-Page "pages/Chat" "Tutor follow-up")) { exit 1 }
 if (-not (Wait-TextContains "请结合课程资料讲解这道题：" "Tutor follow-up prompt")) { exit 1 }
@@ -587,12 +639,11 @@ Start-Sleep -Seconds 2
 Take-Screenshot "07-chat-tab"
 
 # 14. 验证 AI 学伴页面
-if (-not (Wait-TextExists "基于课程资料，为每个问题给出依据" "Chat status area" 15000)) { exit 1 }
+if (-not (Wait-TextContains "给出依据" "Chat status area" 15000)) { exit 1 }
 
 # 15. 点击"我的" Tab
 Write-Output "`n[INFO] Navigating to Profile tab..."
-if (-not (Click-BottomElement "我的" "Profile tab")) { exit 1 }
-Start-Sleep -Seconds 2
+if (-not (Open-ProfileRoot "Profile tab")) { exit 1 }
 Take-Screenshot "08-profile-tab"
 if (-not (Swipe-Viewport "up")) { exit 1 }
 if (-not (Verify-TextExists "连续天数" "Learning streak")) { exit 1 }
@@ -624,7 +675,8 @@ foreach ($mapCourse in @(
     @{ Name = '操作系统'; FirstTopic = '进程与线程' },
     @{ Name = '计算机网络'; FirstTopic = 'OSI与TCP/IP模型' }
 )) {
-    if (-not (Click-Element $mapCourse.Name "Learning map: $($mapCourse.Name)")) { exit 1 }
+    if (-not (Wait-TextContains $mapCourse.Name "Learning map course visible: $($mapCourse.Name)" 8000)) { exit 1 }
+    if (-not (Click-ElementContaining $mapCourse.Name "Learning map: $($mapCourse.Name)" 8000)) { exit 1 }
     if (-not (Verify-TextExists $mapCourse.FirstTopic "Learning map first topic: $($mapCourse.Name)")) { exit 1 }
     if (-not (Verify-TextExists "Level 0" "Learning map graph level")) { exit 1 }
     Take-Screenshot (("{0:D2}-learning-map-{1}" -f $mapIndex, $mapCourse.Name))

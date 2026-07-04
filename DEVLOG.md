@@ -5395,3 +5395,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未在模拟器中强制断网或劫持 `/api/quiz` 来执行本地兜底分支；兜底分支证据等级为源码确认与构建通过。
 - 未执行真实云端 AI 出题完整生成；本批次只验证入口设置页，避免把外部模型稳定性绑定到全量端侧冒烟。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.12 AI 出题快速兜底等待
+
+背景：上一批次已在 `/api/quiz` 失败后切换本地精选题，但源码审计确认 Quiz 页仍使用 `MODEL_REQUEST_TIMEOUT = 120000`，如果云端长时间无响应，评委会在出题骨架屏等待到模型请求超时后才看到本地题组。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/Constants.ets
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- scripts/harmonyos-app-smoke.ps1
+- DEVLOG.md
+
+行为变化：
+- 新增 `QUIZ_REQUEST_TIMEOUT = 45000`，AI 出题不再沿用 120 秒模型长超时。
+- 新增 `QUIZ_FALLBACK_DELAY_MS = 15000`，当前课程有本地精选题时，云端出题等待超过 15 秒即先切换到本地精选题组。
+- `QuizPage` 增加 `generationSerial`，防止旧的云端请求在用户已看到本地题组或发起新一轮生成后回写页面状态。
+- 快速兜底使用同一 `QuizQuestionView` / `QuizGradingItem` 答题结构，来源仍标记为 `curated`，并显示“云端出题等待较久，已切换到本地精选题组”。
+- 冒烟脚本继续加固端侧主路径：点击普通文本改为短轮询，新增包含文本点击函数；AI 出题入口、Chat 状态、Profile 入口、复盘追问按钮和学习星图课程切换改为更稳的业务锚点。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 133 ms`；仍提示未配置 signingConfigs。
+- `pwsh -NoProfile -Command '[scriptblock]::Create((Get-Content -Raw -Path "scripts/harmonyos-app-smoke.ps1")) | Out-Null'`：exit 0。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1` 多次运行未稳定通过全量模拟器链路；其中新增 AI 出题入口设置页在多次运行中均通过，后续失败点分别出现在既有路径的 Chat 文案 exact 匹配、Profile Tab 未切换、复盘追问按钮可视区、学习星图课程 Tab 和 Practice 文案读取。已针对这些脚本脆弱点逐步加固，但最新全量运行仍在 `pages/Practice` 后未读取到“离线精选题库”退出，未形成完整模拟器通过证据。
+- `hdc list targets` 最新可见 `127.0.0.1:5555`，但 `uitest dumpLayout` 在连续冒烟中存在超时或短时空树现象。
+
+未验证：
+- 未强制制造 `/api/quiz` 慢响应来观察 15 秒快速兜底实际触发；本批次快速兜底为源码确认与构建通过。
+- 全量模拟器冒烟本批次未最终通过；不能标记为模拟器通过。
+- 真机未验证。
