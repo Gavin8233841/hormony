@@ -26,7 +26,13 @@ interface MarkdownBlock {
   type: string;
   text: string;
   meta?: string;
+  inlineSource?: string;
   tableRows?: string[][];
+}
+
+interface InlineSegment {
+  type: string;
+  text: string;
 }
 
 @Component
@@ -128,25 +134,29 @@ export struct ChatContent {
       flushTableRows();
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
-        blocks.push({ type: 'heading', text: headingText });
+        blocks.push({ type: 'heading', text: this.cleanInline(headingText), inlineSource: headingText });
       } else if (trimmed.startsWith('>')) {
-        const quote = this.cleanInline(trimmed.slice(1));
+        const quoteSource = trimmed.slice(1);
+        const quote = this.cleanInline(quoteSource);
         if (quote.length > 0) {
-          blocks.push({ type: 'quote', text: quote });
+          blocks.push({ type: 'quote', text: quote, inlineSource: quoteSource });
         }
       } else if (trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ')) {
-        blocks.push({ type: 'task', text: this.cleanInline(trimmed.slice(6)), meta: 'open' });
+        const taskSource = trimmed.slice(6);
+        blocks.push({ type: 'task', text: this.cleanInline(taskSource), meta: 'open', inlineSource: taskSource });
       } else if (trimmed.startsWith('- [x] ') || trimmed.startsWith('- [X] ') ||
         trimmed.startsWith('* [x] ') || trimmed.startsWith('* [X] ')) {
-        blocks.push({ type: 'task', text: this.cleanInline(trimmed.slice(6)), meta: 'done' });
+        const taskSource = trimmed.slice(6);
+        blocks.push({ type: 'task', text: this.cleanInline(taskSource), meta: 'done', inlineSource: taskSource });
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
+        const bulletSource = trimmed.slice(2);
+        blocks.push({ type: 'bullet', text: this.cleanInline(bulletSource), inlineSource: bulletSource });
       } else if (this.numberedText(trimmed).length > 0) {
-        blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
+        blocks.push({ type: 'numbered', text: this.numberedText(trimmed), inlineSource: this.numberedBody(trimmed) });
       } else if (this.isDivider(trimmed)) {
         blocks.push({ type: 'divider', text: '' });
       } else {
-        blocks.push({ type: 'paragraph', text: this.cleanInline(line) });
+        blocks.push({ type: 'paragraph', text: this.cleanInline(line), inlineSource: line });
       }
     }
     flushTableRows();
@@ -165,12 +175,34 @@ export struct ChatContent {
       level += 1;
     }
     if (level > 0 && level <= 6 && line.length > level && line.charAt(level) === ' ') {
-      return this.cleanInline(line.slice(level + 1));
+      return line.slice(level + 1);
     }
     return '';
   }
 
   private numberedText(line: string): string {
+    const prefix = this.numberedPrefix(line);
+    const body = this.numberedBody(line);
+    if (prefix.length === 0 || body.length === 0) return '';
+    return prefix + '. ' + this.cleanInline(body);
+  }
+
+  private numberedPrefix(line: string): string {
+    const dotIndex = line.indexOf('. ');
+    const cnIndex = line.indexOf('、');
+    let splitIndex = dotIndex;
+    if (splitIndex < 0 || (cnIndex > 0 && cnIndex < splitIndex)) {
+      splitIndex = cnIndex;
+    }
+    if (splitIndex <= 0) return '';
+    const prefix = line.slice(0, splitIndex);
+    for (const ch of prefix) {
+      if (ch < '0' || ch > '9') return '';
+    }
+    return prefix;
+  }
+
+  private numberedBody(line: string): string {
     const dotIndex = line.indexOf('. ');
     const cnIndex = line.indexOf('、');
     let splitIndex = dotIndex;
@@ -180,11 +212,8 @@ export struct ChatContent {
       offset = 1;
     }
     if (splitIndex <= 0) return '';
-    const prefix = line.slice(0, splitIndex);
-    for (const ch of prefix) {
-      if (ch < '0' || ch > '9') return '';
-    }
-    return prefix + '. ' + this.cleanInline(line.slice(splitIndex + offset));
+    if (this.numberedPrefix(line).length === 0) return '';
+    return line.slice(splitIndex + offset);
   }
 
   private isDivider(line: string): boolean {
@@ -256,14 +285,195 @@ export struct ChatContent {
   }
 
   private cleanInline(text: string): string {
+    const segments = this.inlineSegments(text);
+    let result = '';
+    for (const segment of segments) {
+      result += segment.text;
+    }
+    return result.trim();
+  }
+
+  private inlineSource(block: MarkdownBlock): string {
+    return block.inlineSource ?? block.text;
+  }
+
+  private inlineSegments(text: string): InlineSegment[] {
+    const source = this.sanitizeInlineSource(text);
+    const segments: InlineSegment[] = [];
+    let cursor = 0;
+    while (cursor < source.length) {
+      let tokenIndex = source.length;
+      let token = '';
+      const codeIndex = source.indexOf('`', cursor);
+      const starIndex = source.indexOf('**', cursor);
+      const underlineIndex = source.indexOf('__', cursor);
+      const linkIndex = source.indexOf('[', cursor);
+      const httpsIndex = source.indexOf('https://', cursor);
+      const httpIndex = source.indexOf('http://', cursor);
+      if (codeIndex >= 0 && codeIndex < tokenIndex) {
+        tokenIndex = codeIndex;
+        token = '`';
+      }
+      if (starIndex >= 0 && starIndex < tokenIndex) {
+        tokenIndex = starIndex;
+        token = '**';
+      }
+      if (underlineIndex >= 0 && underlineIndex < tokenIndex) {
+        tokenIndex = underlineIndex;
+        token = '__';
+      }
+      if (linkIndex >= 0 && linkIndex < tokenIndex) {
+        tokenIndex = linkIndex;
+        token = '[';
+      }
+      if (httpsIndex >= 0 && httpsIndex < tokenIndex) {
+        tokenIndex = httpsIndex;
+        token = 'url';
+      }
+      if (httpIndex >= 0 && httpIndex < tokenIndex) {
+        tokenIndex = httpIndex;
+        token = 'url';
+      }
+      if (tokenIndex > cursor) {
+        this.pushInlineSegment(segments, 'plain', this.plainInlineText(source.slice(cursor, tokenIndex)));
+      }
+      if (token.length === 0) {
+        cursor = source.length;
+      } else if (token === '`') {
+        const endIndex = source.indexOf('`', tokenIndex + 1);
+        if (endIndex > tokenIndex + 1) {
+          this.pushInlineSegment(segments, 'code', this.codeInlineText(source.slice(tokenIndex + 1, endIndex)));
+          cursor = endIndex + 1;
+        } else {
+          this.pushInlineSegment(segments, 'plain', '`');
+          cursor = tokenIndex + 1;
+        }
+      } else if (token === '**' || token === '__') {
+        const endIndex = source.indexOf(token, tokenIndex + 2);
+        if (endIndex > tokenIndex + 2) {
+          this.pushInlineSegment(segments, 'bold', this.plainInlineText(source.slice(tokenIndex + 2, endIndex)));
+          cursor = endIndex + 2;
+        } else {
+          this.pushInlineSegment(segments, 'plain', token);
+          cursor = tokenIndex + 2;
+        }
+      } else if (token === 'url') {
+        const endIndex = this.rawLinkEnd(source, tokenIndex);
+        let rawUrl = source.slice(tokenIndex, endIndex);
+        let suffix = '';
+        while (rawUrl.length > 0 && this.isTrailingUrlPunctuation(rawUrl.charAt(rawUrl.length - 1))) {
+          suffix = rawUrl.charAt(rawUrl.length - 1) + suffix;
+          rawUrl = rawUrl.slice(0, rawUrl.length - 1);
+        }
+        const domain = this.linkDomain(rawUrl);
+        if (domain.length > 0) {
+          this.pushInlineSegment(segments, 'link', domain);
+        } else {
+          this.pushInlineSegment(segments, 'plain', rawUrl);
+        }
+        this.pushInlineSegment(segments, 'plain', suffix);
+        cursor = endIndex;
+      } else {
+        const labelEnd = source.indexOf('](', tokenIndex + 1);
+        const hrefEnd = labelEnd >= 0 ? source.indexOf(')', labelEnd + 2) : -1;
+        if (labelEnd > tokenIndex + 1 && hrefEnd > labelEnd + 2) {
+          const label = this.plainInlineText(source.slice(tokenIndex + 1, labelEnd)).trim();
+          const domain = this.linkDomain(source.slice(labelEnd + 2, hrefEnd));
+          if (label.length > 0) {
+            this.pushInlineSegment(segments, domain.length > 0 ? 'link' : 'plain',
+              label + (domain.length > 0 ? '（' + domain + '）' : ''));
+          }
+          cursor = hrefEnd + 1;
+        } else {
+          this.pushInlineSegment(segments, 'plain', '[');
+          cursor = tokenIndex + 1;
+        }
+      }
+    }
+    return segments;
+  }
+
+  private sanitizeInlineSource(text: string): string {
     return text
       .replace(/<br\s*\/?\s*>/g, '；')
-      .replace(/<[^>]+>/g, '')
+      .replace(/<[^>]+>/g, '');
+  }
+
+  private plainInlineText(text: string): string {
+    return this.sanitizeInlineSource(text)
       .replace(/\*\*/g, '')
       .replace(/__/g, '')
       .replace(/\*/g, '')
-      .replace(/`/g, '')
-      .trim();
+      .replace(/`/g, '');
+  }
+
+  private codeInlineText(text: string): string {
+    return this.sanitizeInlineSource(text).replace(/`/g, '');
+  }
+
+  private rawLinkEnd(source: string, start: number): number {
+    let end = start;
+    while (end < source.length) {
+      const ch = source.charAt(end);
+      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '<' || ch === '>') {
+        break;
+      }
+      end += 1;
+    }
+    return end;
+  }
+
+  private isTrailingUrlPunctuation(ch: string): boolean {
+    return ch === '.' || ch === ',' || ch === ';' || ch === ':' || ch === '!' || ch === '?' ||
+      ch === ')' || ch === ']' || ch === '}';
+  }
+
+  private pushInlineSegment(segments: InlineSegment[], type: string, text: string): void {
+    if (text.length === 0) return;
+    const lastIndex = segments.length - 1;
+    if (lastIndex >= 0 && segments[lastIndex].type === type) {
+      segments[lastIndex].text += text;
+      return;
+    }
+    segments.push({ type, text });
+  }
+
+  private linkDomain(href: string): string {
+    const raw = this.sanitizeInlineSource(href).trim();
+    const lower = raw.toLowerCase();
+    let rest = '';
+    if (lower.startsWith('https://')) {
+      rest = raw.slice(8);
+    } else if (lower.startsWith('http://')) {
+      rest = raw.slice(7);
+    } else {
+      return '';
+    }
+    let endIndex = rest.length;
+    const slashIndex = rest.indexOf('/');
+    const queryIndex = rest.indexOf('?');
+    const hashIndex = rest.indexOf('#');
+    if (slashIndex >= 0 && slashIndex < endIndex) endIndex = slashIndex;
+    if (queryIndex >= 0 && queryIndex < endIndex) endIndex = queryIndex;
+    if (hashIndex >= 0 && hashIndex < endIndex) endIndex = hashIndex;
+    let host = rest.slice(0, endIndex).trim().toLowerCase();
+    if (host.startsWith('www.')) {
+      host = host.slice(4);
+    }
+    if (host.indexOf('@') >= 0) return '';
+    const portIndex = host.indexOf(':');
+    if (portIndex >= 0) {
+      host = host.slice(0, portIndex);
+    }
+    if (host.length === 0 || host.indexOf('.') < 0) return '';
+    for (const ch of host) {
+      const isNumber = ch >= '0' && ch <= '9';
+      const isLowerLetter = ch >= 'a' && ch <= 'z';
+      if (!isNumber && !isLowerLetter && ch !== '-' && ch !== '.') {
+        return '';
+      }
+    }
+    return host;
   }
 
   private codeLanguage(block: MarkdownBlock): string {
@@ -960,15 +1170,32 @@ export struct ChatContent {
   }
 
   @Builder
+  InlineText(source: string, fontSizeValue: number, lineHeightValue: number, colorValue: string,
+    weightValue: FontWeight, layoutWeightValue: number) {
+    Text() {
+      ForEach(this.inlineSegments(source), (segment: InlineSegment): void => {
+        Span(segment.text)
+          .fontSize(fontSizeValue)
+          .fontColor(colorValue === Constants.COLOR_ERROR ? colorValue :
+            ((segment.type === 'code' || segment.type === 'link') ? Constants.COLOR_BRAND : colorValue))
+          .fontWeight((segment.type === 'bold' || segment.type === 'code' || segment.type === 'link') ?
+            FontWeight.Medium : weightValue)
+      })
+    }
+    .layoutWeight(layoutWeightValue)
+    .fontSize(fontSizeValue)
+    .lineHeight(lineHeightValue)
+    .fontColor(colorValue)
+    .fontWeight(weightValue)
+  }
+
+  @Builder
   MarkdownContent(content: string, failed: boolean) {
     Column({ space: 7 }) {
       ForEach(this.markdownBlocks(content), (block: MarkdownBlock): void => {
         if (block.type === 'heading') {
-          Text(block.text)
-            .width('100%')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+          this.InlineText(this.inlineSource(block), 16, 24,
+            failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY, FontWeight.Bold, 0)
         } else if (block.type === 'quote') {
           Row({ space: 9 }) {
             Column()
@@ -976,11 +1203,8 @@ export struct ChatContent {
               .height('100%')
               .backgroundColor(Constants.COLOR_BRAND)
               .borderRadius(2)
-            Text(block.text)
-              .layoutWeight(1)
-              .fontSize(13)
-              .lineHeight(21)
-              .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_TERTIARY)
+            this.InlineText(this.inlineSource(block), 13, 21,
+              failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_TERTIARY, FontWeight.Regular, 1)
           }
           .width('100%')
           .padding({ left: 9, right: 9, top: 8, bottom: 8 })
@@ -998,11 +1222,8 @@ export struct ChatContent {
               .textAlign(TextAlign.Center)
               .backgroundColor(this.taskDone(block) ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND_LIGHT)
               .borderRadius(10)
-            Text(block.text)
-              .layoutWeight(1)
-              .fontSize(14)
-              .lineHeight(22)
-              .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+            this.InlineText(this.inlineSource(block), 14, 22,
+              failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY, FontWeight.Regular, 1)
           }
           .width('100%')
           .alignItems(VerticalAlign.Top)
@@ -1011,11 +1232,8 @@ export struct ChatContent {
             Text(block.type === 'numbered' ? block.text.split(' ')[0] : '•')
               .fontSize(14)
               .fontColor(Constants.COLOR_BRAND)
-            Text(block.type === 'numbered' ? block.text.slice(block.text.indexOf(' ') + 1) : block.text)
-              .layoutWeight(1)
-              .fontSize(14)
-              .lineHeight(22)
-              .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+            this.InlineText(this.inlineSource(block), 14, 22,
+              failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY, FontWeight.Regular, 1)
           }
           .width('100%')
           .alignItems(VerticalAlign.Top)
@@ -1139,11 +1357,8 @@ export struct ChatContent {
           .border({ width: 1, color: Constants.COLOR_BORDER })
           .borderRadius(Constants.RADIUS_SM)
         } else {
-          Text(block.text)
-            .width('100%')
-            .fontSize(14)
-            .lineHeight(22)
-            .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
+          this.InlineText(this.inlineSource(block), 14, 22,
+            failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY, FontWeight.Regular, 0)
         }
       })
     }

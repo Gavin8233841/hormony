@@ -5789,3 +5789,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未安装到模拟器、未抓取 Chat 页面 UI 树或截图，因此不能标记为模拟器通过。
 - 未验证真实模型新回答中的表格触控横向滚动手感。
 - 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：学伴 Markdown 行内样式与链接安全展示
+
+背景：继续推进 `docs/FRONTEND-PRODUCTIZATION-PLAYBOOK-20260703.md` 中 Chat Markdown P0 剩余项。本批次只处理安全行内展示：粗体、行内代码、Markdown 链接和裸 URL，不引入 OHPM Markdown 包，不用 ArkWeb，不给链接绑定跳转。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- `Chat.ets` 的 Markdown 分块保留 `inlineSource`，同时保留清洗后的 `text` 作为纯文本回退。
+- 新增行内段解析：仅识别 `**粗体**`、`__粗体__`、`` `行内代码` ``、`[文本](https://domain/path)` 和裸 `http://` / `https://` 链接。
+- HTML 标签仍会被剥离；不解析 HTML，不执行脚本，不绑定点击跳转。
+- Markdown 链接展示为“文本（domain）”，裸 URL 展示为 `domain`，域名提取只接受 `http` / `https` 且通过字符校验的主机名。
+- 标题、引用、任务、列表和普通段落改用 ArkUI `Text` + `Span` 原生渲染：粗体保持中等字重，行内代码和链接用品牌色强调；失败消息仍统一使用错误色。
+
+外部依据：
+- Huawei Developers ArkUI `Text` / `Span` 文本子组件文档：`https://developer.huawei.com/consumer/cn/doc/harmonyos-references-V5/ts-basic-components-text-V5`
+- OpenHarmony ArkUI `Span` 组件文档：`https://docs.openharmony.cn/pages/v5.0/en/application-dev/reference/apis-arkui/arkui-ts/ts-basic-components-span.md`
+
+验证：
+- DevEco MCP `check_ets_files` 对 `Chat.ets` 两次均返回 `received no diagnostics within 20000ms from LSP`，未取得单文件 ArkTS 诊断结论。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：首次 exit 0，`BUILD SUCCESSFUL in 13 s 379 ms`；仍提示未配置 signingConfigs。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：补充裸 URL 处理后二次 exit 0，`BUILD SUCCESSFUL in 12 s 620 ms`；仍提示未配置 signingConfigs。
+
+未验证：
+- 本批次未安装到模拟器、未抓取 Chat 页面 UI 树或截图，因此不能标记为模拟器通过。
+- 未验证真实模型新回答中的行内样式、链接域名展示与流式更新截图。
+- 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
