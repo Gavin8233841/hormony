@@ -5482,3 +5482,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未新增模拟器截图；本批次为 Practice 取题排序与兜底逻辑，证据等级为构建通过。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：题库 Topic 与难度映射硬约束
+
+背景：根据题库只读审计继续加固内容质量防线。现有测试已经能证明 Web 与 HarmonyOS 题库同源、每个真实 Topic 有 5 道选择题且至少覆盖 2 个难度档，但“33 个 Topic / 分课程 Topic 数”和“选择题难度映射必须完整且无多余”还没有硬断言，后续如果题库、关系图、知识切片同步误删同一个 Topic，集合一致性仍可能不足以暴露问题。
+
+文件：
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+
+行为变化：
+- 导出 `QUESTION_DIFFICULTY` 与 `TOPIC_TAGS`，用于数据完整性测试直接校验元数据映射表。
+- `data-integrity.test.ts` 增加固定 Topic 总数 33 与分课程 Topic 数约束：`cs101=12`、`cs102=10`、`cs103=11`。
+- 增加选择题 ID 与 `QUESTION_DIFFICULTY` 键集合完全一致断言，防止新增选择题静默回退为默认 `medium` 或保留多余映射。
+- 增加 `TOPIC_TAGS` 键集合与 `topic-relations.json` Topic 集合完全一致断言，防止标签表遗漏真实主题或保留无效主题。
+
+验证：
+- `cd apps/web; pnpm test -- src/lib/data/data-integrity.test.ts`：exit 0，11 files / 116 tests passed。
+- `cd apps/web; pnpm lint`：exit 0，无 ESLint warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，11 files / 116 tests passed。
+- `cd apps/web; pnpm build`：exit 0，Next.js production build 成功。
+
+未验证：
+- 本批次只修改 Web 数据测试与导出，不改题库内容、生成脚本或端侧 rawfile；未重新执行 HAP 构建。
+- 线上接口未重新部署验收。

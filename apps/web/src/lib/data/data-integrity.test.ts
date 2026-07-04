@@ -8,12 +8,21 @@ import {
   allQuizzes,
   externalResources,
 } from "@/lib/data";
+import { QUESTION_DIFFICULTY, TOPIC_TAGS } from "@/lib/data/quizzes";
 
 const MINIMUM_COUNTS = {
   cs101: { chunks: 40, questions: 20, choices: 20 },
   cs102: { chunks: 40, questions: 20, choices: 20 },
   cs103: { chunks: 40, questions: 20, choices: 20 },
 };
+
+const EXPECTED_TOPIC_COUNTS = {
+  cs101: 12,
+  cs102: 10,
+  cs103: 11,
+};
+
+const EXPECTED_TOTAL_TOPICS = 33;
 
 interface RawQuizQuestion {
   id: string;
@@ -156,6 +165,12 @@ describe("课程数据资产完整性", () => {
       (question) => `${question.courseId}:${question.topic}`
     ))).sort();
 
+    expect(relationTopics).toHaveLength(EXPECTED_TOTAL_TOPICS);
+    for (const courseId of COURSE_IDS) {
+      const courseTopicCount = topicRelations.filter((relation) => relation.courseId === courseId).length;
+      expect(courseTopicCount).toBe(EXPECTED_TOPIC_COUNTS[courseId]);
+    }
+
     expect(rawTopics).toEqual(relationTopics);
     expect(webTopics).toEqual(relationTopics);
 
@@ -184,6 +199,20 @@ describe("课程数据资产完整性", () => {
           .toBeGreaterThanOrEqual(2);
       }
     }
+  });
+
+  it("选择题难度映射和 Topic 标签表应完整覆盖题库", () => {
+    const choiceQuestionIds = allQuizzes.flatMap((quiz) =>
+      quiz.questions.filter((question) => question.type === "choice").map((question) => question.id)
+    ).sort();
+    const difficultyIds = Object.keys(QUESTION_DIFFICULTY).sort();
+
+    expect(difficultyIds).toEqual(choiceQuestionIds);
+
+    const relationTopics = Array.from(new Set(topicRelations.map((relation) => relation.topic))).sort();
+    const topicTagKeys = Object.keys(TOPIC_TAGS).sort();
+
+    expect(topicTagKeys).toEqual(relationTopics);
   });
 
   it("外部资源应使用受支持类型、HTTPS 地址和有效课程关联", () => {

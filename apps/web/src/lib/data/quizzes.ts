@@ -13,7 +13,7 @@ type QuizSeedQuestion = Omit<Quiz["questions"][number], "difficulty" | "tags"> &
 };
 type QuizSeed = Omit<Quiz, "questions"> & { questions: QuizSeedQuestion[] };
 
-const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
+export const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q01": "easy",
   "cs101_q02": "medium",
   "cs101_q03": "medium",
@@ -181,7 +181,7 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs103_q62": "easy",
 };
 
-const TOPIC_TAGS: Record<string, string> = {
+export const TOPIC_TAGS: Record<string, string> = {
   "数组与线性表": "线性表操作",
   "链表": "链式结构",
   "栈与队列": "受限线性结构",
