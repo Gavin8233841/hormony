@@ -191,6 +191,16 @@ struct PlanPage {
     return reason.trim().length > 0 ? reason.trim() : '学伴根据目标拆出的可执行下一步';
   }
 
+  private taskOutcome(task: PlanTask): string {
+    const topic = this.hasTaskTarget(task) ? (task.topic ?? '') : '这一步';
+    const action = task.action ?? task.type;
+    if (task.done === true) return '完成后：已写入本机进度，稍后可复盘';
+    if (action === 'quiz' || task.type === 'quiz') return '完成后：校准 ' + topic + ' 掌握度';
+    if (action === 'practice' || task.type === 'practice') return '完成后：把 ' + topic + ' 练到更稳';
+    if (action === 'review' || task.type === 'review') return '完成后：修复 ' + topic + ' 的卡点';
+    return '完成后：说清 ' + topic + ' 的关键概念';
+  }
+
   private runLocalProgress(): void {
     this.progressStep = 0;
     setTimeout((): void => {
@@ -429,6 +439,24 @@ struct PlanPage {
                     .margin({ top: 5 })
                     .maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Row({ space: 5 }) {
+                    SymbolGlyph(t.done === true ? $r('sys.symbol.checkmark_circle_fill') :
+                      $r('sys.symbol.lightbulb_max_fill'))
+                      .fontSize(13)
+                      .fontColor([t.done === true ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND])
+                    Text(this.taskOutcome(t))
+                      .fontSize(11)
+                      .fontColor(t.done === true ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+                      .lineHeight(16)
+                      .maxLines(2)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .layoutWeight(1)
+                  }
+                  .width('100%')
+                  .margin({ top: 6 })
+                  .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+                  .backgroundColor(t.done === true ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BRAND_LIGHT)
+                  .borderRadius(Constants.RADIUS_SM)
                   Row({ space: 8 }) {
                     Text(t.date)
                       .fontSize(11)

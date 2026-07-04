@@ -5394,3 +5394,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 真机未验证。
 - 仓库冒烟本轮没有进入云端 AI Quiz 结果页，也没有触发 Plan 生成页专项截图；本批 Quiz 结果行动卡和 Plan 文案的证据等级为构建通过，主流程为模拟器通过。
+
+---
+
+## 2026-07-04 Codex：计划任务卡补充完成收益
+
+背景：继续落实端侧产品模式基准中 `Plan.ets` 的“任务卡结果导向”。上一批已把生成过程标题去技术化，本批只在既有任务卡内补上“完成后获得什么”，让计划从待办列表变成学习收益清单。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- DEVLOG.md
+
+行为变化：
+- Plan 任务卡新增“完成后：...”提示行，按任务 action/type 区分阅读、练习、复盘和测验的学习收益。
+- 已完成任务显示“已写入本机进度，稍后可复盘”，把完成按钮反馈与本地进度闭环连接起来。
+- 新增内容只复用 `PlanTask` 现有字段、系统 Symbol 和 `Constants.ets` 颜色令牌；不改 Plan API、AppStorage 键、Repository、schema、OHPM 依赖或资源目录。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 14 s 17 ms`；ArkTS 编译和 HAP 打包通过。
+- DevEco MCP `get_app_ui_tree`：Pura 90 Pro Max 模拟器，`127.0.0.1:5555`；点击首页“查看全部”后 UI 树出现 `componentName: PlanPage`，但当次只捕获到生成中状态，没有捕获到任务卡新增收益行。
+
+未通过：
+- DevEco MCP `check_ets_files` 对 `Plan.ets` 返回 `wait for diagnostics failed: Failed to flush stdin: 管道正在被关闭。`，未形成静态诊断证据。
+- `.\scripts\harmonyos-app-smoke.ps1` 第一次：exit 1；脚本内构建、安装、启动、首页和课程 Tab 均通过，在课程列表断言处未找到课程名。
+- `.\scripts\harmonyos-app-smoke.ps1` 第二次：exit 1；脚本内构建、安装、启动、课程列表、课程详情、精选练习、Chat、Profile、学习记录、错题本、成就和 LearningMap 第一门课程均通过，在切到第二门学习星图后未找到 `Level 0`。
+
+未验证：
+- 真机未验证。
+- Plan 任务卡新增收益行尚未拿到专项截图；当前证据等级为构建通过。
