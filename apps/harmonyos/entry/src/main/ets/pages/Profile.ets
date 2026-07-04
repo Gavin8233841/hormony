@@ -82,49 +82,132 @@ export struct ProfileContent {
     .alignItems(HorizontalAlign.Center)
   }
 
+  private tagMasteryLevel(item: TagInsight): string {
+    if (item.totalQuestions < 2) return '尝试';
+    if (item.accuracy >= 0.9 && item.totalQuestions >= 6 && item.wrongQuestions === 0) return '掌握';
+    if (item.accuracy >= 0.8 && item.totalQuestions >= 4 && item.wrongQuestions <= 1) return '熟练';
+    if (item.accuracy >= 0.6) return '熟悉';
+    return '尝试';
+  }
+
+  private tagMasteryColor(item: TagInsight): string {
+    const level = this.tagMasteryLevel(item);
+    if (level === '掌握' || level === '熟练') return Constants.COLOR_SUCCESS;
+    if (level === '熟悉') return Constants.COLOR_WARNING;
+    return Constants.COLOR_BRAND;
+  }
+
+  private tagMasteryBackground(item: TagInsight): string {
+    const level = this.tagMasteryLevel(item);
+    if (level === '掌握' || level === '熟练') return Constants.COLOR_SUCCESS_LIGHT;
+    if (level === '熟悉') return Constants.COLOR_BG_TAG;
+    return Constants.COLOR_BRAND_LIGHT;
+  }
+
+  private difficultyLabel(value: string): string {
+    if (value === 'easy') return '基础';
+    if (value === 'hard') return '挑战';
+    return '进阶';
+  }
+
+  private practicedAtLabel(value: string): string {
+    if (value.length >= 10) return value.slice(5, 7) + '月' + value.slice(8, 10) + '日';
+    return '最近练习';
+  }
+
+  private tagMasteryAdvice(item: TagInsight): string {
+    if (item.totalQuestions < 2) return '先完成 2 题建立基线';
+    if (item.wrongQuestions > 0) return item.nextStep;
+    if (this.tagMasteryLevel(item) === '掌握') return '保持复习节奏，下次挑战综合题';
+    return item.nextStep;
+  }
+
   @Builder
   TagInsightRow(item: TagInsight) {
-    Column({ space: 8 }) {
-      Row() {
-        Text(item.tag)
-          .fontSize(13)
+    Column({ space: 10 }) {
+      Row({ space: 8 }) {
+        Column({ space: 3 }) {
+          Text(item.tag)
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('样本 ' + item.totalQuestions.toString() + ' 题 · 正确 ' + item.correctQuestions.toString() + ' 题')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Text(this.tagMasteryLevel(item))
+          .fontSize(11)
           .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text(item.correctQuestions.toString() + '/' + item.totalQuestions.toString())
+          .fontColor(this.tagMasteryColor(item))
+          .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+          .backgroundColor(this.tagMasteryBackground(item))
+          .borderRadius(Constants.RADIUS_SM)
+      }
+      .width('100%')
+      Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
+        .width('100%')
+        .color(this.tagMasteryColor(item))
+        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+        .borderRadius(4)
+      Row({ space: 8 }) {
+        Text(Math.round(item.accuracy * 100).toString() + '% 正确率')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        Text('错题 ' + item.wrongQuestions.toString() + ' 道')
+          .fontSize(11)
+          .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_ERROR : Constants.COLOR_SUCCESS)
+        Text(this.practicedAtLabel(item.lastPracticedAt))
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
       }
       .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-      Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
-        .width('100%')
-        .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : (item.accuracy >= 0.6 ? Constants.COLOR_WARNING :
-          Constants.COLOR_ERROR))
-        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-        .borderRadius(4)
-      Text(item.wrongQuestions > 0 ? '错题 ' + item.wrongQuestions.toString() + ' 道，建议优先复盘' : '当前表现稳定')
-        .fontSize(11)
-        .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_SUCCESS)
-      Row({ space: 6 }) {
+      Flex({ wrap: FlexWrap.Wrap }) {
         Text('基础 ' + item.easyQuestions.toString())
           .fontSize(10)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(Constants.COLOR_BG_TAG)
+          .borderRadius(Constants.RADIUS_SM)
+          .margin({ right: 6, bottom: 4 })
         Text('进阶 ' + item.mediumQuestions.toString())
           .fontSize(10)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(Constants.COLOR_BG_TAG)
+          .borderRadius(Constants.RADIUS_SM)
+          .margin({ right: 6, bottom: 4 })
         Text('挑战 ' + item.hardQuestions.toString())
           .fontSize(10)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(Constants.COLOR_BG_TAG)
+          .borderRadius(Constants.RADIUS_SM)
+          .margin({ right: 6, bottom: 4 })
+        Text('最近 ' + this.difficultyLabel(item.lastDifficulty))
+          .fontSize(10)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(Constants.COLOR_BG_TAG)
+          .borderRadius(Constants.RADIUS_SM)
+          .margin({ right: 6, bottom: 4 })
       }
       .width('100%')
-      Text(item.weakReason)
-        .fontSize(11)
-        .fontColor(Constants.COLOR_TEXT_TERTIARY)
-        .lineHeight(18)
-      Text('下一步：' + item.nextStep)
-        .fontSize(11)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Constants.COLOR_BRAND)
+      Column({ space: 4 }) {
+        Text(item.weakReason)
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          .lineHeight(18)
+        Text('下一步：' + this.tagMasteryAdvice(item))
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND)
+      }
+      .width('100%')
+      .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+      .backgroundColor(Constants.COLOR_SURFACE_TINT)
+      .borderRadius(Constants.RADIUS_SM)
     }
     .width('100%')
   }

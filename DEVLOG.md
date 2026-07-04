@@ -5736,3 +5736,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未安装任何 OHPM 包，未进行 HAP 构建、模拟器 UI 树、截图或真机验证。
 - 第三方 SVG、插画、Lottie、音效、字体、`@luvi/lv-markdown-in`、`@ohos/lottie-turbo`、`@ohos/lottie`、`@ohos/mpchart` 均未进入 HAP，不能标记运行通过。
 - Codecademy 特定帮助文章和 LeetCode 页面在本机自动请求下返回 403；文档已标注为需人工浏览复核的产品参考。
+
+---
+
+## 2026-07-04 Codex：标签掌握等级与学习记录洞察升级
+
+背景：继续按端侧前端产品化 P0 推进，不引入未验证依赖，不做浅层换色。本批次把深猎报告中的 Khan 式标签掌握等级落到 Profile 与 ActivityRecords：使用现有端侧 `LearningTagInsight` 真实统计，不修改 schema、不改 Repository、不接触 Web Agent/API。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+
+行为变化：
+- `Profile.ets` 标签洞察从单纯正确率条升级为“尝试 / 熟悉 / 熟练 / 掌握”等级卡，等级由样本数、正确率、错题数共同推导。
+- 标签行同步展示样本数、正确题数、正确率、错题数、最近练习日期、最近难度和基础/进阶/挑战分布，避免只靠颜色表达状态。
+- 标签建议区继续复用 `weakReason` 与 `nextStep`，并在样本不足时显示“先完成 2 题建立基线”，在掌握状态显示保持复习节奏。
+- `ActivityRecords.ets` 顶部“最近薄弱标签”升级为“标签掌握等级”，用同一等级规则和进度色展示样本、错题、最近练习、最近难度和下一步。
+- 本批次只使用已有 `Constants` 设计令牌和 ArkUI 原生组件；没有新增第三方包、SVG、Lottie、音效或字体。
+
+验证：
+- `git status --short`：exit 0，启动时无输出，工作区干净。
+- `git log -5 --oneline`：exit 0，确认当前分支最新提交为 `a1aeac1 docs: 深猎端侧前端产品化资源`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 28 s 474 ms`；仍提示未配置 signingConfigs。命令未显式执行 clean，hvigor 输出包含内部 `:entry:clean` 任务名。
+
+失败或未验证：
+- DevEco MCP `check_ets_files` 对 `Profile.ets` 与 `ActivityRecords.ets` 均返回 `received no diagnostics within 20000ms from LSP`，未取得单文件 ArkTS 诊断结论；以 hvigor `CompileArkTS` 和 HAP 打包通过作为本批次静态构建证据。
+- 本批次未安装到模拟器、未抓取 Profile/ActivityRecords 页面 UI 树或截图，因此不能标记为模拟器通过。
+- 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
