@@ -127,7 +127,38 @@ struct QuizPage {
     return typeof answer === 'string' ? answer : '';
   }
 
+  private currentQuestion(): QuizQuestionView | null {
+    if (this.currentIndex < 0 || this.currentIndex >= this.questions.length) return null;
+    const question = this.questions[this.currentIndex];
+    return question === undefined ? null : question;
+  }
+
+  private currentQuestionStem(): string {
+    const question = this.currentQuestion();
+    return question === null ? '题目状态异常，请重新生成' : question.stem;
+  }
+
+  private currentQuestionOptions(): string[] {
+    const question = this.currentQuestion();
+    return question === null ? [] : (question.options ?? []);
+  }
+
+  private currentQuestionTags(): string[] {
+    const question = this.currentQuestion();
+    return question === null ? [] : (question.tags ?? []);
+  }
+
+  private currentQuestionDifficulty(): string | undefined {
+    const question = this.currentQuestion();
+    return question === null ? undefined : question.difficulty;
+  }
+
+  private currentQuestionReady(): boolean {
+    return this.currentQuestion() !== null;
+  }
+
   private chooseAnswer(answer: string): void {
+    if (!this.currentQuestionReady()) return;
     const nextAnswers = this.answers.slice();
     nextAnswers[this.currentIndex] = answer;
     this.answers = nextAnswers;
@@ -824,97 +855,118 @@ struct QuizPage {
   @Builder
   QuestionState() {
     Column({ space: 16 }) {
-      Row() {
-        Text('第 ' + (this.currentIndex + 1).toString() + ' 题')
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_BRAND)
-        Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
+      if (!this.currentQuestionReady()) {
+        Text('题目状态异常，请重新生成')
+          .width('100%')
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text('本轮题组没有可展示的当前题，已保护页面不再崩溃。')
+          .width('100%')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-
-      Progress({ value: this.currentIndex + 1, total: this.questions.length, type: ProgressType.Linear })
+          .lineHeight(20)
+        Button('重新生成')
+          .width('100%')
+          .height(48)
+          .fontSize(14)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.generateQuiz(); })
+      } else {
+        Row() {
+          Text('第 ' + (this.currentIndex + 1).toString() + ' 题')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_BRAND)
+          Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
         .width('100%')
-        .color(Constants.COLOR_BRAND)
-        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-        .borderRadius(4)
+        .justifyContent(FlexAlign.SpaceBetween)
 
-      Text(this.questions[this.currentIndex].stem)
-        .width('100%')
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        .lineHeight(27)
+        Progress({ value: this.currentIndex + 1, total: this.questions.length, type: ProgressType.Linear })
+          .width('100%')
+          .color(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+          .borderRadius(4)
 
-      if ((this.questions[this.currentIndex].tags ?? []).length > 0 ||
-        this.questions[this.currentIndex].difficulty !== undefined) {
-        Flex({ wrap: FlexWrap.Wrap }) {
-          Text(this.questionDifficultyLabel(this.questions[this.currentIndex].difficulty))
-            .fontSize(10)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
-            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-            .backgroundColor(Constants.COLOR_BG_TAG)
-            .borderRadius(9)
-            .margin({ right: 6, bottom: 6 })
-          ForEach(this.questions[this.currentIndex].tags ?? [], (tag: string): void => {
-            Text(tag)
+        Text(this.currentQuestionStem())
+          .width('100%')
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .lineHeight(27)
+
+        if (this.currentQuestionTags().length > 0 ||
+          this.currentQuestionDifficulty() !== undefined) {
+          Flex({ wrap: FlexWrap.Wrap }) {
+            Text(this.questionDifficultyLabel(this.currentQuestionDifficulty()))
               .fontSize(10)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_TEXT_TERTIARY)
               .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .backgroundColor(Constants.COLOR_BG_TAG)
               .borderRadius(9)
               .margin({ right: 6, bottom: 6 })
+            ForEach(this.currentQuestionTags(), (tag: string): void => {
+              Text(tag)
+                .fontSize(10)
+                .fontColor(Constants.COLOR_BRAND)
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(9)
+                .margin({ right: 6, bottom: 6 })
+            })
+          }
+          .width('100%')
+        }
+
+        Column({ space: 10 }) {
+          ForEach(this.currentQuestionOptions(), (option: string): void => {
+            AnswerOption(option, this.currentAnswerText() === option, (): void => { this.chooseAnswer(option); })
           })
         }
         .width('100%')
-      }
 
-      Column({ space: 10 }) {
-        ForEach(this.questions[this.currentIndex].options ?? [], (option: string): void => {
-          AnswerOption(option, this.currentAnswerText() === option, (): void => { this.chooseAnswer(option); })
-        })
-      }
-      .width('100%')
-
-      Row({ space: 10 }) {
-        Button('上一题')
-          .layoutWeight(1)
-          .height(48)
-          .fontSize(14)
-          .fontColor(this.currentIndex > 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
-          .backgroundColor(Constants.COLOR_BG_TAG)
-          .borderRadius(Constants.RADIUS_MD)
-          .enabled(this.currentIndex > 0)
-          .onClick(() => { this.currentIndex -= 1; })
-
-        if (this.currentIndex < this.questions.length - 1) {
-          Button('下一题')
+        Row({ space: 10 }) {
+          Button('上一题')
             .layoutWeight(1)
             .height(48)
             .fontSize(14)
-            .fontColor(this.currentAnswerText().length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-            .backgroundColor(this.currentAnswerText().length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+            .fontColor(this.currentIndex > 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            .backgroundColor(Constants.COLOR_BG_TAG)
             .borderRadius(Constants.RADIUS_MD)
-            .enabled(this.currentAnswerText().length > 0)
-            .onClick(() => { this.currentIndex += 1; })
-        } else {
-          Button(this.submitting ? '评分中...' : '提交评分')
-            .layoutWeight(1)
-            .height(48)
-            .fontSize(14)
-            .fontColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-            .backgroundColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
-            .borderRadius(Constants.RADIUS_MD)
-            .enabled(this.currentAnswerText().length > 0 && !this.submitting)
-            .onClick(() => { this.submitQuiz(); })
+            .enabled(this.currentIndex > 0)
+            .onClick(() => { this.currentIndex -= 1; })
+
+          if (this.currentIndex < this.questions.length - 1) {
+            Button('下一题')
+              .layoutWeight(1)
+              .height(48)
+              .fontSize(14)
+              .fontColor(this.currentAnswerText().length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .backgroundColor(this.currentAnswerText().length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+              .borderRadius(Constants.RADIUS_MD)
+              .enabled(this.currentAnswerText().length > 0)
+              .onClick(() => { this.currentIndex += 1; })
+          } else {
+            Button(this.submitting ? '评分中...' : '提交评分')
+              .layoutWeight(1)
+              .height(48)
+              .fontSize(14)
+              .fontColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .backgroundColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+              .borderRadius(Constants.RADIUS_MD)
+              .enabled(this.currentAnswerText().length > 0 && !this.submitting)
+              .onClick(() => { this.submitQuiz(); })
+          }
         }
-      }
-      .width('100%')
-      if (this.submitting) {
-        this.ScoringProgress()
+        .width('100%')
+        if (this.submitting) {
+          this.ScoringProgress()
+        }
       }
     }
     .width('100%')

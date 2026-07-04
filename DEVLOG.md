@@ -5856,3 +5856,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 线上已验证 Health 与 `count=6` 分批出题；`count=10/15`、Plan、Chat SSE 仍需后续验证。
 - 未完成端侧模拟器中“Lesson 互动 → 问学伴讲解/同标签测验 → 生成长题组 → 提交写回画像”的完整点击流，不能标记为该流程模拟器通过。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：首页下一步行动与 Quiz 渲染保护
+
+背景：用户指出应用打开后缺少成熟学习产品的明确下一步，AI 出题和规划在模拟器中仍存在不可用感。本批次把首页首屏从“固定继续课程”推进到 next best action：优先到期错题复习，再到薄弱标签专项练习，再到今日计划任务，最后才回落到继续课程；同时修复 Quiz 当前题状态异常时可能触发渲染层读取空题而崩溃的问题。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+
+行为变化：
+- HomeContent 新增 `loadNextAction()`，按“到期错题 → 薄弱标签 → 今日任务 → 当前课程”的优先级生成首页首屏行动。
+- 首页继续学习大卡内嵌“下一步最好做什么”，CTA 会根据行动类型变为“打开错题本”“练这个标签”“开始测验”“开始练习”“继续学习”或“进入课程”。
+- 首页 CTA 复用现有路由和 `AppStorage` 契约：错题进入 `pages/MistakeBook`，薄弱标签进入 `pages/Quiz` 并携带 `selectedQuizFocusTag`，计划任务按 `task.action` 进入 Lesson/Practice/Quiz。
+- Quiz 页面新增当前题安全访问方法；当前题为空或索引越界时显示“题目状态异常，请重新生成”，不再在 Builder 中直接读取 `this.questions[this.currentIndex]` 的字段。
+- Quiz 选项点击在当前题不可用时直接返回，避免异常状态继续写入答案数组。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `HomeContent.ets`、`Quiz.ets`：`no diagnostics`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 24 s 152 ms`；仍提示未配置 signingConfigs。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --no-incremental`：exit 0，`BUILD SUCCESSFUL in 17 s 390 ms`；用于排除增量编译缓存。
+- `hdc install C:\Users\guo82\Desktop\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap`：exit 0，`install bundle successfully`。
+- `hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，`start ability successfully`。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，窗口 `bundleName:com.c4ai.hormony`，证据 `.tmp/codex-home-next-action-20260704-ui/simple_dump_hormony_20260704175555754.txt` 包含“鸿学伴”“下一步最好做什么”“今日计划”。
+- DevEco MCP `perform_ui_action screenshot`：模拟器 `Pura 90 Pro Max`，截图 `.tmp/codex-home-next-action-20260704-ui/home_next_action_verified.png` 显示首屏“到期复习”“2 道错题今天该复习”“下一步最好做什么”“打开错题本”；证据不提交仓库。
+- DevEco MCP `get_hilog_or_faultlog_recent` 针对 `bundle_name=com.c4ai.hormony`、`keyword=QuizPage`：本批次重新安装启动后未发现新的 `QuizPage` 错误日志。
+
+失败或未验证：
+- 首页 CTA 从“打开错题本/练这个标签/计划任务”点击到目标页面并完成回写的完整链路未全部逐项跑完，不能标记为完整模拟器通过。
+- 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
