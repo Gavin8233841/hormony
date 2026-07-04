@@ -5388,3 +5388,25 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未新增模拟器截图；本批次为错题本跳转参数保护，证据等级为构建通过。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：学习记录行直达复盘动作
+
+背景：继续自审记录页从“流水账”到“复盘入口”的闭环质量。学习事件已经保存 `courseId`、`topic`、题量、正确数和来源，但记录行点击后统一回到课程详情页，用户无法从一条练习记录直接继续对应练习，也无法从已完成主题直接回看对应 Lesson。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+
+行为变化：
+- `lesson_completed` 事件点击后优先进入对应 `pages/Lesson`；若本地知识切片不存在，则回到课程详情页。
+- `quiz_mastered` / `quiz_submitted` 事件点击后进入对应 `pages/Practice`；若事件 Topic 没有本地精选题，则进入同课程综合练习。
+- `task_completed` 或缺少 Topic 的课程事件继续回到课程详情页，保留原有兜底路径。
+- 记录页现在能把“提交练习/掌握主题”的历史记录转化为可执行的下一次复盘入口。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 17 s 689 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未新增模拟器截图；本批次为记录页路由逻辑，证据等级为构建通过。
+- 真机未验证。

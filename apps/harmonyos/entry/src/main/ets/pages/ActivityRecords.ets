@@ -108,17 +108,53 @@ struct ActivityRecordsPage {
     return date.slice(5, 7) + '月' + date.slice(8, 10) + '日';
   }
 
-  private openEvent(event: StudyEvent): void {
-    if (event.courseId === undefined) return;
-    const titles: string[] = ['数据结构', '操作系统', '计算机网络'];
-    const ids: string[] = ['cs101', 'cs102', 'cs103'];
-    const index = ids.indexOf(event.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseId', event.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', index >= 0 ? titles[index] : '课程');
+  private openCourseDetail(courseId: string): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(courseId));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/CourseDetail' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ActivityRecordsPage navigation failed: %{public}s', error.message);
     });
+  }
+
+  private openEventLesson(courseId: string, topic: string): void {
+    const chunks = LearningContentRepository.getKnowledge(courseId, topic);
+    if (chunks.length === 0) {
+      this.openCourseDetail(courseId);
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(courseId));
+    AppStorage.setOrCreate<string>('selectedContentTopic', topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Lesson' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ActivityRecordsPage lesson navigation failed: %{public}s', error.message);
+    });
+  }
+
+  private openEventPractice(courseId: string, topic: string): void {
+    const topicQuestions = LearningContentRepository.getQuestions(courseId, topic);
+    const practiceTopic = topicQuestions.length > 0 ? topic : '';
+    AppStorage.setOrCreate<string>('selectedCourseId', courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(courseId));
+    AppStorage.setOrCreate<string>('selectedPracticeTopic', practiceTopic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'ActivityRecordsPage practice navigation failed: %{public}s', error.message);
+    });
+  }
+
+  private openEvent(event: StudyEvent): void {
+    if (event.courseId === undefined) return;
+    if (event.type === 'lesson_completed' && event.topic !== undefined) {
+      this.openEventLesson(event.courseId, event.topic);
+      return;
+    }
+    if ((event.type === 'quiz_mastered' || event.type === 'quiz_submitted') && event.topic !== undefined) {
+      this.openEventPractice(event.courseId, event.topic);
+      return;
+    }
+    this.openCourseDetail(event.courseId);
   }
 
   build() {
