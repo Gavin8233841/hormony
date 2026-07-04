@@ -76,7 +76,8 @@ struct PracticePage {
     if (focusedQuestion !== undefined) {
       ordered.push(focusedQuestion);
     } else if (focusedReviewQuestionId.length > 0 && nextMessage.length === 0) {
-      nextMessage = '当前错题不是精选题，已切换为同课程练习';
+      nextMessage = this.topic.length > 0 ? '当前错题不是精选题，已切换为同主题练习' :
+        '当前错题不是精选题，已切换为同课程练习';
     }
     for (const question of available) {
       if (question.id !== focusedReviewQuestionId && reviewIds.includes(question.id)) ordered.push(question);

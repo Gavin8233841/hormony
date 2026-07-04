@@ -5534,3 +5534,24 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 本批次只修改校验脚本和 Web 数据测试，不改端侧页面与 HAP 产物；未执行 HAP 构建。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：精确提示非精选错题练习范围
+
+背景：继续自审错题本到 Practice 的复习入口。当前 Practice 已能把非精选错题兜底到可练习范围，但提示文案统一写成“同课程练习”；当错题有真实 Topic 且该 Topic 有精选题时，实际范围仍是同主题练习，文案会误导用户对本轮练习范围的理解。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+
+行为变化：
+- `selectedReviewQuestionId` 对应题目不在本地精选题库时，Practice 根据当前 `topic` 是否为空区分提示。
+- 仍在具体 Topic 范围内时提示“已切换为同主题练习”；课程综合范围内才提示“已切换为同课程练习”。
+- 取题排序、答题记录、错题置顶和兜底逻辑不变，只让用户看到的范围解释与实际练习范围一致。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 395 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未新增模拟器截图；本批次为提示文案与范围判断逻辑，证据等级为构建通过。
+- 真机未验证。
