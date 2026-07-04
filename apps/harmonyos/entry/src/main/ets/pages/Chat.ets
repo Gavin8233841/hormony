@@ -85,12 +85,14 @@ export struct ChatContent {
   private markdownBlocks(content: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
+    const tableRows: string[] = [];
     let codeLanguage = '';
     let inCode = false;
     for (const rawLine of content.split('\n')) {
       const line = rawLine.trimEnd();
       const trimmed = line.trim();
       if (trimmed.startsWith('```')) {
+        this.pushTableBlock(blocks, tableRows);
         if (inCode) {
           blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage });
           codeLines.splice(0, codeLines.length);
@@ -105,35 +107,47 @@ export struct ChatContent {
         codeLines.push(line);
         continue;
       }
-      if (trimmed.length === 0) continue;
+      if (trimmed.length === 0) {
+        this.pushTableBlock(blocks, tableRows);
+        continue;
+      }
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
+        this.pushTableBlock(blocks, tableRows);
         blocks.push({ type: 'heading', text: headingText });
       } else if (trimmed.startsWith('>')) {
+        this.pushTableBlock(blocks, tableRows);
         const quote = this.cleanInline(trimmed.slice(1));
         if (quote.length > 0) {
           blocks.push({ type: 'quote', text: quote });
         }
       } else if (trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ')) {
+        this.pushTableBlock(blocks, tableRows);
         blocks.push({ type: 'task', text: this.cleanInline(trimmed.slice(6)), meta: 'open' });
       } else if (trimmed.startsWith('- [x] ') || trimmed.startsWith('- [X] ') ||
         trimmed.startsWith('* [x] ') || trimmed.startsWith('* [X] ')) {
+        this.pushTableBlock(blocks, tableRows);
         blocks.push({ type: 'task', text: this.cleanInline(trimmed.slice(6)), meta: 'done' });
-      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
+      } else if (this.bulletText(trimmed).length > 0) {
+        this.pushTableBlock(blocks, tableRows);
+        blocks.push({ type: 'bullet', text: this.bulletText(trimmed) });
       } else if (this.numberedText(trimmed).length > 0) {
+        this.pushTableBlock(blocks, tableRows);
         blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
       } else if (this.isTableRow(trimmed)) {
         const tableText = this.tableText(trimmed);
         if (tableText.length > 0) {
-          blocks.push({ type: 'table', text: tableText });
+          tableRows.push(tableText);
         }
       } else if (this.isDivider(trimmed)) {
+        this.pushTableBlock(blocks, tableRows);
         blocks.push({ type: 'divider', text: '' });
       } else {
+        this.pushTableBlock(blocks, tableRows);
         blocks.push({ type: 'paragraph', text: this.cleanInline(line) });
       }
     }
+    this.pushTableBlock(blocks, tableRows);
     if (codeLines.length > 0) {
       blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage });
     }
@@ -143,13 +157,31 @@ export struct ChatContent {
     return blocks;
   }
 
+  private pushTableBlock(blocks: MarkdownBlock[], tableRows: string[]): void {
+    if (tableRows.length === 0) return;
+    blocks.push({ type: 'table', text: tableRows.join('\n') });
+    tableRows.splice(0, tableRows.length);
+  }
+
   private headingText(line: string): string {
     let level = 0;
     while (level < line.length && line.charAt(level) === '#') {
       level += 1;
     }
-    if (level > 0 && level <= 6 && line.length > level && line.charAt(level) === ' ') {
-      return this.cleanInline(line.slice(level + 1));
+    if (level > 0 && level <= 6 && line.length > level) {
+      const next = line.charAt(level);
+      if (next === ' ') return this.cleanInline(line.slice(level + 1));
+      return this.cleanInline(line.slice(level));
+    }
+    return '';
+  }
+
+  private bulletText(line: string): string {
+    if (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('+ ')) {
+      return this.cleanInline(line.slice(2));
+    }
+    if (line.startsWith('• ')) {
+      return this.cleanInline(line.slice(2));
     }
     return '';
   }
@@ -157,14 +189,27 @@ export struct ChatContent {
   private numberedText(line: string): string {
     const dotIndex = line.indexOf('. ');
     const cnIndex = line.indexOf('、');
+    const halfParenIndex = line.indexOf(') ');
+    const fullParenIndex = line.indexOf('）');
     let splitIndex = dotIndex;
     let offset = 2;
     if (splitIndex < 0 || (cnIndex > 0 && cnIndex < splitIndex)) {
       splitIndex = cnIndex;
       offset = 1;
     }
+    if (splitIndex < 0 || (halfParenIndex > 0 && halfParenIndex < splitIndex)) {
+      splitIndex = halfParenIndex;
+      offset = 2;
+    }
+    if (splitIndex < 0 || (fullParenIndex > 0 && fullParenIndex < splitIndex)) {
+      splitIndex = fullParenIndex;
+      offset = 1;
+    }
     if (splitIndex <= 0) return '';
-    const prefix = line.slice(0, splitIndex);
+    let prefix = line.slice(0, splitIndex);
+    if (prefix.startsWith('(') || prefix.startsWith('（')) {
+      prefix = prefix.slice(1);
+    }
     for (const ch of prefix) {
       if (ch < '0' || ch > '9') return '';
     }
@@ -201,13 +246,20 @@ export struct ChatContent {
       }
     }
     if (divider) return '';
-    return cells.join('  ·  ');
+    return cells.join('|');
   }
 
   private cleanInline(text: string): string {
     return text
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1（$2）')
+      .replace(/`([^`]+)`/g, '「$1」')
       .replace(/<br\s*\/?\s*>/g, '；')
       .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
       .replace(/\*\*/g, '')
       .replace(/__/g, '')
       .replace(/\*/g, '')
@@ -233,6 +285,23 @@ export struct ChatContent {
   private codeLineNumber(index: number): string {
     const value = (index + 1).toString();
     return value.length === 1 ? '0' + value : value;
+  }
+
+  private tableRows(block: MarkdownBlock): string[] {
+    const rows: string[] = [];
+    for (const row of block.text.split('\n')) {
+      if (row.trim().length > 0) rows.push(row);
+    }
+    return rows;
+  }
+
+  private tableCells(row: string): string[] {
+    const cells: string[] = [];
+    for (const cell of row.split('|')) {
+      const cleaned = cell.trim();
+      if (cleaned.length > 0) cells.push(cleaned);
+    }
+    return cells;
   }
 
   private boundedCodeText(block: MarkdownBlock): string {
@@ -1035,14 +1104,31 @@ export struct ChatContent {
           .backgroundColor(Constants.COLOR_MAP_SURFACE)
           .borderRadius(Constants.RADIUS_SM)
         } else if (block.type === 'table') {
-          Text(block.text)
-            .width('100%')
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
-            .padding(9)
-            .backgroundColor(Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_SM)
+          Scroll() {
+            Column({ space: 0 }) {
+              ForEach(this.tableRows(block), (row: string, rowIndex: number): void => {
+                Row() {
+                  ForEach(this.tableCells(row), (cell: string): void => {
+                    Text(cell)
+                      .constraintSize({ minWidth: 96 })
+                      .fontSize(11)
+                      .lineHeight(18)
+                      .fontWeight(rowIndex === 0 ? FontWeight.Bold : FontWeight.Regular)
+                      .fontColor(rowIndex === 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_TERTIARY)
+                      .padding({ left: 8, right: 8, top: 7, bottom: 7 })
+                  })
+                }
+                .width('100%')
+                .backgroundColor(rowIndex === 0 ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_SURFACE_TINT)
+                .borderRadius(rowIndex === 0 ? Constants.RADIUS_SM : 0)
+              })
+            }
+          }
+          .width('100%')
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Auto)
+          .backgroundColor(Constants.COLOR_SURFACE_TINT)
+          .borderRadius(Constants.RADIUS_SM)
         } else {
           Text(block.text)
             .width('100%')

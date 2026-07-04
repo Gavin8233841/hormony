@@ -5889,3 +5889,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 首页 CTA 从“打开错题本/练这个标签/计划任务”点击到目标页面并完成回写的完整链路未全部逐项跑完，不能标记为完整模拟器通过。
 - 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：学伴 Markdown 阅读卡增强
+
+背景：用户指出云端学伴 Markdown 文本仍不能正确渲染，不能把 AI 回答当作一坨纯文字。本批次在不新增 OHPM 依赖、不引入 ArkWeb 的前提下，继续增强 HarmonyOS 端 Chat 的零依赖 Markdown 渲染器，使标题、列表、任务项、引用、表格、链接清洗和代码块更接近真实学习产品的阅读体验。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- Markdown 解析会把连续表格行合并为单个 table block，不再把每一行表格拆成普通灰色文本。
+- 表格渲染升级为横向可滚动的行列卡片，首行按表头强调，后续行按单元格展示。
+- 标题识别支持 `##标题` 与 `## 标题` 两种形式。
+- 列表识别扩展到 `-`、`*`、`+`、`•`，编号识别扩展到 `1.`、`1、`、`1)`、`1）`、`（1）`。
+- 行内清洗支持 Markdown 图片、链接、行内代码、HTML 换行和常见实体，减少 `[text](url)`、反引号、HTML 标签直接暴露给用户。
+- 代码块继续保留语言标签、行号、横向滚动和“解释这段”入口，便于后续形成编程学习闭环。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `Chat.ets`：`no diagnostics`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 16 s 967 ms`；仍提示未配置 signingConfigs。
+- `hdc shell aa force-stop com.c4ai.hormony && hdc install entry-default-unsigned.hap && hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，安装和启动成功。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，证据 `.tmp/codex-chat-markdown-20260704-ui/simple_dump_hormony_20260704180917244.txt` 包含 `bundleName:com.c4ai.hormony`、`学伴`、`基于课程资料，为每个问题给出依据`、输入框 hint `输入你的问题...`。
+
+失败或未验证：
+- 本批次未成功完成“端侧输入问题 → Chat SSE 返回真实 Markdown/代码/表格 → 端侧渲染截图”的完整点击链路；一次模拟器坐标输入后页面焦点回到首页，未作为通过证据。
+- 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
