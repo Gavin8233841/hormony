@@ -5366,3 +5366,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 真机未验证。
 - 本批只修复 Practice 重入状态，不新增题库标签、不调整错题间隔算法。
+
+---
+
+## 2026-07-04 Codex：测验结果闭环与规划依据去技术化
+
+背景：继续落实端侧前端资源猎采和产品模式基准。`Quiz.ets` 结果页已有分数、薄弱点和逐题解析，但还缺少 Duolingo/Codecademy 式“看完结果后立刻做什么”的动作闭环；`Plan.ets` 仍把生成过程写成 `Agent 工作链`，学生端文案需要转成可理解的规划依据。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/pages/Quiz.ets
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- DEVLOG.md
+
+行为变化：
+- Quiz 结果页新增“巩固闭环 / 查漏补缺 / 先修复卡点”行动卡，按正确率给出下一步说明。
+- 行动卡提供“看资料”和“练薄弱点”两个直接动作：前者复用现有 Knowledge 路由定位主题资料，后者复用 Practice 路由进入同主题精选练习。
+- 低分和中等分优先使用 `weakTopics[0]`，没有薄弱点时回退到当前 topic，避免空动作。
+- Plan 生成过程标题从“Agent 工作链 / 可解释规划”调整为“规划依据 / 可复盘”，保留原有阶段与依据结构，不暴露技术词。
+- 不改 Web API、Agent 编排、题库、Repository、schema、OHPM 依赖或资源目录。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 969 ms`；ArkTS 编译和 HAP 打包通过。
+- `.\scripts\harmonyos-app-smoke.ps1`：exit 0，76 passed / 0 failed；脚本内增量构建 exit 0，`BUILD SUCCESSFUL in 5 s 657 ms`。
+- 冒烟环境：Pura 90 Pro Max 模拟器，`127.0.0.1:5555`；覆盖 HAP 安装启动、首页、课程列表、课程详情、精选练习 5 题推进、提交评分、本轮闭环、错题追问学伴、Chat、Profile、学习记录、错题本、成就、三门课程学习星图、回到首页。
+- 证据截图目录：`screenshots/trae-smoke-20260704-223637/`，不提交仓库。
+
+未验证：
+- 真机未验证。
+- 仓库冒烟本轮没有进入云端 AI Quiz 结果页，也没有触发 Plan 生成页专项截图；本批 Quiz 结果行动卡和 Plan 文案的证据等级为构建通过，主流程为模拟器通过。

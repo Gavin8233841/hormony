@@ -213,11 +213,11 @@ struct PlanPage {
   AgentTraceCard() {
     Column({ space: 12 }) {
       Row() {
-        Text('Agent 工作链')
+        Text('规划依据')
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('可解释规划')
+        Text('可复盘')
           .fontSize(11)
           .fontColor(Constants.COLOR_BRAND)
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })

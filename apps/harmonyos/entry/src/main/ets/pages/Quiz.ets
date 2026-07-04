@@ -125,6 +125,35 @@ struct QuizPage {
     });
   }
 
+  private practiceWeakTopic(): void {
+    const targetTopic = this.weakTopics.length > 0 ? this.weakTopics[0] : this.topic;
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedPracticeTopic', targetTopic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'QuizPage practice router.pushUrl failed: %{public}s', err.message);
+      this.message = '无法打开精选练习，请稍后重试';
+    });
+  }
+
+  private primaryReviewTopic(): string {
+    if (this.weakTopics.length > 0) return this.weakTopics[0];
+    return this.topic.length > 0 ? this.topic : '综合';
+  }
+
+  private resultLoopTitle(): string {
+    if (this.resultAccuracy >= 0.8) return '巩固闭环';
+    if (this.resultAccuracy >= 0.6) return '查漏补缺';
+    return '先修复卡点';
+  }
+
+  private resultLoopSubtitle(): string {
+    if (this.resultAccuracy >= 0.8) return '先看解析确认判断依据，再挑战同主题新题。';
+    if (this.resultAccuracy >= 0.6) return '先复盘错题，再用精选练习把薄弱点补齐。';
+    return '先回到资料定位概念，再做一组短练习。';
+  }
+
   async generateQuiz(): Promise<void> {
     if (this.loading) return;
     this.resetQuiz();
@@ -526,6 +555,8 @@ struct QuizPage {
         .borderRadius(Constants.RADIUS_MD)
       }
 
+      this.ResultLoopCard()
+
       Text('逐题解析')
         .width('100%')
         .fontSize(18)
@@ -556,6 +587,55 @@ struct QuizPage {
         .onClick(() => { this.resetQuiz(); })
     }
     .width('100%')
+  }
+
+  @Builder
+  private ResultLoopCard() {
+    Column({ space: 12 }) {
+      Row({ space: 8 }) {
+        SymbolGlyph(this.resultAccuracy >= 0.8 ? $r('sys.symbol.checkmark_circle_fill') :
+          $r('sys.symbol.lightbulb_max_fill'))
+          .fontSize(18)
+          .fontColor([this.resultAccuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING])
+        Column({ space: 2 }) {
+          Text(this.resultLoopTitle())
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.resultLoopSubtitle())
+            .fontSize(11)
+            .lineHeight(17)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      Row({ space: 8 }) {
+        Button('看资料')
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick(() => { this.reviewTopic(this.primaryReviewTopic()); })
+        Button('练薄弱点')
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick(() => { this.practiceWeakTopic(); })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .borderRadius(Constants.RADIUS_MD)
   }
 
   build() {
