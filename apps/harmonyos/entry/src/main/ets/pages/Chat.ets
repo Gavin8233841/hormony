@@ -26,6 +26,7 @@ interface MarkdownBlock {
   type: string;
   text: string;
   meta?: string;
+  tableRows?: string[][];
 }
 
 @Component
@@ -85,8 +86,15 @@ export struct ChatContent {
   private markdownBlocks(content: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
+    const tableRows: string[][] = [];
     let codeLanguage = '';
     let inCode = false;
+    const flushTableRows = (): void => {
+      if (tableRows.length === 0) return;
+      const tableText = tableRows.map((row: string[]): string => row.join('  ·  ')).join('\n');
+      blocks.push({ type: 'table', text: tableText, tableRows: tableRows.slice() });
+      tableRows.splice(0, tableRows.length);
+    };
     for (const rawLine of content.split('\n')) {
       const line = rawLine.trimEnd();
       const trimmed = line.trim();
@@ -96,6 +104,7 @@ export struct ChatContent {
           codeLines.splice(0, codeLines.length);
           codeLanguage = '';
         } else {
+          flushTableRows();
           codeLanguage = trimmed.slice(3).trim();
         }
         inCode = !inCode;
@@ -105,7 +114,18 @@ export struct ChatContent {
         codeLines.push(line);
         continue;
       }
-      if (trimmed.length === 0) continue;
+      if (trimmed.length === 0) {
+        flushTableRows();
+        continue;
+      }
+      if (this.isTableRow(trimmed)) {
+        const cells = this.tableCells(trimmed);
+        if (cells.length > 0) {
+          tableRows.push(cells);
+        }
+        continue;
+      }
+      flushTableRows();
       const headingText = this.headingText(trimmed);
       if (headingText.length > 0) {
         blocks.push({ type: 'heading', text: headingText });
@@ -123,17 +143,13 @@ export struct ChatContent {
         blocks.push({ type: 'bullet', text: this.cleanInline(trimmed.slice(2)) });
       } else if (this.numberedText(trimmed).length > 0) {
         blocks.push({ type: 'numbered', text: this.numberedText(trimmed) });
-      } else if (this.isTableRow(trimmed)) {
-        const tableText = this.tableText(trimmed);
-        if (tableText.length > 0) {
-          blocks.push({ type: 'table', text: tableText });
-        }
       } else if (this.isDivider(trimmed)) {
         blocks.push({ type: 'divider', text: '' });
       } else {
         blocks.push({ type: 'paragraph', text: this.cleanInline(line) });
       }
     }
+    flushTableRows();
     if (codeLines.length > 0) {
       blocks.push({ type: 'code', text: codeLines.join('\n'), meta: codeLanguage });
     }
@@ -183,25 +199,60 @@ export struct ChatContent {
     return line.indexOf('|') >= 0 && line.indexOf('|') !== line.lastIndexOf('|');
   }
 
-  private tableText(line: string): string {
+  private tableCells(line: string): string[] {
     const cells: string[] = [];
     for (const cell of line.split('|')) {
       const cleaned = this.cleanInline(cell.trim());
-      if (cleaned.length > 0) {
+      const isEdge = cells.length === 0 && cleaned.length === 0;
+      if (!isEdge) {
         cells.push(cleaned);
       }
     }
-    if (cells.length === 0) return '';
+    if (cells.length > 0 && cells[cells.length - 1].length === 0) {
+      cells.pop();
+    }
+    if (cells.length === 0) return [];
     let divider = true;
     for (const cell of cells) {
+      if (cell.length === 0) {
+        divider = false;
+      }
       for (const ch of cell) {
         if (ch !== '-' && ch !== ':') {
           divider = false;
         }
       }
     }
-    if (divider) return '';
-    return cells.join('  ·  ');
+    if (divider) return [];
+    return cells.slice(0, 6);
+  }
+
+  private tableRows(block: MarkdownBlock): string[][] {
+    return block.tableRows ?? [];
+  }
+
+  private tableColumnWidth(block: MarkdownBlock): number {
+    const rows = this.tableRows(block);
+    let maxColumns = 1;
+    for (const row of rows) {
+      maxColumns = Math.max(maxColumns, row.length);
+    }
+    if (maxColumns <= 2) return 136;
+    if (maxColumns === 3) return 118;
+    return 104;
+  }
+
+  private tableColumnCount(block: MarkdownBlock): number {
+    const rows = this.tableRows(block);
+    let maxColumns = 1;
+    for (const row of rows) {
+      maxColumns = Math.max(maxColumns, row.length);
+    }
+    return maxColumns;
+  }
+
+  private tableMinWidth(block: MarkdownBlock): number {
+    return this.tableColumnCount(block) * this.tableColumnWidth(block);
   }
 
   private cleanInline(text: string): string {
@@ -1035,14 +1086,58 @@ export struct ChatContent {
           .backgroundColor(Constants.COLOR_MAP_SURFACE)
           .borderRadius(Constants.RADIUS_SM)
         } else if (block.type === 'table') {
-          Text(block.text)
+          Column({ space: 0 }) {
+            Row({ space: 6 }) {
+              Text('表格')
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_BRAND)
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(10)
+              Text('可横向滚动')
+                .fontSize(11)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                .layoutWeight(1)
+            }
             .width('100%')
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
-            .padding(9)
+            .padding({ left: 10, right: 10, top: 8, bottom: 8 })
             .backgroundColor(Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_SM)
+
+            Scroll() {
+              Column({ space: 0 }) {
+                ForEach(this.tableRows(block), (row: string[], rowIndex: number): void => {
+                  Row({ space: 0 }) {
+                    ForEach(row, (cell: string): void => {
+                      Text(cell.length > 0 ? cell : '-')
+                        .width(this.tableColumnWidth(block))
+                        .fontSize(12)
+                        .lineHeight(18)
+                        .fontWeight(rowIndex === 0 ? FontWeight.Medium : FontWeight.Regular)
+                        .fontColor(rowIndex === 0 ? Constants.COLOR_TEXT_PRIMARY :
+                          (failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_TERTIARY))
+                        .padding({ left: 9, right: 9, top: 8, bottom: 8 })
+                    })
+                  }
+                  .constraintSize({ minWidth: this.tableMinWidth(block) })
+                  .backgroundColor(rowIndex === 0 ? Constants.COLOR_BG_TAG : Constants.COLOR_BG_CARD)
+                  if (rowIndex < this.tableRows(block).length - 1) {
+                    Divider()
+                      .width(this.tableMinWidth(block))
+                      .color(Constants.COLOR_BORDER)
+                  }
+                })
+              }
+              .constraintSize({ minWidth: this.tableMinWidth(block) })
+            }
+            .width('100%')
+            .constraintSize({ maxHeight: 220 })
+            .scrollable(ScrollDirection.Horizontal)
+            .scrollBar(BarState.Auto)
+          }
+          .width('100%')
+          .border({ width: 1, color: Constants.COLOR_BORDER })
+          .borderRadius(Constants.RADIUS_SM)
         } else {
           Text(block.text)
             .width('100%')

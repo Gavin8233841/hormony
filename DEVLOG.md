@@ -5764,3 +5764,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - DevEco MCP `check_ets_files` 对 `Profile.ets` 与 `ActivityRecords.ets` 均返回 `received no diagnostics within 20000ms from LSP`，未取得单文件 ArkTS 诊断结论；以 hvigor `CompileArkTS` 和 HAP 打包通过作为本批次静态构建证据。
 - 本批次未安装到模拟器、未抓取 Profile/ActivityRecords 页面 UI 树或截图，因此不能标记为模拟器通过。
 - 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：学伴 Markdown 表格渲染升级
+
+背景：继续按 `docs/FRONTEND-PRODUCTIZATION-PLAYBOOK-20260703.md` 的 P0 Chat Markdown 与代码学习方向推进。本批次优先解决模型回答中的 Markdown 表格在端侧只能显示为普通文本的问题，仍保持 ArkUI 原生实现，不引入 OHPM Markdown、ArkWeb、HTML 渲染或未验证资产。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- `Chat.ets` 的 Markdown 分块逻辑会把连续表格行合并为一个 `table` 块，并跳过 `| --- | --- |` 这类分隔行。
+- 表格单元格保留内部空值，最多展示 6 列，避免模型输出的超宽表格撑破消息气泡。
+- 表格渲染从普通文本升级为 ArkUI 原生边框表格：首行作为表头强调，数据行加分隔线，外层支持横向滚动并显示“可横向滚动”提示。
+- 本批次不改变 `/api/chat` SSE 契约、不修改模型编排、不新增依赖、不使用 ArkWeb。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `Chat.ets` 返回 `received no diagnostics within 20000ms from LSP`，未取得单文件 ArkTS 诊断结论。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 329 ms`；仍提示未配置 signingConfigs。
+
+未验证：
+- 本批次未安装到模拟器、未抓取 Chat 页面 UI 树或截图，因此不能标记为模拟器通过。
+- 未验证真实模型新回答中的表格触控横向滚动手感。
+- 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
