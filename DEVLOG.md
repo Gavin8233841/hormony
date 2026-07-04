@@ -6019,3 +6019,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次验证了“课程列表 AI 出题入口 → Quiz 设置页 → 开始答题 → 等待态 → 首题生成”的模拟器路径；未完整提交答案、评分和写回画像。
 - 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：学习计划生成反馈与键盘遮挡修复
+
+背景：继续处理“规划在模拟器中不可用/像卡住”的问题。Plan 页已有基础进度，但真实模拟器截图显示点击生成时软键盘仍停留，遮挡下方等待反馈区域；同时等待解释弱于 Quiz 生成态，用户无法判断 Planner Agent 正在做什么。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+
+行为变化：
+- Plan 页输入框接入 `TextInputController`，点击生成或回车生成前调用 `stopEditing()` 退出编辑态，避免软键盘遮挡等待反馈和计划结果。
+- 计划生成等待态升级为“AI 正在生成学习计划”面板，展示目标/周期摘要、分阶段进度、检查点和骨架任务卡。
+- 规划阶段从 4 步扩展为 5 步：本地画像、真实目录、行动编排、结构校验、端侧同步；文案明确“云端只生成计划，端侧保存状态”。
+- 长等待提示区说明“页面没有卡住，完成后会自动写入本机计划”，21 天周期提示更长等待。
+- 端侧错误提示按云端错误码区分 `MODEL_UNAVAILABLE`、`MODEL_TIMEOUT`、`MODEL_INVALID_RESPONSE`、`SAFETY_BLOCKED`、`INPUT_REJECTED`、参数错误和网络错误，不再统一成模糊失败。
+- 计划响应未通过端侧可执行校验时，提示“云端返回的计划未通过端侧可执行校验”，避免保存不可直达任务。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --no-incremental`：exit 0，`BUILD SUCCESSFUL in 18 s 229 ms`；仍提示未配置 signingConfigs。
+- HAP 产物只读检查：`entry-default-unsigned.hap` 的 `ets/modules.abc` 包含“AI 正在生成学习计划”“本地画像”“端侧同步”“规划仍在云端生成中”等新增等待态文案。
+- DevEco MCP `check_ets_files` 对 `Plan.ets` 返回 `Failed to flush stdin: 管道正在被关闭。 (os error 232)`；该工具调用失败未作为静态诊断通过证据，HAP 构建已覆盖 ArkTS 编译。
+- `hdc shell aa force-stop com.c4ai.hormony`、`hdc install C:\Users\guo82\Desktop\Hormony\apps\harmonyos\entry\build\default\outputs\default\entry-default-unsigned.hap`、`hdc shell aa start -a EntryAbility -b com.c4ai.hormony`：exit 0，安装和启动成功。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，竖屏，窗口 `bundleName:com.c4ai.hormony`、`WindowRect: [ 0, 0, 1256, 2760 ]`。
+- 首次截图 `.tmp/codex-plan-progress-20260704-ui/plan_generation_progress.png` 复现软键盘遮挡问题：按钮进入“正在生成可执行动作”，但等待区被键盘覆盖。
+- 修复后截图 `.tmp/codex-plan-progress-20260704-ui/plan_generation_progress_after_focus_fix.png` 显示软键盘已收起，计划成功态可见；证据不提交仓库。
+- 修复后 UI 树 `.tmp/codex-plan-progress-20260704-ui/simple_dump_hormony_20260704231546395.txt` 包含“计划已生成并同步到首页”“Agent 工作链”“Profile Agent”“Planner Agent”“Local-first Guard”“今日起步”“10 项任务 · 每天约 90 分钟”“网络分层模型核心讲解”。
+- 线上 `POST https://hormony-ruddy.vercel.app/api/plan`：HTTP 200；请求 `goal=一周掌握 TCP 基础`、`durationDays=7`、`dailyMinutes=90`；返回 `tasks=7`、`agentTrace=4`，首任务字段包含 `action,courseId,date,estimatedMin,id,reason,title,topic,type`，首任务为 `cs103|OSI与TCP/IP模型|lesson|reading|90`，`agentTrace` 包含 `Planner Agent`。
+
+失败或未验证：
+- 线上 Plan 响应较快，本批次未在修复后再次抓到完整等待态停留截图；等待态文案已由源码/HAP 产物和构建证明，长等待停留仍需在慢网络或模型长耗时场景补模拟器证据。
+- 本批次只改 HarmonyOS Plan 页，未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
