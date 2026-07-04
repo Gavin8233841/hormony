@@ -193,6 +193,8 @@ export class LocalLearningRepository {
   static async getProfile(): Promise<UserProfile | null> {
     const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
     if (profile === null) return null;
+    const storedCourses = await LocalLearningRepository.getValue<Course[]>(KEY_COURSES) ?? [];
+    LocalLearningRepository.sanitizeProfileTopics(profile, storedCourses);
     const quizStats = await LocalLearningRepository.getQuizStatsAggregate(profile);
     const studyDates: string[] = quizStats.studyDates.slice();
     const events = await LocalLearningRepository.getStudyEvents();
@@ -211,6 +213,50 @@ export class LocalLearningRepository {
 
   static async saveProfile(profile: UserProfile): Promise<void> {
     await LocalLearningRepository.putValue<UserProfile>(KEY_PROFILE, profile);
+  }
+
+  private static sanitizeProfileTopics(profile: UserProfile, courses: Course[]): boolean {
+    const validTopics = LocalLearningRepository.courseTopicNames(courses);
+    const weakTopics = LocalLearningRepository.sanitizedTopicList(profile.weakTopics, validTopics);
+    const strongTopics = LocalLearningRepository.sanitizedTopicList(profile.strongTopics, validTopics);
+    const changed = !LocalLearningRepository.sameStringList(profile.weakTopics, weakTopics) ||
+      !LocalLearningRepository.sameStringList(profile.strongTopics, strongTopics);
+    profile.weakTopics = weakTopics;
+    profile.strongTopics = strongTopics;
+    return changed;
+  }
+
+  private static courseTopicNames(courses: Course[]): string[] {
+    const topics: string[] = [];
+    for (const course of courses) {
+      for (const topic of course.topics) {
+        if (!topics.includes(topic)) topics.push(topic);
+      }
+    }
+    return topics;
+  }
+
+  private static sanitizedTopicList(topics: string[], validTopics: string[]): string[] {
+    const sanitized: string[] = [];
+    for (const topic of topics) {
+      const normalized = topic.trim();
+      if (!LocalLearningRepository.isProfileTopicAllowed(normalized, validTopics)) continue;
+      if (!sanitized.includes(normalized)) sanitized.push(normalized);
+    }
+    return sanitized;
+  }
+
+  private static isProfileTopicAllowed(topic: string, validTopics: string[]): boolean {
+    if (topic.length === 0 || topic === '综合') return false;
+    return validTopics.length === 0 || validTopics.includes(topic);
+  }
+
+  private static sameStringList(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index++) {
+      if (left[index] !== right[index]) return false;
+    }
+    return true;
   }
 
   static async getCourses(): Promise<Course[] | null> {
@@ -291,13 +337,18 @@ export class LocalLearningRepository {
     await LocalLearningRepository.updateTagInsightsAggregate(result);
     const profile = await LocalLearningRepository.getValue<UserProfile>(KEY_PROFILE);
     if (profile !== null) {
+      const storedCourses = await LocalLearningRepository.getValue<Course[]>(KEY_COURSES) ?? [];
+      const validTopics = LocalLearningRepository.courseTopicNames(storedCourses);
+      LocalLearningRepository.sanitizeProfileTopics(profile, storedCourses);
       for (const topic of result.weakTopics) {
-        if (!profile.weakTopics.includes(topic)) profile.weakTopics.push(topic);
-        const strongIndex = profile.strongTopics.indexOf(topic);
+        const normalized = topic.trim();
+        if (!LocalLearningRepository.isProfileTopicAllowed(normalized, validTopics)) continue;
+        if (!profile.weakTopics.includes(normalized)) profile.weakTopics.push(normalized);
+        const strongIndex = profile.strongTopics.indexOf(normalized);
         if (strongIndex >= 0) profile.strongTopics.splice(strongIndex, 1);
       }
-      if (result.accuracy >= 0.8 && !profile.strongTopics.includes(result.topic)) {
-        profile.strongTopics.push(result.topic);
+      if (result.accuracy >= 0.8 && LocalLearningRepository.isProfileTopicAllowed(result.topic, validTopics)) {
+        if (!profile.strongTopics.includes(result.topic)) profile.strongTopics.push(result.topic);
         const weakIndex = profile.weakTopics.indexOf(result.topic);
         if (weakIndex >= 0) profile.weakTopics.splice(weakIndex, 1);
       }

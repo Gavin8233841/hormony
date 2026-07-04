@@ -5346,3 +5346,24 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 本批次为题库数据与测试约束变更，未新增模拟器截图。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：画像 Topic 列表清洗
+
+背景：继续自审真实学习记录到画像洞察的长期闭环。此前旧版本综合练习可能把空字符串或“综合”写入 `profile.weakTopics`，新提交已阻止新数据继续产生空弱项，但旧本地状态仍可能在画像页展示非真实 Topic。本批次在仓库层清洗画像弱项/强项列表，确保画像页只展示课程目录中的真实主题。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+
+行为变化：
+- `getProfile()` 返回前会清洗 `weakTopics` / `strongTopics`，过滤空字符串、“综合”和课程目录外主题，并去重；读取阶段不持久写库，避免初始化早于 `syncCourseCatalog()` 时误删后续完整目录中的 Topic。
+- `appendQuizResult()` 更新画像前先清洗旧列表，再只把真实课程 Topic 写入弱项/强项；综合测验不再进入画像 Topic 列表。
+- 画像页“薄弱知识点/已掌握知识点”更稳定地对应真实 Topic，避免把测验范围名当知识点。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 26 s 74 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未新增模拟器截图；本批次为本地状态清洗逻辑，证据等级为构建通过。
+- 真机未验证。
