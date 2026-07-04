@@ -5509,3 +5509,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 本批次只修改 Web 数据测试与导出，不改题库内容、生成脚本或端侧 rawfile；未重新执行 HAP 构建。
 - 线上接口未重新部署验收。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：固化 Topic 名称全局唯一
+
+背景：继续审计题库标签链路。当前 `TOPIC_TAGS` 以 Topic 名称作为键，端侧画像和标签洞察也按标签聚合。如果不同课程出现同名 Topic，按名称索引的标签表无法区分课程来源，后续薄弱点统计会混入错误课程上下文。本批次把这个数据前提写入关系校验脚本和 Web 数据测试。
+
+文件：
+- `scripts/validate-topic-relations.py`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+
+行为变化：
+- `validate-topic-relations.py` 在原有同课程 Topic 唯一基础上，新增 Topic 名称跨课程全局唯一检查。
+- 数据完整性测试在 33 个 Topic 与分课程数量约束后，断言 `topic-relations.json` 的 Topic 名称集合没有重复。
+- `TOPIC_TAGS` 继续使用 Topic 名称作为键，但现在有测试证明当前数据结构不会把不同课程的同名主题合并到同一标签入口。
+
+验证：
+- `python scripts/validate-topic-relations.py`：exit 0，33 个节点、147 个知识切片，schema、ID、引用、DAG、连通性、单根、层级、知识切片一致性、题库一致性全部通过。
+- `cd apps/web; pnpm test -- src/lib/data/data-integrity.test.ts`：exit 0，11 files / 116 tests passed。
+- `cd apps/web; pnpm lint`：exit 0，无 ESLint warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+
+未验证：
+- 本批次只修改校验脚本和 Web 数据测试，不改端侧页面与 HAP 产物；未执行 HAP 构建。
+- 真机未验证。

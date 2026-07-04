@@ -170,6 +170,8 @@ describe("课程数据资产完整性", () => {
       const courseTopicCount = topicRelations.filter((relation) => relation.courseId === courseId).length;
       expect(courseTopicCount).toBe(EXPECTED_TOPIC_COUNTS[courseId]);
     }
+    const topicTitles = topicRelations.map((relation) => relation.topic);
+    expect(new Set(topicTitles).size).toBe(topicTitles.length);
 
     expect(rawTopics).toEqual(relationTopics);
     expect(webTopics).toEqual(relationTopics);

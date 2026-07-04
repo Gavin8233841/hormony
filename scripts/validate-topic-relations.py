@@ -31,6 +31,7 @@ def check_id_uniqueness(nodes):
 def check_schema(nodes):
     errors = []
     seen_topics = {}
+    seen_topic_titles = {}
     for index, n in enumerate(nodes):
         prefix = f"node[{index}]"
         if not isinstance(n, dict):
@@ -53,6 +54,15 @@ def check_schema(nodes):
             errors.append(f'{prefix}: duplicate topic "{n.get("topic")}" in {n.get("courseId")}')
         else:
             seen_topics[topic_key] = True
+        topic_title = n.get("topic")
+        if isinstance(topic_title, str) and topic_title.strip():
+            if topic_title in seen_topic_titles and seen_topic_titles[topic_title] != n.get("courseId"):
+                errors.append(
+                    f'{prefix}: duplicate topic title "{topic_title}" across courses '
+                    f'({seen_topic_titles[topic_title]} and {n.get("courseId")})'
+                )
+            else:
+                seen_topic_titles[topic_title] = n.get("courseId")
     return errors
 
 def check_reference_integrity(nodes):
@@ -206,7 +216,7 @@ def main():
         print(f"[FAIL] Schema: {schema_errors}")
         all_passed = False
     else:
-        print("[PASS] Schema (required fields, course IDs, levels, unique topics)")
+        print("[PASS] Schema (required fields, course IDs, levels, unique course topics, unique topic titles)")
 
     # 1. ID uniqueness
     dups = check_id_uniqueness(nodes)
