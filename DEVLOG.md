@@ -5851,3 +5851,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 未验证标签按钮在模拟器中进入知识页或 AI 测验的真实跳转流程。
 - 本批次展示的是“本轮等级”，未做跨历史批次的掌握等级变化对比。
 - 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：错题本复盘分组与学伴追问预填
+
+背景：继续推进 `docs/FRONTEND-PRODUCTIZATION-PLAYBOOK-20260703.md` 中错题追问 P0。现有 `MistakeBook.ets` 只按到期复习顺序列出 active 错题，未展示已解决项，也没有“向学伴追问”的入口。本批次只使用 `ReviewItem` 现有字段和页面会话内点击状态，不修改 ArkData schema、不改 Repository、不接触 Chat SSE 契约。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+
+行为变化：
+- 错题本读取 `LocalLearningRepository.getReviewItems(false)`，在 active 错题后追加 `resolved` 已解决项；标题汇总同步显示待巩固、今日复习、已解决数量。
+- 错题卡按“未复盘 / 已追问 / 已解决”分组显示：已解决来自 `ReviewItem.resolved`，已追问来自用户在本页点击“向学伴追问”的会话内状态。
+- 已解决错题默认排在最后，并降低卡片不透明度，避免抢占当前复习优先级。
+- 错题卡新增“向学伴追问”按钮，将题干、我的答案、正确答案、解析、标签预填到 `pendingChatQuestion` 后进入 Chat；不会自动发送，仍需用户在 Chat 页确认。
+- 错题卡保留“查看解析”和“重练”，并展示下次复习日期与标签。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `MistakeBook.ets` 返回 `received no diagnostics within 20000ms from LSP`，未取得单文件 ArkTS 诊断结论。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 18 s 22 ms`；仍提示未配置 signingConfigs。
+- `rg -n "#[0-9A-Fa-f]{3,8}" apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`：exit 1，无匹配，确认本批次未在该页面新增硬编码色值。
+
+未验证：
+- 本批次未安装到模拟器、未抓取 MistakeBook 页面 UI 树或截图，因此不能标记为模拟器通过。
+- 未验证“向学伴追问”按钮在模拟器中进入 Chat 并保留预填输入。
+- `ReviewItem` 当前没有题目选项字段，本批次不能预填选项；只预填现有可证明字段：题干、我的答案、正确答案、解析、标签。
+- “已追问”状态是本页会话内点击状态，未持久化到 ArkData。
+- 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
