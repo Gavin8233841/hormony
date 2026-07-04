@@ -46,7 +46,15 @@ struct PracticePage {
   }
 
   private async loadQuestions(): Promise<void> {
-    const available = LearningContentRepository.getQuestions(this.courseId, this.topic);
+    const focusedReviewQuestionId = AppStorage.get<string>('selectedReviewQuestionId') ?? '';
+    AppStorage.setOrCreate<string>('selectedReviewQuestionId', '');
+    let available = LearningContentRepository.getQuestions(this.courseId, this.topic);
+    let nextMessage = '';
+    if (this.topic.length > 0 && available.length === 0) {
+      this.topic = '';
+      available = LearningContentRepository.getQuestions(this.courseId);
+      nextMessage = '该主题暂无精选练习，已切换为课程综合练习';
+    }
     const reviews = await LocalLearningRepository.getDueReviewItems();
     const results = await LocalLearningRepository.getQuizResults();
     const reviewIds: string[] = [];
@@ -63,20 +71,29 @@ struct PracticePage {
       }
     }
     const ordered: CuratedQuestion[] = [];
-    for (const question of available) {
-      if (reviewIds.includes(question.id)) ordered.push(question);
+    const focusedQuestion = available.find((question: CuratedQuestion): boolean =>
+      question.id === focusedReviewQuestionId);
+    if (focusedQuestion !== undefined) {
+      ordered.push(focusedQuestion);
+    } else if (focusedReviewQuestionId.length > 0 && nextMessage.length === 0) {
+      nextMessage = '当前错题不是精选题，已切换为同课程练习';
     }
     for (const question of available) {
-      if (!reviewIds.includes(question.id) && !attemptedIds.includes(question.id)) ordered.push(question);
+      if (question.id !== focusedReviewQuestionId && reviewIds.includes(question.id)) ordered.push(question);
     }
     for (const question of available) {
-      if (!reviewIds.includes(question.id) && attemptedIds.includes(question.id)) ordered.push(question);
+      if (question.id !== focusedReviewQuestionId && !reviewIds.includes(question.id) &&
+        !attemptedIds.includes(question.id)) ordered.push(question);
+    }
+    for (const question of available) {
+      if (question.id !== focusedReviewQuestionId && !reviewIds.includes(question.id) &&
+        attemptedIds.includes(question.id)) ordered.push(question);
     }
     const selectedQuestions = ordered.slice(0, 5);
     this.answers = new Array<string>(selectedQuestions.length).fill('');
     this.questions = selectedQuestions;
     this.activeQuestion = selectedQuestions.length > 0 ? selectedQuestions[0] : EMPTY_QUESTION;
-    this.message = selectedQuestions.length > 0 ? '' : '这个主题还没有精选练习';
+    this.message = selectedQuestions.length > 0 ? nextMessage : '这个课程还没有精选练习';
   }
 
   private isInPracticeScope(topic: string): boolean {

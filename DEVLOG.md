@@ -5458,3 +5458,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 模拟器新星图 UI 未验证通过。DevEco MCP 返回 `MCP client is shut down`；HDC `uitest dumpLayout` 在重启后出现 `Wait for subscribe uitest.broadcast.command.reply timeout`。后续截图 `.tmp/harmony-1.13-learning-map-labels/learning-map-current.jpeg` 仍显示旧星图文案，不能证明本批次新 UI 已在设备渲染。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：Practice 入口兜底与错题优先
+
+背景：继续复核“错题/薄弱点 -> 下一步练习”的准确性。只读审计指出，入口页虽然会尽量避免跳到空主题，但 `Practice` 页面自身仍直接信任 `selectedPracticeTopic`；同时错题本“重练主题”只能进入主题练习，不能保证用户点击的当前错题排在第一题。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+
+行为变化：
+- 错题本进入练习时额外写入 `selectedReviewQuestionId`，把用户点击的当前错题传给 Practice。
+- Practice 读取 `selectedReviewQuestionId` 后立即清空，避免后续入口复用旧目标。
+- 当前错题存在于本地精选题库时固定排在本轮第一题；不再只依赖“今日到期错题”排序。
+- Practice 内部对非空 Topic 无题场景做兜底：自动切换到同课程综合练习，并显示轻量提示；所有入口都不再依赖调用方提前保护。
+- 如果当前错题来自 AI 或旧数据、不是精选题库题目，则进入同课程练习并提示“当前错题不是精选题，已切换为同课程练习”。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 10 s 680 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未新增模拟器截图；本批次为 Practice 取题排序与兜底逻辑，证据等级为构建通过。
+- 真机未验证。

@@ -61,6 +61,7 @@ struct MistakeBookPage {
     AppStorage.setOrCreate<string>('selectedCourseId', item.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(item.courseId));
     AppStorage.setOrCreate<string>('selectedPracticeTopic', practiceTopic);
+    AppStorage.setOrCreate<string>('selectedReviewQuestionId', item.questionId);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'MistakeBookPage navigation failed: %{public}s', error.message);
