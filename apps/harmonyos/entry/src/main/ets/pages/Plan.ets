@@ -6,7 +6,7 @@
 import { HttpClient } from '../common/HttpClient';
 import { GradientHeader, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
-import { StudyEvent, StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
+import { Course, StudyEvent, StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
 
@@ -31,6 +31,7 @@ struct PlanPage {
   @State progressStep: number = 0;
   private durationOptions: number[] = [7, 14, 21];
   private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
+  private generationSerial: number = 0;
   private planSteps: WorkStep[] = [
     { title: '画像', description: '读取本地学习状态' },
     { title: '选题', description: '锁定真实 Topic' },
@@ -216,6 +217,124 @@ struct PlanPage {
 
   private currentPlanStepDescription(): string {
     return this.planSteps[this.currentPlanStepIndex()].description;
+  }
+
+  private pad2(value: number): string {
+    return value < 10 ? '0' + value.toString() : value.toString();
+  }
+
+  private dateAfter(daysFromToday: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromToday);
+    return date.getFullYear().toString() + '-' + this.pad2(date.getMonth() + 1) + '-' + this.pad2(date.getDate());
+  }
+
+  private hasSharedAsciiToken(leftText: string, rightText: string): boolean {
+    let asciiSegment = '';
+    const flushToken = (): boolean => {
+      if (asciiSegment.length >= 2 && leftText.includes(asciiSegment)) return true;
+      asciiSegment = '';
+      return false;
+    };
+    for (let i = 0; i < rightText.length; i++) {
+      const ch = rightText.charAt(i);
+      const isAscii = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+      if (isAscii) {
+        asciiSegment += ch;
+      } else if (flushToken()) {
+        return true;
+      }
+    }
+    return flushToken();
+  }
+
+  private selectCourseForGoal(courses: Course[]): Course | null {
+    if (courses.length === 0) return null;
+    const goalText = this.goal.trim().toLowerCase();
+    let selected = courses[0];
+    let bestScore = 0;
+    for (const course of courses) {
+      let score = 0;
+      const title = course.title.toLowerCase();
+      if (goalText.includes(title)) score += 5;
+      for (const topic of course.topics) {
+        const topicText = topic.toLowerCase();
+        if (goalText.includes(topicText) || topicText.includes(goalText)) score += 3;
+        if (this.hasSharedAsciiToken(goalText, topicText)) score += 2;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        selected = course;
+      }
+    }
+    return selected;
+  }
+
+  private taskAction(index: number): string {
+    if (index % 3 === 1) return 'practice';
+    if (index % 3 === 2) return 'quiz';
+    return 'lesson';
+  }
+
+  private taskTypeForAction(action: string): string {
+    if (action === 'lesson') return 'reading';
+    if (action === 'practice') return 'practice';
+    if (action === 'quiz') return 'quiz';
+    return 'review';
+  }
+
+  private titleForLocalTask(action: string, topic: string): string {
+    if (action === 'practice') return topic + ' 精选练习';
+    if (action === 'quiz') return topic + ' 测验巩固';
+    return topic + ' 讲解学习';
+  }
+
+  private async buildLocalPlanDraft(): Promise<AgentStudyPlan | null> {
+    const courses = await LocalLearningRepository.getCourses() ?? [];
+    const course = this.selectCourseForGoal(courses);
+    if (course === null || course.topics.length === 0) return null;
+
+    const now = Date.now();
+    const tasks: PlanTask[] = [];
+    for (let i = 0; i < this.days; i++) {
+      const topic = course.topics[i % course.topics.length];
+      const action = this.taskAction(i);
+      const task: PlanTask = {
+        id: 'local-plan-' + now.toString() + '-' + i.toString(),
+        title: this.titleForLocalTask(action, topic),
+        date: this.dateAfter(i),
+        estimatedMin: 90,
+        type: this.taskTypeForAction(action),
+        courseId: course.id,
+        topic: topic,
+        action: action,
+        reason: '本地课程目录草案：根据“' + course.title + '”真实 Topic 安排，可先学习，云端恢复后可重新生成。',
+        done: false
+      } as AgentPlanTask;
+      tasks.push(task);
+    }
+
+    const plan: AgentStudyPlan = {
+      planId: 'local-draft-' + now.toString(),
+      userId: Constants.DEMO_USER_ID,
+      goal: this.goal.trim(),
+      tasks: tasks,
+      agentTrace: []
+    };
+    return plan;
+  }
+
+  private async applyPlan(plan: AgentStudyPlan, message: string): Promise<void> {
+    this.progressStep = 3;
+    await LocalLearningRepository.savePlan(plan);
+    this.tasks = plan.tasks;
+    this.agentTrace = plan.agentTrace ?? [];
+    this.message = message;
+    this.hasError = false;
+    LearningFormUpdater.refreshAll().catch((): void => {
+      this.message = message + '，服务卡片稍后同步';
+      this.hasError = false;
+    });
   }
 
   @Builder
@@ -538,6 +657,29 @@ struct PlanPage {
     this.hasError = false;
     this.tasks = [];
     this.agentTrace = [];
+    this.generationSerial += 1;
+    const activeGeneration = this.generationSerial;
+    let localDraft: AgentStudyPlan | null = null;
+    try {
+      localDraft = await this.buildLocalPlanDraft();
+    } catch (e) {
+      localDraft = null;
+    }
+    if (localDraft !== null) {
+      const draftForTimer: AgentStudyPlan = localDraft;
+      setTimeout((): void => {
+        if (this.generationSerial !== activeGeneration || !this.loading || this.tasks.length > 0) return;
+        this.applyPlan(draftForTimer, '云端规划等待较久，已先生成本地课程计划草案').then((): void => {
+          if (this.generationSerial === activeGeneration) this.loading = false;
+        }).catch((): void => {
+          if (this.generationSerial === activeGeneration) {
+            this.message = '本地计划草案保存失败，请稍后重试';
+            this.hasError = true;
+            this.loading = false;
+          }
+        });
+      }, Constants.PLAN_FALLBACK_DELAY_MS);
+    }
     this.runLocalProgress();
     try {
       const req: PlanRequest = {
@@ -547,18 +689,20 @@ struct PlanPage {
         dailyMinutes: 90,
         profile: LocalLearningRepository.getCachedProfile() ?? undefined
       };
-      const plan = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req));
-      this.progressStep = 3;
-      await LocalLearningRepository.savePlan(plan);
-      await LearningFormUpdater.refreshAll();
-      this.tasks = plan.tasks;
-      this.agentTrace = plan.agentTrace ?? [];
-      this.message = '计划已生成并同步到首页';
+      const plan = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req),
+        Constants.PLAN_REQUEST_TIMEOUT);
+      if (this.generationSerial !== activeGeneration || !this.loading) return;
+      await this.applyPlan(plan, '计划已生成并同步到首页');
     } catch (e) {
-      this.message = '云端学伴暂不可用，未生成任何计划';
-      this.hasError = true;
+      if (this.generationSerial !== activeGeneration || !this.loading) return;
+      if (localDraft !== null) {
+        await this.applyPlan(localDraft, '云端学伴暂不可用，已生成本地课程计划草案');
+      } else {
+        this.message = '云端学伴暂不可用，未生成任何计划';
+        this.hasError = true;
+      }
     } finally {
-      this.loading = false;
+      if (this.generationSerial === activeGeneration && this.loading) this.loading = false;
     }
   }
 

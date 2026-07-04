@@ -33,6 +33,8 @@ export class Constants {
   static readonly MODEL_REQUEST_TIMEOUT: number = 120000;
   static readonly QUIZ_REQUEST_TIMEOUT: number = 45000;
   static readonly QUIZ_FALLBACK_DELAY_MS: number = 15000;
+  static readonly PLAN_REQUEST_TIMEOUT: number = 60000;
+  static readonly PLAN_FALLBACK_DELAY_MS: number = 15000;
   // SSE 流式请求超时（毫秒）——多 Agent 编排可能需要 30-40s，设 90s 留足余量
   static readonly SSE_TIMEOUT: number = 90000;
   static readonly HEALTH_CACHE_MS: number = 60000;

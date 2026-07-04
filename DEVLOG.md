@@ -5449,3 +5449,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未通过网络代理或日志证明成功地址优先减少了后续请求耗时；本批次收益为源码确认与构建通过。
 - 全量模拟器冒烟未最终通过；真机未验证。
+
+---
+
+## 2026-07-04 Codex：鸿蒙1.12 计划生成本地草案兜底
+
+背景：继续只服务 HarmonyOS 端侧 App。只读审计确认 AI 出题已有本地兜底和快速等待，但计划生成仍直接等待 `/api/plan`，云端慢或不可用时只显示“未生成任何计划”，评审现场会打断“今日任务 -> 计划 -> 学习环节”的闭环。
+
+文件：
+- apps/harmonyos/entry/src/main/ets/common/Constants.ets
+- apps/harmonyos/entry/src/main/ets/pages/Plan.ets
+- DEVLOG.md
+
+行为变化：
+- 新增 `PLAN_REQUEST_TIMEOUT = 60000` 和 `PLAN_FALLBACK_DELAY_MS = 15000`，计划生成不再无限沿用 120 秒模型长超时。
+- `PlanPage` 新增本地课程计划草案：从 `LocalLearningRepository.getCourses()` 的真实课程目录和 Topic 生成 lesson/practice/quiz 可执行任务，任务能直达 Lesson、Practice、Quiz。
+- 本地草案用 `planId: local-draft-*`，任务 `reason` 明确写“本地课程目录草案”，不伪装为云端 Agent 成功。
+- 目标匹配优先按课程标题、Topic 和 Topic 中的 ASCII 令牌选择课程；例如包含 TCP 的目标可落到网络课程 Topic，而不是固定静态模板。
+- 云端等待超过 15 秒且本地草案可用时，先保存并展示本地草案；云端在草案展示后晚到不会覆盖当前页面状态。
+- `/api/plan` 失败时若本地草案可用，立即保存草案并提示“云端学伴暂不可用，已生成本地课程计划草案”。
+- 保存计划后先更新页面和本地计划，服务卡片刷新改为后台同步；卡片刷新失败不再遮住已保存计划。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：第一次 exit 1，ArkTS 不在 `setTimeout` 闭包内收窄 `AgentStudyPlan | null`；已改为 `draftForTimer: AgentStudyPlan`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 12 s 144 ms`；仍提示未配置 signingConfigs。
+- 提交前最终复跑 `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 16 s 184 ms`；仍提示未配置 signingConfigs。
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/harmonyos-app-smoke.ps1`：exit 1；构建、安装、启动、首页、课程页、AI 出题入口、课程详情、精选练习、复盘追问、学伴页、Profile 三个子页均通过；最终在学习星图点击“数据结构”后未读取到首个主题 `数组与线性表` 退出。该失败不覆盖本批次 Plan 页草案兜底逻辑，不能标记为全量模拟器通过。截图证据位于 `screenshots/trae-smoke-20260704-183342/`，不提交。
+
+未验证：
+- 未强制制造 `/api/plan` 慢响应或失败来实测 15 秒本地草案触发；本批次兜底为源码确认与构建通过。
+- 全量模拟器冒烟未最终通过；真机未验证。
