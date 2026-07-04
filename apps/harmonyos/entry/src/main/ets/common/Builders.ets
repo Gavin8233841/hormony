@@ -12,6 +12,76 @@ export interface WorkStep {
   description: string;
 }
 
+export interface ResultTagSummary {
+  tag: string;
+  total: number;
+  correct: number;
+  wrong: number;
+  accuracy: number;
+  level: string;
+  action: string;
+}
+
+export function buildResultTagSummaries(details: QuizResultDetail[], fallbackTag: string): ResultTagSummary[] {
+  const summaries: ResultTagSummary[] = [];
+  const normalizedFallback = normalizeResultTag(fallbackTag);
+  const safeFallback = normalizedFallback.length > 0 ? normalizedFallback : '综合';
+  for (const detail of details) {
+    const seenTags: string[] = [];
+    const sourceTags = detail.tags ?? [];
+    for (const sourceTag of sourceTags) {
+      const normalized = normalizeResultTag(sourceTag);
+      if (normalized.length > 0 && !seenTags.includes(normalized)) {
+        seenTags.push(normalized);
+      }
+    }
+    if (seenTags.length === 0) {
+      seenTags.push(safeFallback);
+    }
+    for (const tag of seenTags) {
+      let summary = summaries.find((item: ResultTagSummary): boolean => item.tag === tag);
+      if (summary === undefined) {
+        summary = { tag, total: 0, correct: 0, wrong: 0, accuracy: 0, level: '', action: '' };
+        summaries.push(summary);
+      }
+      summary.total += 1;
+      if (detail.isCorrect) {
+        summary.correct += 1;
+      } else {
+        summary.wrong += 1;
+      }
+    }
+  }
+  for (const summary of summaries) {
+    summary.accuracy = summary.total > 0 ? summary.correct / summary.total : 0;
+    if (summary.wrong > 0 && summary.accuracy < 0.6) {
+      summary.level = '需复盘';
+      summary.action = '先复盘错题，再练同标签 2-3 题';
+    } else if (summary.wrong > 0) {
+      summary.level = '待巩固';
+      summary.action = '先复盘错题，再练同标签 2-3 题';
+    } else if (summary.total < 2) {
+      summary.level = '待确认';
+      summary.action = '样本较少，再做 2 题确认稳定性';
+    } else {
+      summary.level = '本轮掌握';
+      summary.action = '保持间隔复习，准备进入关联主题';
+    }
+  }
+  return summaries.sort((left: ResultTagSummary, right: ResultTagSummary): number => {
+    if (left.wrong !== right.wrong) return right.wrong - left.wrong;
+    if (left.total !== right.total) return right.total - left.total;
+    if (left.accuracy !== right.accuracy) return left.accuracy - right.accuracy;
+    return left.tag < right.tag ? -1 : (left.tag > right.tag ? 1 : 0);
+  }).slice(0, 4);
+}
+
+function normalizeResultTag(value?: string): string {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (normalized.length === 0) return '';
+  return normalized.length > 12 ? normalized.substring(0, 12) : normalized;
+}
+
 /**
  * 统一标题栏（带返回按钮）
  * @param title       主标题
@@ -168,6 +238,97 @@ export function StagedProgress(title: string, subtitle: string, activeIndex: num
   .padding(14)
   .backgroundColor(Constants.COLOR_SURFACE_TINT)
   .borderRadius(Constants.RADIUS_MD)
+}
+
+@Builder
+export function ResultTagSummaryPanel(
+  title: string,
+  summaries: ResultTagSummary[],
+  actionLabel: string,
+  onAction: (tag: string) => void
+) {
+  if (summaries.length > 0) {
+    Column({ space: 12 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text(title)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('按标签看本轮得失')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Text(summaries.length.toString() + ' 个标签')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(Constants.COLOR_BG_TAG)
+          .borderRadius(10)
+      }
+      .width('100%')
+
+      ForEach(summaries, (summary: ResultTagSummary): void => {
+        Column({ space: 8 }) {
+          Row({ space: 8 }) {
+            Text(summary.tag)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              .layoutWeight(1)
+            Text(summary.level)
+              .fontSize(11)
+              .fontColor(summary.wrong > 0 ? Constants.COLOR_WARNING : Constants.COLOR_SUCCESS)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .backgroundColor(summary.wrong > 0 ? Constants.COLOR_BG_TAG : Constants.COLOR_SUCCESS_LIGHT)
+              .borderRadius(9)
+            Text(Math.round(summary.accuracy * 100).toString() + '%')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(summary.wrong > 0 ? Constants.COLOR_WARNING : Constants.COLOR_SUCCESS)
+          }
+          .width('100%')
+          Progress({ value: summary.correct, total: Math.max(summary.total, 1), type: ProgressType.Linear })
+            .width('100%')
+            .height(6)
+            .color(summary.wrong > 0 ? Constants.COLOR_WARNING : Constants.COLOR_SUCCESS)
+            .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+            .borderRadius(3)
+          Row({ space: 8 }) {
+            Text(summary.total.toString() + ' 题 · 错 ' + summary.wrong.toString() + ' 题')
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              .layoutWeight(1)
+            Button(actionLabel)
+              .height(30)
+              .fontSize(11)
+              .fontColor(Constants.COLOR_BRAND)
+              .padding({ left: 10, right: 10 })
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(15)
+              .onClick((): void => { onAction(summary.tag); })
+          }
+          .width('100%')
+          Text(summary.action)
+            .width('100%')
+            .fontSize(11)
+            .lineHeight(17)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Constants.COLOR_BG_CARD)
+        .borderRadius(Constants.RADIUS_MD)
+        .border({ width: 1, color: Constants.COLOR_BORDER })
+      })
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_LG)
+  }
 }
 
 @Builder

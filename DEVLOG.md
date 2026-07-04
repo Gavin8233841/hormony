@@ -5820,3 +5820,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未安装到模拟器、未抓取 Chat 页面 UI 树或截图，因此不能标记为模拟器通过。
 - 未验证真实模型新回答中的行内样式、链接域名展示与流式更新截图。
 - 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-04 Codex：Quiz 与 Practice 标签复盘面板
+
+背景：继续推进 `docs/FRONTEND-PRODUCTIZATION-PLAYBOOK-20260703.md` 中 Quiz / Practice 结果复盘 P0。现有结果页已有逐题解析和标签字段，但缺少按标签汇总的本轮得失。本批次只复用已保存的 `LearningQuizResultDetail`，不修改 ArkData schema、不改 Repository、不接触云端 Agent/API。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/common/Builders.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+
+行为变化：
+- 新增 `buildResultTagSummaries()`，从本次答题详情按标签统计题数、正确数、错题数、正确率、本轮等级和下一步动作；每题同一标签只计一次，缺少标签时回落到当前主题。
+- 新增 `ResultTagSummaryPanel()`，用 ArkUI 原生 `Progress`、`Text`、`Button` 展示最多 4 个本轮重点标签，不新增图表依赖。
+- Quiz 结果页在逐题解析前展示“标签复盘”，按钮进入知识页并预填该标签。
+- Practice 结果页在逐题复盘前展示“标签复盘”，按钮进入 AI 测验并以该标签作为出题主题。
+- 本轮等级使用“需复盘 / 待巩固 / 待确认 / 本轮掌握”文本，避免只靠颜色表达状态。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `Builders.ets`、`Quiz.ets`、`Practice.ets` 两次均返回 `received no diagnostics within 20000ms from LSP`，未取得单文件 ArkTS 诊断结论。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：首次 exit 0，`BUILD SUCCESSFUL in 16 s 60 ms`；仍提示未配置 signingConfigs。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：补充本轮等级后二次 exit 0，`BUILD SUCCESSFUL in 21 s 281 ms`；仍提示未配置 signingConfigs。
+- `rg -n "#[0-9A-Fa-f]{3,8}" apps/harmonyos/entry/src/main/ets/common/Builders.ets apps/harmonyos/entry/src/main/ets/pages/Quiz.ets apps/harmonyos/entry/src/main/ets/pages/Practice.ets`：exit 1，无匹配，确认本批次未在这三处新增硬编码色值。
+
+未验证：
+- 本批次未安装到模拟器、未抓取 Quiz/Practice 结果页 UI 树或截图，因此不能标记为模拟器通过。
+- 未验证标签按钮在模拟器中进入知识页或 AI 测验的真实跳转流程。
+- 本批次展示的是“本轮等级”，未做跨历史批次的掌握等级变化对比。
+- 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。

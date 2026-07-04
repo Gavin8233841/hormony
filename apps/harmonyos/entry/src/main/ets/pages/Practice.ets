@@ -1,4 +1,10 @@
-import { AnswerOption, GradientHeader, ReviewDetailRow } from '../common/Builders';
+import {
+  AnswerOption,
+  buildResultTagSummaries,
+  GradientHeader,
+  ResultTagSummaryPanel,
+  ReviewDetailRow
+} from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
@@ -104,6 +110,16 @@ struct PracticePage {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'PracticePage Quiz navigation failed: %{public}s', err.message);
+    });
+  }
+
+  private openQuizForTag(tag: string): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', tag.length > 0 ? tag : (this.topic.length > 0 ? this.topic : '综合'));
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'PracticePage tag Quiz navigation failed: %{public}s', err.message);
     });
   }
 
@@ -323,6 +339,9 @@ struct PracticePage {
       .padding(18)
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
+
+      ResultTagSummaryPanel('标签复盘', buildResultTagSummaries(this.details, this.topic), 'AI 测验',
+        (tag: string): void => { this.openQuizForTag(tag); })
 
       Text('逐题复盘')
         .width('100%')

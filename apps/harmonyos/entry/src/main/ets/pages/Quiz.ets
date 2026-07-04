@@ -2,7 +2,15 @@
  * 课程测验页 - 真实 AI 出题、本地评分与学习记录
  */
 
-import { AnswerOption, GradientHeader, ReviewDetailRow, StagedProgress, WorkStep } from '../common/Builders';
+import {
+  AnswerOption,
+  buildResultTagSummaries,
+  GradientHeader,
+  ResultTagSummaryPanel,
+  ReviewDetailRow,
+  StagedProgress,
+  WorkStep
+} from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { HttpClient } from '../common/HttpClient';
@@ -775,6 +783,9 @@ struct QuizPage {
         .backgroundColor(Constants.COLOR_SURFACE_TINT)
         .borderRadius(Constants.RADIUS_MD)
       }
+
+      ResultTagSummaryPanel('标签复盘', buildResultTagSummaries(this.resultDetails, this.topic), '学习标签',
+        (tag: string): void => { this.reviewTopic(tag); })
 
       Text('逐题解析')
         .width('100%')
