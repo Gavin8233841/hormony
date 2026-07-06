@@ -20,7 +20,7 @@ import {
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 9;
+const SCHEMA_VERSION: number = 10;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -34,6 +34,12 @@ const KEY_TOPIC_MASTERY: string = 'topic_mastery';
 const KEY_QUIZ_STATS: string = 'quiz_stats';
 const KEY_TAG_INSIGHTS: string = 'tag_insights';
 const KEY_FORM_IDS: string = 'form_ids';
+
+interface TopicMasteryDelta {
+  topic: string;
+  totalQuestions: number;
+  correctQuestions: number;
+}
 
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
@@ -120,6 +126,13 @@ export class LocalLearningRepository {
     if (previousVersion < 9) {
       const insights = await LocalLearningRepository.rebuildTagInsightsFromResults();
       await LocalLearningRepository.putValue<TagInsight[]>(KEY_TAG_INSIGHTS, insights);
+    }
+    if (previousVersion < 10) {
+      const mastery = await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY);
+      if (mastery !== null) {
+        await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY,
+          LocalLearningRepository.sanitizeTopicMastery(mastery));
+      }
     }
   }
 
@@ -524,7 +537,11 @@ export class LocalLearningRepository {
   }
 
   static async getTopicMastery(courseId?: string): Promise<TopicMastery[]> {
-    let mastery = (await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY)) ?? [];
+    const storedMastery = (await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY)) ?? [];
+    let mastery = LocalLearningRepository.sanitizeTopicMastery(storedMastery);
+    if (mastery.length !== storedMastery.length) {
+      await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, mastery);
+    }
     if (mastery.length === 0) {
       mastery = await LocalLearningRepository.rebuildTopicMasteryFromResults();
       if (mastery.length > 0) await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, mastery);
@@ -536,7 +553,9 @@ export class LocalLearningRepository {
   }
 
   private static async updateTopicMastery(result: QuizResult): Promise<void> {
-    const mastery = (await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY)) ?? [];
+    const mastery = LocalLearningRepository.sanitizeTopicMastery(
+      (await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY)) ?? []
+    );
     LocalLearningRepository.applyResultToMastery(mastery, result);
     await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, mastery);
   }
@@ -551,26 +570,70 @@ export class LocalLearningRepository {
   }
 
   private static applyResultToMastery(mastery: TopicMastery[], result: QuizResult): void {
-    let item = mastery.find((value: TopicMastery): boolean =>
-      value.courseId === result.courseId && value.topic === result.topic);
-    if (item === undefined) {
-      item = {
-        courseId: result.courseId,
-        topic: result.topic,
-        attempts: 0,
-        totalQuestions: 0,
-        correctQuestions: 0,
-        accuracy: 0,
-        mastered: false
-      };
-      mastery.push(item);
+    const deltas = LocalLearningRepository.topicMasteryDeltas(result);
+    for (const delta of deltas) {
+      let item = mastery.find((value: TopicMastery): boolean =>
+        value.courseId === result.courseId && value.topic === delta.topic);
+      if (item === undefined) {
+        item = {
+          courseId: result.courseId,
+          topic: delta.topic,
+          attempts: 0,
+          totalQuestions: 0,
+          correctQuestions: 0,
+          accuracy: 0,
+          mastered: false
+        };
+        mastery.push(item);
+      }
+      item.attempts += 1;
+      item.totalQuestions += delta.totalQuestions;
+      item.correctQuestions += delta.correctQuestions;
+      item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
+      item.mastered = item.accuracy >= 0.8;
+      item.lastPracticedAt = result.submittedAt;
     }
-    item.attempts += 1;
-    item.totalQuestions += result.totalQuestions;
-    item.correctQuestions += result.correctCount;
-    item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
-    item.mastered = item.accuracy >= 0.8;
-    item.lastPracticedAt = result.submittedAt;
+  }
+
+  private static topicMasteryDeltas(result: QuizResult): TopicMasteryDelta[] {
+    const deltas: TopicMasteryDelta[] = [];
+    for (const detail of result.details) {
+      const topic = LocalLearningRepository.normalizedMasteryTopic(detail.topic ?? result.topic);
+      if (topic.length === 0) continue;
+      let delta = deltas.find((item: TopicMasteryDelta): boolean => item.topic === topic);
+      if (delta === undefined) {
+        delta = {
+          topic: topic,
+          totalQuestions: 0,
+          correctQuestions: 0
+        };
+        deltas.push(delta);
+      }
+      delta.totalQuestions += 1;
+      if (detail.isCorrect) delta.correctQuestions += 1;
+    }
+    if (deltas.length === 0) {
+      const topic = LocalLearningRepository.normalizedMasteryTopic(result.topic);
+      if (topic.length > 0) {
+        deltas.push({
+          topic: topic,
+          totalQuestions: result.totalQuestions,
+          correctQuestions: result.correctCount
+        });
+      }
+    }
+    return deltas;
+  }
+
+  private static sanitizeTopicMastery(mastery: TopicMastery[]): TopicMastery[] {
+    return mastery.filter((item: TopicMastery): boolean =>
+      LocalLearningRepository.normalizedMasteryTopic(item.topic).length > 0);
+  }
+
+  private static normalizedMasteryTopic(topic: string): string {
+    const normalized = topic.trim();
+    if (normalized.length === 0 || normalized === '综合') return '';
+    return normalized;
   }
 
   static async getTagInsights(limit: number = 6): Promise<TagInsight[]> {

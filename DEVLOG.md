@@ -5555,3 +5555,26 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 未验证：
 - 未新增模拟器截图；本批次为提示文案与范围判断逻辑，证据等级为构建通过。
 - 真机未验证。
+
+---
+
+## 2026-07-04 Codex 鸿蒙1.13：综合练习按真实 Topic 更新星图掌握度
+
+背景：继续复核“练习结果 -> 掌握度 -> 学习星图”的闭环。Practice 已经在逐题明细中保存真实 `topic`，但 `LocalLearningRepository.applyResultToMastery()` 仍按整场 `result.topic` 聚合；课程综合练习会写成“综合”，导致星图无法获得各真实 Topic 的练习正确率。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+
+行为变化：
+- `topic_mastery` schema 升至 10，迁移时只过滤空字符串和“综合”等非真实 Topic，不重建整表，不清除已有真实 Topic 历史聚合。
+- `applyResultToMastery()` 改为先按逐题 `detail.topic` 汇总每个真实 Topic 的题量和正确题数；同一场综合练习会分别更新多个 Topic 的掌握度。
+- 没有逐题 Topic 的旧数据仅在整场 `result.topic` 是真实主题时回退聚合；AI 综合测验不再写入“综合”掌握节点。
+- `getTopicMastery()` 读取时同步清洗旧的非真实 Topic 节点，让 LearningMap 只接收课程图谱中的真实主题掌握状态。
+
+验证：
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 557 ms`；仍为 unsigned HAP，签名未配置。
+
+未验证：
+- 未新增模拟器截图；本批次为本地掌握度聚合逻辑，证据等级为构建通过。
+- 旧设备上历史综合练习的逐题 Topic 只能在保留的 `quiz_results` 明细范围内用于重建；本批次不伪造更早历史数据。
+- 真机未验证。
