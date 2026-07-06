@@ -21,6 +21,8 @@ interface MapNode {
 }
 
 interface MapEdge {
+  fromId: string;
+  toId: string;
   fromX: number;
   fromY: number;
   toX: number;
@@ -145,6 +147,8 @@ struct LearningMapPage {
         const source = nextNodes.find((item: MapNode): boolean => item.id === prerequisiteId);
         if (source === undefined) continue;
         nextEdges.push({
+          fromId: source.id,
+          toId: node.id,
           fromX: source.x + NODE_WIDTH / 2,
           fromY: source.y + 22,
           toX: node.x + NODE_WIDTH / 2,
@@ -171,6 +175,41 @@ struct LearningMapPage {
     if (node.recommended) return 50;
     if (node.mastery === null) return node.lessonCompleted ? 38 : 34;
     return Math.min(38 + node.mastery.attempts * 3, 50);
+  }
+
+  private selectedNode(): MapNode | null {
+    return this.nodes.find((node: MapNode): boolean => node.topic === this.selectedTopic) ?? null;
+  }
+
+  private isOneHopNode(node: MapNode): boolean {
+    const selected = this.selectedNode();
+    if (selected === null) return true;
+    if (selected.id === node.id) return true;
+    if (selected.prerequisiteIds.includes(node.id)) return true;
+    return node.prerequisiteIds.includes(selected.id);
+  }
+
+  private isOneHopEdge(edge: MapEdge): boolean {
+    const selected = this.selectedNode();
+    if (selected === null) return true;
+    return edge.fromId === selected.id || edge.toId === selected.id;
+  }
+
+  private nodeOpacity(node: MapNode): number {
+    const base = node.unlocked ? 1 : 0.58;
+    if (this.selectedTopic.length === 0) return base;
+    return this.isOneHopNode(node) ? base : 0.28;
+  }
+
+  private edgeOpacity(edge: MapEdge): number {
+    const base = edge.active ? 0.86 : 0.52;
+    if (this.selectedTopic.length === 0) return base;
+    return this.isOneHopEdge(edge) ? base : 0.18;
+  }
+
+  private edgeWidth(edge: MapEdge): number {
+    if (this.selectedTopic.length > 0 && this.isOneHopEdge(edge)) return edge.active ? 2.6 : 1.6;
+    return edge.active ? 2.2 : 1;
   }
 
   private masteryLabel(node: MapNode): string {
@@ -342,8 +381,14 @@ struct LearningMapPage {
           .startPoint([edge.fromX, edge.fromY])
           .endPoint([edge.toX, edge.toY])
           .stroke(edge.active ? Constants.COLOR_MAP_LINE_ACTIVE : Constants.COLOR_MAP_LINE)
-          .strokeWidth(edge.active ? 2.2 : 1)
-          .opacity(edge.active ? 0.86 : 0.52)
+          .strokeWidth(this.edgeWidth(edge))
+          .opacity(this.edgeOpacity(edge))
+        Text('↓')
+          .fontSize(this.isOneHopEdge(edge) ? 12 : 9)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(edge.active ? Constants.COLOR_MAP_LINE_ACTIVE : Constants.COLOR_MAP_TEXT_MUTED)
+          .opacity(this.edgeOpacity(edge))
+          .position({ x: edge.toX - 4, y: edge.toY - 13 })
       })
 
       ForEach(this.nodes, (node: MapNode): void => {
@@ -398,7 +443,7 @@ struct LearningMapPage {
         .width(NODE_WIDTH)
         .height(72)
         .position({ x: node.x, y: node.y })
-        .opacity(node.unlocked ? 1 : 0.58)
+        .opacity(this.nodeOpacity(node))
         .scale({ x: this.selectedTopic === node.topic ? 1.08 : (node.recommended ? 1.04 : 1),
           y: this.selectedTopic === node.topic ? 1.08 : (node.recommended ? 1.04 : 1) })
         .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
@@ -443,6 +488,64 @@ struct LearningMapPage {
     .borderRadius(Constants.RADIUS_LG)
   }
 
+  @Builder
+  MapLegend() {
+    Column({ space: 10 }) {
+      Flex({ wrap: FlexWrap.Wrap }) {
+        this.LegendDot(Constants.COLOR_MAP_NODE_IDLE, '可开始')
+        this.LegendDot(Constants.COLOR_BRAND, '已学习')
+        this.LegendDot(Constants.COLOR_WARNING, '学习中')
+        this.LegendDot(Constants.COLOR_SUCCESS, '已掌握')
+      }
+      .width('100%')
+      Flex({ wrap: FlexWrap.Wrap }) {
+        this.LegendText('↓', '箭头表示先修方向')
+        this.LegendText('○', '外环越大代表练习次数越多')
+        this.LegendText('邻', '选中后一跳前置和后继高亮')
+        this.LegendText('淡', '非邻域节点降低亮度')
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_MD)
+  }
+
+  @Builder
+  LegendDot(color: ResourceColor, label: string) {
+    Row({ space: 6 }) {
+      Column()
+        .width(9)
+        .height(9)
+        .backgroundColor(color)
+        .borderRadius(5)
+      Text(label)
+        .fontSize(11)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+    }
+    .margin({ right: 14, bottom: 6 })
+  }
+
+  @Builder
+  LegendText(mark: string, label: string) {
+    Row({ space: 6 }) {
+      Text(mark)
+        .width(18)
+        .height(18)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_BRAND)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(9)
+      Text(label)
+        .fontSize(11)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+    }
+    .margin({ right: 14, bottom: 6 })
+  }
+
   build() {
     Column() {
       TitleBar('学习星图', '练习越充分，知识节点越清晰', () => this.getUIContext().getRouter().back())
@@ -475,26 +578,7 @@ struct LearningMapPage {
             .scrollBar(BarState.Off)
           }
 
-          Row({ space: 18 }) {
-            Row({ space: 6 }) {
-              Column().width(9).height(9).backgroundColor(Constants.COLOR_MAP_NODE_IDLE).borderRadius(5)
-              Text('可开始').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
-            }
-            Row({ space: 6 }) {
-              Column().width(9).height(9).backgroundColor(Constants.COLOR_BRAND).borderRadius(5)
-              Text('已学习').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
-            }
-            Row({ space: 6 }) {
-              Column().width(9).height(9).backgroundColor(Constants.COLOR_WARNING).borderRadius(5)
-              Text('学习中').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
-            }
-            Row({ space: 6 }) {
-              Column().width(9).height(9).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(5)
-              Text('已掌握').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
-            }
-          }
-          .width('100%')
-          .justifyContent(FlexAlign.Center)
+          this.MapLegend()
 
           if (this.selectedTopic.length > 0) {
             Column({ space: 12 }) {

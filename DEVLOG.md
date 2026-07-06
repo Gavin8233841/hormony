@@ -5880,3 +5880,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `ReviewItem` 当前没有题目选项字段，本批次不能预填选项；只预填现有可证明字段：题干、我的答案、正确答案、解析、标签。
 - “已追问”状态是本页会话内点击状态，未持久化到 ArkData。
 - 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-06 Codex：学习星图方向与邻域可读性保全
+
+背景：收尾前保全本线程已完成的学习星图 P1 可读性增强。本批次只使用 `TopicRelation.prerequisiteIds`、`TopicMastery` 与 `LessonProgress` 已有数据，不引入 Canvas、图表库、第三方资源或新依赖。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+
+行为变化：
+- `MapEdge` 增加 `fromId` 与 `toId`，用于从先修关系精确判断选中节点的一跳前置与后继。
+- 学习星图边增加向下箭头，明确先修方向；选中节点后，一跳前置/后继边和节点保持高亮，非邻域节点与边降低透明度。
+- 图例从单纯颜色说明升级为颜色、箭头、练习次数外环、一跳邻域和非邻域淡化的说明。
+- 外环说明为“练习次数越多”，对应 `TopicMastery.attempts`；未声称展示错题量。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `LearningMap.ets` 返回 `received no diagnostics within 20000ms from LSP`，未取得单文件 ArkTS 诊断结论。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 13 s 947 ms`；仍提示未配置 signingConfigs。
+- `rg -n "#[0-9A-Fa-f]{3,8}" apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`：exit 1，无匹配，确认本批次未在该页面新增硬编码色值。
+
+未验证：
+- 本批次未安装到模拟器、未抓取 LearningMap 页面 UI 树或截图，因此不能标记为模拟器通过。
+- 未验证实际点击节点后的一跳高亮与横向滚动手感。
+- `TopicMastery` 当前没有独立错题量字段，本批次未实现错题量外环。
+- 真机、OCR、TTS、Lottie、音效、字体、distributedKVStore 仍未验证。
