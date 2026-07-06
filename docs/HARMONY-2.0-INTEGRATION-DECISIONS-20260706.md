@@ -6,7 +6,7 @@
 
 - 主项目路径：`C:\Users\guo82\Desktop\Hormony`
 - 当前分支：`main`
-- 当前 HEAD：`c57d594 feat: 强化学习计划生成反馈`
+- 本轮补验开始基线：`a3ddd5e feat: 补验鸿蒙2.0 Chat 发送状态`
 - 当前主线以 `HEAD`、源码、构建配置和可执行验证为准。旧交接文档只作为线索，不覆盖当前源码结论。
 - 工作区存在保留改动与本地资产：`.trae/progress.json`、`.tmp/`、`assets/`、展示站、zip、本地提示词和 HTML 提案等不得纳入主线提交。
 
@@ -22,7 +22,7 @@
 
 ### 3.1 Chat 发送按钮状态
 
-状态：源码确认、构建通过、模拟器通过不可用重试状态。
+状态：源码确认、静态诊断通过、构建通过、线上通过、模拟器通过连接可用态与历史回答渲染。
 
 主线工作区 `apps/harmonyos/entry/src/main/ets/pages/Chat.ets` 已有窄范围改动：
 
@@ -31,7 +31,7 @@
 - 云端连接中显示加载状态。
 - 云端未连接时右侧按钮可触发重试，提示“云端未连接，点击右侧按钮重试”。
 
-采纳决策：先进入主线。完整“输入问题 -> 发送 -> SSE 返回 -> 端侧渲染”模拟器链路未完成前，不标记为端侧 Chat 问答模拟器通过。
+采纳决策：已进入主线。当前补验确认线上 Chat SSE 正常、端侧 fallback 网关可让 Chat 进入可输入态并显示历史真实回答。模拟器工具注入输入框文本后未触发新的 `POST /api/chat`，因此“端侧新输入问题 -> 发送 -> SSE 返回 -> 保存历史”仍不标记为完整模拟器通过。
 
 ### 3.2 1.13 数据与学习洞察
 
@@ -79,5 +79,8 @@
 - 源码确认：`Chat.ets` 当前未提交 diff 已读取，范围仅为发送按钮状态与提示。
 - 构建通过：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` exit 0，`BUILD SUCCESSFUL in 15 s 646 ms`。
 - 模拟器通过：`Pura 90 Pro Max` 竖屏，窗口 `bundleName:com.c4ai.hormony`。UI 树证据显示 Chat 页不可用态包含“云端未连接，点击右侧按钮重试”；点击右侧圆形按钮后进入“正在连接云端学伴”并显示 `LoadingProgress`。
-- 未验证：DevEco MCP `check_ets_files` 对 `Chat.ets` 返回 `Failed to flush stdin: 管道正在被关闭。 (os error 232)`，未作为静态诊断通过证据。
+- 静态诊断通过：DevEco MCP `check_ets_files` 对 `Chat.ets` 返回 `no diagnostics`。
+- 线上通过：`GET https://hormony-ruddy.vercel.app/api/health` 返回 HTTP 200、`status=ready`、模型名 `doubao-seed-2-1-pro-260628`；`POST /api/chat` 返回 HTTP 200，SSE 包含 `delta=1`、`done=1`、`citation=3`、`trace=3`、`thinking=4`，正文长度 1246 且包含 Java 代码内容。
+- 模拟器通过：启动 `scripts/simulator-api-gateway.mjs` 后，端侧经 `http://10.0.2.2:3001` fallback 获取 Health 200，Chat 页进入 `输入你的问题...` 可输入态，并显示“输入问题后发送按钮会亮起”。UI 树显示历史真实回答包含“数组”“链表”“随机访问”“参考资料 (3)”。
+- 未验证：模拟器工具 `uitest inputText` 与 `hdc shell uitest uiInput text` 能让输入框显示文本，但点击真实发送按钮后网关日志未出现新的 `POST /api/chat`，未证明新输入问题触发端侧发送。
 - 真机未验证：Chat、Plan、Quiz、Lottie、OCR、TTS、distributedKVStore。

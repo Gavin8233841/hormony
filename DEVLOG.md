@@ -5890,8 +5890,6 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
 
----
-
 ## 2026-07-04 Codex：Chat SSE 流式接收稳健化
 
 背景：继续处理云端学伴真实可用性。端侧 Chat 已能打开学伴页并具备 Markdown 阅读卡，但 SSE 客户端仍存在过早完成和帧解析不够稳健的风险：不能只把 `requestInStream` 的 200 当成回答完成信号，必须按 SSE 的 `data:` 帧和服务端 `done` 事件收尾。
@@ -6082,5 +6080,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - DevEco MCP `check_ets_files` 对 `Chat.ets` 返回 `Failed to flush stdin: 管道正在被关闭。 (os error 232)`；该工具调用失败未作为静态诊断通过证据。HAP 构建已覆盖 ArkTS 编译。
 - 当前环境下云端探测显示不可用；本批次验证了不可用态、重试入口和连接中状态，未完成“输入问题 -> 发送 -> SSE 返回 -> 端侧渲染”的完整模拟器链路。
+- 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-06 Codex：Chat 未验证项补核查
+
+背景：继续补齐上一批 Chat 发送状态的未验证项。重点核查 DevEco ArkTS 单文件诊断、线上 Health/Chat SSE、模拟器 fallback 网关与端侧 Chat 可输入状态，并确认端侧新问题发送链路是否能形成 `POST /api/chat` 证据。
+
+文件：
+- `DEVLOG.md`
+- `docs/HARMONY-2.0-INTEGRATION-DECISIONS-20260706.md`
+
+行为变化：
+- 无产品代码变化。
+- 更新鸿蒙2.0 整合决策文档中的证据等级和剩余未验证项。
+
+验证：
+- DevEco MCP `check_ets_files` 对 `Chat.ets`：`no diagnostics`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 3 s 742 ms`；仍提示未配置 signingConfigs。
+- 线上 `GET https://hormony-ruddy.vercel.app/api/health`：HTTP 200，`status=ready`，模型名 `doubao-seed-2-1-pro-260628`。
+- 线上 `POST https://hormony-ruddy.vercel.app/api/chat`：HTTP 200；SSE 统计为 `frames=12`、`delta=1`、`done=1`、`citation=3`、`trace=3`、`thinking=4`，正文长度 1246，包含 Java 代码内容。
+- 启动 `scripts/simulator-api-gateway.mjs` 后，本地 `GET http://127.0.0.1:3001/api/health`：HTTP 200，`status=ready`，模型名 `doubao-seed-2-1-pro-260628`。
+- DevEco MCP `start_app`：模拟器 `Pura 90 Pro Max` 安装并启动当前 HAP 成功。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，竖屏，窗口 `bundleName:com.c4ai.hormony`。证据 `.tmp/codex-harmony-2-chat-full-20260706-ui/simple_dump_hormony_20260706203017270.txt` 包含输入框 hint `输入你的问题...` 和提示“输入问题后发送按钮会亮起”，证明 fallback 网关让端侧进入可输入态。
+- DevEco MCP `get_app_ui_tree`：证据 `.tmp/codex-harmony-2-chat-full-20260706-ui/simple_dump_hormony_20260706203201364.txt` 包含历史真实回答文本“数组”“链表”“随机访问”和“参考资料 (3)”。
+- 临时网关进程 PID `31236` 已通过 `Stop-Process -Id 31236` 关闭，随后确认 3001 不再监听。
+
+失败或未验证：
+- 模拟器新输入发送链路未通过：`uitest inputText` 和 `hdc shell uitest uiInput text` 均能让输入框 UI 显示文本，但点击 UI 树中的真实发送按钮后，`simulator-api-gateway` 日志未出现新的 `POST /api/chat`，因此不能标记“端侧新输入问题 -> 发送 -> SSE 返回 -> 保存历史”为模拟器通过。
+- 第一次 Node `fetch` 访问线上 Health 发生连接超时；同一网络下 PowerShell `Invoke-WebRequest` 随后验证通过，因此该超时仅记录为 Node 网络栈失败，不作为服务不可用证据。
 - 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
