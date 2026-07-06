@@ -6053,3 +6053,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 线上 Plan 响应较快，本批次未在修复后再次抓到完整等待态停留截图；等待态文案已由源码/HAP 产物和构建证明，长等待停留仍需在慢网络或模型长耗时场景补模拟器证据。
 - 本批次只改 HarmonyOS Plan 页，未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-06 Codex：鸿蒙2.0 整合决策与 Chat 发送状态补验
+
+背景：上一轮“鸿蒙线程收口与整合”交接到主线后，先按根规范复核当前 `HEAD`、交接文档、模型策略、资源收口文档和 DEVLOG 尾部记录。本批次把主线整合边界固化到文档，并补验当前工作区中已有的 Chat 发送按钮状态改动。
+
+文件：
+- `DEVLOG.md`
+- `docs/HARMONY-2.0-INTEGRATION-DECISIONS-20260706.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+
+行为变化：
+- 新增鸿蒙2.0 主线整合决策文档，明确当前基线、采纳顺序、暂缓项和证据等级。
+- Chat 输入栏在空输入、云端未连接、连接中和回答中显示更明确的发送按钮状态与提示。
+- 云端未连接时，右侧圆形按钮可作为重试入口；点击后进入连接中加载状态。
+
+验证：
+- `git status --short`：exit 0，确认工作区存在保留改动与未跟踪本地资产，未执行清理或回滚。
+- `git log -5 --oneline`：exit 0，当前 HEAD 为 `c57d594 feat: 强化学习计划生成反馈`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 15 s 646 ms`；仍提示未配置 signingConfigs。
+- DevEco MCP `start_app`：模拟器 `Pura 90 Pro Max` 安装并启动当前 HAP 成功。
+- DevEco MCP `get_app_ui_tree`：模拟器 `Pura 90 Pro Max`，竖屏，窗口 `bundleName:com.c4ai.hormony`，证据 `.tmp/codex-harmony-2-chat-send-20260706-ui/simple_dump_hormony_20260706152032013.txt` 包含“云端学伴暂不可用”“云端学伴连接后可提问”“云端未连接，点击右侧按钮重试”。
+- DevEco MCP `perform_ui_action click`：点击右侧圆形按钮后，UI 树证据 `.tmp/codex-harmony-2-chat-send-20260706-ui/simple_dump_hormony_20260706152057079.txt` 包含“正在连接云端学伴”，并显示按钮内 `LoadingProgress`。
+- DevEco MCP `perform_ui_action screenshot`：截图 `.tmp/codex-harmony-2-chat-send-20260706-ui/chat_retry_connecting.png` 已保存，证据不提交仓库。
+
+失败或未验证：
+- DevEco MCP `check_ets_files` 对 `Chat.ets` 返回 `Failed to flush stdin: 管道正在被关闭。 (os error 232)`；该工具调用失败未作为静态诊断通过证据。HAP 构建已覆盖 ArkTS 编译。
+- 当前环境下云端探测显示不可用；本批次验证了不可用态、重试入口和连接中状态，未完成“输入问题 -> 发送 -> SSE 返回 -> 端侧渲染”的完整模拟器链路。
+- 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
+- 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。

@@ -82,6 +82,29 @@ export struct ChatContent {
     return this.cloudAgentReady && !this.loading && this.inputText.trim().length > 0;
   }
 
+  private canRetryCloudAgent(): boolean {
+    return !this.probing && !this.cloudAgentReady;
+  }
+
+  private sendButtonBackground(): string {
+    if (this.canSend) return Constants.COLOR_BRAND;
+    if (this.canRetryCloudAgent()) return Constants.COLOR_WARNING;
+    return Constants.COLOR_BRAND_LIGHT;
+  }
+
+  private sendButtonIconColor(): string {
+    if (this.canSend || this.canRetryCloudAgent()) return Constants.COLOR_TEXT_ON_GRADIENT;
+    return Constants.COLOR_BRAND;
+  }
+
+  private sendButtonHint(): string {
+    if (this.loading) return '学伴正在回答，完成后可继续追问';
+    if (this.probing) return '正在连接云端学伴';
+    if (!this.cloudAgentReady) return '云端未连接，点击右侧按钮重试';
+    if (this.inputText.trim().length === 0) return '输入问题后发送按钮会亮起';
+    return '';
+  }
+
   private markdownBlocks(content: string): MarkdownBlock[] {
     const blocks: MarkdownBlock[] = [];
     const codeLines: string[] = [];
@@ -600,40 +623,58 @@ export struct ChatContent {
         .width('100%')
         .padding({ left: 18, right: 18, top: 8 })
       }
-      Row({ space: 12 }) {
-        TextInput({
-          text: this.inputText,
-          placeholder: this.cloudAgentReady ? '输入你的问题...' : '云端学伴连接后可提问'
-        })
-          .layoutWeight(1)
-          .height(44)
-          .fontSize(14)
-          .backgroundColor(Constants.COLOR_BG_CARD)
-          .borderRadius(Constants.RADIUS_MD)
-          .enabled(this.cloudAgentReady && !this.loading)
-          .onChange((value: string) => {
-            this.inputText = value;
+      Column({ space: 6 }) {
+        Row({ space: 12 }) {
+          TextInput({
+            text: this.inputText,
+            placeholder: this.cloudAgentReady ? '输入你的问题...' : '云端学伴连接后可提问'
           })
-          .onSubmit(() => {
-            this.sendMessage();
-          })
-
-        Button() {
-          SymbolGlyph($r('sys.symbol.paperplane_right_fill'))
-            .fontSize(20)
-            .fontColor([this.canSend ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND])
-        }
-          .width(44)
-          .height(44)
-          .backgroundColor(this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
-          .borderRadius(22)
-          .onClick(() => {
-            if (this.canSend) {
+            .layoutWeight(1)
+            .height(44)
+            .fontSize(14)
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(Constants.RADIUS_MD)
+            .enabled(this.cloudAgentReady && !this.loading)
+            .onChange((value: string) => {
+              this.inputText = value;
+            })
+            .onSubmit(() => {
               this.sendMessage();
-            } else if (!this.probing && !this.cloudAgentReady) {
-              this.probeCloudAgent();
+            })
+
+          Button() {
+            if (this.loading || this.probing) {
+              LoadingProgress()
+                .width(20)
+                .height(20)
+                .color(Constants.COLOR_BRAND)
+            } else {
+              SymbolGlyph($r('sys.symbol.paperplane_right_fill'))
+                .fontSize(20)
+                .fontColor([this.sendButtonIconColor()])
             }
-          })
+          }
+            .width(44)
+            .height(44)
+            .backgroundColor(this.sendButtonBackground())
+            .border({ width: 1, color: this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT })
+            .borderRadius(22)
+            .onClick(() => {
+              if (this.canSend) {
+                this.sendMessage();
+              } else if (this.canRetryCloudAgent()) {
+                this.probeCloudAgent();
+              }
+            })
+        }
+        .width('100%')
+
+        if (this.sendButtonHint().length > 0) {
+          Text(this.sendButtonHint())
+            .width('100%')
+            .fontSize(11)
+            .fontColor(this.canRetryCloudAgent() ? Constants.COLOR_WARNING : Constants.COLOR_TEXT_SECONDARY)
+        }
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 20, top: 12 })
