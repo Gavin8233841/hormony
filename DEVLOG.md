@@ -6113,3 +6113,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 第一次 Node `fetch` 访问线上 Health 发生连接超时；同一网络下 PowerShell `Invoke-WebRequest` 随后验证通过，因此该超时仅记录为 Node 网络栈失败，不作为服务不可用证据。
 - 本批次未修改 Web API，未重新跑 Web `pnpm lint/typecheck/test/build`。
 - 真机、OCR、TTS、Lottie、distributedKVStore 仍未验证。
+
+---
+
+## 2026-07-07 Codex：鸿蒙2.0 接力文档
+
+背景：用户要求全面审查现有进展、数据、重要记忆、关键上下文与核心资产，并在本地项目文件夹下创建接力文档，供更新后的模型继续接手。
+
+文件：
+- `DEVLOG.md`
+- `docs/CODEX-HANDOFF-HARMONY-2.0-20260707.md`
+
+行为变化：
+- 新增鸿蒙2.0 接力文档，汇总当前 Git 状态、保留资产、产品边界、模型与云端配置、数据规模、HarmonyOS/Web 结构、验证证据、未验证项和下一步路线。
+- 明确 `.trae/progress.json` 包含旧模型名误判记录，不得作为当前生产模型事实来源，也不得提交。
+- 明确未跟踪 `.tmp/`、`assets/`、展示站、zip、本地 HTML 提案和本地提示词资产不得直接纳入主线。
+
+验证：
+- `git status --short --branch`：exit 0，当前 `main...origin/main`，保留 `.trae/progress.json` 与未跟踪本地资产。
+- `git log -5 --oneline`：exit 0，当前 HEAD 为 `9e4ccad docs: 补充 Chat 核查证据`。
+- `python scripts/validate-topic-relations.py`：exit 0，`ALL CHECKS PASSED`。
+- 只读数据统计：端侧题库 165 道选择题，33 个 Topic，每 Topic 5 道；知识切片 147 条；Topic 关系 33 个；Lesson 体验 33 个；外部资源 36 条。
+- 只读资产统计：`.tmp/` 约 319 个文件、176.9 MB；`assets/` 约 52 个文件、189 KB；`hongxueban-showcase/` 约 94 个文件、12.3 MB；`hongxueban-showcase.zip` 约 6.58 MB；`鸿学伴-创意提案.html` 约 3.59 MB。
+- 对禁用不确定词做全文扫描：exit 1，无命中。
+
+失败或未验证：
+- 本批次是文档接力批次，未重新运行 Web `pnpm lint/typecheck/test/build`。
+- 本批次未重新运行 HarmonyOS HAP 构建；沿用上一批 `Chat.ets` 静态诊断、HAP 构建、线上 Health/Chat SSE 与模拟器 fallback 证据。
+- 工作区仍保留 `.trae/progress.json` 和未跟踪本地资产；未执行清理、回滚、目录移动或删除。
