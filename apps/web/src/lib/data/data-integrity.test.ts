@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import type { QuizQuestion } from "@/lib/types";
 import {
   COURSE_IDS,
   EXTERNAL_RESOURCE_TYPES,
@@ -8,6 +9,7 @@ import {
   allQuizzes,
   externalResources,
 } from "@/lib/data";
+import { balanceChoiceOptions } from "./quizzes";
 
 const MINIMUM_COUNTS = {
   cs101: { chunks: 40, questions: 20, choices: 20 },
@@ -130,7 +132,35 @@ describe("课程数据资产完整性", () => {
     }
   });
 
-  it("选择题答案位置应均衡且每门课程具备完整难度梯度", () => {
+  it("选项轮换应保持正确答案正文和选项正文集合不变", () => {
+    const sourceQuestion: QuizQuestion = {
+      id: "rotation_fixture",
+      type: "choice",
+      stem: "固定轮换输入",
+      options: ["A. alpha", "B. beta", "C. gamma", "D. delta"],
+      answer: "B",
+      explanation: "beta 是固定正确答案。轮换只能改变位置标签，不能改变任何选项正文。",
+    };
+    const sourceSnapshot = structuredClone(sourceQuestion);
+    const sourceBodies = sourceQuestion.options?.map((option) => option.slice(3)) ?? [];
+    const correctBody = sourceBodies[1];
+
+    ANSWER_LABELS.forEach((answer, targetIndex) => {
+      const rotated = balanceChoiceOptions(sourceQuestion, targetIndex);
+      const rotatedBodies = rotated.options?.map((option) => option.slice(3)) ?? [];
+      const answerIndex = ANSWER_LABELS.indexOf(rotated.answer as AnswerLabel);
+
+      expect(rotated.answer).toBe(answer);
+      expect(rotatedBodies[answerIndex]).toBe(correctBody);
+      expect(rotatedBodies.slice().sort()).toEqual(sourceBodies.slice().sort());
+      expect(rotated.stem).toBe(sourceQuestion.stem);
+      expect(rotated.explanation).toBe(sourceQuestion.explanation);
+    });
+
+    expect(sourceQuestion).toEqual(sourceSnapshot);
+  });
+
+  it("选择题答案位置应均衡且全局难度分布应受控", () => {
     const choices = allQuizzes.flatMap((quiz) =>
       quiz.questions
         .filter((question) => question.type === "choice")
@@ -162,18 +192,15 @@ describe("课程数据资产完整性", () => {
     for (const quiz of allQuizzes) {
       const topicChoices = quiz.questions.filter((question) => question.type === "choice");
       const topicAnswerCounts: Record<AnswerLabel, number> = { A: 0, B: 0, C: 0, D: 0 };
-      const topicDifficulties = new Set<QuizDifficulty>();
       expect(topicChoices).toHaveLength(5);
 
       for (const question of topicChoices) {
         topicAnswerCounts[question.answer as AnswerLabel] += 1;
-        topicDifficulties.add(question.difficulty as QuizDifficulty);
       }
       for (const answer of ANSWER_LABELS) {
         expect(topicAnswerCounts[answer]).toBeGreaterThanOrEqual(1);
         expect(topicAnswerCounts[answer]).toBeLessThanOrEqual(2);
       }
-      expect(topicDifficulties).toEqual(new Set(QUIZ_DIFFICULTIES));
     }
 
     for (const courseId of COURSE_IDS) {
@@ -181,19 +208,14 @@ describe("课程数据资产完整性", () => {
         .filter((entry) => entry.courseId === courseId)
         .map((entry) => entry.question);
       const courseAnswerCounts: Record<AnswerLabel, number> = { A: 0, B: 0, C: 0, D: 0 };
-      const difficultyCounts: Record<QuizDifficulty, number> = { easy: 0, medium: 0, hard: 0 };
 
       for (const question of courseQuestions) {
         courseAnswerCounts[question.answer as AnswerLabel] += 1;
-        difficultyCounts[question.difficulty as QuizDifficulty] += 1;
       }
 
       const answerPositions = Object.values(courseAnswerCounts);
       expect(Math.max(...answerPositions) - Math.min(...answerPositions))
         .toBeLessThanOrEqual(5);
-      expect(difficultyCounts.easy).toBeGreaterThanOrEqual(20);
-      expect(difficultyCounts.medium).toBeGreaterThanOrEqual(20);
-      expect(difficultyCounts.hard).toBeGreaterThanOrEqual(9);
     }
   });
 

@@ -25,7 +25,7 @@
 
 - 依据稳定题目 ID 对四个选项做确定性轮换；每个 Topic 的 5 道选择题覆盖 A-D，单一位置最多出现 2 次。
 - 165 道题最终答案位置为 A=42、B=43、C=41、D=39。
-- 难度最终为 easy=66、medium=66、hard=33；33 个 Topic 均同时具备三级难度。
+- 本批次当时记录的 `easy=66、medium=66、hard=33` 与“33 个 Topic 均同时具备三级难度”已由批次 4 复算并纠正；当前精确统计与有效门禁以批次 4 为准。
 - 修正 AVL 双旋次数、链地址法期望复杂度、分页碎片题双正确项，以及 HTTP 请求目标、HTTP/2 队头阻塞、现代 TLS、DNS TCP 回退和包过滤字段等表述。
 - 修正题库源码中的旧题量注释；当前为 165 道选择题与 21 道简答题。
 - Web 数据完整性测试新增全局、分课程和逐 Topic 的答案位置与难度门禁。
@@ -104,3 +104,43 @@
 - **静态诊断通过**：文档门禁确认项目介绍为 467 个 Unicode 字符，评分项、截止时间、4 分 45 秒和 20 页上限均存在，exit 0。
 - **未验证**：官方作品说明模板最新版、门户实时字段、单文件大小限制、真实队名和剩余更新次数仍须队长登录核对。
 - **未验证**：最终 PDF、MP4、ZIP、截图、HAP 哈希和签署材料尚未生成；本文不把准备清单写成已交付。
+
+## 批次 4：纠正 hard 题认知复杂度与难度统计
+
+背景：对提交 `d0f9f95` 的复核发现，29 道新增 hard 中有 24 道正文相对父提交没有实质升级；批次 1 还把真实难度统计 `easy=67、medium=65、hard=33` 错写为 `66/66/33`。逐 Topic 强制三级难度会诱导只改标签，不能作为内容质量门禁。
+
+文件：
+
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `docs/workstreams/06-competition-release-result.md`
+- `DEVLOG.md`
+
+行为变化：
+
+- 实质重写 29 道 hard：数据结构 8 道、操作系统 10 道、计算机网络 11 道。题目改为扩容/树与图状态推演、调度与页面置换、地址转换、TCP/UDP/TLS/DNS/HTTP 状态与边界计算等需要多步推理的固定输入，不再以定义记忆题承载 hard 标签。
+- 当前精确难度分布为 `easy=67、medium=65、hard=33`；答案位置仍为 `A=42、B=43、C=41、D=39`。
+- 删除逐 Topic 必须同时出现 easy/medium/hard 和每课程 hard 数量的机械门槛；保留 165 题、33 Topic、每 Topic 5 题、答案位置覆盖及全局难度区间门禁。
+- 导出确定性选项轮换函数并增加固定输入单测，逐目标位置断言正确答案正文、全部选项正文集合、题干和解析在轮换前后不变，且源对象不被修改。
+
+验证：
+
+- **源码确认**：PowerShell 从 `d0f9f95^` 读取旧 `quizzes.ts`，按 29 个指定题目 ID 精确提取并比较题干，exit 0，`HARD_STEMS_CHANGED=29/29`、`UNCHANGED=`。
+- **源码确认**：`node scripts/generate-quizzes-json.mjs`，exit 0；生成 165 道题，Web 单一源与 HarmonyOS JSON 完全一致。
+- **静态诊断通过**：`cd apps/web; pnpm lint`，exit 0，无警告或错误。
+- **静态诊断通过**：`cd apps/web; pnpm typecheck`，exit 0。
+- **静态诊断通过**：`cd apps/web; pnpm test`，exit 0，13 个测试文件、169 项测试通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建成功。
+- **源码确认**：`python scripts/validate-topic-relations.py`，exit 0，关系、Topic、知识切片与题库一致性全部通过。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，exit 0，`BUILD SUCCESSFUL in 31 s 833 ms`；仍有未配置 `signingConfigs` 的既有警告。
+
+失败后纠正：
+
+- 首次从 `apps/web` 目录误执行根目录相对路径 `node scripts/generate-quizzes-json.mjs`，exit 1；生成器未运行，随后定向同源测试按预期因端侧 JSON 陈旧而失败。改从仓库根执行生成器后，同一测试 7/7 通过，未用失败结果充当通过证据。
+
+未验证：
+
+- **未验证**：29 道题尚未完成具名学科专家逐题签字，不能宣称“答案 100% 正确”。
+- **未验证**：未进行模拟器逐题作答、真机或线上 API 回归；本批只达到静态诊断通过与构建通过。
+- **未验证**：HAP 未配置正式签名，构建通过不等于可发布安装包通过。

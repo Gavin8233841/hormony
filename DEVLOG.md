@@ -6231,3 +6231,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 官方作品说明模板最新版、门户实时字段、单文件大小限制、真实队名和剩余更新次数仍须队长登录核对。
 - 最终 PDF、MP4、ZIP、截图、HAP 哈希和签署材料尚未生成；本批只达到源码确认，不标记为正式上传通过。
 - 本批仅修改文档，未运行 Web 四项或 HarmonyOS 构建。
+
+---
+
+## 2026-07-17 [WS06]：纠正 hard 题认知复杂度与难度统计
+
+背景：主线复核 `d0f9f95` 发现 29 道新增 hard 中有 24 道只改难度标签或只做轻微勘误，且上一条 WS06 记录把实际 `easy=67、medium=65、hard=33` 错写为 `66/66/33`。本条只追加纠正，不改写旧历史。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/06-competition-release-result.md`
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+
+行为变化：
+- 实质重写数据结构 8 道、操作系统 10 道、计算机网络 11 道 hard 题，覆盖多步计算、状态推演、边界比较和综合判断；未继续使用直接定义记忆题冒充 hard。
+- 精确难度统计为 `easy=67、medium=65、hard=33`，答案位置为 `A=42、B=43、C=41、D=39`。
+- 移除逐 Topic 强制三级难度和每课程 hard 数量门槛，保留答案位置、题量、Topic 覆盖和全局难度区间约束。
+- 增加固定输入选项轮换测试，断言正确答案正文、全部选项正文集合、题干与解析均保持不变，且不修改源对象。
+
+验证：
+- PowerShell 对 `d0f9f95^` 与当前 29 个指定题目 ID 的题干做精确比较：exit 0，`HARD_STEMS_CHANGED=29/29`、无未变化项。
+- `node scripts/generate-quizzes-json.mjs`：exit 0，165 道题与端侧 JSON 完全一致。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，13 个测试文件、169 项测试通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建成功。
+- `python scripts/validate-topic-relations.py`：exit 0，`ALL CHECKS PASSED`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 31 s 833 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 首次在 `apps/web` 目录误用根目录相对生成器路径，命令 exit 1，随后同源测试因端侧 JSON 陈旧按预期失败；从仓库根重新生成后定向测试 7/7 通过。
+- 29 道题尚未完成具名学科专家逐题签字；不能宣称“答案 100% 正确”。
+- 未执行模拟器逐题答题、真机或线上 API 回归；HAP 未配置正式签名。
