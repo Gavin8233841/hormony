@@ -6752,3 +6752,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 当前分支未部署；带真实模型的 Chat SSE 正文、Plan 与 Quiz 仍为未验证。
 - 浏览器交互、HarmonyOS 模拟器与真机未验证；本批未修改 HarmonyOS 文件。
+
+---
+
+## [WS05] 2026-07-17：Web Chat 停止后重发与历史请求边界
+
+背景：Web Chat 会把历史正文原样发送；用户停止请求后立即重发时，旧请求的事件、catch 或 finally 可能覆盖新 assistant、写入旧 session，或清除新 AbortController。
+
+文件：
+- `apps/web/src/app/chat/page.tsx`
+- `apps/web/src/app/chat/sse-client.ts`、`apps/web/src/app/chat/sse-client.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- Web 仅发送最近 12 条历史，每条在客户端截到 1000 字符，与服务端 `INVALID_HISTORY` 上限对齐。
+- `ChatRequestCoordinator` 以 AbortController 身份标识当前请求；启动新请求会中止旧请求，流事件、catch、session 更新与 finally 仅允许当前控制器修改状态。
+- stop 立即解除页面 loading 并把空 assistant 标记为已取消；旧请求随后结束时不能覆盖新 assistant，也不能清除新控制器。
+- Chat 请求继续发送经本地日历字段生成的 `startDate`，不覆盖 HarmonyOS 主线已修复的客户端实现。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/app/chat/sse-client.test.ts`：exit 0，1 个测试文件、8 项通过；包含 14 条历史裁至最后 12 条、逐条不超过 1000 字符，以及 stop 后启动新控制器时旧 finish 不能清理新请求的回归。
+- 集成工作树 `pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，21 个测试文件、343 项通过；`pnpm build`：exit 0。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- Browser 插件未提供，`apps/web/node_modules/.bin/playwright.cmd` 不存在；未安装新依赖，Chat 停止后立即重发的真实浏览器交互为未验证。
+- 当前分支未部署；真实模型 Chat SSE、HarmonyOS 模拟器与真机未验证。本批未修改 HarmonyOS 文件。

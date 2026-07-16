@@ -2,6 +2,14 @@ import type { AgentName, Citation, StreamEvent } from "@/lib/types";
 
 type StreamErrorEvent = Extract<StreamEvent, { type: "error" }>;
 
+const MAX_CHAT_HISTORY_MESSAGES = 12;
+const MAX_CHAT_HISTORY_CONTENT_LENGTH = 1000;
+
+export interface ChatHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface ChatStreamResult {
   error: StreamErrorEvent | null;
   sessionId: string | null;
@@ -24,6 +32,45 @@ export class ChatRequestError extends Error {
     this.status = status;
     this.code = code;
   }
+}
+
+export class ChatRequestCoordinator {
+  private current: AbortController | null = null;
+
+  start(): AbortController {
+    const next = new AbortController();
+    const previous = this.current;
+    this.current = next;
+    previous?.abort("superseded");
+    return next;
+  }
+
+  isCurrent(controller: AbortController): boolean {
+    return this.current === controller;
+  }
+
+  stop(reason = "stopped"): AbortController | null {
+    const controller = this.current;
+    if (!controller) return null;
+    this.current = null;
+    controller.abort(reason);
+    return controller;
+  }
+
+  finish(controller: AbortController): boolean {
+    if (this.current !== controller) return false;
+    this.current = null;
+    return true;
+  }
+}
+
+export function buildChatHistory(
+  messages: readonly ChatHistoryMessage[]
+): ChatHistoryMessage[] {
+  return messages.slice(-MAX_CHAT_HISTORY_MESSAGES).map((message) => ({
+    role: message.role,
+    content: message.content.slice(0, MAX_CHAT_HISTORY_CONTENT_LENGTH),
+  }));
 }
 
 const AGENT_NAMES: readonly AgentName[] = [
