@@ -23,6 +23,7 @@
         "id": "cs101-数组与线性表-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "线性表操作",
         "prompt": "这段代码运行后输出什么？",
         "content": "vector<int> score = {72, 85, 91};\nscore[1] += 5;\ncout << score[1];",
         "language": "C++",
@@ -38,7 +39,7 @@
         ],
         "answer": "90",
         "feedback": "score[1] 是第二个元素 85，加 5 后变为 90。数组下标从 0 开始。",
-        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+        "source": "数据结构与算法分析；知识切片 cs101_k01、cs101_k02、cs101_k03、cs101_k04"
       }
     ]
   },
@@ -59,8 +60,8 @@
     "workedExampleSteps": [
       "Node* p = head;",
       "while (p != nullptr) {",
-      "  cout << p->value;",
-      "  p = p->next;",
+      "cout << p->value;",
+      "p = p->next;",
       "}"
     ],
     "activities": [
@@ -68,6 +69,7 @@
         "id": "cs101-链表-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "链式结构",
         "prompt": "循环在什么条件下结束？",
         "content": "Node* p = head;\nwhile (p != nullptr) {\n  cout << p->value;\n  p = p->next;\n}",
         "language": "C++",
@@ -83,7 +85,7 @@
         ],
         "answer": "p 指向 nullptr",
         "feedback": "尾节点的 next 为 nullptr，指针越过尾节点后循环结束。",
-        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+        "source": "数据结构与算法分析；知识切片 cs101_k05、cs101_k06、cs101_k07、cs101_k08、cs101_k09"
       }
     ]
   },
@@ -112,6 +114,7 @@
         "id": "cs101-栈与队列-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "受限线性结构",
         "prompt": "top() 返回哪个值？",
         "content": "stack<int> s;\ns.push(2);\ns.push(7);\ncout << s.top();",
         "language": "C++",
@@ -127,7 +130,7 @@
         ],
         "answer": "7",
         "feedback": "栈后进先出，最后压入的 7 位于栈顶。",
-        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+        "source": "数据结构与算法分析；知识切片 cs101_k10、cs101_k11、cs101_k12、cs101_k13"
       }
     ]
   },
@@ -155,6 +158,7 @@
         "id": "cs102-进程与线程-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "进程线程模型",
         "prompt": "若没有同步，最终结果一定是 2 吗？",
         "content": "int counter = 0;\n// 两个线程各执行一次\ncounter = counter + 1;",
         "language": "C++",
@@ -170,7 +174,7 @@
         ],
         "answer": "不一定",
         "feedback": "读、改、写不是原子操作，两个线程可能覆盖彼此结果，必须用锁或原子变量同步。",
-        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+        "source": "操作系统概念；知识切片 cs102_k01、cs102_k02、cs102_k03、cs102_k04、cs102_k05"
       }
     ]
   },
@@ -199,6 +203,7 @@
         "id": "cs102-虚拟内存与分页-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "分页置换",
         "prompt": "该地址的页内偏移是多少？",
         "content": "页大小 = 4 KB\n虚拟地址 = 8196\n页号 = 8196 / 4096\n偏移 = 8196 % 4096",
         "language": "地址推演",
@@ -214,7 +219,7 @@
         ],
         "answer": "4",
         "feedback": "8196 = 2 × 4096 + 4，因此位于第 2 页，页内偏移为 4。",
-        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+        "source": "操作系统概念；知识切片 cs102_k15、cs102_k16、cs102_k17、cs102_k18、cs102_k19"
       }
     ]
   },
@@ -242,6 +247,7 @@
         "id": "cs103-TCP握手与挥手-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "TCP状态",
         "prompt": "第三次 ACK 的核心作用是什么？",
         "content": "Client -> Server : SYN seq=100\nServer -> Client : SYN ACK seq=300 ack=101\nClient -> Server : ACK ack=301",
         "language": "网络时序",
@@ -257,7 +263,7 @@
         ],
         "answer": "确认客户端能收到服务端响应",
         "feedback": "服务端收到第三次 ACK 后，才确认自己的响应已被客户端收到，双方收发链路均可用。",
-        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+        "source": "计算机网络：自顶向下方法；知识切片 cs103_k14、cs103_k15、cs103_k16、cs103_k17、cs103_k18"
       }
     ]
   },
@@ -278,7 +284,6 @@
     "workedExampleSteps": [
       "GET /courses HTTP/1.1",
       "Accept: application/json",
-      "",
       "HTTP/1.1 200 OK",
       "Content-Type: application/json"
     ],
@@ -287,6 +292,7 @@
         "id": "cs103-HTTP协议-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "HTTP语义",
         "prompt": "哪一部分表达请求希望接收 JSON？",
         "content": "GET /courses HTTP/1.1\nAccept: application/json\n\nHTTP/1.1 200 OK\nContent-Type: application/json",
         "language": "HTTP",
@@ -302,7 +308,7 @@
         ],
         "answer": "Accept 请求头",
         "feedback": "Accept 请求头描述客户端期望接收的媒体类型；Content-Type 描述实际发送内容的类型。",
-        "source": "现有主动学习体验，经 LearningActivity v2 迁移"
+        "source": "计算机网络：自顶向下方法；知识切片 cs103_k28、cs103_k29、cs103_k30、cs103_k31"
       }
     ]
   },
@@ -333,6 +339,7 @@
         "id": "cs101-二叉树与BST-1",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "树结构性质",
         "prompt": "以下是在 BST 中递归插入节点的 C++ 代码，请填写空缺部分使插入逻辑正确",
         "content": "代码：\nstruct TreeNode {\n    int val;\n    TreeNode* left;\n    TreeNode* right;\n};\n\nTreeNode* insert(TreeNode* root, int val) {\n    if (root == nullptr) {\n        return new TreeNode{val, nullptr, nullptr};\n    }\n    if (val < root->val) {\n        root->left = ________;  // 填空1\n    } else if (val > root->val) {\n        root->right = ________;  // 填空2\n    }\n    return root;\n}",
         "language": "代码阅读",
@@ -347,6 +354,7 @@
         "id": "cs101-二叉树与BST-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "树结构性质",
         "prompt": "给定如下 BST，请将对它进行中序遍历的步骤排列为正确执行顺序\n        50\n       /  \\\n      30   70\n       \\   /\n       40 60",
         "content": "",
         "language": "步骤卡片",
@@ -375,7 +383,7 @@
         ],
         "answer": "D → F → G → E → A → B → C → H → I",
         "feedback": "中序遍历的顺序是\"左子树 → 根 → 右子树\"。先递归遍历 50 的左子树（D），在左子树中以 30 为根：先访问 30（F），再遍历 30 的右子树（G）访问 40（E）。回到根访问 50（A）。然后递归遍历 50 的右子树（B），在右子树中以 70 为根：先遍历 70 的左子树（C）访问 60（H），再访问 70（I）。最终输出序列为 30, 40, 50, 60, 70，是严格递增的，验证了知识切片 cs101_k17 所述 BST 中序遍历得到有序序列的性质",
-        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k15、cs101_k17\n\n---"
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k15、cs101_k17"
       }
     ]
   },
@@ -406,6 +414,7 @@
         "id": "cs101-AVL树与红黑树-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "平衡树机制",
         "prompt": "给定如下 AVL 树（所有节点当前平衡），依次执行操作：插入 55。请推演插入后的平衡因子变化并给出最终树结构\n       40\n      /  \\\n    20    50\n   /  \\     \\\n  10   30    60",
         "content": "操作内容：\n初始树中节点 40 为根，左子树 {20,10,30} 高 2，右子树 {50,60} 高 2，BF(40)=0\n操作：插入 55",
         "language": "推演草稿",
@@ -420,6 +429,7 @@
         "id": "cs101-AVL树与红黑树-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "平衡树机制",
         "prompt": "在红黑树中插入一个新红色节点后，若其父节点也为红色（违反\"红节点的子节点必为黑\"性质），请将修复操作的步骤排列为正确顺序（假设叔节点为红色的情况）",
         "content": "",
         "language": "步骤卡片",
@@ -440,7 +450,7 @@
         ],
         "answer": "C → B → E → A → D",
         "feedback": "红黑树插入修复的典型流程：先将新节点着红色（C），检查是否违反红色节点不能连续的性质（B）。当父节点和叔节点均为红色时，进行重新着色：将父和叔变黑（E），将祖父变红（A），然后把\"当前节点\"移到祖父位置继续向上检查（D），因为祖父变红可能与其父节点形成新的连续红节点冲突。这一过程体现了知识切片 cs101_k20 中\"通过变色和旋转恢复平衡\"的描述，变色优先于旋转以减少旋转次数",
-        "source": "算法导论（CLRS）；知识切片 cs101_k20\n\n---"
+        "source": "算法导论（CLRS）；知识切片 cs101_k20"
       }
     ]
   },
@@ -471,6 +481,7 @@
         "id": "cs101-图的表示与遍历-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "图遍历建模",
         "prompt": "给定如下无向图和 DFS 递归代码，预测程序从顶点 0 开始遍历的输出序列\n图结构（无向图）：\n顶点: 0, 1, 2, 3, 4\n邻接表（按升序排列邻接顶点）:\n0: [1, 3]\n1: [0, 2, 4]\n2: [1, 3]\n3: [0, 2, 4]\n4: [1, 3]\nbool visited[5] = {false};\nvoid dfs(int v) {\n    visited[v] = true;\n    cout << v << \" \";\n    for (int u : adj[v]) {\n        if (!visited[u]) {\n            dfs(u);\n        }\n    }\n}\n// 调用: dfs(0)",
         "content": "",
         "language": "推演草稿",
@@ -485,6 +496,7 @@
         "id": "cs101-图的表示与遍历-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "图遍历建模",
         "prompt": "以下是对有向图执行 BFS 遍历的通用步骤，请排列为正确的执行顺序",
         "content": "",
         "language": "步骤卡片",
@@ -507,7 +519,7 @@
         ],
         "answer": "C → A → B → D → E → F",
         "feedback": "BFS 的标准流程：先初始化标记数组和队列（C），将起点标记并入队（A）。然后循环执行：取队首顶点（B），遍历其邻接顶点将未访问者标记并入队（D），检查队列是否为空决定是否继续（E）。队列为空表示所有可达顶点已访问，算法结束（F）。这一流程体现了知识切片 cs101_k26 中\"借助队列实现\"\"先访问所有邻接顶点，再逐层向外扩展\"的描述",
-        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k26\n\n---"
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k26"
       }
     ]
   },
@@ -538,6 +550,7 @@
         "id": "cs101-最短路径算法-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "路径搜索",
         "prompt": "给定如下有向带权图，从源点 S 执行 Dijkstra 算法。请推演每轮选择顶点后的 dist 数组变化并给出最终各顶点最短距离\n有向带权图：\nS → A (权 10),  S → B (权 3)\nB → A (权 4),   B → C (权 2)\nA → C (权 1)\n源点: S",
         "content": "操作内容：\n初始 dist: S=0, A=∞, B=∞, C=∞\n操作1：选 S(0) 加入 S，松弛 S 的出边\n操作2：选当前最小 dist 顶点加入 S，松弛其出边\n操作3：选当前最小 dist 顶点加入 S，松弛其出边\n操作4：选当前最小 dist 顶点加入 S，松弛其出边",
         "language": "推演草稿",
@@ -552,6 +565,7 @@
         "id": "cs101-最短路径算法-2",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "路径搜索",
         "prompt": "以下是 Floyd-Warshall 算法的核心代码，请填写状态转移的关键空缺\n// dist[i][j] 初始化为邻接矩阵，dist[i][i]=0，无边为 INF\nvoid floyd(int dist[][N], int n) {\n    for (int k = 0; k < n; k++) {\n        for (int i = 0; i < n; i++) {\n            for (int j = 0; j < n; j++) {\n                if (dist[i][k] != INF && dist[k][j] != INF) {\n                    dist[i][j] = min(dist[i][j], ________);  // 填空\n                }\n            }\n        }\n    }\n}",
         "content": "",
         "language": "代码阅读",
@@ -560,7 +574,7 @@
         "answerIndexes": [],
         "answer": "dist[i][k] + dist[k][j]",
         "feedback": "Floyd 的核心转移方程为 d[k][i][j] = min(d[k-1][i][j], d[k-1][i][k] + d[k-1][k][j])，表示只经过前 k 个顶点中转时 i 到 j 的最短距离。空间优化后用二维数组原地更新，填空处就是\"经过顶点 k 中转\"的路径长度 dist[i][k]+dist[k][j]。注意 k 必须是最外层循环，因为每轮 k 表示允许经过的新中转顶点，这与知识切片 cs101_k28 中\"状态 d[k][i][j] 表示只经过前 k 个顶点中转\"的描述一致",
-        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k28\n\n---"
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k28"
       }
     ]
   },
@@ -591,6 +605,7 @@
         "id": "cs101-排序算法-1",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "排序策略",
         "prompt": "以下是归并排序中合并两个有序子数组的 merge 函数，请填写空缺部分。注意此实现需要保证排序稳定性\nvoid merge(int arr[], int left, int mid, int right) {\n    int n1 = mid - left + 1;\n    int n2 = right - mid;\n    int L[n1], R[n2];\n    for (int i = 0; i < n1; i++) L[i] = arr[left + i];\n    for (int j = 0; j < n2; j++) R[j] = arr[mid + 1 + j];\n    int i = 0, j = 0, k = left;\n    while (i < n1 && j < n2) {\n        if (L[i] <= R[j]) {\n            ________;  // 填空：两行代码\n            ________;\n        } else {\n            arr[k] = R[j]; j++;\n        }\n        k++;\n    }\n    while (i < n1) { arr[k] = L[i]; i++; k++; }\n    while (j < n2) { arr[k] = R[j]; j++; k++; }\n}",
         "content": "",
         "language": "代码阅读",
@@ -605,6 +620,7 @@
         "id": "cs101-排序算法-2",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "排序策略",
         "prompt": "对数组 [7, 2, 5, 1, 8, 3] 执行一次快速排序 Lomuto 分区（取末元素为 pivot）。请推演分区完成后的数组状态及 pivot 的最终位置",
         "content": "操作内容：\n初始数组：[7, 2, 5, 1, 8, 3]\npivot = 3（末元素），i = -1\n依次扫描 j = 0 到 4，遇到小于 pivot 的元素时 i++ 并交换 arr[i] 与 arr[j]\n最后交换 arr[i+1] 与 arr[high]",
         "language": "推演草稿",
@@ -613,7 +629,7 @@
         "answerIndexes": [],
         "answer": "1. j=0: 7 >= 3，跳过。i=-1\n  2. j=1: 2 < 3，i=0，swap(arr[0],arr[1]) → [2, 7, 5, 1, 8, 3]\n  3. j=2: 5 >= 3，跳过。i=0\n  4. j=3: 1 < 3，i=1，swap(arr[1],arr[3]) → [2, 1, 5, 7, 8, 3]\n  5. j=4: 8 >= 3，跳过。i=1\n  6. 最终交换：swap(arr[2], arr[5]) → [2, 1, 3, 7, 8, 5]\n  7. pivot=3 位于下标 2，左侧 [2,1] 均 < 3，右侧 [7,8,5] 均 > 3",
         "feedback": "Lomuto 分区通过维护指针 i 划分小于区和大于等于区。每次遇到小于 pivot 的元素就扩展小于区（i++ 并交换），最终将 pivot 放到 i+1 位置。分区后数组被划分为 [2,1] | 3 | [7,8,5]，pivot 到达最终排序位置 2。此后对左右子数组 [2,1] 和 [7,8,5] 递归分区。这与知识切片 cs101_k31 中\"Lomuto 分区取末元素为基准，单指针扫描\"的描述一致",
-        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k31\n\n---"
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k31"
       }
     ]
   },
@@ -643,6 +659,7 @@
         "id": "cs101-动态规划-1",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "状态转移",
         "prompt": "以下是最长公共子序列（LCS）的动态规划实现，请填写状态转移的关键空缺\nint lcs(string& X, string& Y) {\n    int m = X.size(), n = Y.size();\n    int dp[m+1][n+1];\n    for (int i = 0; i <= m; i++) dp[i][0] = 0;\n    for (int j = 0; j <= n; j++) dp[0][j] = 0;\n    for (int i = 1; i <= m; i++) {\n        for (int j = 1; j <= n; j++) {\n            if (X[i-1] == Y[j-1]) {\n                ________;  // 填空\n            } else {\n                dp[i][j] = max(dp[i-1][j], dp[i][j-1]);\n            }\n        }\n    }\n    return dp[m][n];\n}",
         "content": "",
         "language": "代码阅读",
@@ -657,6 +674,7 @@
         "id": "cs101-动态规划-2",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "状态转移",
         "prompt": "给定字符串 X=\"ABCB\"，Y=\"BDCB\"，使用 LCS 动态规划填表。初始 dp 表全为 0（dp[0][*]=0, dp[*][0]=0）。请推演 dp[3][3] 和 dp[4][4] 的值",
         "content": "操作内容：\nX = \"ABCB\"（下标 1-4 对应 A,B,C,B）\nY = \"BDCB\"（下标 1-4 对应 B,D,C,B）\n转移规则：X[i-1]==Y[j-1] 则 dp[i][j]=dp[i-1][j-1]+1；否则 dp[i][j]=max(dp[i-1][j], dp[i][j-1])\n推演目标：dp[3][3]（X 前 3 字符 \"ABC\" vs Y 前 3 字符 \"BDC\"）和 dp[4][4]（完整 LCS）",
         "language": "推演草稿",
@@ -665,7 +683,7 @@
         "answerIndexes": [],
         "answer": "1. 先推演 dp[2][1]：X[1]='B', Y[0]='B'，相等，dp[2][1]=dp[1][0]+1=1\n  2. 推演 dp[3][3]：X[2]='C', Y[2]='C'，相等，dp[3][3]=dp[2][2]+1。而 dp[2][2]：X[1]='B' ≠ Y[1]='D'，dp[2][2]=max(dp[1][2], dp[2][1])=max(0,1)=1。因此 dp[3][3]=1+1=2\n  3. 推演 dp[4][4]：X[3]='B', Y[3]='B'，相等，dp[4][4]=dp[3][3]+1=2+1=3\n  4. LCS 长度 = dp[4][4] = 3，最长公共子序列为 \"BCB\"",
         "feedback": "dp[3][3] 对比 \"ABC\" 与 \"BDC\"，公共子序列 \"BC\" 长度为 2，此时 C 与 C 匹配，在 \"AB\" 与 \"BD\" 的 LCS（长度 1，即 \"B\"）基础上加 1。dp[4][4] 对比完整串，末尾 B 与 B 匹配，在前 3 字符 \"ABC\" 与 \"BDC\" 的 LCS 长度 2 基础上加 1 得 3。整个推演过程体现了知识切片 cs101_k38 中 LCS 的状态转移和知识切片 cs101_k40 中自底向上填表的方式",
-        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k38、cs101_k40\n\n---"
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k38、cs101_k40"
       }
     ]
   },
@@ -696,6 +714,7 @@
         "id": "cs101-贪心算法与分治-1",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "算法设计范式",
         "prompt": "以下是归并排序基于分治法的递归执行流程，请将步骤排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
@@ -722,6 +741,7 @@
         "id": "cs101-贪心算法与分治-2",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "算法设计范式",
         "prompt": "以下是贪心法求解活动选择问题的代码，活动已按结束时间升序排列。预测程序的输出\n// activities 已按结束时间升序排列\n// activities = { {1,3}, {2,5}, {4,6}, {5,7}, {6,9} }\n// 每个元素 {start, end}\nint greedySelect(vector<pair<int,int>>& act) {\n    int count = 1;              // 选第一个活动\n    int lastEnd = act[0].second; // 记录已选活动的最晚结束时间\n    for (int i = 1; i < act.size(); i++) {\n        if (act[i].first >= lastEnd) {  // 不冲突\n            count++;\n            lastEnd = act[i].second;\n        }\n    }\n    return count;\n}\n// 调用: greedySelect(activities)",
         "content": "",
         "language": "推演草稿",
@@ -730,7 +750,7 @@
         "answerIndexes": [],
         "answer": "输出 3",
         "feedback": "贪心过程：选活动 {1,3}，lastEnd=3。活动 {2,5} 的 start=2 < 3 冲突跳过。活动 {4,6} 的 start=4 >= 3，选，lastEnd=6。活动 {5,7} 的 start=5 < 6 冲突跳过。活动 {6,9} 的 start=6 >= 6，选，lastEnd=9。共选 3 个活动：{1,3}, {4,6}, {6,9}。每次选结束最早的活动为后续留出最大空间，这是贪心选择性质的体现（cs101_k41）。注意活动选择问题有贪心选择性质所以贪心可得最优解，而 0-1 背包不具备此性质",
-        "source": "算法导论（CLRS）；知识切片 cs101_k41\n\n---"
+        "source": "算法导论（CLRS）；知识切片 cs101_k41"
       }
     ]
   },
@@ -760,6 +780,7 @@
         "id": "cs101-哈希表-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "散列冲突",
         "prompt": "给定如下使用线性探测法的哈希表（容量 m=7，h(key)=key mod 7），依次执行插入操作。请推演每次插入后的表状态\n当前表状态:\n索引:  0    1    2    3    4    5    6\n值:   null null null  10   24   17  null\n\n操作1: 插入 3\n操作2: 插入 7",
         "content": "操作内容：\n线性探测：冲突时从 h(key) 开始顺序向后探测 (idx+1) mod m，直到找到空位\n请给出每次操作后哈希表的状态",
         "language": "推演草稿",
@@ -774,6 +795,7 @@
         "id": "cs101-哈希表-2",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "散列冲突",
         "prompt": "给定如下使用线性探测法的哈希表，预测查找函数对 search(17) 和 search(31) 的返回值\n哈希表（线性探测，容量 m=7，h(key) = key mod 7）:\n索引:  0    1    2    3    4    5    6\n值:   null null null  10   24   17  null\nint search(int table[], int key) {\n    int idx = key % 7;\n    while (table[idx] != -1) {  // -1 表示空位\n        if (table[idx] == key) return idx;\n        idx = (idx + 1) % 7;\n    }\n    return -1;  // 未找到\n}\n// 调用1: search(table, 17)\n// 调用2: search(table, 31)",
         "content": "",
         "language": "推演草稿",
@@ -782,7 +804,7 @@
         "answerIndexes": [],
         "answer": "search(17) 返回 5；search(31) 返回 -1",
         "feedback": "search(17)：h(17)=3，table[3]=10 ≠ 17，探测到 table[4]=24 ≠ 17，探测到 table[5]=17 == 17，返回 5。查找路径与插入时的探测路径一致。search(31)：h(31)=3，table[3]=10 ≠ 31，table[4]=24 ≠ 31，table[5]=17 ≠ 31，table[6]=-1（空位），说明 31 不在表中，返回 -1。遇到空位即停止是正确的：线性探测插入时遇到空位就会放入，所以空位之后的元素不可能与当前键冲突。这也说明了开放地址法删除困难的原因——直接删除会留下空位打断查找链，需用软删除标记",
-        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k46、cs101_k48\n\n---"
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k46、cs101_k48"
       }
     ]
   },
@@ -812,6 +834,7 @@
         "id": "cs101-堆与优先队列-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "堆结构维护",
         "prompt": "给定如下大顶堆（数组表示），执行插入操作 7。请推演上浮过程并给出最终堆状态\n当前大顶堆数组: [9, 5, 4, 1, 1, 3, 2]\n对应完全二叉树:\n          9\n        /   \\\n       5     4\n      / \\   / \\\n     1   1 3   2\n操作: 插入 7",
         "content": "操作内容：\n插入 7 放在数组末尾，然后执行上浮（sift up）：与父节点比较，若大于父节点则交换，直到满足堆序或到达根\n父节点下标公式: parent(i) = (i-1) / 2",
         "language": "推演草稿",
@@ -826,6 +849,7 @@
         "id": "cs101-堆与优先队列-2",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "堆结构维护",
         "prompt": "以下是从 n 个元素中找出最大 k 个元素的 TopK 解法（使用小顶堆），请填写空缺部分\n#include <queue>\n#include <vector>\nusing namespace std;\n\nvector<int> topK(vector<int>& nums, int k) {\n    // 小顶堆：堆顶是当前 k 个元素中的最小值\n    priority_queue<int, vector<int>, greater<int>> minHeap;\n    for (int num : nums) {\n        if ((int)minHeap.size() < k) {\n            minHeap.push(num);\n        } else if (________) {  // 填空\n            minHeap.pop();       // 弹出堆顶最小值\n            minHeap.push(num);   // 插入新元素\n        }\n    }\n    vector<int> result;\n    while (!minHeap.empty()) {\n        result.push_back(minHeap.top());\n        minHeap.pop();\n    }\n    return result;\n}",
         "content": "",
         "language": "代码阅读",
@@ -834,7 +858,7 @@
         "answerIndexes": [],
         "answer": "num > minHeap.top()",
         "feedback": "TopK 问题用容量 k 的小顶堆：堆顶是当前 k 个元素中的最小值（第 k 大）。当新元素 num 大于堆顶时，说明堆顶不可能是 Top-K，弹出堆顶并插入 num；否则 num 不可能进入 Top-K，直接跳过。最终堆中 k 个元素即为最大的 k 个，时间 O(n log k) 远优于排序的 O(n log n)（cs101_k52）。注意此处用小顶堆而非大顶堆：求最大 k 个用小顶堆（堆顶是门槛），求最小 k 个用大顶堆，这是 TopK 问题的关键技巧",
-        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k51、cs101_k52\n\n---"
+        "source": "数据结构与算法分析（Mark Allen Weiss）；知识切片 cs101_k51、cs101_k52"
       }
     ]
   },
@@ -865,6 +889,7 @@
         "id": "cs102-CPU调度算法-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "调度策略",
         "prompt": "三个进程 P1、P2、P3 同时到达（t=0），运行时间分别为 5、3、1。采用时间片轮转（RR）调度，时间片大小为 2。请推演完整的执行过程并给出最终完成顺序",
         "content": "初始状态：\n就绪队列 [P1, P2, P3]，时间片 = 2\n\n操作序列：\n轮次1：P1 执行 2 个单位，P1 剩余 3 → 队列变为 [P2, P3, P1]\n轮次2：P2 执行 2 个单位，P2 剩余 1 → 队列变为 [P3, P1, P2]\n轮次3：P3 执行 1 个单位，P3 完成 → 队列变为 [P1, P2]\n轮次4：P1 执行 2 个单位，P1 剩余 1 → 队列变为 [P2, P1]\n轮次5：P2 执行 1 个单位，P2 完成 → 队列变为 [P1]\n轮次6：P1 执行 1 个单位，P1 完成 → 队列空",
         "language": "推演草稿",
@@ -879,6 +904,7 @@
         "id": "cs102-CPU调度算法-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "调度策略",
         "prompt": "在多级反馈队列（MLFQ）调度中，一个 CPU 密集型进程从进入系统到被定期提升优先级的完整流程。请将以下步骤排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
@@ -899,7 +925,7 @@
         ],
         "answer": "B → C → E → A → D",
         "feedback": "MLFQ 的核心机制是：新进程进入最高优先级队列 Q0（步骤 B），I/O 密集型进程通常在短时间片内完成或阻塞，留在高优先级队列获得快速响应；CPU 密集型进程在 Q0 时间片用完后降级到 Q1（步骤 C），再降级到 Q2（步骤 E），在 Q2 中以更长的时间片执行（步骤 A）。为防止低优先级进程饥饿，系统定期执行优先级提升（步骤 D），将所有进程移回 Q0。这与知识切片 cs102_k09 中\"通过定期提升所有进程优先级可防止低优先级进程饥饿\"的描述一致",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k09\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k09"
       }
     ]
   },
@@ -929,6 +955,7 @@
         "id": "cs102-内存管理基础-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "内存分配",
         "prompt": "使用首次适应（FF）算法，给定初始空闲分区表和分配/释放请求序列，推演最终内存空闲状态\n初始空闲表（按地址升序）：[100K, 50K, 30K, 20K]",
         "content": "操作序列：\n操作1：分配 60K\n操作2：分配 25K\n操作3：分配 15K\n\n推演过程：\n分配 60K：FF 从表头查找，100K >= 60K，分配。剩余 40K。空闲表：[40K, 50K, 30K, 20K]\n分配 25K：FF 从表头查找，40K >= 25K，分配。剩余 15K。空闲表：[15K, 50K, 30K, 20K]\n分配 15K：FF 从表头查找，15K >= 15K，正好分配。移除该分区。空闲表：[50K, 30K, 20K]",
         "language": "推演草稿",
@@ -943,6 +970,7 @@
         "id": "cs102-内存管理基础-2",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "内存分配",
         "prompt": "以下是用 C 语言实现的首次适应（First-Fit）内存分配算法，请填写空缺部分使分配逻辑正确",
         "content": "代码：\n// 首次适应算法：从空闲分区数组头部查找第一个足够大的分区\n// free_list: 空闲分区大小数组，n: 分区数量，request: 请求大小\n// 返回分配的分区索引，-1 表示分配失败\nint first_fit(int free_list[], int n, int request) {\n    for (int i = 0; i < n; i++) {\n        if (free_list[i] >= request) {\n            int remaining = free_list[i] - request;\n            free_list[i] = ________;  // 填空：更新分区剩余大小\n            return i;\n        }\n    }\n    return -1;\n}",
         "language": "代码阅读",
@@ -951,7 +979,7 @@
         "answerIndexes": [],
         "answer": "remaining",
         "feedback": "首次适应算法找到第一个满足大小要求的分区后，将分区大小减去请求大小作为剩余空间。填入 remaining（即 free_list[i] - request）正确更新了分区剩余大小。若分区大小正好等于请求大小，remaining 为 0，表示该分区被完全占用。知识切片 cs102_k12 描述 FF \"从链表头部开始查找第一个足够大的空闲分区\"，代码中的 for 循环从头遍历体现了这一策略。注意最佳适应（BF）需要遍历所有分区选最小满足者，最坏适应（WF）选最大满足者",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k12\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k12"
       }
     ]
   },
@@ -981,6 +1009,7 @@
         "id": "cs102-分段与段页式-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "地址转换",
         "prompt": "在纯分页系统中（非段页式），页大小为 4KB。给定虚拟地址 0x1005（十进制 4101），页表内容如下。请预测物理地址的十进制值",
         "content": "页表内容：\n页号 0 → 物理页框号 3\n页号 1 → 物理页框号 7\n页号 2 → 物理页框号 5\n\n代码/计算：\n页大小 = 4096 字节\n虚拟地址 = 4101\n页号 = 虚拟地址 / 页大小 = 4101 / 4096 = ?\n页内偏移 = 虚拟地址 % 页大小 = 4101 % 4096 = ?\n物理地址 = 物理页框号 × 页大小 + 页内偏移",
         "language": "推演草稿",
@@ -995,6 +1024,7 @@
         "id": "cs102-分段与段页式-2",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "地址转换",
         "prompt": "在纯分段存储管理中，给定段表和逻辑地址，推演地址转换过程并判断是否越界",
         "content": "段表内容：\n段号 0：段基址 = 1000，段限长 = 400\n段号 1：段基址 = 3000，段限长 = 600\n段号 2：段基址 = 5000，段限长 = 500\n\n逻辑地址：\n段号 = 2，段内偏移 = 100\n\n推演步骤：\n步骤1：用段号 2 查段表 → 段表[2]: 段基址 = 5000，段限长 = 500\n步骤2：越界检查 → 段内偏移 100 < 段限长 500，未越界，地址合法\n步骤3：计算物理地址 → 物理地址 = 段基址 + 段内偏移 = 5000 + 100 = 5100",
         "language": "推演草稿",
@@ -1003,7 +1033,7 @@
         "answerIndexes": [],
         "answer": "物理地址 = 5100，地址合法（未越界）",
         "feedback": "分段管理中逻辑地址由段号和段内偏移组成（知识切片 cs102_k20）。地址转换时先用段号查段表得到段基址和段限长，再检查段内偏移是否越界，最后将段基址与段内偏移相加得到物理地址。若段内偏移超过段限长则触发越界异常（保护违例）。段表项中包含段基址和段限长是分段区别于分页的重要特征（知识切片 cs102_k22），分段便于实现段的共享和保护",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k20、cs102_k23\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k20、cs102_k23"
       }
     ]
   },
@@ -1034,6 +1064,7 @@
         "id": "cs102-文件系统-1",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "文件组织",
         "prompt": "FAT 文件系统使用链式分配，以下代码模拟通过 FAT 表读取文件第 n 个数据块的过程，请填写空缺部分",
         "content": "代码：\n// FAT 表：fat[i] 存储簇 i 的下一个簇号，0xFFFF 表示文件结束\n// start_cluster: 文件起始簇号，n: 要读取的逻辑块号（从0开始）\n// 返回第 n 个数据块的物理簇号\nint read_fat_block(unsigned short fat[], int start_cluster, int n) {\n    int current = start_cluster;\n    for (int i = 0; i < n; i++) {\n        if (current == 0xFFFF) {\n            return -1;  // 文件结束，块号超出范围\n        }\n        current = ________;  // 填空：沿 FAT 链前进到下一个簇\n    }\n    return current;\n}",
         "language": "代码阅读",
@@ -1048,6 +1079,7 @@
         "id": "cs102-文件系统-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "文件组织",
         "prompt": "日志文件系统（如 ext3/ext4）在执行一次文件写操作时，为保证崩溃一致性，需按特定顺序执行步骤。请将以下步骤排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1070,7 +1102,7 @@
         ],
         "answer": "B → D → E → A → F → C",
         "feedback": "日志文件系统的核心是预写日志（WAL）原则（知识切片 cs102_k28）：元数据修改必须先写入日志区域并提交（步骤 D → E），然后才能写入实际位置（步骤 A），最后标记日志记录可回收（步骤 F）。如果系统在步骤 A 之前崩溃，重启时重放已提交的日志（步骤 C）恢复到一致状态。这保证了\"要么操作完全完成，要么完全未执行\"的原子性。ext3/ext4 支持 journal、ordered、writeback 三种日志模式，权衡性能与可靠性",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k28\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k28"
       }
     ]
   },
@@ -1101,6 +1133,7 @@
         "id": "cs102-I/O系统与磁盘调度-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "I/O调度",
         "prompt": "磁头当前位置 = 50，移动方向 = 向高磁道。请求队列：25, 80, 120, 10, 180。采用 C-SCAN（循环扫描）算法，磁道范围 0-199。请推演磁头移动序列并计算总寻道距离",
         "content": "推演过程：\n向高方向服务（按升序）：50 → 80(30) → 120(40) → 180(60)\n到达最高请求 180 后，C-SCAN 继续到边缘 199(19)，然后快速返回到起始端 0(199)\n从 0 继续向高方向服务剩余请求（按升序）：0 → 10(10) → 25(15)",
         "language": "推演草稿",
@@ -1115,6 +1148,7 @@
         "id": "cs102-I/O系统与磁盘调度-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "I/O调度",
         "prompt": "DMA（直接存储器访问）方式完成一次磁盘数据传输的完整流程。请将以下步骤排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1137,7 +1171,7 @@
         ],
         "answer": "B → E → A → C → F → D",
         "feedback": "DMA 传输流程（知识切片 cs102_k31）：CPU 先初始化 DMA 参数（步骤 B），包括源地址、目的地址和传输长度，然后发出 I/O 命令让 DMA 控制器接管总线（步骤 E）。DMA 控制器在设备与内存间直接传输数据，CPU 无需逐字节参与可执行其他任务（步骤 A）。传输完成后（步骤 C），DMA 控制器通过中断通知 CPU（步骤 F），CPU 响应中断处理后续逻辑（步骤 D）。与中断驱动 I/O 每传输一个字节中断一次相比，DMA 以块为单位传输，大幅减少中断次数和 CPU 开销",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k31\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k31"
       }
     ]
   },
@@ -1168,6 +1202,7 @@
         "id": "cs102-死锁-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "死锁分析",
         "prompt": "基于上述银行家算法示例的初始状态，进程 P1 发起资源请求 Request(P1) = [1, 0]。请推演分配后的安全性检查结果，判断是否允许分配",
         "content": "初始状态：\nAvailable = [1, 2]，Allocation(P1) = [1, 1]，Need(P1) = [2, 1]\n\n推演步骤：\n步骤1：检查 Request <= Need(P1) → [1,0] <= [2,1]？是，请求合法\n步骤2：检查 Request <= Available → [1,0] <= [1,2]？是，资源充足\n步骤3：试探性分配 → Available = [1,2]-[1,0] = [0,2]；Allocation(P1) = [1,1]+[1,0] = [2,1]；Need(P1) = [2,1]-[1,0] = [1,1]\n步骤4：安全性检查 → Available=[0,2]。P0 Need=[2,2]：2<=0？否。P1 Need=[1,1]：1<=0？否。P2 Need=[1,2]：1<=0？否。没有任何进程能完成！",
         "language": "推演草稿",
@@ -1182,6 +1217,7 @@
         "id": "cs102-死锁-2",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "死锁分析",
         "prompt": "以下代码用深度优先搜索（DFS）检测资源分配图中是否存在环路（即循环等待条件），从而判断是否可能死锁。请填写空缺部分",
         "content": "代码：\n// graph[N][N]: 邻接矩阵，graph[i][j]=1 表示进程 i 等待进程 j 持有的资源\n// visited[N]: 全局访问标记，rec_stack[N]: 当前递归路径栈\nbool dfs_cycle(int graph[N][N], int v, bool visited[], bool rec_stack[]) {\n    visited[v] = true;\n    rec_stack[v] = true;  // 将当前节点压入递归栈\n\n    for (int i = 0; i < N; i++) {\n        if (graph[v][i]) {\n            if (!visited[i]) {\n                if (dfs_cycle(graph, i, visited, ________))  // 填空：递归检测\n                    return true;\n            } else if (________) {  // 填空：节点已在当前路径上，发现环\n                return true;\n            }\n        }\n    }\n    rec_stack[v] = false;  // 回溯，将当前节点移出递归栈\n    return false;\n}",
         "language": "代码阅读",
@@ -1190,7 +1226,7 @@
         "answerIndexes": [],
         "answer": "填空1 为 rec_stack；填空2 为 rec_stack[i]",
         "feedback": "检测环路是死锁检测的核心方法（知识切片 cs102_k38）。填空1 递归调用时传入 rec_stack 维护当前路径。填空2 检查邻接节点 i 是否已在当前递归路径上（rec_stack[i]==true），若是则存在从 i 到 v 再回 i 的环路，即循环等待条件成立。注意区分 visited（是否曾访问过）和 rec_stack（是否在当前路径上）：一个节点可能被访问过但不在当前路径中，此时不构成环。死锁四条件中循环等待是图论判定依据（知识切片 cs102_k34），资源分配图无环路则一定无死锁",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k34、cs102_k38\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k34、cs102_k38"
       }
     ]
   },
@@ -1221,6 +1257,7 @@
         "id": "cs102-同步与互斥-1",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "并发同步",
         "prompt": "以下生产者代码存在 P 操作顺序错误。当缓冲区已满（empty=0, full=N）时，预测程序运行结果",
         "content": "代码：\n// 缓冲区大小 N=2，初始 mutex=1, empty=2, full=0\n// 生产者代码（存在错误）\nvoid producer() {\n    while (true) {\n        produce_item();\n        P(mutex);    // 错误：先获取互斥锁\n        P(empty);    // 再获取空位信号量\n        put_item();\n        V(mutex);\n        V(full);\n    }\n}",
         "language": "推演草稿",
@@ -1235,6 +1272,7 @@
         "id": "cs102-同步与互斥-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "并发同步",
         "prompt": "条件变量配合互斥锁实现\"等待条件成立\"的正确流程。请将以下步骤排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1259,7 +1297,7 @@
         ],
         "answer": "B → F → D → E → A → C → G",
         "feedback": "条件变量的标准使用模式（知识切片 cs102_k41）：线程先获取互斥锁（步骤 B），在持有锁的状态下检查条件（步骤 F）。若条件不满足则调用 wait 操作释放锁并阻塞（步骤 D）。另一线程修改共享状态后调用 signal/broadcast 唤醒等待者（步骤 E）。被唤醒的线程重新获取互斥锁（步骤 A），再次检查条件防止虚假唤醒（步骤 C）。条件满足后执行后续逻辑并释放锁（步骤 G）。知识切片 cs102_k41 强调\"wait操作通常放在while循环中\"以处理虚假唤醒——即使被唤醒，条件也可能已被其他线程改变，必须重新检查",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k41\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k41"
       }
     ]
   },
@@ -1290,6 +1328,7 @@
         "id": "cs102-进程间通信-1",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "IPC机制",
         "prompt": "以下代码实现父子进程通过匿名管道通信：子进程写入消息，父进程读取消息。请填写空缺部分",
         "content": "代码：\n#include <unistd.h>\nint fd[2];\npipe(fd);  // fd[0] = 读端, fd[1] = 写端\n\nif (fork() == 0) {\n    // 子进程：写入数据\n    close(fd[0]);  // 关闭不使用的读端\n    char msg[] = \"hello parent\";\n    ________;  // 填空：通过管道写端写入消息\n    close(fd[1]);\n} else {\n    // 父进程：读取数据\n    close(fd[1]);  // 关闭不使用的写端\n    char buf[64];\n    read(fd[0], buf, sizeof(buf));\n    printf(\"received: %s\\n\", buf);\n    close(fd[0]);\n}",
         "language": "代码阅读",
@@ -1304,6 +1343,7 @@
         "id": "cs102-进程间通信-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "IPC机制",
         "prompt": "Socket 网络通信中服务器端从创建套接字到关闭连接的完整流程。请将以下步骤排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1328,7 +1368,7 @@
         ],
         "answer": "B → C → E → A → G → F → D",
         "feedback": "Socket 服务器端通信流程（知识切片 cs102_k48）：先创建套接字（步骤 B），再绑定地址和端口（步骤 C），然后开始监听（步骤 E），接着调用 accept 等待客户端连接（步骤 A）。客户端调用 connect 发起连接（步骤 G），accept 返回后连接建立。双方通过新套接字进行数据通信（步骤 F），通信结束后关闭套接字（步骤 D）。知识切片 cs102_k48 指出 Socket \"通过IP地址和端口号标识通信端点，支持TCP（面向连接、可靠传输）和UDP（无连接、不可靠但高效）\"。Socket 是唯一支持跨网络通信的 IPC 机制，而管道、消息队列、共享内存仅限同一主机",
-        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k48\n\n---"
+        "source": "操作系统概念（Silberschatz）；知识切片 cs102_k48"
       }
     ]
   },
@@ -1358,6 +1398,7 @@
         "id": "cs103-OSI与TCP/IP模型-1",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "网络分层",
         "prompt": "以下是在TCP/IP模型中，发送端从应用层数据到物理层比特流的封装过程。请将打乱的步骤排列为正确的封装顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1384,15 +1425,16 @@
         "id": "cs103-OSI与TCP/IP模型-2",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "网络分层",
         "prompt": "一个DNS查询消息从应用层发出，依次经过TCP/IP模型的各层。请推演该消息在每一层的协议数据单元（PDU）类型变化",
         "content": "初始状态：\n应用层已生成DNS查询消息，PDU为Message\n\n操作序列：\n1. 传输层处理：添加UDP首部（8字节，含源端口、目的端口53）\n  2. 网络层处理：添加IP首部（20字节，含源IP、目的IP）\n  3. 数据链路层处理：添加以太网帧首部和FCS帧尾\n  4. 物理层处理：转换为比特流在线路上传输\n\n推演过程：\n操作1后：PDU从 Message 变为 Segment（报文段）\n操作2后：PDU从 Segment 变为 Datagram（数据报）\n操作3后：PDU从 Datagram 变为 Frame（数据帧）\n操作4后：PDU从 Frame 变为 Bit（比特流）\n\n最终状态：\n到达物理层时PDU为Bit（比特流），接收端将逆向从Bit逐层还原为Message",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "Message → Segment → Datagram → Frame → Bit；最终为 Bit（比特流）",
         "feedback": "OSI各层PDU依次为：物理层-Bit、数据链路层-Frame、网络层-Packet(Datagram)、传输层-Segment、应用层-Message。DNS使用UDP而非TCP，因此传输层PDU虽为报文段但承载的是UDP报文。注意TCP/IP模型将OSI上三层合并为应用层，但PDU名称仍沿用OSI定义。这与知识切片 cs103_k03 和 cs103_k04 中PDU通过封装保持独立性的描述一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k03、cs103_k04\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k03、cs103_k04"
       }
     ]
   },
@@ -1422,13 +1464,14 @@
         "id": "cs103-物理层与数据链路层-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "链路层机制",
         "prompt": "一台交换机有3个端口，初始MAC地址表为空。端口1连PC1(MAC=11)，端口2连PC2(MAC=22)，端口3连PC3(MAC=33)。请推演以下操作序列后交换机MAC地址表的内容",
         "content": "初始状态：\nMAC地址表为空\n\n操作序列：\n1. PC1发送帧给PC3 → 交换机从端口1收帧，学习(11, 端口1)；表中无33，泛洪到端口2和端口3\n  2. PC3回复帧给PC1 → 交换机从端口3收帧，学习(33, 端口3)；表中有11(端口1)，从端口1单播转发\n  3. PC2发送帧给PC1 → 交换机从端口2收帧，学习(22, 端口2)；表中有11(端口1)，从端口1单播转发\n\n最终状态：\nMAC地址表包含3条记录：(11, 端口1)、(33, 端口3)、(22, 端口2)。此时三台主机互相通信均可查表单播转发，无需泛洪",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "(11, 端口1)、(33, 端口3)、(22, 端口2)",
         "feedback": "交换机每次收到帧都执行两个动作：先学习源MAC与入端口的映射，再查表转发目的MAC。第一次通信时目的MAC不在表中，触发泛洪使帧到达所有端口；目标主机回复后其MAC也被学习，后续通信即可精确转发。交换机每个端口是独立冲突域，全双工模式下无冲突。这与知识切片 cs103_k07 所述\"地址学习\"和\"查表转发\"机制一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k07"
       },
@@ -1436,6 +1479,7 @@
         "id": "cs103-物理层与数据链路层-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "链路层机制",
         "prompt": "以下是以太网CSMA/CD协议在节点发送数据时的工作流程。请将打乱的步骤排列为正确的执行顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1454,7 +1498,7 @@
         ],
         "answer": "C → A → D → B",
         "feedback": "CSMA/CD的四个阶段按时间顺序为：先听后发（载波监听）→ 边发边听（冲突检测）→ 冲突停发（发送Jam信号）→ 随机重发（二进制指数退避）。第n次冲突后从0到2^k-1中随机选择等待时间（k=min(n,10)）。冲突检测要求帧发送时间大于信号往返传播时间，因此以太网规定最小帧长64字节。现代交换式以太网全双工模式下不存在冲突，CSMA/CD已不再需要。这与知识切片 cs103_k06 所述工作流程一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；IEEE 802.3标准；知识切片 cs103_k06\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；IEEE 802.3标准；知识切片 cs103_k06"
       }
     ]
   },
@@ -1484,6 +1528,7 @@
         "id": "cs103-网络层与IP协议-1",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "IP寻址",
         "prompt": "以下Python代码通过IP地址和子网掩码计算网络地址。请填空使计算正确",
         "content": "代码：\nip = [192, 168, 1, 130]\nmask = [255, 255, 255, 192]\nnetwork = []\nfor i in range(4):\n    network.append(__________)  # 填入计算网络地址的表达式\nprint(\"网络地址:\", \".\".join(map(str, network)))",
         "language": "代码阅读",
@@ -1498,6 +1543,7 @@
         "id": "cs103-网络层与IP协议-2",
         "type": "output_predict",
         "title": "输出预测",
+        "focusTag": "IP寻址",
         "prompt": "路由器的路由表中有以下4条路由条目，目的地址为10.1.2.5的IP数据报到达后，路由器将选择哪个下一跳转发？请预测结果",
         "content": "路由表内容：\n目的网络          前缀长度  下一跳\n10.0.0.0/8       /8       R1\n10.1.0.0/16      /16      R2\n10.1.2.0/24      /24      R3\n0.0.0.0/0        /0       R4（默认路由）\n\n预测内容：\n目的地址10.1.2.5同时匹配4条路由（/8、/16、/24、/0），路由器按最长前缀匹配原则选择前缀最长的条目",
         "language": "推演草稿",
@@ -1506,7 +1552,7 @@
         "answerIndexes": [],
         "answer": "选择R3（10.1.2.0/24），因为/24前缀长度最长（最具体），匹配最精确",
         "feedback": "最长前缀匹配原则要求当多条路由都匹配目标地址时，选择前缀最长（最具体）的路由条目。10.1.2.5匹配/8（10.x.x.x）、/16（10.1.x.x）、/24（10.1.2.x）和/0（任意），其中/24前缀长度24最长，因此选R3。默认路由0.0.0.0/0前缀长度为0，是最后兜底选择。CIDR通过最长前缀匹配实现了路由聚合与精确路由的共存。这与知识切片 cs103_k11 所述\"路由器选择前缀最长（最具体）的路由\"一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 4632（CIDR）；知识切片 cs103_k11\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 4632（CIDR）；知识切片 cs103_k11"
       }
     ]
   },
@@ -1536,13 +1582,14 @@
         "id": "cs103-TCP流量控制与拥塞控制-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "拥塞控制",
         "prompt": "一个TCP连接初始cwnd=1，ssthresh=16。请推演以下操作序列后cwnd和ssthresh的最终值",
         "content": "初始状态：\ncwnd=1, ssthresh=16\n\n操作序列：\n1. 经过4个RTT的慢启动（cwnd每RTT翻倍）→ cwnd从1经2、4、8变为16，达到ssthresh\n  2. 进入拥塞避免，经过2个RTT线性增长 → cwnd从16变为17，再变为18\n  3. 收到3个重复ACK，触发快重传和快恢复 → ssthresh=floor(18/2)=9，cwnd=ssthresh=9\n  4. 继续拥塞避免1个RTT → cwnd从9变为10\n\n推演过程：\n操作1后：cwnd=16, ssthresh=16（慢启动阶段指数增长，4个RTT：1→2→4→8→16）\n操作2后：cwnd=18, ssthresh=16（拥塞避免线性增长，每RTT加1）\n操作3后：cwnd=9, ssthresh=9（快恢复：ssthresh=cwnd/2=9，cwnd=ssthresh=9，不归1）\n操作4后：cwnd=10, ssthresh=9（拥塞避免线性增长1个RTT）\n\n最终状态：\ncwnd=10, ssthresh=9",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "cwnd=10，ssthresh=9",
         "feedback": "慢启动阶段cwnd每RTT翻倍（指数增长），4个RTT后从1增长到16。达到ssthresh后切换为拥塞避免，每RTT仅加1（线性增长）。收到3个重复ACK触发快重传：ssthresh降为当前cwnd的一半（9），cwnd也设为ssthresh值（9），不重置为1——这是因为3个重复ACK说明网络仍能传输报文段，丢包可能只是偶然。这与知识切片 cs103_k20、cs103_k23 所述慢启动、快恢复机制一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k23"
       },
@@ -1550,6 +1597,7 @@
         "id": "cs103-TCP流量控制与拥塞控制-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "拥塞控制",
         "prompt": "以下是TCP Reno拥塞控制从连接建立到遇到3个重复ACK的各阶段。请将打乱的步骤排列为正确的时间顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1568,7 +1616,7 @@
         ],
         "answer": "B → C → A → D",
         "feedback": "TCP Reno拥塞控制的时间线为：连接建立时cwnd=1进入慢启动（B），指数增长快速探测带宽；cwnd达到ssthresh后切换到拥塞避免（C），线性增长温和试探；收到3个重复ACK触发快重传和快恢复（A），ssthresh减半但cwnd不归1；快恢复后继续拥塞避免的线性增长（D）。若发生超时而非3个重复ACK，则cwnd重置为1重新慢启动，这是TCP Tahoe与Reno的关键区别。这与知识切片 cs103_k20、cs103_k21、cs103_k23 所述四阶段算法一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k21、cs103_k23\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k21、cs103_k23"
       }
     ]
   },
@@ -1598,6 +1646,7 @@
         "id": "cs103-UDP协议-1",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "UDP机制",
         "prompt": "以下Python代码解析接收到的UDP报文首部并验证长度字段。请填空使长度验证逻辑正确",
         "content": "代码：\nimport struct\n\n# udp_packet为接收到的完整UDP报文（首部+数据）\nudp_header = udp_packet[:8]   # 提取前8字节首部\nudp_data = udp_packet[8:]     # 提取数据部分\n\n# 解包首部4个字段（均为2字节无符号整数，网络字节序）\nsrc_port, dst_port, length, checksum = struct.unpack('!HHHH', udp_header)\n\n# 验证长度字段：应等于首部长度与数据长度之和\nexpected_length = ____________  # 填入正确的长度计算表达式\nif length != expected_length:\n    print(\"UDP长度校验失败: 声明={}, 实际={}\".format(length, expected_length))\nelse:\n    print(\"UDP长度校验通过, 目的端口={}\".format(dst_port))",
         "language": "代码阅读",
@@ -1612,15 +1661,16 @@
         "id": "cs103-UDP协议-2",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "UDP机制",
         "prompt": "发送方依次通过UDP发送3个数据报D1、D2、D3，接收方无序号确认和重传机制。请推演以下网络传输操作后接收方的最终状态",
         "content": "初始状态：\n发送方队列中有D1、D2、D3三个UDP数据报待发送，接收方缓存为空\n\n操作序列：\n1. D1正常到达接收方 → 接收方收到D1，缓存中有[D1]\n  2. D2在网络中因拥塞被丢弃 → 接收方未收到D2，发送方不知道丢包（UDP无确认和重传机制）\n  3. D3经过不同路径先到达 → 接收方收到D3，缓存中有[D1, D3]（乱序到达，UDP不保证有序）\n  4. 等待超时，D2始终未到达 → 接收方最终持有D1和D3，D2永久丢失\n\n推演过程：\n操作1后：接收方缓存 = [D1]（正常到达）\n操作2后：接收方缓存 = [D1]（D2丢失，无反馈机制）\n操作3后：接收方缓存 = [D1, D3]（D3乱序到达，无排序机制）\n操作4后：接收方缓存 = [D1, D3]（D2永久丢失，应用层需自行处理）\n\n最终状态：\n接收方持有D1和D3，缺失D2，且到达顺序为D1→D3（乱序）。与TCP不同，UDP不保证可靠交付、不保证顺序、不重传丢失数据",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "接收方缓存为 [D1, D3]，D2 丢失且不会由 UDP 重传",
         "feedback": "UDP不提供流量控制、拥塞控制、重传和序号机制，数据报可能丢失、重复或乱序到达。D2丢失后发送方无感知，D3乱序到达后接收方不重排——可靠性需由应用层自行保障。例如QUIC协议在UDP之上实现了可靠传输和前向纠错。这与知识切片 cs103_k24 所述\"数据报可能丢失、重复或乱序到达，可靠性需要由应用层自行保障\"一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 768（UDP）；知识切片 cs103_k24、cs103_k27\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 768（UDP）；知识切片 cs103_k24、cs103_k27"
       }
     ]
   },
@@ -1651,6 +1701,7 @@
         "id": "cs103-HTTPS与TLS-1",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "TLS安全",
         "prompt": "以下是TLS 1.2握手建立加密通道的主要步骤。请将打乱的步骤排列为正确的时间顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1675,15 +1726,16 @@
         "id": "cs103-HTTPS与TLS-2",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "TLS安全",
         "prompt": "客户端访问https://shop.example.com，服务器返回的证书链包含：终端证书（shop.example.com）→ 中间CA证书 → 根CA证书。请推演证书链验证的全过程及最终结果",
         "content": "初始状态：\n客户端收到3级证书链，本地信任库中预装有根CA证书\n\n操作序列：\n1. 验证终端证书签名 → 用中间CA证书中的公钥验证终端证书的签名，签名验证通过\n  2. 验证中间CA证书签名 → 用根CA证书中的公钥验证中间CA证书的签名，签名验证通过\n  3. 验证根CA证书 → 根CA证书是自签名的，且已预装在本地信任库中（信任锚），验证通过\n  4. 检查域名匹配 → 终端证书的SAN（Subject Alternative Name）字段包含shop.example.com，与访问域名匹配\n  5. 检查有效期和吊销状态 → 所有证书均在有效期内，OCSP查询未发现任何证书被吊销\n\n推演过程：\n操作1-3后：签名链验证全部通过，信任链从终端证书经中间CA到达根CA信任锚\n操作4后：域名匹配验证通过，确认证书属于目标服务器\n操作5后：有效期和吊销状态均正常\n\n最终状态：\n证书链验证全部通过，客户端信任服务器身份，继续进行密钥交换。若任何一步失败（签名不匹配、域名不匹配、过期或被吊销），客户端将中止连接并警告用户",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "签名链、域名、有效期和吊销状态均通过，客户端继续密钥交换",
         "feedback": "证书链验证从终端证书开始逐级向上验证签名，直到到达预装在信任库中的根CA。验证内容包括：签名正确性（上级CA私钥签发）、有效期、域名匹配（SAN/CN字段）和吊销状态（CRL/OCSP）。根CA自签名且预装在系统或浏览器中，不需要在网络中传输。这与知识切片 cs103_k33 所述\"从终端证书开始逐级向上验证签名，直到到达信任的根CA\"一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5280（X.509证书）；知识切片 cs103_k33\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5280（X.509证书）；知识切片 cs103_k33"
       }
     ]
   },
@@ -1714,6 +1766,7 @@
         "id": "cs103-DNS系统-1",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "DNS解析",
         "prompt": "以下是客户端解析www.example.com时，本地DNS服务器完成的迭代查询过程。请将打乱的步骤排列为正确的执行顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1740,6 +1793,7 @@
         "id": "cs103-DNS系统-2",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "DNS解析",
         "prompt": "以下是example.com的DNS区域文件片段。www主机需要直接映射到IPv4地址，请填入正确的资源记录类型",
         "content": "代码：\n; example.com 区域文件\nexample.com.    IN  SOA   ns1.example.com. admin.example.com. (\n                        2026010101 ; 序列号\n                        3600       ; 刷新间隔\n                        1800       ; 重试间隔\n                        604800     ; 过期时间\n                        86400 )    ; 默认TTL\n\nwww             IN  ____    93.184.216.34    ; 填入正确的记录类型\nmail            IN  MX      10 mail.example.com.\nns1             IN  A       192.168.1.1\nexample.com.    IN  NS      ns1.example.com.",
         "language": "代码阅读",
@@ -1748,7 +1802,7 @@
         "answerIndexes": [],
         "answer": "A",
         "feedback": "A记录将域名映射到IPv4地址。www主机需要直接映射到IPv4地址93.184.216.34，因此使用A记录。MX用于指定邮件交换服务器及优先级，SOA用于区域起始授权信息，NS用于指定权威域名服务器，CNAME用于设置域名别名（指向另一个域名而非IP）。若www需要映射IPv6地址则使用AAAA记录。这与知识切片 cs103_k39 所述\"A记录将域名映射到IPv4地址\"一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 1035（DNS实现与规格）；知识切片 cs103_k39\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 1035（DNS实现与规格）；知识切片 cs103_k39"
       }
     ]
   },
@@ -1778,13 +1832,14 @@
         "id": "cs103-路由算法与协议-1",
         "type": "state_trace",
         "title": "状态推演",
+        "focusTag": "路由决策",
         "prompt": "路由器R1运行RIP协议（度量值为跳数），初始路由表如下。R2向R1发送了距离向量更新。请推演R1更新后的路由表",
         "content": "初始状态：\nR1路由表：N1(距离0, 直连)、N2(距离2, 经R2)、N3(距离4, 经R3)。R2到各网段的距离：N1=1, N2=0, N3=1\n\n操作序列：\n1. R1收到R2的距离向量更新（R2到N1=1, N2=0, N3=1）\n  2. 对N1：原距离0（直连）vs R2通告1+1=2，0 < 2，保持不变\n  3. 对N2：原距离2（经R2）vs R2通告0+1=1，1 < 2，更新为距离1（经R2）\n  4. 对N3：原距离4（经R3）vs R2通告1+1=2，2 < 4，更新为距离2（经R2）\n\n推演过程：\n操作2后：N1=0(直连)，保持不变（直连距离0最优）\n操作3后：N2=1(经R2)，从2更新为1（R2是N2的直连网段，经R2只需1跳）\n操作4后：N3=2(经R2)，从4更新为2（经R2到N3只需2跳，比经R3的4跳更短）\n\n最终状态：\nR1路由表为：N1=0(直连)、N2=1(经R2)、N3=2(经R2)。Bellman-Ford方程：新距离=min(原距离, 邻居到目标距离+到邻居距离)",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "N1=0（直连）、N2=1（经R2）、N3=2（经R2）",
         "feedback": "距离向量算法使用Bellman-Ford方程更新路由：D(x,y)=min(D(x,y), D(x,v)+D(v,y))。R1收到R2的距离向量后，对每个目的网络比较原路径和新路径（经R2）的距离，取较小值。N1直连最优不更新，N2和N3经R2更短故更新。RIP每30秒交换距离向量，最大15跳限制防止计数到无穷。这与知识切片 cs103_k40、cs103_k41 所述Bellman-Ford方程和RIP机制一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k40、cs103_k41"
       },
@@ -1792,6 +1847,7 @@
         "id": "cs103-路由算法与协议-2",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "路由决策",
         "prompt": "以下是OSPF路由器从启动到计算出路由表的主要步骤。请将打乱的步骤排列为正确的执行顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1812,7 +1868,7 @@
         ],
         "answer": "B → A → D → E → C",
         "feedback": "OSPF建立邻接和计算路由的流程为：先通过Hello协议发现邻居建立邻接关系（B），再交换DBD了解对方LSDB摘要（A），然后通过LSR/LSU/LSAck完成LSDB的详细同步（D），LSA在全区域泛洪使所有路由器的LSDB一致（E），最后每台路由器独立运行Dijkstra算法基于完整的LSDB计算最短路径树生成路由表（C）。与距离向量算法不同，链路状态算法中每台路由器都拥有完整拓扑图，收敛速度快且无计数到无穷问题。这与知识切片 cs103_k42 所述\"通过Hello协议发现邻居、泛洪LSA同步LSDB、运行Dijkstra算法\"一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 2328（OSPF v2）；知识切片 cs103_k42\n\n---"
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 2328（OSPF v2）；知识切片 cs103_k42"
       }
     ]
   },
@@ -1843,6 +1899,7 @@
         "id": "cs103-网络安全基础-1",
         "type": "step_order",
         "title": "步骤排序",
+        "focusTag": "安全机制",
         "prompt": "以下是数字签名的生成与验证过程。请将打乱的步骤排列为正确的执行顺序",
         "content": "",
         "language": "步骤卡片",
@@ -1869,6 +1926,7 @@
         "id": "cs103-网络安全基础-2",
         "type": "code_fill",
         "title": "代码填空",
+        "focusTag": "安全机制",
         "prompt": "以下Python代码使用AES-GCM模式进行认证加密。GCM模式同时提供机密性和完整性验证。请填入正确的模式构造方法",
         "content": "代码：\nfrom cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes\nfrom cryptography.hazmat.backends import default_backend\nimport os\n\nkey = os.urandom(32)    # AES-256 密钥（32字节）\nnonce = os.urandom(12)  # GCM推荐12字节随机数\n\n# 使用AES-GCM认证加密模式\ncipher = Cipher(\n    algorithms.AES(key),\n    modes.____(nonce),   # 填入正确的GCM模式构造方法\n    backend=default_backend()\n)\n\nencryptor = cipher.encryptor()\nciphertext = encryptor.update(plaintext) + encryptor.finalize()\ntag = encryptor.tag      # GCM认证标签，用于完整性验证",
         "language": "代码阅读",

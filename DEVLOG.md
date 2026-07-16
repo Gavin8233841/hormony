@@ -6141,3 +6141,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次是文档接力批次，未重新运行 Web `pnpm lint/typecheck/test/build`。
 - 本批次未重新运行 HarmonyOS HAP 构建；沿用上一批 `Chat.ets` 静态诊断、HAP 构建、线上 Health/Chat SSE 与模拟器 fallback 证据。
 - 工作区仍保留 `.trae/progress.json` 和未跟踪本地资产；未执行清理、回滚、目录移动或删除。
+
+---
+
+## 2026-07-17 [WS03] Lesson 同标签测验与内容完整性契约
+
+背景：课程互动已有学伴和测验入口，但 `Lesson.ets` 把活动标题当作聚焦标签，未证明该值存在于同 Topic 题库；59 个活动中另有 6 个自由回答缺少标准答案，HTTP 分步示例含空白步骤，旧 7 个体验只显示模糊迁移来源。本批先修复内容单一来源与可达性契约，为后续课程 UI 闭环提供确定数据。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `docs/LEARNING-ACTIVITY-V2.md`
+- `scripts/generate-learning-activities.mjs`
+- `scripts/validate-topic-relations.py`
+- `scripts/test_validate_topic_relations.py`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+
+行为变化：
+- `LearningActivity` 新增必填 `focusTag`，生成脚本从同 Topic 题库首标签精确生成；Lesson 直接用该字段进入聚焦测验。
+- 首条演示路径 `cs101 / 数组与线性表` 的互动标签为 `线性表操作`，与同 Topic 精选题标签一致。
+- 6 个计算机网络自由回答补入规格中已有最终状态作为非空标准答案；HTTP 示例空白步骤被过滤。
+- 旧 7 个体验的来源改为对应教材与知识切片 ID，规格来源尾部 Markdown 分隔符不再进入产物。
+- Topic 校验新增 33 Topic Lesson experience、互动结构、答案、标签、知识切片、精选题和 Practice 可达性检查；新增 11 项回归单测。
+
+验证：
+- `node scripts/generate-learning-activities.mjs`：退出码 0，生成 33 个 experience、59 个活动。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts/test_validate_topic_relations.py`：退出码 0，11 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 全部通过，`ALL CHECKS PASSED`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 32 s 438 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 本批尚未安装到模拟器，课程点击路径、手机与平板布局均未验证。
+- 真机与线上聚焦测验请求未验证。

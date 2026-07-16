@@ -13,6 +13,12 @@ const knowledgePath = resolve(
   root,
   'apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json'
 );
+const quizzesPath = resolve(
+  root,
+  'apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json'
+);
+
+const LEGACY_MIGRATION_SOURCE = '现有主动学习体验，经 LearningActivity v2 迁移';
 
 const specFiles = [
   ['cs101', 'docs/ACTIVE-LEARNING-SPEC-CS101.md'],
@@ -27,6 +33,7 @@ function cleanMarkdown(value) {
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/^\s*-\s+/gm, '')
+    .replace(/^---\s*$/gm, '')
     .trim();
 }
 
@@ -77,6 +84,7 @@ function parseActivity(section, courseId, topic, index) {
   const entries = readEntries(section);
   const type = entryValue(entries, '类型');
   const prompt = entryValue(entries, '题目');
+  const answer = entryValue(entries, '答案');
   const feedback = entryValue(entries, '反馈');
   const source = entryValue(entries, '来源');
   if (!['code_fill', 'step_order', 'state_trace', 'output_predict'].includes(type)) {
@@ -84,6 +92,9 @@ function parseActivity(section, courseId, topic, index) {
   }
   if (prompt.length === 0 || feedback.length === 0 || source.length === 0) {
     throw new Error(`${courseId}/${topic}/练习${index} 缺少题目、反馈或来源`);
+  }
+  if (type !== 'step_order' && answer.length === 0) {
+    throw new Error(`${courseId}/${topic}/练习${index} 缺少标准答案`);
   }
 
   if (type === 'step_order') {
@@ -123,9 +134,79 @@ function parseActivity(section, courseId, topic, index) {
     interactionMode: 'free_response',
     options: [],
     answerIndexes: [],
-    answer: entryValue(entries, '答案'),
+    answer,
     feedback,
     source,
+  };
+}
+
+function topicKey(courseId, topic) {
+  return `${courseId}\u0000${topic}`;
+}
+
+function buildTopicFocusTags(quizzes) {
+  const tags = new Map();
+  for (const question of quizzes) {
+    const focusTag = question.tags?.[0]?.trim() ?? '';
+    const key = topicKey(question.courseId, question.topic);
+    if (focusTag.length === 0 || focusTag.length > 12) {
+      throw new Error(`${question.courseId}/${question.topic}/${question.id} 缺少 12 字以内的首标签`);
+    }
+    const previous = tags.get(key);
+    if (previous !== undefined && previous !== focusTag) {
+      throw new Error(`${question.courseId}/${question.topic} 的题库首标签不一致: ${previous} / ${focusTag}`);
+    }
+    tags.set(key, focusTag);
+  }
+  return tags;
+}
+
+function topicSource(knowledge, courseId, topic) {
+  const chunks = knowledge.filter((item) => item.courseId === courseId && item.topic === topic);
+  const sources = [...new Set(chunks.map((item) => item.source.trim()).filter(Boolean))];
+  const ids = chunks.map((item) => item.id);
+  if (sources.length === 0 || ids.length === 0) {
+    throw new Error(`${courseId}/${topic} 缺少可追溯知识切片来源`);
+  }
+  return `${sources.join('、')}；知识切片 ${ids.join('、')}`;
+}
+
+function normalizeExperience(item, focusTags, knowledge) {
+  const focusTag = focusTags.get(topicKey(item.courseId, item.topic));
+  if (focusTag === undefined) {
+    throw new Error(`${item.courseId}/${item.topic} 缺少同 Topic 题库标签`);
+  }
+  const workedExampleSteps = item.workedExampleSteps
+    .filter((step) => step.trim().length > 0);
+  if (workedExampleSteps.length === 0) {
+    throw new Error(`${item.courseId}/${item.topic} 缺少分步示例`);
+  }
+  const legacySource = topicSource(knowledge, item.courseId, item.topic);
+  return {
+    schemaVersion: item.schemaVersion,
+    courseId: item.courseId,
+    topic: item.topic,
+    visualTitle: item.visualTitle,
+    visualSteps: item.visualSteps,
+    caseTitle: item.caseTitle,
+    caseBody: item.caseBody,
+    workedExampleTitle: item.workedExampleTitle,
+    workedExampleSteps,
+    activities: item.activities.map((activity) => ({
+      id: activity.id,
+      type: activity.type,
+      title: activity.title,
+      focusTag,
+      prompt: activity.prompt,
+      content: activity.content,
+      language: activity.language,
+      interactionMode: activity.interactionMode,
+      options: activity.options,
+      answerIndexes: activity.answerIndexes,
+      answer: activity.answer,
+      feedback: activity.feedback,
+      source: activity.source === LEGACY_MIGRATION_SOURCE ? legacySource : activity.source,
+    })),
   };
 }
 
@@ -191,12 +272,15 @@ function migrateExistingExperience(item) {
       answerIndexes: [item.answerIndex],
       answer: item.options[item.answerIndex],
       feedback: item.explanation,
-      source: '现有主动学习体验，经 LearningActivity v2 迁移',
+      source: LEGACY_MIGRATION_SOURCE,
     }],
   };
 }
 
 const current = JSON.parse(readFileSync(outputPath, 'utf8'));
+const knowledge = JSON.parse(readFileSync(knowledgePath, 'utf8'));
+const quizzes = JSON.parse(readFileSync(quizzesPath, 'utf8'));
+const focusTags = buildTopicFocusTags(quizzes);
 const generated = specFiles.flatMap(([courseId, relativePath]) => parseSpec(courseId, relativePath));
 const generatedKeys = new Set(generated.map((item) => `${item.courseId}\u0000${item.topic}`));
 const existing = current
@@ -205,8 +289,7 @@ const existing = current
 if (existing.length !== 7) {
   throw new Error(`预期迁移 7 个既有体验，实际 ${existing.length} 个；请检查源数据状态`);
 }
-const all = [...existing, ...generated];
-const knowledge = JSON.parse(readFileSync(knowledgePath, 'utf8'));
+const all = [...existing, ...generated].map((item) => normalizeExperience(item, focusTags, knowledge));
 const expectedTopics = new Set(knowledge.map((item) => `${item.courseId}\u0000${item.topic}`));
 const actualTopics = new Set(all.map((item) => `${item.courseId}\u0000${item.topic}`));
 const activityCounts = { code_fill: 0, step_order: 0, state_trace: 0, output_predict: 0 };
