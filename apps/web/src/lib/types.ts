@@ -161,6 +161,7 @@ export interface AgentResult {
 export interface ChatRequest {
   userId: string;
   message: string;
+  startDate: string;
   history?: ChatMessage[];
   profile?: LearningProfileSnapshot;
   context?: {

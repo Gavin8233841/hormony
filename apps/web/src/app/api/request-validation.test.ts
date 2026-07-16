@@ -110,6 +110,12 @@ describe("API request validation", () => {
       code: "INPUT_REJECTED",
     },
     {
+      name: "chat invalid local start date",
+      handler: (request: Request) => postChat(request as NextRequest),
+      body: { message: "制定复习计划", startDate: "2026-7-17" },
+      code: "INVALID_START_DATE",
+    },
+    {
       name: "plan invalid duration",
       handler: postPlan,
       body: { goal: "复习数据结构", durationDays: 99 },
@@ -120,6 +126,18 @@ describe("API request validation", () => {
       handler: postPlan,
       body: { goal: "复习数据结构", dailyMinutes: 481 },
       code: "INVALID_DAILY_MINUTES",
+    },
+    {
+      name: "plan invalid local start date",
+      handler: postPlan,
+      body: { goal: "复习数据结构", startDate: "2026-02-29" },
+      code: "INVALID_START_DATE",
+    },
+    {
+      name: "plan non-string local start date",
+      handler: postPlan,
+      body: { goal: "复习数据结构", startDate: 20260717 },
+      code: "INVALID_START_DATE",
     },
     {
       name: "plan overlong goal",

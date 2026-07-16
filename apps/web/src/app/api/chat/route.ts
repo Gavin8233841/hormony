@@ -9,11 +9,12 @@
 import { NextRequest } from "next/server";
 import { orchestrateStream } from "@/lib/agents/orchestrator";
 import type { ChatMessage, ChatRequest, StreamEvent } from "@/lib/types";
-import { getModelRuntimeInfo } from "@/lib/agents/model";
+import { getModelRuntimeInfo, ModelCancelledError } from "@/lib/agents/model";
 import { validateUserInput } from "@/lib/agents/safety-agent";
 import { modelErrorResponse } from "@/lib/api-errors";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
 import {
+  readDateKey,
   readUserId,
   sanitizeLearningProfile,
   validationError,
@@ -23,6 +24,23 @@ import { isCourseId } from "@/lib/data";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+
+// 模型输出上限为 2048 tokens；最长 Tutor 流当前包含至多 12 个事件（含 3 条引用）。
+// 以下硬上限为协议与内存留出充足余量，同时约束异常编排的单事件、事件数和总字节数。
+const MAX_SSE_EVENT_BYTES = 64 * 1024;
+const MAX_SSE_TOTAL_BYTES = 512 * 1024;
+const MAX_SSE_EVENTS = 128;
+const OUTPUT_LIMIT_CODE = "OUTPUT_LIMIT_EXCEEDED";
+const OUTPUT_LIMIT_MESSAGE = "模型输出超过流式响应限制，请缩短问题后重试";
+
+class SseOutputLimitError extends Error {
+  readonly code = OUTPUT_LIMIT_CODE;
+
+  constructor() {
+    super(OUTPUT_LIMIT_MESSAGE);
+    this.name = "SseOutputLimitError";
+  }
+}
 
 export async function POST(req: NextRequest) {
   const parsed = await readJsonObject<Record<string, unknown>>(req);
@@ -54,6 +72,13 @@ export async function POST(req: NextRequest) {
 
   const userId = readUserId(body.userId);
   if (!userId.ok) return userId.response;
+  const startDate = readDateKey(
+    body.startDate,
+    new Date().toISOString().slice(0, 10),
+    "INVALID_START_DATE",
+    "startDate"
+  );
+  if (!startDate.ok) return startDate.response;
   const profile = sanitizeLearningProfile(body.profile);
   if (!profile.ok) return profile.response;
   const profileSafetyFlags = profile.value ? validateUserInput(profileSafetyText(profile.value)) : [];
@@ -89,6 +114,7 @@ export async function POST(req: NextRequest) {
   const chatRequest: ChatRequest = {
     userId: userId.value,
     message,
+    startDate: startDate.value,
     profile: profile.value,
     context: context.value,
     history: history.value,
@@ -97,6 +123,13 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
   const sse = (event: StreamEvent) =>
     encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+  const outputLimitErrorChunk = sse({
+    type: "error",
+    code: OUTPUT_LIMIT_CODE,
+    message: OUTPUT_LIMIT_MESSAGE,
+  });
+  const outputLimitDoneChunk = sse({ type: "done", sessionId: "error" });
+  const outputLimitTerminalBytes = outputLimitErrorChunk.byteLength + outputLimitDoneChunk.byteLength;
   const abortController = new AbortController();
 
   // 在建立 SSE 流之前，先探测编排是否能够正常产出首个事件：
@@ -106,6 +139,9 @@ export async function POST(req: NextRequest) {
   let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null;
   let primed = false;
   let orchestrateError: unknown = null;
+  let clientCancelled = false;
+  let emittedEventCount = 0;
+  let emittedBytes = 0;
 
   // definite assignment：在 new Promise 构造器内同步赋值
   let resolveFirst!: (chunk: Uint8Array) => void;
@@ -115,9 +151,36 @@ export async function POST(req: NextRequest) {
     rejectFirst = reject;
   });
 
+  const stopForClient = (reason?: unknown) => {
+    if (clientCancelled) return;
+    clientCancelled = true;
+    buffered.length = 0;
+    controllerRef = null;
+    const cancellationError = new ModelCancelledError();
+    if (orchestrateError === null) orchestrateError = cancellationError;
+    if (!abortController.signal.aborted) abortController.abort(reason);
+    if (!primed) rejectFirst(cancellationError);
+  };
+  const handleRequestAbort = () => stopForClient(req.signal.reason);
+  if (req.signal.aborted) handleRequestAbort();
+  else req.signal.addEventListener("abort", handleRequestAbort, { once: true });
+
   const emit = (event: StreamEvent) => {
-    if (orchestrateError) return;
+    if (orchestrateError || clientCancelled || abortController.signal.aborted) return;
     const chunk = sse(event);
+    const terminalEventReserve = event.type === "done" ? 0 : 2;
+    const terminalByteReserve = event.type === "done" ? 0 : outputLimitTerminalBytes;
+    if (
+      chunk.byteLength > MAX_SSE_EVENT_BYTES ||
+      emittedEventCount + 1 + terminalEventReserve > MAX_SSE_EVENTS ||
+      emittedBytes + chunk.byteLength + terminalByteReserve > MAX_SSE_TOTAL_BYTES
+    ) {
+      const limitError = new SseOutputLimitError();
+      abortController.abort(limitError);
+      throw limitError;
+    }
+    emittedEventCount += 1;
+    emittedBytes += chunk.byteLength;
     if (!primed) {
       // 首个事件：解除对响应的等待，随后由流回放
       primed = true;
@@ -140,6 +203,8 @@ export async function POST(req: NextRequest) {
         // 流尚未建立即出错：触发 500 分支
         rejectFirst(err);
       }
+    } finally {
+      req.signal.removeEventListener("abort", handleRequestAbort);
     }
   })();
 
@@ -149,12 +214,30 @@ export async function POST(req: NextRequest) {
     firstChunk = await firstChunkPromise;
   } catch {
     // 编排在产出任何事件前失败 → 返回 HTTP 500
-    console.error(
-      "[chat] orchestrate error (pre-stream):",
-      orchestrateError instanceof Error ? orchestrateError.message : String(orchestrateError)
-    );
+    if (!clientCancelled) {
+      console.error(
+        "[chat] orchestrate error (pre-stream):",
+        orchestrateError instanceof Error ? orchestrateError.message : String(orchestrateError)
+      );
+    }
     return modelErrorResponse(orchestrateError);
   }
+
+  const enqueueErrorAndDone = (
+    controller: ReadableStreamDefaultController<Uint8Array>,
+    event: Extract<StreamEvent, { type: "error" }>
+  ) => {
+    let errorChunk = sse(event);
+    const fitsLimits =
+      errorChunk.byteLength <= MAX_SSE_EVENT_BYTES &&
+      emittedEventCount + 2 <= MAX_SSE_EVENTS &&
+      emittedBytes + errorChunk.byteLength + outputLimitDoneChunk.byteLength <= MAX_SSE_TOTAL_BYTES;
+    if (!fitsLimits) errorChunk = outputLimitErrorChunk;
+    controller.enqueue(errorChunk);
+    controller.enqueue(outputLimitDoneChunk);
+    emittedEventCount += 2;
+    emittedBytes += errorChunk.byteLength + outputLimitDoneChunk.byteLength;
+  };
 
   // 首个事件已就绪，建立 SSE 流（HTTP 200）
   const stream = new ReadableStream<Uint8Array>({
@@ -172,7 +255,7 @@ export async function POST(req: NextRequest) {
         // 等待编排完成，期间 emit 会直接写入 controller
         await orchestratePromise;
 
-        if (orchestrateError) {
+        if (orchestrateError && !clientCancelled) {
           // 流中错误：HTTP 状态已固化为 200，通过 SSE 事件通知客户端
           const errDetail = orchestrateError instanceof Error
             ? orchestrateError.message
@@ -187,11 +270,14 @@ export async function POST(req: NextRequest) {
               ? "模型返回内容无效，请重新生成"
               : errCode === "KNOWLEDGE_UNAVAILABLE"
                 ? "当前主题缺少课程资料，请换一个主题重试"
+                : errCode === OUTPUT_LIMIT_CODE
+                  ? OUTPUT_LIMIT_MESSAGE
               : "服务处理异常，请稍后重试";
-          controller.enqueue(
-            sse({ type: "error", code: errCode, message: userMessage })
-          );
-          controller.enqueue(sse({ type: "done", sessionId: "error" }));
+          enqueueErrorAndDone(controller, {
+            type: "error",
+            code: errCode,
+            message: userMessage,
+          });
           console.error(
             "[chat] orchestrate error (mid-stream):",
             errDetail
@@ -199,7 +285,9 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         // 流被取消或写入失败：记录日志，不向客户端泄露细节
-        console.error("[chat] stream write error:", err instanceof Error ? err.message : String(err));
+        if (!clientCancelled) {
+          console.error("[chat] stream write error:", err instanceof Error ? err.message : String(err));
+        }
       } finally {
         controllerRef = null;
         try {
@@ -209,10 +297,9 @@ export async function POST(req: NextRequest) {
         }
       }
     },
-    cancel() {
+    cancel(reason) {
       // 客户端断开连接：停止向 controller 写入，避免在已取消的流上抛错
-      abortController.abort();
-      controllerRef = null;
+      stopForClient(reason);
     },
   });
 

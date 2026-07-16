@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CalendarDays, Loader2, CheckCircle2, Clock, Circle } from "lucide-react";
 import type { PlanTask, StudyPlan } from "@/lib/types";
 import { requestJson, getErrorMessage, isNotFound, isEndpointDisabled } from "@/lib/client-api";
+import { localDateKey } from "@/lib/client-date";
 import { DeviceDataNotice } from "@/components/device-data-notice";
 
 export default function PlanPage() {
@@ -71,6 +72,7 @@ export default function PlanPage() {
           goal: goal.trim(),
           durationDays: days,
           dailyMinutes: minutes,
+          startDate: localDateKey(),
         }),
       });
       setTasks(plan.tasks ?? []);

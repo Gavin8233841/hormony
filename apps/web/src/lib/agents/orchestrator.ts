@@ -112,7 +112,15 @@ async function routeMainAgent(
     case "plan":
       emit?.({ type: "thinking", agent: "Planner" });
       mainResult = await (async () => {
-        const plan = await runPlannerAgent(req.userId, req.message, 14, 90, req.profile, signal);
+        const plan = await runPlannerAgent(
+          req.userId,
+          req.message,
+          14,
+          90,
+          req.startDate,
+          req.profile,
+          signal
+        );
         return {
           agent: "Planner" as const,
           content: isStream
