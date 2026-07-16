@@ -1,13 +1,23 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { AchievementProgress } from '../model/DataModels';
+import { AchievementProgress, Course, LessonExperience, StudyEvent } from '../model/DataModels';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+
+interface AchievementActionTarget {
+  course: Course;
+  topic: string;
+}
 
 @Entry
 @Component
 struct AchievementsPage {
   @State achievements: AchievementProgress[] = [];
+  @State courses: Course[] = [];
+  @State studyEvents: StudyEvent[] = [];
+  @State actionContextReady: boolean = false;
   @State loading: boolean = true;
   @State message: string = '';
 
@@ -16,13 +26,33 @@ struct AchievementsPage {
   }
 
   private async loadAchievements(): Promise<void> {
+    this.loading = true;
+    this.message = '';
+    this.actionContextReady = false;
     try {
       this.achievements = await LocalLearningRepository.getAchievements();
     } catch (error) {
-      this.message = '成就进度读取失败';
-    } finally {
+      this.achievements = [];
+      this.courses = [];
+      this.studyEvents = [];
+      this.message = '成就进度读取失败，请重新读取';
       this.loading = false;
+      return;
     }
+    try {
+      this.courses = await LocalLearningRepository.getCourses() ?? [];
+      this.studyEvents = await LocalLearningRepository.getStudyEvents();
+      if (this.courses.length === 0) {
+        this.message = '本地课程目录为空，请重新读取';
+      } else {
+        this.actionContextReady = true;
+      }
+    } catch (error) {
+      this.courses = [];
+      this.studyEvents = [];
+      this.message = '学习入口准备失败，请重新读取';
+    }
+    this.loading = false;
   }
 
   private isUnlocked(item: AchievementProgress): boolean {
@@ -33,23 +63,309 @@ struct AchievementsPage {
     return this.achievements.filter((item: AchievementProgress): boolean => this.isUnlocked(item)).length;
   }
 
-  private nextAchievementTitle(): string {
-    const item = this.achievements.find((achievement: AchievementProgress): boolean => !this.isUnlocked(achievement));
-    return item !== undefined ? item.title : '';
+  private completionRatio(item: AchievementProgress): number {
+    return Math.min(Math.max(item.current / Math.max(item.target, 1), 0), 1);
+  }
+
+  private remainingCount(item: AchievementProgress): number {
+    return Math.max(item.target - item.current, 0);
+  }
+
+  private nextAchievement(): AchievementProgress | null {
+    let next: AchievementProgress | null = null;
+    for (const item of this.achievements) {
+      if (this.isUnlocked(item)) continue;
+      if (next === null) {
+        next = item;
+        continue;
+      }
+      const remainingDelta = this.remainingCount(item) - this.remainingCount(next);
+      const ratioDelta = this.completionRatio(item) - this.completionRatio(next);
+      if (remainingDelta < 0 || (remainingDelta === 0 && ratioDelta > 0.001)) {
+        next = item;
+      }
+    }
+    return next;
+  }
+
+  private isNextAchievement(item: AchievementProgress): boolean {
+    return this.nextAchievement()?.id === item.id;
+  }
+
+  private activeCourse(): Course | null {
+    const storedCourseId = AppStorage.get<string>('selectedCourseId') ?? '';
+    const storedCourse = this.courses.find((item: Course): boolean => item.id === storedCourseId);
+    if (storedCourse !== undefined) return storedCourse;
+    let active: Course | null = null;
+    for (const course of this.courses) {
+      if (course.progress >= 1) continue;
+      if (active === null || course.progress > active.progress) active = course;
+    }
+    if (active !== null) return active;
+    return this.courses.length > 0 ? this.courses[0] : null;
+  }
+
+  private orderedCourses(): Course[] {
+    const active = this.activeCourse();
+    if (active === null) return [];
+    const ordered: Course[] = [active];
+    for (const course of this.courses) {
+      if (course.id !== active.id) ordered.push(course);
+    }
+    return ordered;
+  }
+
+  private orderedTopics(course: Course): string[] {
+    const topics = LearningContentRepository.getTopics(course.id);
+    const storedTopics: string[] = [
+      AppStorage.get<string>('selectedContentTopic') ?? '',
+      AppStorage.get<string>('selectedPracticeTopic') ?? '',
+      AppStorage.get<string>('selectedQuizTopic') ?? ''
+    ];
+    const ordered: string[] = [];
+    for (const topic of storedTopics) {
+      if (topics.includes(topic) && !ordered.includes(topic)) ordered.push(topic);
+    }
+    for (const topic of topics) {
+      if (!ordered.includes(topic)) ordered.push(topic);
+    }
+    return ordered;
+  }
+
+  private practiceTarget(): AchievementActionTarget | null {
+    for (const course of this.orderedCourses()) {
+      for (const topic of this.orderedTopics(course)) {
+        if (LearningContentRepository.getQuestions(course.id, topic).length > 0) {
+          return { course: course, topic: topic };
+        }
+      }
+    }
+    return null;
+  }
+
+  private activityCompleted(activityId: string): boolean {
+    return this.studyEvents.some((event: StudyEvent): boolean =>
+      event.type === 'lesson_activity' && event.taskId === activityId);
+  }
+
+  private activityTarget(): AchievementActionTarget | null {
+    for (const course of this.orderedCourses()) {
+      for (const topic of this.orderedTopics(course)) {
+        const experience: LessonExperience | null =
+          LearningContentRepository.getLessonExperience(course.id, topic);
+        const firstActivityId = experience?.activities[0]?.id ?? '';
+        if (firstActivityId.length > 0 && !this.activityCompleted(firstActivityId)) {
+          return { course: course, topic: topic };
+        }
+      }
+    }
+    return null;
+  }
+
+  private topicMastered(courseId: string, topic: string): boolean {
+    return this.studyEvents.some((event: StudyEvent): boolean =>
+      event.type === 'quiz_mastered' && event.courseId === courseId && event.topic === topic);
+  }
+
+  private masteryTarget(): AchievementActionTarget | null {
+    for (const course of this.orderedCourses()) {
+      for (const topic of this.orderedTopics(course)) {
+        if (!this.topicMastered(course.id, topic)) return { course: course, topic: topic };
+      }
+    }
+    return null;
+  }
+
+  private actionTarget(item: AchievementProgress): AchievementActionTarget | null {
+    if (!this.actionContextReady) return null;
+    if (item.id === 'first_quiz') return this.practiceTarget();
+    if (item.id === 'active_learning_3') return this.activityTarget();
+    if (item.id === 'mastery_3') return this.masteryTarget();
+    return null;
+  }
+
+  private needsActionContext(item: AchievementProgress | null): boolean {
+    return item !== null && item.id !== 'task_5';
+  }
+
+  private nextActionLabel(): string {
+    const item = this.nextAchievement();
+    if (item === null) return '查看学习记录';
+    if (this.needsActionContext(item) && !this.actionContextReady) return '重新准备学习入口';
+    if (item.id === 'first_quiz') return '完成一次精选练习';
+    if (item.id === 'active_learning_3') return '继续课程互动';
+    if (item.id === 'task_5') return '推进今日计划';
+    if (item.id === 'mastery_3') return '验证知识掌握';
+    return '查看目标详情';
+  }
+
+  private nextActionHint(): string {
+    const item = this.nextAchievement();
+    if (item === null) return '全部里程碑已点亮，学习记录仍会继续保存在本机。';
+    const remaining = this.remainingCount(item).toString();
+    if (item.id === 'task_5') return '还差 ' + remaining + ' 项任务，从今日计划继续推进。';
+    if (!this.actionContextReady) return '成就已读取，但学习入口尚未准备好。重新读取后可继续推进。';
+    const target = this.actionTarget(item);
+    if (target === null) return '暂无能推进该成就的本地学习内容，请重新读取课程资产。';
+    const context = target.course.title + ' · ' + target.topic;
+    if (item.id === 'first_quiz') {
+      return '还差 ' + remaining + ' 次练习，下一步进入 ' + context + '，提交后写入本机。';
+    }
+    if (item.id === 'active_learning_3') {
+      return '还差 ' + remaining + ' 个课程互动，下一步进入 ' + context + ' 的未计数互动。';
+    }
+    if (item.id === 'mastery_3') {
+      return '还差 ' + remaining + ' 个知识点，下一步验证尚未掌握的 ' + context + '。';
+    }
+    return '还差 ' + remaining + ' 项真实学习记录。';
+  }
+
+  private unlockedAtLabel(item: AchievementProgress): string {
+    if (item.unlockedAt === undefined) return '';
+    const date = new Date(item.unlockedAt);
+    if (Number.isNaN(date.getTime())) return '';
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return date.getFullYear().toString() + '-' + month + '-' + day;
+  }
+
+  private achievementSource(item: AchievementProgress): string {
+    if (item.id === 'first_quiz') return '来源：本机练习提交记录';
+    if (item.id === 'active_learning_3') return '来源：课程互动完成记录';
+    if (item.id === 'task_5') return '来源：学习计划任务完成记录';
+    if (item.id === 'mastery_3') return '来源：正确率达到 80% 的主题记录';
+    return '来源：本机学习事件';
+  }
+
+  private achievementIcon(item: AchievementProgress): Resource {
+    if (item.id === 'first_quiz') return $r('sys.symbol.checkmark_circle_fill');
+    if (item.id === 'active_learning_3') return $r('sys.symbol.book_pages_fill_1');
+    if (item.id === 'task_5') return $r('sys.symbol.calendar_fill');
+    if (item.id === 'mastery_3') return $r('sys.symbol.lightbulb_max_fill');
+    return $r('sys.symbol.star_fill');
+  }
+
+  private setCourseContext(course: Course): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', course.id);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
+  }
+
+  private pushPage(url: string, failureMessage: string): void {
+    this.message = '';
+    this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'AchievementsPage navigation failed: %{public}s', error.message);
+      this.message = failureMessage;
+    });
+  }
+
+  private openNextAchievement(): void {
+    const item = this.nextAchievement();
+    if (item === null) {
+      this.pushPage('pages/ActivityRecords', '无法打开学习记录，请重试');
+      return;
+    }
+    if (item.id === 'task_5') {
+      this.pushPage('pages/Plan', '无法打开今日计划，请重试');
+      return;
+    }
+    if (!this.actionContextReady) {
+      this.loadAchievements();
+      return;
+    }
+    const target = this.actionTarget(item);
+    if (target === null) {
+      this.message = '暂无能推进该成就的本地学习内容';
+      return;
+    }
+    this.setCourseContext(target.course);
+    if (item.id === 'first_quiz') {
+      AppStorage.setOrCreate<string>('selectedPracticeTopic', target.topic);
+      this.pushPage('pages/Practice', '无法打开精选练习，请重试');
+      return;
+    }
+    if (item.id === 'active_learning_3') {
+      AppStorage.setOrCreate<string>('selectedContentTopic', target.topic);
+      this.pushPage('pages/Lesson', '无法打开课程互动，请重试');
+      return;
+    }
+    if (item.id === 'mastery_3') {
+      AppStorage.setOrCreate<string>('selectedQuizTopic', target.topic);
+      AppStorage.setOrCreate<string>('selectedQuizFocusTag', '');
+      this.pushPage('pages/Quiz', '无法打开 AI 测验，请重试');
+      return;
+    }
+    this.message = '该里程碑暂未配置直达动作';
+  }
+
+  @Builder
+  AchievementsSkeleton() {
+    Column({ space: 16 }) {
+      Column({ space: 12 }) {
+        Row() {
+          Column().width(116).height(18).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+          Blank()
+          Column().width(48).height(20).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+        }
+        .width('100%')
+        Column().width('100%').height(6).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(3)
+        Column().width('78%').height(14).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+        Column().width('100%').height(44).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_MD)
+      }
+      .width('100%')
+      .height(168)
+      .padding(18)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .borderRadius(Constants.RADIUS_LG)
+
+      ForEach([1, 2, 3], (_: number): void => {
+        Row({ space: 13 }) {
+          Column().width(46).height(46).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(23)
+          Column({ space: 8 }) {
+            Column().width('48%').height(15).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+            Column().width('78%').height(12).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+            Column().width('100%').height(4).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(2)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+        .height(88)
+        .padding(16)
+        .backgroundColor(Constants.COLOR_BG_CARD)
+        .borderRadius(Constants.RADIUS_MD)
+      })
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, bottom: 24 + SafeAreaInsets.bottomVp() })
   }
 
   build() {
     Column() {
       TitleBar('成就', '每个里程碑都来自真实学习记录', () => this.getUIContext().getRouter().back())
       if (this.loading) {
-        Column().width('90%').height(220).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
+        this.AchievementsSkeleton()
       } else if (this.achievements.length === 0) {
-        Column() {
+        Column({ space: 14 }) {
+          SymbolGlyph($r('sys.symbol.star_fill'))
+            .fontSize(40)
+            .fontColor([this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PLACEHOLDER])
           Text(this.message.length > 0 ? this.message : '暂无成就规则')
             .fontSize(14)
             .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+          if (this.message.length > 0) {
+            Button('重新读取')
+              .height(42)
+              .fontSize(14)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.loadAchievements(); })
+          }
         }
+        .width('100%')
         .layoutWeight(1)
+        .alignItems(HorizontalAlign.Center)
         .justifyContent(FlexAlign.Center)
       } else {
         List({ space: 16 }) {
@@ -80,12 +396,12 @@ struct AchievementsPage {
                 .color(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
 
-              if (this.nextAchievementTitle().length > 0) {
+              if (this.nextAchievement() !== null) {
                 Row({ space: 7 }) {
                   SymbolGlyph($r('sys.symbol.star_fill'))
                     .fontSize(15)
                     .fontColor([Constants.COLOR_WARNING])
-                  Text('下一目标 · ' + this.nextAchievementTitle())
+                  Text('下一目标 · ' + (this.nextAchievement()?.title ?? ''))
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
@@ -97,6 +413,42 @@ struct AchievementsPage {
                   .fontSize(12)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(Constants.COLOR_SUCCESS)
+              }
+
+              Text(this.nextActionHint())
+                .width('100%')
+                .fontSize(12)
+                .lineHeight(18)
+                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+
+              Button() {
+                Row({ space: 8 }) {
+                  Text(this.nextActionLabel())
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  SymbolGlyph($r('sys.symbol.arrow_right'))
+                    .fontSize(15)
+                    .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                }
+                .justifyContent(FlexAlign.Center)
+              }
+              .width('100%')
+              .height(44)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.openNextAchievement(); })
+
+              if (this.message.length > 0) {
+                Row({ space: 7 }) {
+                  SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+                    .fontSize(14)
+                    .fontColor([Constants.COLOR_ERROR])
+                  Text(this.message)
+                    .fontSize(12)
+                    .fontColor(Constants.COLOR_ERROR)
+                }
+                .width('100%')
               }
             }
             .width('100%')
@@ -127,11 +479,13 @@ struct AchievementsPage {
                       Column()
                         .width(46)
                         .height(46)
-                        .backgroundColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)
+                        .backgroundColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS_LIGHT :
+                          (this.isNextAchievement(item) ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG))
                         .borderRadius(23)
-                      SymbolGlyph($r('sys.symbol.star_fill'))
+                      SymbolGlyph(this.achievementIcon(item))
                         .fontSize(22)
-                        .fontColor([this.isUnlocked(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_PLACEHOLDER])
+                        .fontColor([this.isUnlocked(item) ? Constants.COLOR_SUCCESS :
+                          (this.isNextAchievement(item) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER)])
                     }
                     Column({ space: 6 }) {
                       Row() {
@@ -139,20 +493,38 @@ struct AchievementsPage {
                           .fontSize(15)
                           .fontWeight(FontWeight.Bold)
                           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                        Text(this.isUnlocked(item) ? '已解锁' : item.current.toString() + '/' + item.target.toString())
+                        Text(this.isUnlocked(item) ? '已解锁' :
+                          (this.isNextAchievement(item) ? '当前目标 · ' : '') +
+                          item.current.toString() + '/' + item.target.toString())
                           .fontSize(11)
                           .fontWeight(FontWeight.Medium)
-                          .fontColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
+                          .fontColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS :
+                            (this.isNextAchievement(item) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY))
                       }
                       .width('100%')
                       .justifyContent(FlexAlign.SpaceBetween)
                       Text(item.description)
                         .fontSize(12)
                         .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      Progress({ value: item.current, total: item.target, type: ProgressType.Linear })
+                      Row({ space: 8 }) {
+                        Text(this.achievementSource(item))
+                          .layoutWeight(1)
+                          .fontSize(11)
+                          .lineHeight(17)
+                          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                          .maxLines(2)
+                        Text(this.isUnlocked(item) ? this.unlockedAtLabel(item) :
+                          '还差 ' + this.remainingCount(item).toString())
+                          .fontSize(11)
+                          .fontWeight(FontWeight.Medium)
+                          .fontColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                      }
+                      .width('100%')
+                      Progress({ value: Math.min(item.current, item.target), total: item.target, type: ProgressType.Linear })
                         .width('100%')
                         .height(4)
-                        .color(this.isUnlocked(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+                        .color(this.isUnlocked(item) ? Constants.COLOR_SUCCESS :
+                          (this.isNextAchievement(item) ? Constants.COLOR_BRAND : Constants.COLOR_MAP_NODE_IDLE))
                         .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
                     }
                     .layoutWeight(1)

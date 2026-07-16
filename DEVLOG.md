@@ -6260,3 +6260,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 门户实时模板、单文件大小、剩余更新次数及官网/竞赛群是否发布最新赛程变动仍须队长登录核对。
 - 本批只修正文档事实，未把服务卡片或通知标记为模拟器、真机或正式上传通过。
+
+---
+
+## 2026-07-17 [MAIN]：成就下一动作真实增长闭环
+
+背景：成就页原本只展示静态进度；初版直达动作又会按完成率误选目标，并可能复用已计数的课程互动或已掌握 Topic，导致用户完成 CTA 后成就不增长。本批按 ArkData 的真实 QuizResult/StudyEvent 聚合语义修正排序、目标选择和失败恢复，同时增加可执行契约门禁。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
+- `scripts/test-achievements-next-action.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- “下一目标”改为剩余动作最少优先，完成率只在剩余动作数相同时决定次序；四个既有成就 ID 保持确定顺序和真实来源。
+- 首次练习只进入存在端侧精选题的精确课程/Topic；主动学习只进入首个 activity 尚未产生 `lesson_activity/taskId` 的 Topic；掌握目标只进入尚无 `quiz_mastered(courseId, topic)` 事件的 Topic。
+- Practice、Lesson、Plan、Quiz 四个入口只写各目标页实际消费的 AppStorage 键；Quiz 入口清空旧 `selectedQuizFocusTag`，避免残留标签改变新目标。
+- 成就读取与课程/事件上下文读取拆分；课程目录或学习事件读取失败时保留已读成就，并提供“重新准备学习入口”，计划与全部解锁后的学习记录入口不被无关上下文阻断。
+- 增加稳定骨架、明确空态/重试、真实来源、解锁日期、当前目标强调和下一步解释；所有进度仍由本机 Repository 计算，不引入静态伪数据。
+
+验证：
+- `node scripts/test-achievements-next-action.mjs`：exit 0，4/4 通过；核对 4 个成就 ID/目标值与排序真值表、33 Topic/165 题/每 Topic 5 题、59 个唯一 activity ID、33 个唯一首 activity ID、四路由和精确 AppStorage 键，并穷举 1,771 种 `active_learning_3` 未解锁历史均存在可增长目标。
+- `node --check scripts/test-achievements-next-action.mjs`：exit 0。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 19 s 160 ms`；CompileArkTS、打包完成，仍提示未配置 `signingConfigs`。
+- `.\scripts\harmonyos-app-smoke.ps1 -SelfTest`：exit 0，9/9 通过；仅证明 bounds/UI 树解析等离线门禁。
+- 两轮独立只读审查：初审发现排序、重复 Topic 和加载恢复问题；修正后复审无阻断，确认 33 个首 activity ID 唯一且未解锁时 CTA 必增长，mastery 去重语义与 Repository 一致。
+- `git diff --check -- apps/harmonyos/entry/src/main/ets/pages/Achievements.ets scripts/test-achievements-next-action.mjs`：exit 0，仅有既有 LF/CRLF 提示。
+
+失败或未验证：
+- 当前 PowerShell 会话无法从 PATH 解析 `hdc`，未执行安装、四个 CTA 点击、ArkData 写回后重进成就页、截图或字体缩放；模拟器与真机均未验证。
+- HAP 未配置正式签名，构建通过不证明可发布安装包通过。
+- 当前门禁证明源码、数据与排序/路由契约，不把静态检查或离线 fixture 写成动态 UI 通过。
