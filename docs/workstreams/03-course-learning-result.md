@@ -360,3 +360,31 @@
 
 - **未验证**：当前无模拟器或真机证据检查修正后的答案、反馈换行和滚动显示。
 - **未验证**：本批没有逐题外部资料核验其他 58 个活动；门禁只证明显式有向路径使用题面声明边，不等同全量事实审校。
+
+## 批次十四：红黑树根节点不变量补全
+
+### 行为
+
+- 修正 `cs101-AVL树与红黑树-2` 的叔父为红插入修复顺序：原序列在祖父为根时会以红根结束，现增加循环结束后把根重新着色为黑色的最终步骤。
+- 正确顺序由 `C → B → E → A → D` 补全为 `C → B → E → A → D → F`；反馈明确区分本轮叔父为红的变色传播和整个修复循环结束后的根节点收尾。
+- 只修改唯一源规格 `ACTIVE-LEARNING-SPEC-CS101.md`，随后由既有生成器同步端侧 JSON；未修改知识切片、共享仓储或页面。
+- 新增真实内容契约，按精确活动 ID 读取生成产物，并与 `cs101_k20` 的“根为黑”性质及源规格最终步骤交叉校验。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS101.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：知识切片 `cs101_k20` 明确要求根为黑；旧顺序先把祖父设为红再向上检查，却没有 CLRS 插入修复循环结束时强制根为黑的步骤。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；生成 33/33 Topic、59 个活动，52 个规格活动类型分布保持不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts scripts.test_validate_topic_relations -v`，退出码 0；15 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过，`ALL CHECKS PASSED`。
+- **静态诊断通过**：`python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations scripts.test_lesson_content_facts -v`，退出码 0；41 项运行，40 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 19 s 259 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：`hdc list targets` 输出 `[Empty]`；增加第六个排序步骤后的手机/平板布局、拖动排序与反馈滚动没有模拟器或真机证据。

@@ -6510,3 +6510,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 当前无模拟器或真机，修正后的长答案/反馈实际渲染未验证。
 - 本批未逐题外部核验其他 58 个活动；新增门禁不等同全量事实审校。
+
+---
+
+## 2026-07-17 [WS03] 红黑树根节点不变量补全
+
+背景：`cs101-AVL树与红黑树-2` 的叔父为红修复顺序把祖父设为红并向上继续检查，却没有修复循环结束后强制根为黑。祖父恰为根时，旧答案会留下红根，与同 Topic 知识切片 `cs101_k20` 的明确性质冲突。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `docs/ACTIVE-LEARNING-SPEC-CS101.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+行为变化：
+- 在唯一源规格增加“循环结束后将根节点重新着色为黑色”步骤，正确顺序补全为 `C → B → E → A → D → F`。
+- 反馈明确叔父为红时本轮以变色向上传播，不需要旋转；整个循环结束仍必须恢复根为黑。
+- 运行现有生成器同步端侧 JSON；只改变该活动的 `options`、`answerIndexes`、`answer` 和 `feedback`。
+- 新增真实内容契约，按精确活动 ID、知识切片 ID 和源规格验证根节点收尾，避免再次生成不完整步骤。
+
+验证：
+- `node scripts/generate-learning-activities.mjs`：退出码 0，生成 33/33 Topic、59 个活动，类型分布保持不变。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_lesson_content_facts scripts.test_validate_topic_relations -v`：退出码 0，15 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约通过，`ALL CHECKS PASSED`。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations scripts.test_lesson_content_facts -v`：退出码 0，41 项运行，40 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 19 s 259 ms`；仍提示未配置 `signingConfigs`。
+- `hdc list targets`：退出码 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前无模拟器、手机、平板或真机；第六个排序步骤的实际布局、拖动排序与反馈滚动未验证。
