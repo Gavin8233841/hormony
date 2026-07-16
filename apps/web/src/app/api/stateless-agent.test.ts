@@ -1,7 +1,10 @@
+import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { middleware } from "../../middleware";
 import { POST as chat } from "./chat/route";
 import { GET as health } from "./health/route";
 import { POST as searchKnowledge } from "./knowledge/search/route";
+import { GET as getProfile } from "./profile/route";
 import { POST as generateQuiz } from "./quiz/route";
 import { store } from "@/lib/store/db";
 
@@ -9,6 +12,7 @@ const originalModelKey = process.env.MODEL_API_KEY;
 const originalDeploymentMode = process.env.DEPLOYMENT_MODE;
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   delete process.env.TEST_MODEL_RESPONSE;
   if (originalModelKey === undefined) delete process.env.MODEL_API_KEY;
   else process.env.MODEL_API_KEY = originalModelKey;
@@ -17,6 +21,14 @@ afterEach(() => {
   else process.env.DEPLOYMENT_MODE = originalDeploymentMode;
   vi.restoreAllMocks();
 });
+
+async function getProfileThroughGateway(request: NextRequest): Promise<Response> {
+  const gatewayResponse = middleware(request);
+  if (gatewayResponse.headers.get("x-middleware-next") !== "1") {
+    return gatewayResponse;
+  }
+  return getProfile(request);
+}
 
 describe("无状态真实 Agent 边界", () => {
   it("模型未配置时健康检查与聊天都应返回 503", async () => {
@@ -80,6 +92,27 @@ describe("无状态真实 Agent 边界", () => {
     const body = await response.json();
 
     expect(body.deploymentMode).toBe("stateless");
+    expect(body.persistence).toEqual({ mode: "stateless" });
+  });
+
+  it("生产环境未设置部署模式时应默认禁用状态路由", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DEPLOYMENT_MODE", undefined);
+
+    const profileResponse = await getProfileThroughGateway(
+      new NextRequest("http://localhost/api/profile?userId=demo")
+    );
+    const healthResponse = await health();
+
+    expect(profileResponse.status).toBe(404);
+    await expect(profileResponse.json()).resolves.toEqual({
+      error: "该接口在无状态部署中不可用",
+      code: "ENDPOINT_DISABLED",
+    });
+    await expect(healthResponse.json()).resolves.toMatchObject({
+      deploymentMode: "stateless",
+      persistence: { mode: "stateless" },
+    });
   });
 
   it("无状态测验生成应返回评分包但不写入进程内测验状态", async () => {

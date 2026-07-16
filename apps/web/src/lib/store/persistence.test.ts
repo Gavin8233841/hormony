@@ -36,6 +36,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   if (originalDeploymentMode === undefined) delete process.env.DEPLOYMENT_MODE;
   else process.env.DEPLOYMENT_MODE = originalDeploymentMode;
 
@@ -45,6 +46,21 @@ afterEach(() => {
 
 describe("app state persistence boundary", () => {
   it("does not read or write files by default", () => {
+    expect(isAppStatePersistenceEnabled()).toBe(false);
+    expect(loadPersistedState()).toBeUndefined();
+    savePersistedState(emptyState);
+
+    expect(fsMock.readFileSync).not.toHaveBeenCalled();
+    expect(fsMock.mkdirSync).not.toHaveBeenCalled();
+    expect(fsMock.writeFileSync).not.toHaveBeenCalled();
+    expect(fsMock.renameSync).not.toHaveBeenCalled();
+  });
+
+  it("forces file persistence off by default in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.DEPLOYMENT_MODE;
+    process.env.APP_STATE_PERSISTENCE = "on";
+
     expect(isAppStatePersistenceEnabled()).toBe(false);
     expect(loadPersistedState()).toBeUndefined();
     savePersistedState(emptyState);
