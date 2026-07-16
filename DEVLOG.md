@@ -6688,3 +6688,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：生成器退出码 0，33 Topic/59 活动；内容事实 10 项与 CS102 一致性 5 项均通过；topic/内容关系校验通过；WS03 完整回归 47 项运行、46 项通过、1 项既有预期失败；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 16 s 348 ms`。
 
 失败或未验证：无模拟器或真机；代码块与反馈长文本在手机/平板的实际换行、滚动未验证。HAP 未配置 `signingConfigs`。
+
+---
+
+## 2026-07-17 [WS03] 分段地址严格限长与同标签题一致性
+
+背景：`cs102-分段与段页式-2` 旧反馈用“超过段限长”描述越界，逐步示例还把 `段限长 >= 8202` 判为合法；当偏移恰等于段长度时，两处都会放行首个段外地址。同标签题 `cs102_q52` 使用相同模糊表述。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS102.md`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`apps/web/src/lib/data/quizzes.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`、`scripts/test_lesson_content_facts.py`。
+
+行为变化：活动、逐步示例和同标签题统一为 `0 <= d < L`；真实契约解析段表并计算物理地址 5100，`d == L`、旧“超过”和 `L >= d` fixtures 均红灯。子 agent 完成测试实现，主代理复核、去除恒真断言并合入跨端唯一源修订。
+
+验证：两个生成器退出码 0，33 Topic/59 活动与 165 道端侧题一致；目标 17 项、关系校验、WS03 49 项回归均通过（1 项既有 expected failure）；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 35 s 794 ms`。
+
+失败或未验证：旧生成内容首次精准红灯；一次题库句式与测试精确片段不一致使目标测试退出码 1，统一句式并重新生成后通过。无模拟器或真机，同标签跳转和长文本实际显示未验证；HAP 未配置 `signingConfigs`。

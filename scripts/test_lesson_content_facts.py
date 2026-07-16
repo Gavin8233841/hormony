@@ -15,6 +15,10 @@ KNOWLEDGE_PATH = (
     ROOT
     / "apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json"
 )
+QUIZZES_PATH = (
+    ROOT
+    / "apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json"
+)
 WEB_CS103_KNOWLEDGE_PATH = ROOT / "apps/web/src/lib/data/cs103-knowledge.ts"
 CS101_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS101.md"
 CS102_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS102.md"
@@ -233,10 +237,137 @@ def pipe_eof_contract_errors(activity):
     return errors
 
 
+SEGMENT_TABLE_ROW_PATTERN = re.compile(
+    r"^段号\s+(\d+)：段基址\s*=\s*(-?\d+)，段限长\s*=\s*(\d+)\s*$",
+    re.MULTILINE,
+)
+SEGMENT_LOGICAL_ADDRESS_PATTERN = re.compile(
+    r"^逻辑地址：\s*\n段号\s*=\s*(\d+)，段内偏移\s*=\s*(-?\d+)\s*$",
+    re.MULTILINE,
+)
+SEGMENTED_OFFSET_PATTERN = re.compile(
+    r"P × 页大小 \+ D = (\d+) × (\d+) \+ (\d+) = (\d+)"
+)
+SEGMENTED_LIMIT_PATTERN = re.compile(
+    r"段限长\s*>\s*(\d+)\s*(?:时|则)地址合法"
+)
+CS102_KNOWLEDGE_ID_PATTERN = re.compile(r"cs102_k\d{2}")
+
+
+def parse_segment_activity(activity):
+    table = {}
+    errors = []
+    for raw_segment, raw_base, raw_limit in SEGMENT_TABLE_ROW_PATTERN.findall(
+        activity.get("content", "")
+    ):
+        segment = int(raw_segment)
+        if segment in table:
+            errors.append(f"duplicate segment table row {segment}")
+            continue
+        table[segment] = {
+            "base": int(raw_base),
+            "limit": int(raw_limit),
+        }
+
+    logical_matches = SEGMENT_LOGICAL_ADDRESS_PATTERN.findall(
+        activity.get("content", "")
+    )
+    if not table:
+        errors.append("segment table must contain at least one row")
+    if len(logical_matches) != 1:
+        errors.append(
+            f"expected exactly one logical address, got {len(logical_matches)}"
+        )
+        return table, None, None, errors
+    segment, offset = (int(value) for value in logical_matches[0])
+    return table, segment, offset, errors
+
+
+def translate_segment_address(table, segment, offset):
+    entry = table.get(segment)
+    if entry is None or not 0 <= offset < entry["limit"]:
+        return {"valid": False, "physical_address": None}
+    return {
+        "valid": True,
+        "physical_address": entry["base"] + offset,
+    }
+
+
+def segment_address_contract_errors(activity, knowledge_items):
+    table, segment, offset, errors = parse_segment_activity(activity)
+    if segment is None or offset is None:
+        return errors
+
+    result = translate_segment_address(table, segment, offset)
+    if not result["valid"]:
+        errors.append("the generated logical address must be within its segment limit")
+    else:
+        expected_answer = (
+            f"物理地址 = {result['physical_address']}，地址合法（未越界）"
+        )
+        if activity.get("answer") != expected_answer:
+            errors.append(
+                f"answer {activity.get('answer')!r} does not match {expected_answer!r}"
+            )
+
+    feedback = activity.get("feedback", "")
+    if "若段内偏移大于或等于段限长则触发越界异常" not in feedback:
+        errors.append("feedback must reject an offset equal to the segment limit")
+
+    knowledge_by_id = {item.get("id"): item for item in knowledge_items}
+    source_ids = set(
+        CS102_KNOWLEDGE_ID_PATTERN.findall(activity.get("source", ""))
+    )
+    feedback_ids = set(CS102_KNOWLEDGE_ID_PATTERN.findall(feedback))
+    if "cs102_k20" not in feedback_ids:
+        errors.append("feedback must cite cs102_k20 for segment base and length")
+    if not feedback_ids.issubset(source_ids):
+        errors.append("every feedback knowledge citation must appear in source")
+    for knowledge_id in source_ids:
+        knowledge = knowledge_by_id.get(knowledge_id)
+        if knowledge is None:
+            errors.append(f"source references missing knowledge chunk {knowledge_id}")
+            continue
+        if knowledge.get("courseId") != "cs102":
+            errors.append(f"{knowledge_id} must belong to cs102")
+        if knowledge.get("topic") != "分段与段页式":
+            errors.append(f"{knowledge_id} must belong to 分段与段页式")
+    return errors
+
+
+def segment_worked_example_contract_errors(experience):
+    steps = [
+        step
+        for step in experience.get("workedExampleSteps", [])
+        if "P × 页大小 + D" in step
+    ]
+    if len(steps) != 1:
+        return [f"expected exactly one segmented offset step, got {len(steps)}"]
+
+    step = steps[0]
+    matches = SEGMENTED_OFFSET_PATTERN.findall(step)
+    if len(matches) != 1:
+        return [f"expected one segmented offset calculation, got {len(matches)}"]
+    page, page_size, displacement, rendered_offset = (
+        int(value) for value in matches[0]
+    )
+    offset = page * page_size + displacement
+    errors = []
+    if offset != rendered_offset:
+        errors.append(
+            f"rendered offset {rendered_offset} does not match calculated {offset}"
+        )
+    limit_matches = [int(value) for value in SEGMENTED_LIMIT_PATTERN.findall(step)]
+    if limit_matches != [offset]:
+        errors.append("worked example must require segment limit greater than offset")
+    return errors
+
+
 class LessonContentFactsTest(unittest.TestCase):
     def setUp(self):
         self.experiences = load_json(EXPERIENCES_PATH)
         self.knowledge_items = load_json(KNOWLEDGE_PATH)
+        self.quizzes = load_json(QUIZZES_PATH)
         self.activity = find_activity(
             self.experiences,
             "cs101",
@@ -365,6 +496,96 @@ class LessonContentFactsTest(unittest.TestCase):
         self.assertEqual(
             [],
             pipe_eof_contract_errors(activity),
+        )
+
+    def test_segment_limit_contract_accepts_generated_content_and_sources(self):
+        experience = find_unique(
+            self.experiences,
+            "cs102/分段与段页式 experience",
+            lambda item: item.get("courseId") == "cs102"
+            and item.get("topic") == "分段与段页式",
+        )
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "分段与段页式",
+            "cs102-分段与段页式-2",
+        )
+        quiz = find_unique(
+            self.quizzes,
+            "cs102_q52 quiz",
+            lambda item: item.get("courseId") == "cs102"
+            and item.get("topic") == "分段与段页式"
+            and item.get("id") == "cs102_q52",
+        )
+
+        table, segment, offset, parse_errors = parse_segment_activity(activity)
+        self.assertEqual([], parse_errors)
+        self.assertEqual(
+            {"valid": True, "physical_address": 5100},
+            translate_segment_address(table, segment, offset),
+        )
+        self.assertEqual(
+            [],
+            segment_address_contract_errors(activity, self.knowledge_items),
+        )
+        self.assertEqual(
+            [],
+            segment_worked_example_contract_errors(experience),
+        )
+        self.assertIn(
+            "段内偏移必须严格小于段限长，大于或等于段限长即越界",
+            quiz["explanation"],
+        )
+
+    def test_segment_limit_contract_rejects_equal_limit_fixtures(self):
+        experience = find_unique(
+            self.experiences,
+            "cs102/分段与段页式 experience",
+            lambda item: item.get("courseId") == "cs102"
+            and item.get("topic") == "分段与段页式",
+        )
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "分段与段页式",
+            "cs102-分段与段页式-2",
+        )
+        table, segment, _, parse_errors = parse_segment_activity(activity)
+        self.assertEqual([], parse_errors)
+        limit = table[segment]["limit"]
+
+        self.assertEqual(
+            {"valid": False, "physical_address": None},
+            translate_segment_address(table, segment, limit),
+        )
+
+        wrong_activity = {
+            **activity,
+            "feedback": activity["feedback"].replace(
+                "大于或等于段限长",
+                "超过段限长",
+            ),
+        }
+        activity_errors = segment_address_contract_errors(
+            wrong_activity,
+            self.knowledge_items,
+        )
+        self.assertIn(
+            "feedback must reject an offset equal to the segment limit",
+            activity_errors,
+        )
+
+        wrong_experience = {
+            **experience,
+            "workedExampleSteps": [
+                step.replace("段限长 > 8202", "段限长 >= 8202")
+                for step in experience["workedExampleSteps"]
+            ],
+        }
+        self.assertIn(
+            "worked example must require segment limit greater than offset",
+            segment_worked_example_contract_errors(wrong_experience),
         )
 
     def test_red_black_root_step_is_kept_in_the_source_spec(self):

@@ -551,3 +551,38 @@
 ### 未验证
 
 - **未验证**：当前无模拟器、手机、平板或真机；修订后的代码块、反馈长文本换行和滚动未验证。
+
+## 批次二十一：分段地址严格限长与同标签题一致性
+
+### 行为
+
+- 修正分段地址合法边界：段限长表示段长度时，合法段内偏移必须满足 `0 <= d < L`，`d == L` 已越界；活动反馈不再使用会漏掉等值边界的“超过段限长”。
+- 同步修正同 Topic 逐步示例：`P × 4096 + D = 8202` 时，仅当段限长严格大于 `8202` 才合法，旧 `段限长 >= 8202` 会允许首个越界地址。
+- 修正同标签题 `cs102_q52` 的解析，并由 Web 题库唯一源生成端侧 `quizzes.json`；Course→Lesson→同标签练习对边界条件使用同一表述。
+- 子 agent 实现真实活动解析与边界执行：解析三条段表、逻辑段号/偏移，计算 `base + offset = 5100`；`offset == limit`、旧“超过段限长”和旧 `>= 8202` fixture 均红灯，当前活动、逐步示例、知识切片引用与题库解析绿灯。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：生成活动 `$[18].workedExampleSteps[3]` 使用 `段限长 > 8202`，`$[18].activities[1].feedback` 明确 `d >= L` 越界；`cs102_q52` 端侧解析与 Web 唯一源逐字一致。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs`，退出码 0；165 道选择题与 Web 源一致。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；33/33 Topic、59 个活动，类型分布不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts scripts.test_lesson_content_consistency_cs102 -v`，退出码 0；17 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；49 项运行，48 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，退出码均为 0。
+- **静态诊断通过**：`cd apps/web; pnpm test`，退出码 0；13 个测试文件、167 项通过。
+- **构建通过**：`cd apps/web; pnpm build`，退出码 0；Next.js 生产构建成功并生成 10/10 静态页面。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 35 s 794 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- 子 agent 在旧生成内容上首次执行目标测试精准红灯，定位到逐步示例仍使用 `>= 8202`；生成后转绿。主代理随后一度把题库句式改成重复主语，目标测试退出码 1；收敛到契约精确句式并重新生成后，12 项内容事实测试全部通过。
+- **未验证**：当前无模拟器、手机、平板或真机；逐步示例、活动反馈与题库解析在实际设备上的换行、滚动和同标签跳转未验证。
