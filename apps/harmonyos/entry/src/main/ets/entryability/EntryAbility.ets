@@ -16,14 +16,16 @@ import { ProactiveLearningService } from '../common/ProactiveLearningService';
 export default class EntryAbility extends UIAbility {
   private mainWindow: window.Window | null = null;
   private avoidAreaChangeCallback: ((options: window.AvoidAreaOptions) => void) | null = null;
+  private pendingProactiveWant: Want | null = null;
+  private repositoriesReady: boolean = false;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    this.handleProactiveWant(want);
+    this.queueProactiveWant(want);
     console.info('EntryAbility onCreate');
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    this.handleProactiveWant(want);
+    this.queueProactiveWant(want);
   }
 
   onDestroy(): void {
@@ -33,14 +35,7 @@ export default class EntryAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     console.info('EntryAbility onWindowStageCreate');
     this.configureSafeArea(windowStage);
-    this.initializeRepositories().then((): void => {
-      this.loadMainPage(windowStage);
-      this.probeCloudAgent();
-    }).catch((error: Error): void => {
-      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'Local repository initialization failed: %{public}s', error.message);
-      this.loadMainPage(windowStage);
-    });
+    this.startMainPage(windowStage);
   }
 
   private async configureSafeArea(windowStage: window.WindowStage): Promise<void> {
@@ -105,22 +100,59 @@ export default class EntryAbility extends UIAbility {
     await LocalLearningRepository.syncCourseCatalog(catalog);
   }
 
-  private handleProactiveWant(want: Want): void {
-    const source = this.wantString(want, 'source');
-    if (source !== 'proactive_learning_card' && source !== 'proactive_learning_reminder') return;
-    ProactiveLearningService.requestLaunch(
-      this.wantString(want, 'targetPage'),
-      this.wantString(want, 'courseId'),
-      this.wantString(want, 'courseTitle'),
-      this.wantString(want, 'topic'),
-      this.wantString(want, 'focusTag'),
-      this.wantString(want, 'taskAction')
-    );
+  private async startMainPage(windowStage: window.WindowStage): Promise<void> {
+    try {
+      await this.initializeRepositories();
+      this.repositoriesReady = true;
+      await this.consumeProactiveWant();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'Local repository initialization failed: %{public}s', message);
+    }
+    this.loadMainPage(windowStage);
+    this.probeCloudAgent();
   }
 
-  private wantString(want: Want, key: string): string {
+  private queueProactiveWant(want: Want): void {
+    const source = this.wantString(want, 'source');
+    if (source === undefined || !ProactiveLearningService.isLaunchSource(source)) {
+      this.pendingProactiveWant = null;
+      return;
+    }
+    this.pendingProactiveWant = want;
+    if (this.repositoriesReady) {
+      this.consumeProactiveWant().catch((error: Error): void => {
+        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+          'Proactive Want validation failed: %{public}s', error.message);
+      });
+    }
+  }
+
+  private async consumeProactiveWant(): Promise<void> {
+    const want = this.pendingProactiveWant;
+    this.pendingProactiveWant = null;
+    if (want === null) return;
+    const source = this.wantString(want, 'source');
+    const targetPage = this.wantString(want, 'targetPage');
+    const courseId = this.wantString(want, 'courseId');
+    const topic = this.wantString(want, 'topic');
+    const focusTag = this.wantString(want, 'focusTag');
+    const taskAction = this.wantString(want, 'taskAction');
+    if (source === undefined || targetPage === undefined || courseId === undefined || topic === undefined ||
+      focusTag === undefined || taskAction === undefined) {
+      return;
+    }
+    const courses = await LocalLearningRepository.getCourses() ?? [];
+    const launch = ProactiveLearningService.validateLaunch(
+      courses, source, targetPage, courseId, topic, focusTag, taskAction);
+    if (launch === undefined) return;
+    ProactiveLearningService.requestLaunch(launch);
+  }
+
+  private wantString(want: Want, key: string): string | undefined {
     const value = want.parameters?.[key];
-    return typeof value === 'string' ? value : '';
+    return typeof value === 'string' ? value : undefined;
   }
 
   private buildCourse(id: string, title: string): Course {

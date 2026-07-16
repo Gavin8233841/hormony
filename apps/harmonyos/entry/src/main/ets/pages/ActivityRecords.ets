@@ -2,17 +2,27 @@ import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import {
-  LearningStudyEvent as StudyEvent,
-  LearningTagInsight as TagInsight
-} from '../model/LearningMetadataModels';
+import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
+import { Course, PlanTask } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+
+interface ActivityDay {
+  key: string;
+  label: string;
+  count: number;
+  completed: boolean;
+}
 
 @Entry
 @Component
 struct ActivityRecordsPage {
   @State events: StudyEvent[] = [];
-  @State tagInsights: TagInsight[] = [];
+  @State visibleEvents: StudyEvent[] = [];
+  @State courses: Course[] = [];
+  @State planTasks: PlanTask[] = [];
+  @State recentDays: ActivityDay[] = [];
+  @State selectedFilter: string = 'all';
+  @State streakDays: number = 0;
   @State loading: boolean = true;
   @State message: string = '';
 
@@ -23,7 +33,14 @@ struct ActivityRecordsPage {
   private async loadEvents(): Promise<void> {
     try {
       this.events = (await LocalLearningRepository.getStudyEvents()).slice().reverse();
-      this.tagInsights = await LocalLearningRepository.getTagInsights(4);
+      this.visibleEvents = this.events.filter((event: StudyEvent): boolean =>
+        this.eventMatchesFilter(event, this.selectedFilter));
+      this.courses = await LocalLearningRepository.getCourses() ?? [];
+      const plan = await LocalLearningRepository.getPlan();
+      this.planTasks = plan?.tasks ?? [];
+      this.recentDays = this.buildActivityDays(this.events);
+      const profile = await LocalLearningRepository.getProfile();
+      this.streakDays = profile?.stats.streakDays ?? 0;
     } catch (error) {
       this.message = '学习记录读取失败';
     } finally {
@@ -34,20 +51,22 @@ struct ActivityRecordsPage {
   private title(event: StudyEvent): string {
     if (event.type === 'task_completed') return '完成学习任务';
     if (event.type === 'lesson_completed') return '完成课程主题';
+    if (event.type === 'lesson_activity') return '提交课程互动';
     if (event.type === 'quiz_mastered') return '掌握练习主题';
     if (event.type === 'quiz_submitted') return '提交练习';
     return '学习活动';
   }
 
   private detail(event: StudyEvent): string {
-    const source = event.source === 'ai' ? 'AI 出题' : (event.source === 'curated' ? '精选题库' : '');
+    const source = event.source === 'ai' ? 'AI 出题' :
+      (event.source === 'curated' ? '精选题库' : (event.source === 'lesson_interactive' ? '课程互动' : ''));
     const difficulty = event.difficulty !== undefined ? this.difficultyLabel(event.difficulty) : '';
     const prefix = source.length > 0 || difficulty.length > 0 ? source + (source.length > 0 && difficulty.length > 0 ? ' · ' : '') + difficulty + ' · ' : '';
     if (event.topic !== undefined && event.totalQuestions !== undefined && event.correctCount !== undefined) {
       return prefix + event.topic + ' · ' + event.correctCount.toString() + '/' + event.totalQuestions.toString() + ' 题正确';
     }
     if (event.topic !== undefined) return event.topic;
-    if (event.taskId !== undefined) return '任务 ' + event.taskId;
+    if (event.taskId !== undefined) return this.taskTitle(event.taskId);
     return '本地学习记录';
   }
 
@@ -57,28 +76,38 @@ struct ActivityRecordsPage {
     return '进阶';
   }
 
+  private taskTitle(taskId: string): string {
+    const task = this.planTasks.find((item: PlanTask): boolean => item.id === taskId);
+    return task !== undefined ? task.title : '已完成计划任务';
+  }
+
   private courseTitle(courseId: string): string {
-    if (courseId === 'cs101') return '数据结构';
-    if (courseId === 'cs102') return '操作系统';
-    if (courseId === 'cs103') return '计算机网络';
-    return '课程';
+    const course = this.courses.find((item: Course): boolean => item.id === courseId);
+    return course !== undefined ? course.title : '';
   }
 
-  private masteryColor(item: TagInsight): string {
-    if (item.masteryPoints >= 88) return Constants.COLOR_SUCCESS;
-    if (item.masteryPoints >= 72) return Constants.COLOR_BRAND;
-    if (item.masteryPoints >= 48) return Constants.COLOR_WARNING;
-    return Constants.COLOR_ERROR;
+  private hasCourseTopic(courseId: string, topic: string): boolean {
+    const course = this.courses.find((item: Course): boolean => item.id === courseId);
+    return course !== undefined && course.topics.includes(topic);
   }
 
-  private openFocusedQuiz(item: TagInsight): void {
-    AppStorage.setOrCreate<string>('selectedCourseId', item.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(item.courseId));
-    AppStorage.setOrCreate<string>('selectedQuizTopic', item.topic);
-    AppStorage.setOrCreate<string>('selectedQuizFocusTag', item.tag);
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
+  private setCourseContext(courseId: string): boolean {
+    const title = this.courseTitle(courseId);
+    if (title.length === 0) {
+      this.message = '无法定位这条记录对应的课程';
+      return false;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', title);
+    return true;
+  }
+
+  private pushPage(url: string, failureMessage: string): void {
+    this.message = '';
+    this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'ActivityRecordsPage focused quiz navigation failed: %{public}s', error.message);
+        'ActivityRecordsPage navigation failed: %{public}s', error.message);
+      this.message = failureMessage;
     });
   }
 
@@ -90,6 +119,9 @@ struct ActivityRecordsPage {
   }
 
   private iconColor(event: StudyEvent): string {
+    if (event.type === 'lesson_activity') {
+      return event.accuracy !== undefined && event.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING;
+    }
     if (event.type === 'task_completed' || event.type === 'lesson_completed' || event.type === 'quiz_mastered') {
       return Constants.COLOR_SUCCESS;
     }
@@ -97,33 +129,259 @@ struct ActivityRecordsPage {
   }
 
   private iconBackground(event: StudyEvent): string {
+    if (event.type === 'lesson_activity') {
+      return event.accuracy !== undefined && event.accuracy >= 0.8 ?
+        Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BRAND_LIGHT;
+    }
     if (event.type === 'task_completed' || event.type === 'lesson_completed' || event.type === 'quiz_mastered') {
       return Constants.COLOR_SUCCESS_LIGHT;
     }
     return Constants.COLOR_BRAND_LIGHT;
   }
 
-  private isFirstOfDay(index: number): boolean {
+  private localDateKey(timestamp: string): string {
+    const date = new Date(timestamp);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return date.getFullYear().toString() + '-' + month + '-' + day;
+  }
+
+  private buildActivityDays(events: StudyEvent[]): ActivityDay[] {
+    const days: ActivityDay[] = [];
+    const today = new Date();
+    for (let offset = 27; offset >= 0; offset--) {
+      const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - offset);
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const key = date.getFullYear().toString() + '-' + month + '-' + day;
+      const dayEvents = events.filter((event: StudyEvent): boolean => this.localDateKey(event.timestamp) === key);
+      days.push({
+        key: key,
+        label: date.getDate().toString(),
+        count: dayEvents.length,
+        completed: dayEvents.some((event: StudyEvent): boolean =>
+          event.type === 'quiz_mastered' || event.type === 'lesson_completed' || event.type === 'task_completed')
+      });
+    }
+    return days;
+  }
+
+  private activityWeeks(): ActivityDay[][] {
+    const weeks: ActivityDay[][] = [];
+    for (let index = 0; index < this.recentDays.length; index += 7) {
+      weeks.push(this.recentDays.slice(index, index + 7));
+    }
+    return weeks;
+  }
+
+  private activeDaysCount(): number {
+    return this.recentDays.filter((day: ActivityDay): boolean => day.count > 0).length;
+  }
+
+  private recentEventCount(): number {
+    let total = 0;
+    for (const day of this.recentDays) total += day.count;
+    return total;
+  }
+
+  private bestDayLabel(): string {
+    let best: ActivityDay | null = null;
+    for (const day of this.recentDays) {
+      if (best === null || day.count > best.count) best = day;
+    }
+    return best !== null && best.count > 0 ? best.key.slice(5).replace('-', '/') + ' · ' +
+      best.count.toString() + ' 条' : '暂无记录';
+  }
+
+  private activityDayColor(day: ActivityDay): string {
+    if (day.count === 0) return Constants.COLOR_BG_TAG;
+    if (day.completed) return Constants.COLOR_SUCCESS;
+    if (day.count >= 3) return Constants.COLOR_BRAND;
+    return Constants.COLOR_BRAND_LIGHT;
+  }
+
+  private activityDayTextColor(day: ActivityDay): string {
+    if (day.count === 0) return Constants.COLOR_TEXT_PLACEHOLDER;
+    if (day.completed || day.count >= 3) return Constants.COLOR_TEXT_ON_GRADIENT;
+    return Constants.COLOR_BRAND;
+  }
+
+  private filterLabel(value: string): string {
+    if (value === 'quiz') return '练习';
+    if (value === 'lesson') return '课程';
+    if (value === 'task') return '任务';
+    return '全部';
+  }
+
+  private eventMatchesFilter(event: StudyEvent, filter: string): boolean {
+    if (filter === 'all') return true;
+    if (filter === 'quiz') {
+      return event.type === 'quiz_mastered' || event.type === 'quiz_submitted';
+    }
+    if (filter === 'lesson') {
+      return event.type === 'lesson_completed' || event.type === 'lesson_activity';
+    }
+    if (filter === 'task') return event.type === 'task_completed';
+    return true;
+  }
+
+  private selectFilter(value: string): void {
+    this.selectedFilter = value;
+    this.visibleEvents = this.events.filter((event: StudyEvent): boolean =>
+      this.eventMatchesFilter(event, value));
+  }
+
+  private isFirstOfDayIn(events: StudyEvent[], index: number): boolean {
     if (index === 0) return true;
-    return this.events[index - 1].timestamp.slice(0, 10) !== this.events[index].timestamp.slice(0, 10);
+    return this.localDateKey(events[index - 1].timestamp) !== this.localDateKey(events[index].timestamp);
   }
 
   private dateLabel(timestamp: string): string {
-    const date = timestamp.slice(0, 10);
-    return date.slice(5, 7) + '月' + date.slice(8, 10) + '日';
+    const date = new Date(timestamp);
+    return (date.getMonth() + 1).toString() + '月' + date.getDate().toString() + '日';
+  }
+
+  private timeLabel(timestamp: string): string {
+    const date = new Date(timestamp);
+    const hour = date.getHours().toString().padStart(2, '0');
+    const minute = date.getMinutes().toString().padStart(2, '0');
+    return hour + ':' + minute;
+  }
+
+  private canOpenEvent(event: StudyEvent): boolean {
+    if (event.type === 'task_completed') return true;
+    return event.courseId !== undefined && this.courseTitle(event.courseId).length > 0;
+  }
+
+  private eventActionLabel(event: StudyEvent): string {
+    if (event.type === 'task_completed') return '查看计划';
+    const courseId = event.courseId ?? '';
+    const topic = event.topic ?? '';
+    const hasExactTopic = courseId.length > 0 && topic.length > 0 && this.hasCourseTopic(courseId, topic);
+    if (event.type === 'lesson_activity' || event.type === 'lesson_completed') {
+      return hasExactTopic ? '回看课程' : '查看课程';
+    }
+    if (event.type === 'quiz_submitted' || event.type === 'quiz_mastered') {
+      if (event.source === 'curated' && hasExactTopic) return '再次练习';
+      if (event.source === 'ai' && hasExactTopic) return '再次测验';
+      return '查看课程';
+    }
+    return event.courseId !== undefined ? '查看课程' : '';
   }
 
   private openEvent(event: StudyEvent): void {
-    if (event.courseId === undefined) return;
-    const titles: string[] = ['数据结构', '操作系统', '计算机网络'];
-    const ids: string[] = ['cs101', 'cs102', 'cs103'];
-    const index = ids.indexOf(event.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseId', event.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', index >= 0 ? titles[index] : '课程');
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/CourseDetail' }).catch((error: Error): void => {
-      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'ActivityRecordsPage navigation failed: %{public}s', error.message);
-    });
+    if (event.type === 'task_completed') {
+      this.pushPage('pages/Plan', '无法打开学习计划，请重试');
+      return;
+    }
+    const courseId = event.courseId;
+    if (courseId === undefined || !this.setCourseContext(courseId)) return;
+    const topic = event.topic ?? '';
+    const hasExactTopic = topic.length > 0 && this.hasCourseTopic(courseId, topic);
+    if ((event.type === 'lesson_activity' || event.type === 'lesson_completed') && hasExactTopic) {
+      AppStorage.setOrCreate<string>('selectedContentTopic', topic);
+      this.pushPage('pages/Lesson', '无法打开对应课程，请重试');
+      return;
+    }
+    if ((event.type === 'quiz_submitted' || event.type === 'quiz_mastered') && hasExactTopic) {
+      if (event.source === 'curated') {
+        AppStorage.setOrCreate<string>('selectedPracticeTopic', topic);
+        this.pushPage('pages/Practice', '无法打开精选练习，请重试');
+      } else if (event.source === 'ai') {
+        AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
+        const focusTag = event.tags !== undefined && event.tags.length > 0 ? event.tags[0] : '';
+        AppStorage.setOrCreate<string>('selectedQuizFocusTag', focusTag);
+        this.pushPage('pages/Quiz', '无法打开 AI 测验，请重试');
+      } else {
+        this.pushPage('pages/CourseDetail', '无法打开课程详情，请重试');
+      }
+      return;
+    }
+    this.pushPage('pages/CourseDetail', '无法打开课程详情，请重试');
+  }
+
+  @Builder
+  FilterPill(value: string) {
+    Button({ type: ButtonType.Normal }) {
+      Text(this.filterLabel(value))
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.selectedFilter === value ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_TERTIARY)
+    }
+    .height(44)
+    .padding({ left: 14, right: 14 })
+    .backgroundColor(this.selectedFilter === value ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+    .borderRadius(20)
+    .onClick((): void => { this.selectFilter(value); })
+  }
+
+  @Builder
+  ActivityOverview() {
+    Column({ space: 12 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text('近 4 周学习节奏')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('连续 ' + this.streakDays.toString() + ' 天 · ' + this.activeDaysCount().toString() + ' 天有学习')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Text(this.recentEventCount().toString() + ' 条')
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_BRAND)
+      }
+      .width('100%')
+
+      Column({ space: 7 }) {
+        ForEach(this.activityWeeks(), (week: ActivityDay[]): void => {
+          Row({ space: 7 }) {
+            ForEach(week, (day: ActivityDay): void => {
+              Column({ space: 2 }) {
+                Text(day.count > 0 ? day.count.toString() : '')
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(this.activityDayTextColor(day))
+                Text(day.label)
+                  .fontSize(10)
+                  .fontColor(this.activityDayTextColor(day))
+              }
+              .layoutWeight(1)
+              .height(42)
+              .justifyContent(FlexAlign.Center)
+              .backgroundColor(this.activityDayColor(day))
+              .borderRadius(Constants.RADIUS_SM)
+            })
+          }
+          .width('100%')
+        })
+      }
+      .width('100%')
+
+      Row() {
+        Text('记录最多：' + this.bestDayLabel())
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        Row({ space: 5 }) {
+          Text('少').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Column().width(14).height(8).backgroundColor(Constants.COLOR_BG_TAG).borderRadius(4)
+          Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND_LIGHT).borderRadius(4)
+          Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND).borderRadius(4)
+          Column().width(14).height(8).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(4)
+          Text('多').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
   }
 
   build() {
@@ -147,82 +405,33 @@ struct ActivityRecordsPage {
         .justifyContent(FlexAlign.Center)
       } else {
         List({ space: 10 }) {
-          if (this.tagInsights.length > 0) {
+          ListItem() {
+            this.ActivityOverview()
+          }
+          ListItem() {
+            Row({ space: 8 }) {
+              this.FilterPill('all')
+              this.FilterPill('quiz')
+              this.FilterPill('lesson')
+              this.FilterPill('task')
+            }
+            .width('100%')
+          }
+          if (this.message.length > 0) {
             ListItem() {
-              Column({ space: 12 }) {
-                Row() {
-                  Text('最近薄弱标签')
-                    .fontSize(15)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                  Text('用于安排下一次复习')
-                    .fontSize(11)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                }
+              Text(this.message)
                 .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
-                ForEach(this.tagInsights, (item: TagInsight): void => {
-                  Column({ space: 8 }) {
-                    Row({ space: 10 }) {
-                      Text(item.tag)
-                        .fontSize(12)
-                        .fontColor(Constants.COLOR_BRAND)
-                        .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                        .borderRadius(Constants.RADIUS_SM)
-                      Text(item.masteryLevel)
-                        .fontSize(10)
-                        .fontColor(this.masteryColor(item))
-                        .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-                        .backgroundColor(Constants.COLOR_SURFACE_TINT)
-                        .borderRadius(Constants.RADIUS_SM)
-                      Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
-                        .layoutWeight(1)
-                        .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-                        .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-                        .borderRadius(4)
-                      Text(Math.round(item.accuracy * 100).toString() + '%')
-                        .fontSize(11)
-                        .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                    }
-                    .width('100%')
-                    Text(item.weakReason)
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                      .lineHeight(18)
-                    Text('下一步：' + item.nextStep)
-                      .fontSize(11)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor(Constants.COLOR_BRAND)
-                    Row({ space: 8 }) {
-                      Text(this.courseTitle(item.courseId) + ' · ' + item.topic + ' · 掌握值 ' +
-                        item.masteryPoints.toString())
-                        .layoutWeight(1)
-                        .fontSize(10)
-                        .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
-                      Button('练这个标签')
-                        .height(30)
-                        .fontSize(11)
-                        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                        .backgroundColor(Constants.COLOR_BRAND)
-                        .borderRadius(Constants.RADIUS_SM)
-                        .onClick((): void => { this.openFocusedQuiz(item); })
-                    }
-                    .width('100%')
-                  }
-                  .width('100%')
-                })
-              }
-              .width('100%')
-              .padding(16)
-              .backgroundColor(Constants.COLOR_BG_CARD)
-              .borderRadius(Constants.RADIUS_LG)
+                .fontSize(12)
+                .fontColor(Constants.COLOR_ERROR)
+                .padding(12)
+                .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+                .borderRadius(Constants.RADIUS_MD)
             }
           }
-          ForEach(this.events, (event: StudyEvent, index: number): void => {
+          ForEach(this.visibleEvents, (event: StudyEvent, index: number): void => {
             ListItem() {
               Column() {
-                if (this.isFirstOfDay(index)) {
+                if (this.isFirstOfDayIn(this.visibleEvents, index)) {
                   Row() {
                     Text(this.dateLabel(event.timestamp))
                       .fontSize(13)
@@ -267,10 +476,19 @@ struct ActivityRecordsPage {
                   }
                   .layoutWeight(1)
                   .alignItems(HorizontalAlign.Start)
-                  Text(event.timestamp.slice(11, 16))
-                    .fontSize(11)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                  if (event.courseId !== undefined) {
+                  Column({ space: 3 }) {
+                    Text(this.timeLabel(event.timestamp))
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    if (this.canOpenEvent(event)) {
+                      Text(this.eventActionLabel(event))
+                        .fontSize(10)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(Constants.COLOR_BRAND)
+                    }
+                  }
+                  .alignItems(HorizontalAlign.End)
+                  if (this.canOpenEvent(event)) {
                     SymbolGlyph($r('sys.symbol.chevron_right'))
                       .fontSize(15)
                       .fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
@@ -286,6 +504,23 @@ struct ActivityRecordsPage {
               .width('100%')
             }
           })
+          if (this.visibleEvents.length === 0) {
+            ListItem() {
+              Column({ space: 6 }) {
+                Text('这个分类下还没有记录')
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                Text('完成一次' + this.filterLabel(this.selectedFilter) + '后会自动出现')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              }
+              .width('100%')
+              .padding(18)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .borderRadius(Constants.RADIUS_LG)
+            }
+          }
         }
         .width('100%')
         .height('100%')
