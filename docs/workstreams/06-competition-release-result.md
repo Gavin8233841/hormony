@@ -203,3 +203,75 @@
 
 - **未验证**：本批只纠正文档口径，未发起线上 Chat SSE 或 Plan 请求，不能证明当前线上部署的引用行为。
 - **未验证**：未运行 Web 四项或 HarmonyOS 构建；产品源码与数据未改变。
+
+## 批次 7：内容溯源、Lesson 合同与源码提交真实性门禁
+
+背景：147 条知识切片和 36 条外部资源此前只有自由文本来源，端侧 JSON 与 Web 数据分别维护；Lesson 规格中的 6 个状态推演虽有“最终状态”，生成器却输出空 `answer`，页面会显示空“标准答案”。正式源码集合也缺少可执行的 manifest、内容同一性、禁止项和秘密扫描门禁。
+
+文件：
+
+- `apps/web/src/lib/types.ts`
+- `apps/web/src/lib/data/cs101-knowledge.ts`
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/web/src/lib/data/cs103-knowledge.ts`
+- `apps/web/src/lib/data/external-resources.ts`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LearningContentRepository.ets`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/external-resources.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `docs/COMPETITION-NOTICE.md`
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/generate-learning-activities.mjs`
+- `scripts/generate-learning-content-json.mjs`
+- `scripts/generate-learning-content-json.test.mjs`
+- `scripts/validate-competition-content.py`
+- `scripts/test_validate_competition_content.py`
+- `docs/workstreams/06-competition-release-result.md`
+- `DEVLOG.md`
+
+行为变化：
+
+- Web TypeScript 成为知识切片和外部资源的单一来源；生成器确定性写出两份 HarmonyOS rawfile，并以深相等测试约束 147/36 数量、ID 唯一、33 Topic 和跨端字段完全一致。
+- 147 条知识切片补齐书名、版次、Topic 对应章节、官方 URL、权利边界和访问记录；全部明确为 `reference-only`，只证明书目映射，不冒充内容许可。
+- 36 条外部资源补齐版次/定位、官方 URL、`external-link-only`、访问状态和 HTTP 状态。当前记录为 35 条 `reachable/200`、`res_01` 为 `unreachable/403`；10 条没有 `courseId` 的既有全局资源在 HarmonyOS 模型中改为可选字段，无筛选时返回全部、按课程筛选时只返回对应 26 条课程资源，不虚构课程归属。
+- 修正 HTTP/2 仍受 TCP 层队头阻塞、RFC 9000 不定义内置 FEC、HPKP 已弃用三处事实；失实片段进入回归门禁。
+- 状态推演复用规格中的精确“最终状态”生成标准答案，59/59 活动均有非空答案；既有 v2 迁移会过滤代码空行，避免页面出现空示例步骤。
+- Lesson 门禁校验 33 Topic、59 活动、首屏/案例/示例展示字段、三种交互模式、options/answerIndexes、单选答案和排序答案映射；知识切片与题库比较完整 `(courseId, topic)` 集合，而非只比较数量。
+- 源码 manifest 固定完整展开 `apps/web` 与 `apps/harmonyos`，只允许三个精确排除项；源码目录/ZIP 门禁比较文件集合和逐字内容，拒绝空必备文件、未列文件、危险路径、符号链接、禁止目录/后缀、超过 2 MiB 无法扫描的条目及可识别秘密。
+- 固定输入对抗测试证明 manifest 缩减、README 篡改/置空、包内 manifest 漏项、`.npmrc` `_authToken` 和超大文本均被拒绝，错误不回显秘密值。
+- `--submission-path` 明确只证明 Git 源码子集逐字一致，不再冒充包含 HAP、许可证附件、原创/AI 声明和发布证据的最终 Demo/源码 ZIP。
+- NOTICE 按真实资源树修正为 5 个 PNG 文件、3 个唯一哈希；System Symbol 为 76 次引用、29 个不同 ID。浏览器标识请求的精确 UA、最终 URL 和时刻未留存，文档明确标为不可复现的当日审计记录。
+
+验证：
+
+- **源码确认**：`node scripts/generate-learning-activities.mjs`，exit 0，33/33 Topic、59 个活动；全量类型分布 `code_fill=13、step_order=16、state_trace=17、output_predict=13`。
+- **源码确认**：`node scripts/generate-learning-content-json.mjs --check`，exit 0，147 条知识切片和 36 条资源与 Web 单一源完全一致。
+- **静态诊断通过**：`node --test scripts/generate-learning-content-json.test.mjs`，exit 0，4/4 通过。
+- **静态诊断通过**：`python -m unittest scripts/test_validate_competition_content.py -v`，exit 0，29/29 通过。
+- **源码确认**：`python scripts/validate-competition-content.py`，exit 0；题库 `A=42、B=43、C=41、D=39`，难度 `easy=67、medium=65、hard=33`，147/36/33/59、Topic 对齐、失实回归和源码提交集合均通过。
+- **源码确认**：独立子 agent 从 Git 索引加载门禁，运行 7 类固定输入对抗验证，整体 exit 0；六类绕过被拒绝，源码子集证据边界输出符合预期。
+- **源码确认**：`python scripts/validate-topic-relations.py`，exit 0，关系、知识切片与题库的 33 Topic 一致。
+- **静态诊断通过**：`cd apps/web; pnpm lint`，exit 0，无警告或错误。
+- **静态诊断通过**：`cd apps/web; pnpm typecheck`，exit 0。
+- **静态诊断通过**：`cd apps/web; pnpm test`，exit 0，13 个测试文件、169 项测试通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建成功。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，exit 0，`BUILD SUCCESSFUL in 27 s 714 ms`；仍有未配置 `signingConfigs` 的既有警告。
+- **静态诊断通过**：`git diff --cached --check`，exit 0。
+
+失败后纠正：
+
+- 新增 manifest 尚未精确暂存时，首次完整门禁 exit 1，提交集合检查按预期报告未跟踪文件；精确暂存后同一检查通过。
+- 第一轮 Lesson 完整性门禁 exit 1，发现 6 个状态推演 `answer` 为空；核对现有 schema、生成器、规格“最终状态”和 `Lesson.ets` 消费逻辑后修复单一源生成规则，未手工复制答案。
+- 第二轮 Lesson 门禁 exit 1，发现 HTTP 既有体验含 1 个空示例步骤，同时步骤数组的重复限制超过现有契约；生成器过滤迁移空行，门禁只对 tags/options 保留唯一性要求后通过。
+- 两次用于哈希/资源报告的内联 PowerShell 最初因 `foreach` 后直接接管道产生解析错误，exit 1；改为先收集行再输出后 exit 0，未改写数据。
+
+未验证：
+
+- **未验证**：本次最终门禁不联网；35/1 是 2026-07-17 已记录状态，不证明当前实时可达。`res_26` 的浏览器标识请求没有保存精确 UA、最终 URL 和时刻，不能复现。
+- **未验证**：147 条内容与教材章节的实际创作/改写关系、165 道题答案、59 个活动和 3 个唯一 PNG 内容尚未完成具名负责人签字；不能宣称版权已解决或答案百分之百正确。
+- **未验证**：NOTICE 仍含正式提交前待人工处理标记；最终逐包许可证附件、原创声明、AI 使用明细、团队签字和发布证据索引未完成。
+- **未验证**：最终签名 HAP、含 HAP 的 Demo/源码 ZIP、PDF、MP4、文件名、大小、SHA-256、独立目录解压和从零构建尚未验收。源码子集门禁通过不等于最终 ZIP 通过。
+- **未验证**：没有模拟器、真机或线上流程证据；构建通过不等于安装、运行、真机或线上通过。

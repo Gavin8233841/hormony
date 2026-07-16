@@ -11,7 +11,19 @@
       "数据结构",
       "教材",
       "经典"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Introduction to Algorithms",
+      "sourceVersion": "Fourth Edition (2022)",
+      "sourceLocator": "MIT Press product page; ISBN 9780262046305",
+      "sourceUrl": "https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/",
+      "accessStatus": "unreachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 403
+    }
   },
   {
     "id": "res_02",
@@ -26,7 +38,19 @@
       "教材",
       "C++",
       "Java"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Data Structures and Algorithm Analysis in C++",
+      "sourceVersion": "Fourth Edition (2013); ISBN 978-0132847377",
+      "sourceLocator": "Author's FIU page; C++ Fourth Edition book section",
+      "sourceUrl": "https://users.cs.fiu.edu/~weiss/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://users.cs.fiu.edu/~weiss/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_03",
@@ -41,7 +65,19 @@
       "教材",
       "可视化",
       "Princeton"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Algorithms, 4th Edition",
+      "sourceVersion": "Fourth Edition",
+      "sourceLocator": "Princeton official companion site home",
+      "sourceUrl": "https://algs4.cs.princeton.edu/home/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://algs4.cs.princeton.edu/home/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_04",
@@ -56,7 +92,19 @@
       "教材",
       "国内经典",
       "考研"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "数据结构（C语言版）",
+      "sourceVersion": "1997 edition; ISBN 9787302023685",
+      "sourceLocator": "清华大学出版社图书详情 00236807",
+      "sourceUrl": "https://www.tup.com.cn/wap/tsxqy.aspx?id=00236807",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.tup.com.cn/wap/tsxqy.aspx?id=00236807",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_05",
@@ -71,7 +119,19 @@
       "经典",
       "进程管理",
       "文件系统"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Operating System Concepts",
+      "sourceVersion": "Tenth Edition",
+      "sourceLocator": "Official companion site home and 10th-edition entry",
+      "sourceUrl": "https://www.os-book.com/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.os-book.com/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_06",
@@ -86,7 +146,19 @@
       "经典",
       "MINIX",
       "分布式系统"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Modern Operating Systems",
+      "sourceVersion": "Second Edition",
+      "sourceLocator": "Author's official book page",
+      "sourceUrl": "https://www.cs.vu.nl/~ast/books/mos2/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.cs.vu.nl/~ast/books/mos2/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_07",
@@ -101,7 +173,19 @@
       "免费",
       "并发",
       "虚拟化"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Operating Systems: Three Easy Pieces",
+      "sourceVersion": "Online edition checked 2026-07-17",
+      "sourceLocator": "Official online book index",
+      "sourceUrl": "https://pages.cs.wisc.edu/~remzi/OSTEP/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://pages.cs.wisc.edu/~remzi/OSTEP/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_08",
@@ -116,7 +200,19 @@
       "自顶向下",
       "协议栈",
       "Pearson"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Computer Networking: A Top-Down Approach",
+      "sourceVersion": "9th Edition",
+      "sourceLocator": "Pearson subject catalog product P200000013385",
+      "sourceUrl": "https://www.pearson.com/en-us/subject-catalog/p/computer-networking-a-top-down-approach/P200000013385",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.pearson.com/en-us/subject-catalog/p/computer-networking-a-top-down-approach/P200000013385",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_09",
@@ -131,7 +227,19 @@
       "教材",
       "协议分析",
       "Addison-Wesley"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "TCP/IP Illustrated, Volume 1: The Protocols",
+      "sourceVersion": "2nd Edition (2011)",
+      "sourceLocator": "InformIT product page; ISBN 9780321336316",
+      "sourceUrl": "https://www.informit.com/store/tcp-ip-illustrated-volume-1-the-protocols-9780321336316",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.informit.com/store/tcp-ip-illustrated-volume-1-the-protocols-9780321336316",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_10",
@@ -146,7 +254,19 @@
       "国内经典",
       "考研",
       "电子工业出版社"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "计算机网络",
+      "sourceVersion": "第9版（2026）; ISBN 9787121527852",
+      "sourceLocator": "电子工业出版社图书详情 70139",
+      "sourceUrl": "https://www.phei.com.cn/module/goods/wssd_content.jsp?bookid=70139",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.phei.com.cn/module/goods/wssd_content.jsp?bookid=70139",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_11",
@@ -161,7 +281,19 @@
       "JavaScript",
       "HTTP",
       "文档"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "MDN Web Docs",
+      "sourceVersion": "Continuously updated web documentation; checked 2026-07-17",
+      "sourceLocator": "Official documentation portal home",
+      "sourceUrl": "https://developer.mozilla.org/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://developer.mozilla.org/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_12",
@@ -175,7 +307,19 @@
       "API",
       "文档",
       "JavaScript"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Node.js Documentation",
+      "sourceVersion": "Current documentation portal; checked 2026-07-17",
+      "sourceLocator": "Official documentation index",
+      "sourceUrl": "https://nodejs.org/en/docs",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://nodejs.org/en/docs",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_13",
@@ -189,7 +333,19 @@
       "华为",
       "移动开发",
       "文档"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "HarmonyOS Developer Documentation",
+      "sourceVersion": "Current documentation portal; checked 2026-07-17",
+      "sourceLocator": "Huawei Developer documentation index",
+      "sourceUrl": "https://developer.huawei.com/consumer/cn/doc/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://developer.huawei.com/consumer/cn/doc/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_14",
@@ -204,7 +360,19 @@
       "网络协议",
       "文档",
       "Web"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "RFC 9110: HTTP Semantics",
+      "sourceVersion": "RFC 9110 (June 2022)",
+      "sourceLocator": "RFC Editor full-text HTML",
+      "sourceUrl": "https://www.rfc-editor.org/rfc/rfc9110.html",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.rfc-editor.org/rfc/rfc9110.html",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_15",
@@ -219,7 +387,19 @@
       "传输层",
       "网络协议",
       "文档"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "RFC 9293: Transmission Control Protocol (TCP)",
+      "sourceVersion": "RFC 9293 (August 2022)",
+      "sourceLocator": "RFC Editor full-text HTML",
+      "sourceUrl": "https://www.rfc-editor.org/rfc/rfc9293.html",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.rfc-editor.org/rfc/rfc9293.html",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_16",
@@ -234,7 +414,19 @@
       "传输层",
       "网络协议",
       "文档"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "RFC 768: User Datagram Protocol",
+      "sourceVersion": "RFC 768 (August 1980)",
+      "sourceLocator": "RFC Editor full-text HTML",
+      "sourceUrl": "https://www.rfc-editor.org/rfc/rfc768.html",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.rfc-editor.org/rfc/rfc768.html",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_17",
@@ -248,7 +440,19 @@
       "文档",
       "前端",
       "JavaScript"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "TypeScript Documentation",
+      "sourceVersion": "Current documentation portal; checked 2026-07-17",
+      "sourceLocator": "Official documentation index",
+      "sourceUrl": "https://www.typescriptlang.org/docs/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.typescriptlang.org/docs/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_18",
@@ -262,7 +466,19 @@
       "HarmonyOS",
       "声明式UI",
       "文档"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "ArkTS",
+      "sourceVersion": "Current developer guide; checked 2026-07-17",
+      "sourceLocator": "Huawei Developer ArkTS getting-started page",
+      "sourceUrl": "https://developer.huawei.com/consumer/cn/arkts/devstart/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://developer.huawei.com/consumer/cn/arkts/devstart/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_19",
@@ -277,7 +493,19 @@
       "OCW",
       "免费课程",
       "数据结构"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "MIT 6.006 Introduction to Algorithms",
+      "sourceVersion": "Spring 2020",
+      "sourceLocator": "MIT OpenCourseWare course home",
+      "sourceUrl": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_20",
@@ -292,7 +520,19 @@
       "Java",
       "免费课程",
       "项目驱动"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "CS 61B Data Structures",
+      "sourceVersion": "Spring 2021",
+      "sourceLocator": "UC Berkeley archived course home",
+      "sourceUrl": "https://sp21.datastructur.es/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://sp21.datastructur.es/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_21",
@@ -307,7 +547,19 @@
       "xv6",
       "内核",
       "免费课程"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "MIT 6.1810 Operating System Engineering",
+      "sourceVersion": "Official course entry checked 2026-07-17",
+      "sourceLocator": "MIT PDOS 6.828/6.1810 course index",
+      "sourceUrl": "https://pdos.csail.mit.edu/6.828/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://pdos.csail.mit.edu/6.828/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_22",
@@ -322,7 +574,19 @@
       "TCP",
       "协议栈",
       "免费课程"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "CS 144: Introduction to Computer Networking",
+      "sourceVersion": "Official course entry checked 2026-07-17",
+      "sourceLocator": "Stanford CS144 course home",
+      "sourceUrl": "https://cs144.stanford.edu/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://cs144.stanford.edu/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_23",
@@ -336,7 +600,19 @@
       "入门",
       "免费课程",
       "编程"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "CS50: Introduction to Computer Science",
+      "sourceVersion": "Official course entry checked 2026-07-17",
+      "sourceLocator": "Harvard CS50 course index",
+      "sourceUrl": "https://cs50.harvard.edu/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://cs50.harvard.edu/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_24",
@@ -351,7 +627,19 @@
       "Princeton",
       "在线课程",
       "Sedgewick"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Algorithms, Part I",
+      "sourceVersion": "Current Coursera course page; checked 2026-07-17",
+      "sourceLocator": "Princeton course landing page on Coursera",
+      "sourceUrl": "https://www.coursera.org/learn/algorithms-part1",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.coursera.org/learn/algorithms-part1",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_25",
@@ -366,7 +654,19 @@
       "中文课程",
       "在线课程",
       "考研"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "数据结构",
+      "sourceVersion": "中国大学 MOOC 课程 cid=93001",
+      "sourceLocator": "Official course detail page",
+      "sourceUrl": "https://www.icourse163.org/course/detail.htm?cid=93001",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.icourse163.org/course/detail.htm?cid=93001",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_26",
@@ -381,7 +681,19 @@
       "极客时间",
       "付费课程",
       "实战"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "数据结构与算法之美",
+      "sourceVersion": "极客时间专栏 100017301",
+      "sourceLocator": "Official column introduction page",
+      "sourceUrl": "https://time.geekbang.org/column/intro/100017301",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://time.geekbang.org/column/intro/100017301",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_27",
@@ -396,7 +708,19 @@
       "标准",
       "局域网",
       "数据链路层"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "IEEE 802.3 Ethernet Working Group",
+      "sourceVersion": "Current working-group portal; checked 2026-07-17",
+      "sourceLocator": "IEEE 802.3 official working-group home",
+      "sourceUrl": "https://www.ieee802.org/3/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.ieee802.org/3/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_28",
@@ -411,7 +735,19 @@
       "标准",
       "Web",
       "多路复用"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "RFC 9113: HTTP/2",
+      "sourceVersion": "RFC 9113 (June 2022)",
+      "sourceLocator": "RFC Editor full-text HTML",
+      "sourceUrl": "https://www.rfc-editor.org/rfc/rfc9113.html",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.rfc-editor.org/rfc/rfc9113.html",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_29",
@@ -426,7 +762,19 @@
       "RFC",
       "标准",
       "传输协议"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "RFC 9114: HTTP/3",
+      "sourceVersion": "RFC 9114 (June 2022)",
+      "sourceLocator": "RFC Editor full-text HTML",
+      "sourceUrl": "https://www.rfc-editor.org/rfc/rfc9114.html",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.rfc-editor.org/rfc/rfc9114.html",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_30",
@@ -441,7 +789,19 @@
       "系统编程",
       "Shell",
       "UNIX"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "The Open Group Base Specifications Issue 7",
+      "sourceVersion": "2018 Edition (POSIX.1-2017)",
+      "sourceLocator": "The Open Group online publication 9699919799",
+      "sourceUrl": "https://pubs.opengroup.org/onlinepubs/9699919799/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://pubs.opengroup.org/onlinepubs/9699919799/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_31",
@@ -455,7 +815,19 @@
       "编码",
       "标准",
       "国际化"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "The Unicode Standard",
+      "sourceVersion": "Current standard portal; checked 2026-07-17",
+      "sourceLocator": "Unicode Consortium official home",
+      "sourceUrl": "https://www.unicode.org/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.unicode.org/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_32",
@@ -469,7 +841,19 @@
       "微软",
       "开发工具",
       "跨平台"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Visual Studio Code",
+      "sourceVersion": "Current product portal; checked 2026-07-17",
+      "sourceLocator": "Microsoft official product home",
+      "sourceUrl": "https://code.visualstudio.com/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://code.visualstudio.com/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_33",
@@ -484,7 +868,19 @@
       "抓包",
       "开源工具",
       "协议调试"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Wireshark",
+      "sourceVersion": "Current project portal; checked 2026-07-17",
+      "sourceLocator": "Wireshark Foundation official home",
+      "sourceUrl": "https://www.wireshark.org/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.wireshark.org/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_34",
@@ -499,7 +895,19 @@
       "GNU",
       "C/C++",
       "系统编程"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "GDB: The GNU Project Debugger",
+      "sourceVersion": "Current project portal; checked 2026-07-17",
+      "sourceLocator": "GNU official GDB project page",
+      "sourceUrl": "https://www.gnu.org/software/gdb/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.gnu.org/software/gdb/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_35",
@@ -513,7 +921,19 @@
       "分布式",
       "开发工具",
       "协作"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Git",
+      "sourceVersion": "Current project portal; checked 2026-07-17",
+      "sourceLocator": "Git official project home",
+      "sourceUrl": "https://git-scm.com/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://git-scm.com/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   },
   {
     "id": "res_36",
@@ -527,6 +947,18 @@
       "HTTP",
       "开发工具",
       "接口调试"
-    ]
+    ],
+    "provenance": {
+      "sourceTitle": "Postman",
+      "sourceVersion": "Current product portal; checked 2026-07-17",
+      "sourceLocator": "Postman official product home",
+      "sourceUrl": "https://www.postman.com/",
+      "rightsStatus": "external-link-only",
+      "rightsName": "Third-party official page; external link only, with no page or attachment redistribution",
+      "rightsUrl": "https://www.postman.com/",
+      "accessStatus": "reachable",
+      "checkedAt": "2026-07-17",
+      "httpStatus": 200
+    }
   }
 ]

@@ -3,9 +3,36 @@
 // I/O系统与磁盘调度、死锁、同步与互斥、进程间通信共 10 个主题。
 // 每条切片为完整独立知识点，用于 RAG 检索增强生成。
 
-import type { KnowledgeChunk } from "@/lib/types";
+import type { ContentProvenance, KnowledgeChunk } from "@/lib/types";
 
-export const cs102KnowledgeChunks: KnowledgeChunk[] = [
+const CS102_SOURCE = {
+  sourceTitle: "Operating System Concepts",
+  sourceVersion: "Tenth Edition",
+  sourceUrl: "https://www.os-book.com/",
+  rightsStatus: "reference-only",
+  rightsName: "Wiley copyrighted textbook; bibliographic reference only",
+  rightsUrl: "https://www.os-book.com/",
+  accessStatus: "reachable",
+  checkedAt: "2026-07-17",
+  httpStatus: 200,
+} satisfies Omit<ContentProvenance, "sourceLocator">;
+
+const CS102_LOCATORS = {
+  "进程与线程": "Chapter 3: Processes; Chapter 4: Threads & Concurrency",
+  "CPU调度算法": "Chapter 5: CPU Scheduling",
+  "内存管理基础": "Chapter 9: Main Memory",
+  "虚拟内存与分页": "Chapter 10: Virtual Memory",
+  "分段与段页式": "Chapter 9: Main Memory",
+  "文件系统": "Chapter 13: File-System Interface; Chapter 14: File-System Implementation",
+  "I/O系统与磁盘调度": "Chapter 11: Mass-Storage Structure; Chapter 12: I/O Systems",
+  "死锁": "Chapter 8: Deadlocks",
+  "同步与互斥": "Chapter 6: Synchronization Tools; Chapter 7: Synchronization Examples",
+  "进程间通信": "Chapter 3: Processes",
+} as const satisfies Record<string, string>;
+
+const cs102KnowledgeChunkDrafts: Array<
+  KnowledgeChunk & { topic: keyof typeof CS102_LOCATORS }
+> = [
   // ========== 进程与线程 ==========
   {
     id: "cs102_k01",
@@ -362,3 +389,13 @@ export const cs102KnowledgeChunks: KnowledgeChunk[] = [
     topic: "进程间通信",
   },
 ];
+
+export const cs102KnowledgeChunks: KnowledgeChunk[] = cs102KnowledgeChunkDrafts.map(
+  (chunk) => ({
+    ...chunk,
+    provenance: {
+      ...CS102_SOURCE,
+      sourceLocator: CS102_LOCATORS[chunk.topic],
+    },
+  })
+);

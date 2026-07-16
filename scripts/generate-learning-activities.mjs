@@ -109,6 +109,12 @@ function parseActivity(section, courseId, topic, index) {
     };
   }
 
+  const answer = entryValue(entries, '答案') ||
+    (type === 'state_trace' ? entryValue(entries, '最终状态') : '');
+  if (answer.length === 0) {
+    throw new Error(`${courseId}/${topic}/练习${index} 缺少答案`);
+  }
+
   return {
     id: `${courseId}-${topic}-${index}`,
     type,
@@ -123,7 +129,7 @@ function parseActivity(section, courseId, topic, index) {
     interactionMode: 'free_response',
     options: [],
     answerIndexes: [],
-    answer: entryValue(entries, '答案'),
+    answer,
     feedback,
     source,
   };
@@ -178,7 +184,9 @@ function migrateExistingExperience(item) {
     caseTitle: item.caseTitle,
     caseBody: item.caseBody,
     workedExampleTitle: '先读代码，再预测结果',
-    workedExampleSteps: item.code.split('\n'),
+    workedExampleSteps: item.code
+      .split('\n')
+      .filter((line) => line.trim().length > 0),
     activities: [{
       id: `${item.courseId}-${item.topic}-1`,
       type: 'output_predict',
@@ -196,12 +204,22 @@ function migrateExistingExperience(item) {
   };
 }
 
+function normalizeExistingExperience(item) {
+  if (item.schemaVersion !== 2) return migrateExistingExperience(item);
+  return {
+    ...item,
+    workedExampleSteps: item.workedExampleSteps.filter(
+      (step) => typeof step === 'string' && step.trim().length > 0
+    ),
+  };
+}
+
 const current = JSON.parse(readFileSync(outputPath, 'utf8'));
 const generated = specFiles.flatMap(([courseId, relativePath]) => parseSpec(courseId, relativePath));
 const generatedKeys = new Set(generated.map((item) => `${item.courseId}\u0000${item.topic}`));
 const existing = current
   .filter((item) => !generatedKeys.has(`${item.courseId}\u0000${item.topic}`))
-  .map((item) => item.schemaVersion === 2 ? item : migrateExistingExperience(item));
+  .map(normalizeExistingExperience);
 if (existing.length !== 7) {
   throw new Error(`预期迁移 7 个既有体验，实际 ${existing.length} 个；请检查源数据状态`);
 }
@@ -214,7 +232,12 @@ for (const experience of all) {
   if (!expectedTopics.has(`${experience.courseId}\u0000${experience.topic}`)) {
     throw new Error(`体验引用了未知 Topic: ${experience.courseId}/${experience.topic}`);
   }
-  for (const activity of experience.activities) activityCounts[activity.type] += 1;
+  for (const activity of experience.activities) {
+    if (activity.answer.length === 0) {
+      throw new Error(`${experience.courseId}/${experience.topic}/${activity.id} 缺少标准答案`);
+    }
+    activityCounts[activity.type] += 1;
+  }
 }
 if (actualTopics.size !== expectedTopics.size || actualTopics.size !== 33) {
   throw new Error(`Topic 覆盖不完整: ${actualTopics.size}/${expectedTopics.size}`);

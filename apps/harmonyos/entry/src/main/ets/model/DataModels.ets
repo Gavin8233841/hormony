@@ -269,7 +269,7 @@ export interface ExternalLearningResource {
   type: string;
   url: string;
   description: string;
-  courseId: string;
+  courseId?: string;
   tags: string[];
 }
 

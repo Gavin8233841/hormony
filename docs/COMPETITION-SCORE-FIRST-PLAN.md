@@ -237,6 +237,8 @@ PDF 检查清单：
 5. 安装 HAP 到明确设备并运行黄金路径；记录 ZIP 与 HAP SHA-256、文件大小、构建命令和退出码。
 6. 文件名严格替换真实值：`03-作品名称+参赛队伍名称.zip`。门户大小上限为**未验证**，队长上传前核对。
 
+当前 `python scripts/validate-competition-content.py --submission-path <目录或ZIP>` 只校验 Git manifest 展开的源码集合逐字一致，并明确排除 HAP；它是最终 ZIP 的源码子集门禁，不是最终 ZIP 通过证明。包含 HAP、许可证附件、原创/AI 声明和发布证据索引的正式包仍为**未验证**，不得用源码子集通过替代。
+
 ## 十一、NOTICE、原创声明与 AI 使用说明
 
 ### 1. 第三方 NOTICE

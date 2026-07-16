@@ -6320,3 +6320,67 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 本批只纠正文档口径，未发起线上 Chat SSE 或 Plan 请求，不能证明当前线上部署的引用行为。
 - 未运行 Web 四项或 HarmonyOS 构建；产品源码与数据未改变。
+
+---
+
+## 2026-07-17 [WS06]：内容溯源、Lesson 合同与源码提交真实性门禁
+
+背景：147 条知识切片和 36 条外部资源缺少结构化权利/访问证据且跨端分别维护；6 个状态推演生成了空标准答案；正式源码集合没有可执行的 manifest、内容同一性和秘密扫描门禁。
+
+文件：
+- `apps/web/src/lib/types.ts`
+- `apps/web/src/lib/data/cs101-knowledge.ts`
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/web/src/lib/data/cs103-knowledge.ts`
+- `apps/web/src/lib/data/external-resources.ts`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LearningContentRepository.ets`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/external-resources.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `docs/COMPETITION-NOTICE.md`
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/generate-learning-activities.mjs`
+- `scripts/generate-learning-content-json.mjs`
+- `scripts/generate-learning-content-json.test.mjs`
+- `scripts/validate-competition-content.py`
+- `scripts/test_validate_competition_content.py`
+- `docs/workstreams/06-competition-release-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Web TypeScript 成为 147 条知识切片和 36 条外部资源的单一来源；生成器与深相等测试约束两份 HarmonyOS rawfile。
+- 知识切片补齐版次、章节、官方 URL、`reference-only` 和访问记录；资源补齐定位、`external-link-only` 与访问状态，当前记录为 35 条 200、`res_01` 为 403。
+- 10 条既有全局资源保持可选 `courseId` 语义；HarmonyOS 无筛选返回全部、按课程筛选只返回对应资源，不虚构课程归属。
+- 修正 HTTP/2/TCP 队头阻塞、QUIC FEC 和 HPKP 三处事实，并加入失实片段回归。
+- 状态推演复用规格“最终状态”生成标准答案，59/59 活动答案非空；既有 v2 迁移过滤空示例步骤。
+- 独立门禁校验题库分布、内容核心字段、147/36 数量与溯源、知识/题库 Topic 集合、33 Topic/59 活动和三种交互合同。
+- manifest 固定展开完整 `apps/web` 与 `apps/harmonyos`；源码目录/ZIP 必须与 Git 源码集合逐字一致，并拒绝空文件、危险路径、禁止项、未列文件、超过 2 MiB 无法扫描条目与可识别秘密。
+- 对抗固定输入覆盖 manifest 缩减、README 篡改/空文件、包内漏项、`.npmrc` token 和超大文本；均被拒绝且不回显秘密。
+- NOTICE 修正为 5 个 PNG 文件/3 个唯一哈希、System Symbol 76 次/29 个不同 ID，并披露浏览器 UA 证据未留存。
+- `--submission-path` 只证明源码子集，不把它写成含 HAP、许可证附件和签署材料的最终 ZIP 通过。
+
+验证：
+- `node scripts/generate-learning-activities.mjs`：exit 0，33/33 Topic、59 个活动。
+- `node scripts/generate-learning-content-json.mjs --check`：exit 0，147/36 跨端一致。
+- `node --test scripts/generate-learning-content-json.test.mjs`：exit 0，4/4 通过。
+- `python -m unittest scripts/test_validate_competition_content.py -v`：exit 0，29/29 通过。
+- `python scripts/validate-competition-content.py`：exit 0，题库答案 `42/43/41/39`、难度 `67/65/33`，内容、Topic、Lesson 和源码集合全部通过。
+- 独立子 agent 从 Git 索引运行 7 类固定输入：整体 exit 0，六类绕过均被阻断，源码子集证据边界正确。
+- `python scripts/validate-topic-relations.py`：exit 0，`ALL CHECKS PASSED`。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，13 个测试文件、169 项测试通过。
+- `cd apps/web; pnpm build`：exit 0，生产构建成功。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 27 s 714 ms`；仍提示未配置 `signingConfigs`。
+- `git diff --cached --check`：exit 0。
+
+失败或未验证：
+- manifest 未精确暂存时完整门禁 exit 1；精确暂存后通过。
+- Lesson 门禁先后以 exit 1 揭示 6 个空标准答案和 1 个空示例步骤；均从现有规格/生成器修复并重跑通过。重复步骤不属于现有 schema 禁止项，未继续施加错误限制。
+- 两次内联 PowerShell 报告命令因 `foreach` 后直接接管道解析失败，exit 1；改为先收集结果后 exit 0，未改写数据。
+- 最终命令不联网；35/1 访问记录不等于当前实时可达，`res_26` 的精确 UA/最终 URL/时刻未留存。
+- 内容、题库、活动和 3 个唯一 PNG 内容尚无具名负责人签字；NOTICE、逐包许可证附件、原创/AI 声明和签署材料未完成。
+- 最终签名 HAP、含 HAP 的 Demo/源码 ZIP、PDF、MP4、独立解压/从零构建、模拟器、真机和线上均未验证。

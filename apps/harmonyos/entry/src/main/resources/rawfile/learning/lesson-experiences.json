@@ -278,7 +278,6 @@
     "workedExampleSteps": [
       "GET /courses HTTP/1.1",
       "Accept: application/json",
-      "",
       "HTTP/1.1 200 OK",
       "Content-Type: application/json"
     ],
@@ -1390,7 +1389,7 @@
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "到达物理层时PDU为Bit（比特流），接收端将逆向从Bit逐层还原为Message",
         "feedback": "OSI各层PDU依次为：物理层-Bit、数据链路层-Frame、网络层-Packet(Datagram)、传输层-Segment、应用层-Message。DNS使用UDP而非TCP，因此传输层PDU虽为报文段但承载的是UDP报文。注意TCP/IP模型将OSI上三层合并为应用层，但PDU名称仍沿用OSI定义。这与知识切片 cs103_k03 和 cs103_k04 中PDU通过封装保持独立性的描述一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k03、cs103_k04\n\n---"
       }
@@ -1428,7 +1427,7 @@
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "MAC地址表包含3条记录：(11, 端口1)、(33, 端口3)、(22, 端口2)。此时三台主机互相通信均可查表单播转发，无需泛洪",
         "feedback": "交换机每次收到帧都执行两个动作：先学习源MAC与入端口的映射，再查表转发目的MAC。第一次通信时目的MAC不在表中，触发泛洪使帧到达所有端口；目标主机回复后其MAC也被学习，后续通信即可精确转发。交换机每个端口是独立冲突域，全双工模式下无冲突。这与知识切片 cs103_k07 所述\"地址学习\"和\"查表转发\"机制一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k07"
       },
@@ -1542,7 +1541,7 @@
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "cwnd=10, ssthresh=9",
         "feedback": "慢启动阶段cwnd每RTT翻倍（指数增长），4个RTT后从1增长到16。达到ssthresh后切换为拥塞避免，每RTT仅加1（线性增长）。收到3个重复ACK触发快重传：ssthresh降为当前cwnd的一半（9），cwnd也设为ssthresh值（9），不重置为1——这是因为3个重复ACK说明网络仍能传输报文段，丢包可能只是偶然。这与知识切片 cs103_k20、cs103_k23 所述慢启动、快恢复机制一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k23"
       },
@@ -1618,8 +1617,8 @@
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
-        "feedback": "UDP不提供流量控制、拥塞控制、重传和序号机制，数据报可能丢失、重复或乱序到达。D2丢失后发送方无感知，D3乱序到达后接收方不重排——可靠性需由应用层自行保障。例如QUIC协议在UDP之上实现了可靠传输和前向纠错。这与知识切片 cs103_k24 所述\"数据报可能丢失、重复或乱序到达，可靠性需要由应用层自行保障\"一致",
+        "answer": "接收方持有D1和D3，缺失D2，且到达顺序为D1→D3（乱序）。与TCP不同，UDP不保证可靠交付、不保证顺序、不重传丢失数据",
+        "feedback": "UDP不提供流量控制、拥塞控制、重传和序号机制，数据报可能丢失、重复或乱序到达。D2丢失后发送方无感知，D3乱序到达后接收方不重排——可靠性需由应用层自行保障。例如QUIC在UDP之上实现可靠传输、拥塞控制和流式多路复用；RFC 9000本身不定义前向纠错（FEC）。这与知识切片 cs103_k24 所述\"数据报可能丢失、重复或乱序到达，可靠性需要由应用层自行保障\"一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 768（UDP）；知识切片 cs103_k24、cs103_k27\n\n---"
       }
     ]
@@ -1681,7 +1680,7 @@
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "证书链验证全部通过，客户端信任服务器身份，继续进行密钥交换。若任何一步失败（签名不匹配、域名不匹配、过期或被吊销），客户端将中止连接并警告用户",
         "feedback": "证书链验证从终端证书开始逐级向上验证签名，直到到达预装在信任库中的根CA。验证内容包括：签名正确性（上级CA私钥签发）、有效期、域名匹配（SAN/CN字段）和吊销状态（CRL/OCSP）。根CA自签名且预装在系统或浏览器中，不需要在网络中传输。这与知识切片 cs103_k33 所述\"从终端证书开始逐级向上验证签名，直到到达信任的根CA\"一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5280（X.509证书）；知识切片 cs103_k33\n\n---"
       }
@@ -1784,7 +1783,7 @@
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "",
+        "answer": "R1路由表为：N1=0(直连)、N2=1(经R2)、N3=2(经R2)。Bellman-Ford方程：新距离=min(原距离, 邻居到目标距离+到邻居距离)",
         "feedback": "距离向量算法使用Bellman-Ford方程更新路由：D(x,y)=min(D(x,y), D(x,v)+D(v,y))。R1收到R2的距离向量后，对每个目的网络比较原路径和新路径（经R2）的距离，取较小值。N1直连最优不更新，N2和N3经R2更短故更新。RIP每30秒交换距离向量，最大15跳限制防止计数到无穷。这与知识切片 cs103_k40、cs103_k41 所述Bellman-Ford方程和RIP机制一致",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k40、cs103_k41"
       },

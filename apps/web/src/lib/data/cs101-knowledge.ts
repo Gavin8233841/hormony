@@ -2,9 +2,38 @@
 // 覆盖 12 个核心主题，共 52 条切片，每条 text 字段不少于 100 个中文字符
 // 供 RAG 检索引擎使用（TF-IDF 加权 + 中文双字分词）
 
-import type { KnowledgeChunk } from "@/lib/types";
+import type { ContentProvenance, KnowledgeChunk } from "@/lib/types";
 
-export const cs101KnowledgeChunks: KnowledgeChunk[] = [
+const CS101_SOURCE = {
+  sourceTitle: "Data Structures and Algorithm Analysis in C++",
+  sourceVersion: "Fourth Edition (2013); ISBN 978-0132847377",
+  sourceUrl: "https://users.cs.fiu.edu/~weiss/",
+  rightsStatus: "reference-only",
+  rightsName: "Addison-Wesley copyrighted textbook; bibliographic reference only",
+  rightsUrl: "https://users.cs.fiu.edu/~weiss/",
+  accessStatus: "reachable",
+  checkedAt: "2026-07-17",
+  httpStatus: 200,
+} satisfies Omit<ContentProvenance, "sourceLocator">;
+
+const CS101_LOCATORS = {
+  "数组与线性表": "Chapter 3: Lists, Stacks, and Queues; Chapter 11: Amortized Analysis",
+  "链表": "Chapter 3: Lists, Stacks, and Queues",
+  "栈与队列": "Chapter 3: Lists, Stacks, and Queues",
+  "二叉树与BST": "Chapter 4: Trees",
+  "AVL树与红黑树": "Chapter 4: Trees",
+  "图的表示与遍历": "Chapter 9: Graph Algorithms",
+  "最短路径算法": "Chapter 9: Graph Algorithms",
+  "排序算法": "Chapter 7: Sorting",
+  "动态规划": "Chapter 10: Algorithm Design Techniques",
+  "贪心算法与分治": "Chapter 10: Algorithm Design Techniques",
+  "哈希表": "Chapter 5: Hashing",
+  "堆与优先队列": "Chapter 6: Priority Queues (Heaps)",
+} as const satisfies Record<string, string>;
+
+const cs101KnowledgeChunkDrafts: Array<
+  KnowledgeChunk & { topic: keyof typeof CS101_LOCATORS }
+> = [
   // ========== 一、数组与线性表 ==========
   {
     id: "cs101_k01",
@@ -393,3 +422,13 @@ export const cs101KnowledgeChunks: KnowledgeChunk[] = [
     topic: "堆与优先队列",
   },
 ];
+
+export const cs101KnowledgeChunks: KnowledgeChunk[] = cs101KnowledgeChunkDrafts.map(
+  (chunk) => ({
+    ...chunk,
+    provenance: {
+      ...CS101_SOURCE,
+      sourceLocator: CS101_LOCATORS[chunk.topic],
+    },
+  })
+);

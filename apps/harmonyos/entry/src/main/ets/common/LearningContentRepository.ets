@@ -119,11 +119,13 @@ export class LearningContentRepository {
     }
 
     for (const item of LearningContentRepository.resources) {
-      LearningContentRepository.appendCourseItem(
-        LearningContentRepository.resourcesByCourse,
-        item.courseId,
-        item
-      );
+      if (item.courseId !== undefined && item.courseId.length > 0) {
+        LearningContentRepository.appendCourseItem(
+          LearningContentRepository.resourcesByCourse,
+          item.courseId,
+          item
+        );
+      }
     }
 
     for (const item of LearningContentRepository.topicRelations) {
@@ -205,8 +207,11 @@ export class LearningContentRepository {
     return LearningContentRepository.findCourseItems(LearningContentRepository.questionsByCourse, courseId);
   }
 
-  static getResources(courseId: string): ExternalLearningResource[] {
-    return LearningContentRepository.findCourseItems(LearningContentRepository.resourcesByCourse, courseId);
+  static getResources(courseId?: string): ExternalLearningResource[] {
+    if (courseId !== undefined && courseId.length > 0) {
+      return LearningContentRepository.findCourseItems(LearningContentRepository.resourcesByCourse, courseId);
+    }
+    return LearningContentRepository.resources.slice();
   }
 
   static getTopics(courseId: string): string[] {
