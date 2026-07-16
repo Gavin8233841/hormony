@@ -228,8 +228,19 @@ struct PracticePage {
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
     AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+      this.message = '无法打开 AI 测验，请重试';
+      this.hasError = true;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'PracticePage Quiz navigation failed: %{public}s', err.message);
+    });
+  }
+
+  private openMistakeBook(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeBook' }).catch((err: Error): void => {
+      this.message = '无法打开错题本，请重试';
+      this.hasError = true;
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'PracticePage mistake book navigation failed: %{public}s', err.message);
     });
   }
 
@@ -530,13 +541,16 @@ struct PracticePage {
           .backgroundColor(Constants.COLOR_BRAND_LIGHT)
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => { this.getUIContext().getRouter().back(); })
-        Button('进入 AI 测验')
+        Button(this.correctCount < this.questions.length ? '查看错题本' : '进入 AI 测验')
           .layoutWeight(1)
           .height(48)
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(Constants.COLOR_BRAND)
+          .backgroundColor(this.correctCount < this.questions.length ? Constants.COLOR_WARNING : Constants.COLOR_BRAND)
           .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => { this.openQuiz(); })
+          .onClick((): void => {
+            if (this.correctCount < this.questions.length) this.openMistakeBook();
+            else this.openQuiz();
+          })
       }
         .width('100%')
     }

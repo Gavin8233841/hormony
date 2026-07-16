@@ -178,6 +178,55 @@ const quizPageSource = readFileSync(
   ),
   "utf8"
 );
+const practicePageSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../../harmonyos/entry/src/main/ets/pages/Practice.ets",
+      import.meta.url
+    )
+  ),
+  "utf8"
+);
+
+interface PageMethodSource {
+  name: string;
+  source: string;
+}
+
+function pageMethods(pageSource: string): PageMethodSource[] {
+  const declaration = /\n  (?:(?:private|public|protected)\s+)?(?:async\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\([^;\n]*\)\s*(?::\s*[^\n{]+)?\s*\{/g;
+  const matches = Array.from(pageSource.matchAll(declaration));
+  return matches.map((match, index): PageMethodSource => {
+    const start = (match.index ?? 0) + 1;
+    const end = index + 1 < matches.length ? (matches[index + 1].index ?? pageSource.length) + 1 : pageSource.length;
+    return {
+      name: match[1],
+      source: pageSource.slice(start, end),
+    };
+  });
+}
+
+function pageMethod(pageSource: string, methodName: string): PageMethodSource {
+  const method = pageMethods(pageSource).find((item) => item.name === methodName);
+  if (method === undefined) throw new Error(`页面缺少可执行方法 ${methodName}`);
+  return method;
+}
+
+function pageRouteMethod(pageSource: string, url: string): PageMethodSource {
+  const methods = pageMethods(pageSource).filter((item) =>
+    item.source.includes(`pushUrl({ url: '${url}' })`)
+  );
+  expect(methods).toHaveLength(1);
+  return methods[0];
+}
+
+function expectNavigationFailureMessage(method: PageMethodSource, destination: RegExp): void {
+  const catchIndex = method.source.indexOf(".catch(");
+  expect(catchIndex).toBeGreaterThan(-1);
+  const catchSource = method.source.slice(catchIndex);
+  expect(catchSource).toMatch(/this\.message\s*=\s*'[^']*无法打开[^']*'/);
+  expect(catchSource).toMatch(destination);
+}
 const repositorySourceFile = ts.createSourceFile(
   "LocalLearningRepository.ets",
   repositorySource,
@@ -619,5 +668,63 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     expect(source).not.toContain("getStudyEvents");
     expect(source).not.toMatch(/\.slice\s*\(/);
     expect(source).not.toContain("for (const event");
+  });
+});
+
+describe("Quiz 与 Practice 结果页下一步动作", () => {
+  it("Quiz 有错题时主动作直接进入错题本，导航失败显示明确消息", () => {
+    const routeMethod = pageRouteMethod(quizPageSource, "pages/MistakeBook");
+    expectNavigationFailureMessage(routeMethod, /错题本/);
+
+    const resultSource = pageMethod(quizPageSource, "ResultState").source;
+    const conditionIndex = resultSource.indexOf("if (this.resultCorrectCount < this.resultTotalQuestions)");
+    const actionIndex = resultSource.indexOf(`this.${routeMethod.name}();`, conditionIndex);
+    expect(conditionIndex).toBeGreaterThan(-1);
+    expect(actionIndex).toBeGreaterThan(conditionIndex);
+  });
+
+  it("Quiz 高正确率主动作按 easy→medium→hard 提升难度并重置生成态", () => {
+    const transitionMethods = pageMethods(quizPageSource).filter((method) =>
+      /this\.difficulty\s*===\s*'easy'[\s\S]*return\s+'medium'/.test(method.source) &&
+      /return\s+'hard'/.test(method.source)
+    );
+    expect(transitionMethods).toHaveLength(1);
+    const transitionMethod = transitionMethods[0];
+    const difficultyActions = pageMethods(quizPageSource).filter((method) =>
+      method.source.includes(`this.${transitionMethod.name}()`) &&
+      method.source.includes("this.resultAccuracy < 0.8") &&
+      method.source.includes("this.resetQuiz()") &&
+      /this\.difficulty\s*=/.test(method.source)
+    );
+    expect(difficultyActions).toHaveLength(1);
+    const actionMethod = difficultyActions[0];
+    const nextDifficultyIndex = actionMethod.source.indexOf(`this.${transitionMethod.name}()`);
+    const resetIndex = actionMethod.source.lastIndexOf("this.resetQuiz()");
+    const assignmentIndex = actionMethod.source.lastIndexOf("this.difficulty =");
+    expect(nextDifficultyIndex).toBeGreaterThan(-1);
+    expect(resetIndex).toBeGreaterThan(nextDifficultyIndex);
+    expect(assignmentIndex).toBeGreaterThan(resetIndex);
+
+    const resultSource = pageMethod(quizPageSource, "ResultState").source;
+    expect(resultSource).toContain(`this.${actionMethod.name}();`);
+  });
+
+  it("Practice 有错题时进入错题本，全对时保留进入 AI 测验", () => {
+    const mistakeRoute = pageRouteMethod(practicePageSource, "pages/MistakeBook");
+    expectNavigationFailureMessage(mistakeRoute, /错题本/);
+    const quizRoute = pageRouteMethod(practicePageSource, "pages/Quiz");
+
+    const resultSource = pageMethod(practicePageSource, "ResultView").source;
+    const wrongConditionIndex = resultSource.indexOf("if (this.correctCount < this.questions.length)");
+    const mistakeActionIndex = resultSource.indexOf(`this.${mistakeRoute.name}();`, wrongConditionIndex);
+    const quizActionIndex = resultSource.indexOf(`else this.${quizRoute.name}();`, mistakeActionIndex);
+    expect(wrongConditionIndex).toBeGreaterThan(-1);
+    expect(mistakeActionIndex).toBeGreaterThan(wrongConditionIndex);
+    expect(quizActionIndex).toBeGreaterThan(mistakeActionIndex);
+  });
+
+  it("Practice 的 AI 测验导航失败也显示明确消息", () => {
+    const quizRoute = pageRouteMethod(practicePageSource, "pages/Quiz");
+    expectNavigationFailureMessage(quizRoute, /AI 测验|测验/);
   });
 });

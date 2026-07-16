@@ -94,3 +94,39 @@
 - **未验证**：当前无模拟器或真机目标，未执行真实 ArkData 并发提交、进程中断后的 pending 恢复、应用重启后的错题/画像/Topic 掌握度/活动/课程进度逐项读取，也未完成到期时间跨日的设备流程。
 - **未验证**：线上 AI 出题与提交链路本批次未重新调用；不沿用 HTTP 200 作为本批次业务成功证据。
 - **未验证**：HAP 未签名，安装、真机和多设备行为未验证。
+
+## 批次 3：结果页下一步与复合标签消费契约
+
+### 背景
+
+答题写回后虽然已有逐题复盘和状态回执，但 Quiz 结果页只有泛化的“再练一组”，Practice 结果页无论是否存在错题都进入 AI 测验，用户无法从结果页直接继续错题复习。本批次补齐真实下一步动作，并复核 WS04 消费标签洞察所需的精确隔离和全量读取边界。
+
+### 文件
+
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+
+### 行为变化
+
+- Quiz 有错题时显示“查看错题本”并进入真实 `pages/MistakeBook`；同时保留再练动作。正确率达到 80% 后，下一组按 `easy -> medium -> hard` 提升难度，挑战难度不再越界；不足 80% 时保持当前难度再练。
+- Practice 有错题时下一步进入错题本，全对时才进入 AI 测验。Quiz 与 Practice 的两个新导航路径失败时均在当前页面显示明确错误，不把失败误报为成功。
+- 页面动作契约从源码提取实际方法，约束错题本路由、失败提示、难度递进与 Practice 分支，不依赖静态假回复或运行时替身。
+- **源码确认**：生产 reducer 使用 `JSON.stringify([courseId, topic, tag])` 作为标签洞察身份；605 条学习事件契约证明跨 Topic 同名标签分别累计且长期总数不受 500 条活动明细截断。
+- **源码确认**：公开 `LocalLearningRepository.getAllTagInsights()` 克隆并排序 `state.tagInsights` 全量持久状态，不调用截断版活动读取、不做 `slice`，供 WS04 在按精确课程、Topic 过滤弱项前使用；现有 `getTagInsights(limit)` 仅作为展示摘要 API。
+
+### 验证
+
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，exit 0，33 个 Topic 的 schema、唯一性、引用、DAG、连通性、层级及题库/知识切片一致性全部通过。
+- **静态诊断通过**：`cd apps/web; pnpm lint`，exit 0，无警告或错误。
+- **静态诊断通过**：`cd apps/web; pnpm typecheck`，exit 0。
+- **静态诊断通过**：`cd apps/web; pnpm test`，exit 0，15 个文件、192 项测试通过；其中结果页新增 4 项动作契约，全量洞察与复合标签隔离契约继续通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建完成。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，exit 0，`BUILD SUCCESSFUL in 26 s 637 ms`；项目未配置 `signingConfigs`，构建跳过签名。
+- **源码确认**：`hdc list targets`，exit 0，输出 `[Empty]`，当前没有可用于设备验收的目标。
+
+### 失败或未验证
+
+- **未验证**：无模拟器或真机目标，未执行结果页点击、错题本跳转、难度递进和应用重启后的设备流程。
+- **未验证**：本批次未重新调用线上 Quiz，不声明线上题组生成或业务字段通过。
+- **未验证**：HAP 未签名，安装、真机和多设备行为未验证。

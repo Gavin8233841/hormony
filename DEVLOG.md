@@ -6222,3 +6222,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前没有模拟器或真机目标；真实 ArkData 并发提交、进程中断恢复、应用重启后的五类写回读取及跨日到期复习均未验证，不能标记模拟器或真机通过。
 - 本批次未重新请求线上 Quiz；线上业务字段未验证。
 - HAP 未签名，安装、真机和多设备行为未验证。
+
+---
+
+## 2026-07-17 [WS02] 结果页下一步与复合标签消费契约
+
+背景：测验写回已有逐题复盘和状态回执，但 Quiz 与 Practice 结果页没有根据真实答题结果给出明确的错题复习路径；同时 WS04 需要在筛选弱项前读取按课程、Topic、标签精确隔离且不受活动明细截断的全量洞察。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+- `docs/workstreams/02-quiz-mastery-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Quiz 有错题时提供直达 `pages/MistakeBook` 的动作；正确率达到 80% 后，下一组按 `easy -> medium -> hard` 真实提升难度，不足 80% 时保持当前难度再练。
+- Practice 有错题时进入错题本，全对时保留进入 AI 测验；新导航失败均在当前页面显示明确错误。
+- 新增 4 项页面源码契约，约束实际路由、失败提示、结果分支与难度递进。
+- 复核生产 reducer 的标签身份为 `JSON.stringify([courseId, topic, tag])`；605 条学习事件契约证明跨 Topic 同名标签隔离且长期累计不受 500 条活动明细截断。
+- 复核公开 `getAllTagInsights()` 直接克隆、排序全量 `state.tagInsights`，不通过截断活动明细重算，供 WS04 按精确课程与 Topic 过滤；`getTagInsights(limit)` 继续只用于展示摘要。
+
+验证：
+- `python scripts/validate-topic-relations.py`：exit 0，`ALL CHECKS PASSED`。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，15 个文件、192 项测试通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建完成。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 26 s 637 ms`；仍提示未配置 `signingConfigs`，跳过签名。
+- `& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前无模拟器或真机目标，结果页点击、错题本跳转、难度递进、重启恢复和跨日到期复习均未做设备验证。
+- 本批次未重新调用线上 Quiz；不声明线上业务字段通过。
+- HAP 未签名，安装、真机和多设备行为未验证。
