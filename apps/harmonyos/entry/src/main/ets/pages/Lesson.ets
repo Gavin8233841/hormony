@@ -118,37 +118,58 @@ struct LessonPage {
     this.feedbackVisible = true;
   }
 
-  private selfAssess(activity: LearningActivity, correct: boolean): void {
-    this.markActivityAttempted(activity, correct);
+  private selfAssess(activity: LearningActivity, covered: boolean): void {
+    this.markActivityAttempted(activity, covered, true);
   }
 
-  private markActivityAttempted(activity: LearningActivity, correct: boolean): void {
+  private markActivityAttempted(activity: LearningActivity, correct: boolean, selfAssessed: boolean = false): void {
     if (!this.attemptedActivityIds.includes(activity.id)) {
       this.attemptedActivityIds = this.attemptedActivityIds.concat([activity.id]);
-      this.persistActivityEvidence(activity, correct);
+      this.persistActivityEvidence(activity, correct, selfAssessed);
     }
   }
 
-  private persistActivityEvidence(activity: LearningActivity, correct: boolean): void {
+  private persistActivityEvidence(activity: LearningActivity, correct: boolean, selfAssessed: boolean): void {
     const now = new Date().toISOString();
-    const event: LearningStudyEvent = {
-      id: 'lesson_activity_' + now + '_' + activity.id,
-      type: 'lesson_activity',
-      timestamp: now,
-      courseId: this.courseId,
-      topic: this.topic,
-      taskId: activity.id,
-      source: 'lesson_interactive',
-      difficulty: this.activityDifficulty(activity),
-      accuracy: correct ? 1 : 0,
-      tags: this.activityTags(activity),
-      totalQuestions: 1,
-      correctCount: correct ? 1 : 0
-    };
+    let event: LearningStudyEvent;
+    if (selfAssessed) {
+      event = {
+        id: 'lesson_activity_' + now + '_' + activity.id,
+        type: 'lesson_activity',
+        timestamp: now,
+        courseId: this.courseId,
+        topic: this.topic,
+        taskId: activity.id,
+        source: 'lesson_self_assessment',
+        difficulty: this.activityDifficulty(activity),
+        tags: this.activityTags(activity)
+      };
+    } else {
+      event = {
+        id: 'lesson_activity_' + now + '_' + activity.id,
+        type: 'lesson_activity',
+        timestamp: now,
+        courseId: this.courseId,
+        topic: this.topic,
+        taskId: activity.id,
+        source: 'lesson_interactive',
+        difficulty: this.activityDifficulty(activity),
+        accuracy: correct ? 1 : 0,
+        tags: this.activityTags(activity),
+        totalQuestions: 1,
+        correctCount: correct ? 1 : 0
+      };
+    }
     LocalLearningRepository.appendStudyEvent(event).then((): void => {
-      this.activityEvidenceMessage = correct ?
-        '已记录为掌握证据：画像、成就和标签洞察会同步更新。' :
-        '已记录为复盘证据：建议问学伴讲清错因，或进入同标签测验。';
+      if (selfAssessed) {
+        this.activityEvidenceMessage = correct ?
+          '已记录本次自我对照：关键点已覆盖。请用同标签测验做客观验证。' :
+          '已记录本次自我对照：关键点有遗漏。建议先看对照重点再练习。';
+      } else {
+        this.activityEvidenceMessage = correct ?
+          '已记录本次客观题结果：回答正确。' :
+          '已记录本次客观题结果：回答有误，建议查看对照重点。';
+      }
     }).catch((): void => {
       this.activityEvidenceMessage = '互动记录保存失败，本次仍可继续学习。';
     });
@@ -797,14 +818,14 @@ struct LessonPage {
             if (this.activeActivity()!.interactionMode === 'free_response' &&
               !this.attemptedActivityIds.includes(this.activeActivity()!.id)) {
               Row({ space: 10 }) {
-                Button('还需巩固')
+                Button('关键点有遗漏')
                   .layoutWeight(1)
                   .height(44)
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   .backgroundColor(Constants.COLOR_BG_TAG)
                   .borderRadius(Constants.RADIUS_MD)
                   .onClick((): void => { this.selfAssess(this.activeActivity()!, false); })
-                Button('我答对了')
+                Button('关键点已覆盖')
                   .layoutWeight(1)
                   .height(44)
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)

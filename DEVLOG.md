@@ -6256,3 +6256,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前无模拟器或真机目标，结果页点击、错题本跳转、难度递进、重启恢复和跨日到期复习均未做设备验证。
 - 本批次未重新调用线上 Quiz；不声明线上业务字段通过。
 - HAP 未签名，安装、真机和多设备行为未验证。
+
+---
+
+## 2026-07-17 [WS02] v10 向前迁移与掌握证据一致性
+
+背景：`c7afdf8` 将当前 ArkData `SCHEMA_VERSION` 设为 8，但历史已发布提交 `16f168a` 的同一 `app_state(state_key, payload, updated_at)` 表已使用 schema 10，并通过 `quiz_stats` 保存未受 20 条明细截断的累计统计。当前 reducer 还会把自由回答自评计入客观题标签统计，并按单次正确率生成 `quiz_mastered`，导致先错后对的累计掌握状态与事件不一致，保存重读后可能突然补出 milestone 和课程进度。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- 数据库 schema 升至 11。迁移按 v10 的精确键 `quiz_stats`、`topic_mastery`、`quiz_results`、`review_items` 和 `study_events` 读取行式 JSON；累计总题数、正确数、学习日期、Topic 尝试和首次掌握在保存及二次初始化后保持一致。
+- 若 v10 曾被旧代码降写为 v8，且 `legacy.updatedAt < current.firstSubmittedAt` 明确证明旧聚合与新答题前后不重叠，迁移会相加两段统计；否则只采用覆盖范围更完整的一侧，避免重复累计。
+- v10 `tag_insights` 只有全局 `tag` 聚合，`lastCourseId/lastTopic` 只记录最后上下文，不能证明终身累计属于当前 `courseId + topic + tag` 身份。迁移不把该累计注入复合标签状态，也不覆盖或删除原行，避免 Topic 污染。
+- Topic 掌握阈值集中为累计题数与累计正确数的 80%。`TopicMastery.mastered`、`quiz_mastered`、事件累计正确率和首次 milestone 使用同一判定；重读只从与累计事件证据一致的 `quiz_mastered` 恢复 milestone。
+- Lesson 自由回答的“关键点已覆盖/关键点有遗漏”统一写入 `source='lesson_self_assessment'`，不携带 `totalQuestions/correctCount/accuracy`；reducer 保留活动幂等事实，但不改变客观题总数、正确数或错题数。
+- 补充内存 ArkData fixture，严格执行当前三条 SQL，覆盖原生 v10 迁移、v10 降写 v8 后新增答题、JSON 保存重读、先错后对、课程进度稳定和自由回答两种自评。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts src/lib/data/mistake-review-flow.test.ts`：exit 0，2 个文件、27 项测试通过。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，15 个文件、196 项测试通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建完成。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`：exit 0，`BUILD SUCCESSFUL in 34 s 667 ms`；`CompileArkTS` 完成，仍提示未配置 `signingConfigs`，跳过签名。
+- `& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前无模拟器或真机目标，真实 ArkData 升级、进程中断、应用重启、课程进度 UI、自由回答两种自评及跨日复习未做设备验证。
+- 本批次未调用线上 Quiz；不声明线上业务字段通过。
+- HAP 未签名，安装、真机和多设备行为未验证。

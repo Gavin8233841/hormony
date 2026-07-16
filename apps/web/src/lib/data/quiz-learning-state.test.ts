@@ -35,11 +35,14 @@ interface RuntimeResult {
 }
 
 interface RuntimeMastery {
+  courseId: string;
+  topic: string;
   attempts: number;
   totalQuestions: number;
   correctQuestions: number;
   accuracy: number;
   mastered: boolean;
+  lastPracticedAt?: string;
 }
 
 interface RuntimeReviewItem {
@@ -57,6 +60,8 @@ interface RuntimeTagInsight {
   topic: string;
   totalQuestions: number;
   correctQuestions: number;
+  accuracy: number;
+  wrongQuestions: number;
 }
 
 interface RuntimeState {
@@ -73,7 +78,13 @@ interface RuntimeState {
   reviewItems: RuntimeReviewItem[];
   topicMastery: RuntimeMastery[];
   tagInsights: RuntimeTagInsight[];
-  quizEvents: Array<{ id: string }>;
+  quizEvents: Array<{
+    id: string;
+    type: string;
+    accuracy?: number;
+    totalQuestions?: number;
+    correctCount?: number;
+  }>;
   masteryMilestones: Array<{ courseId: string; topic: string; masteredAt: string }>;
   weakTopics: string[];
   strongTopics: string[];
@@ -85,6 +96,7 @@ interface RuntimeStudyEvent {
   timestamp: string;
   courseId?: string;
   topic?: string;
+  source?: string;
   difficulty?: string;
   tags?: string[];
   totalQuestions?: number;
@@ -102,6 +114,7 @@ interface RuntimeReceipt {
 
 interface ReducerRuntime {
   createEmptyState(): RuntimeState;
+  preparePersistentState(state: RuntimeState): boolean;
   enqueueResult(state: RuntimeState, result: RuntimeResult): boolean;
   applyPendingResults(state: RuntimeState): number;
   applyResult(state: RuntimeState, result: RuntimeResult): boolean;
@@ -109,6 +122,81 @@ interface ReducerRuntime {
   createReceipt(state: RuntimeState, result: RuntimeResult, applied: boolean, now?: string): RuntimeReceipt;
   localDateKey(timestamp: string): string;
   tagInsightKey(courseId: string, topic: string, tag: string): string;
+}
+
+interface RuntimeProfile {
+  stats: {
+    totalQuestions: number;
+    accuracy: number;
+    studyDays: number;
+    streakDays: number;
+  };
+}
+
+interface RuntimeCourse {
+  id: string;
+  progress: number;
+}
+
+interface RepositoryRuntime {
+  initialize(context: object): Promise<void>;
+  getProfile(): Promise<RuntimeProfile | null>;
+  getCourses(): Promise<RuntimeCourse[] | null>;
+}
+
+interface ArkDataRow {
+  payload: string;
+  updatedAt: number;
+}
+
+class MemoryResultSet {
+  constructor(private readonly payload: string | null) {}
+
+  goToFirstRow(): boolean {
+    return this.payload !== null;
+  }
+
+  getString(index: number): string {
+    if (index !== 0 || this.payload === null) throw new Error("ResultSet payload 不存在");
+    return this.payload;
+  }
+
+  close(): void {}
+}
+
+class MemoryRdbStore {
+  readonly queriedKeys: string[] = [];
+
+  constructor(private readonly rows: Map<string, ArkDataRow>) {}
+
+  async executeSql(sql: string, bindArgs: unknown[] = []): Promise<void> {
+    if (sql === "CREATE TABLE IF NOT EXISTS app_state " +
+      "(state_key TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)") return;
+    if (sql !== "INSERT OR REPLACE INTO app_state " +
+      "(state_key, payload, updated_at) VALUES (?, ?, ?)") {
+      throw new Error(`未实现的 ArkData 写入 SQL: ${sql}`);
+    }
+    const [key, payload, updatedAt] = bindArgs;
+    if (typeof key !== "string" || typeof payload !== "string" || typeof updatedAt !== "number") {
+      throw new Error("ArkData 写入参数结构无效");
+    }
+    this.rows.set(key, { payload, updatedAt });
+  }
+
+  async querySql(sql: string, bindArgs: unknown[]): Promise<MemoryResultSet> {
+    if (sql !== "SELECT payload FROM app_state WHERE state_key = ?") {
+      throw new Error(`未实现的 ArkData 查询 SQL: ${sql}`);
+    }
+    const [key] = bindArgs;
+    if (typeof key !== "string") throw new Error("ArkData 查询键无效");
+    this.queriedKeys.push(key);
+    return new MemoryResultSet(this.rows.get(key)?.payload ?? null);
+  }
+}
+
+interface LoadedRepository {
+  repository: RepositoryRuntime;
+  store: MemoryRdbStore;
 }
 
 const reducerSource = readFileSync(
@@ -187,6 +275,152 @@ const practicePageSource = readFileSync(
   ),
   "utf8"
 );
+const lessonPageSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../../harmonyos/entry/src/main/ets/pages/Lesson.ets",
+      import.meta.url
+    )
+  ),
+  "utf8"
+);
+
+function loadRepository(rows: Map<string, ArkDataRow>): LoadedRepository {
+  const sourceFile = ts.createSourceFile(
+    "LocalLearningRepository.ets",
+    repositorySource,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS
+  );
+  const withoutImports = ts.factory.updateSourceFile(
+    sourceFile,
+    sourceFile.statements.filter((statement) => !ts.isImportDeclaration(statement))
+  );
+  const printableSource = ts.createPrinter().printFile(withoutImports);
+  const transpiled = ts.transpileModule(printableSource, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      strict: true,
+    },
+    reportDiagnostics: true,
+  });
+  const errors = (transpiled.diagnostics ?? []).filter(
+    (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error
+  );
+  expect(errors).toEqual([]);
+
+  const store = new MemoryRdbStore(rows);
+  const runtimeExports: Record<string, unknown> = {};
+  runInNewContext(transpiled.outputText, {
+    exports: runtimeExports,
+    module: { exports: runtimeExports },
+    relationalStore: {
+      SecurityLevel: { S1: "S1" },
+      getRdbStore: async (): Promise<MemoryRdbStore> => store,
+    },
+    LearningContentRepository: {
+      getTopics: (courseId: string): string[] =>
+        courseId === "cs101" ? ["二叉树与BST", "图的遍历"] : [],
+    },
+    QuizLearningStateReducer: reducer,
+  });
+  const repository = runtimeExports.LocalLearningRepository;
+  if (typeof repository !== "function") {
+    throw new Error("LocalLearningRepository 未导出可执行类");
+  }
+  return { repository: repository as unknown as RepositoryRuntime, store };
+}
+
+function v10Rows(): Map<string, ArkDataRow> {
+  const values: Record<string, unknown> = {
+    schema_version: 10,
+    profile: {
+      userId: "demo",
+      name: "历史用户",
+      stage: "本科二年级",
+      weakTopics: [],
+      strongTopics: ["二叉树与BST"],
+      learningStyle: "视觉型",
+      stats: { totalQuestions: 40, accuracy: 0.725, studyDays: 3, streakDays: 3 },
+    },
+    courses: [
+      {
+        id: "cs101",
+        title: "数据结构",
+        progress: 0.5,
+        docCount: 52,
+        topics: ["二叉树与BST", "图的遍历"],
+      },
+    ],
+    quiz_results: [],
+    study_events: [
+      {
+        id: "event-v10-mastered",
+        type: "quiz_mastered",
+        timestamp: "2026-07-10T08:00:00.000Z",
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        source: "curated",
+        difficulty: "medium",
+        accuracy: 1,
+        tags: ["树结构"],
+        totalQuestions: 5,
+        correctCount: 5,
+      },
+    ],
+    review_items: [],
+    topic_mastery: [
+      {
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 4,
+        totalQuestions: 10,
+        correctQuestions: 8,
+        accuracy: 0.8,
+        mastered: true,
+        lastPracticedAt: "2026-07-10T08:00:00.000Z",
+      },
+    ],
+    quiz_stats: {
+      totalQuestions: 40,
+      accuracy: 0.725,
+      studyDates: ["2026-07-08", "2026-07-09", "2026-07-10"],
+      updatedAt: "2026-07-10T08:00:00.000Z",
+    },
+    tag_insights: [
+      {
+        tag: "树结构",
+        totalQuestions: 10,
+        correctQuestions: 8,
+        accuracy: 0.8,
+        wrongQuestions: 2,
+        lastPracticedAt: "2026-07-10T08:00:00.000Z",
+        easyQuestions: 2,
+        mediumQuestions: 8,
+        hardQuestions: 0,
+        lastDifficulty: "medium",
+        lastCourseId: "cs101",
+        lastTopic: "二叉树与BST",
+        weakReason: "错题重复出现，建议按标签集中复盘",
+        nextStep: "练 5 道同标签题，再查看错题解析",
+      },
+    ],
+  };
+  return new Map(
+    Object.entries(values).map(([key, value], index): [string, ArkDataRow] => [
+      key,
+      { payload: JSON.stringify(value), updatedAt: index + 1 },
+    ])
+  );
+}
+
+function rowValue<T>(rows: Map<string, ArkDataRow>, key: string): T {
+  const row = rows.get(key);
+  if (row === undefined) throw new Error(`ArkData fixture 缺少 ${key}`);
+  return JSON.parse(row.payload) as T;
+}
 
 interface PageMethodSource {
   name: string;
@@ -421,6 +655,215 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     }
     expect(sanitizeSource).toContain("if (retainedStatsSourceCount !== originalStatsSourceCount)");
     expect(sanitizeSource).toContain("QuizLearningStateReducer.masteryTotals(state.topicMastery)");
+  });
+
+  it("从已发布 schema v10 行迁移后保留累计统计，并在 JSON 重读后保持一致", async () => {
+    const rows = v10Rows();
+    const legacyTagInsightsPayload = rows.get("tag_insights")?.payload;
+    expect(legacyTagInsightsPayload).toBeDefined();
+    const first = loadRepository(rows);
+    await first.repository.initialize({});
+
+    expect(first.store.queriedKeys).toEqual(expect.arrayContaining([
+      "schema_version",
+      "quiz_stats",
+      "topic_mastery",
+    ]));
+    expect(rowValue<number>(rows, "schema_version")).toBeGreaterThan(10);
+
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({
+      totalAttempts: 4,
+      totalQuestions: 40,
+      correctQuestions: 29,
+    });
+    expect(migrated.stats.quizDates.slice().sort()).toEqual([
+      "2026-07-08",
+      "2026-07-09",
+      "2026-07-10",
+    ]);
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 4,
+        totalQuestions: 10,
+        correctQuestions: 8,
+        accuracy: 0.8,
+        mastered: true,
+        lastPracticedAt: "2026-07-10T08:00:00.000Z",
+      }),
+    ]);
+    expect(rows.get("tag_insights")?.payload).toBe(legacyTagInsightsPayload);
+    expect(migrated.masteryMilestones).toEqual([
+      {
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        masteredAt: "2026-07-10T08:00:00.000Z",
+      },
+    ]);
+
+    const firstProfile = await first.repository.getProfile();
+    const firstCourses = await first.repository.getCourses();
+    expect(firstProfile?.stats.totalQuestions).toBe(40);
+    expect(firstProfile?.stats.accuracy).toBeCloseTo(0.725, 10);
+    expect(firstCourses).toEqual([
+      expect.objectContaining({ id: "cs101", progress: 0.5 }),
+    ]);
+
+    const persistedSnapshot = JSON.parse(JSON.stringify(migrated)) as RuntimeState;
+    const second = loadRepository(rows);
+    await second.repository.initialize({});
+    const reloaded = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    const secondProfile = await second.repository.getProfile();
+    const secondCourses = await second.repository.getCourses();
+
+    expect(reloaded).toEqual(persistedSnapshot);
+    expect(rows.get("tag_insights")?.payload).toBe(legacyTagInsightsPayload);
+    expect(secondProfile?.stats.totalQuestions).toBe(40);
+    expect(secondProfile?.stats.accuracy).toBeCloseTo(0.725, 10);
+    expect(secondCourses).toEqual(firstCourses);
+  });
+
+  it("v10 被旧版降到 v8 后产生的新答题与历史聚合按时间边界合并且重读稳定", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("post-v10-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("post-v10-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+
+    const first = loadRepository(rows);
+    await first.repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({
+      totalAttempts: 6,
+      totalQuestions: 42,
+      correctQuestions: 30,
+    });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 6,
+        totalQuestions: 12,
+        correctQuestions: 9,
+        accuracy: 0.75,
+        mastered: false,
+      }),
+    ]);
+    expect(migrated.masteryMilestones).toEqual([
+      {
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        masteredAt: "2026-07-10T08:00:00.000Z",
+      },
+    ]);
+    const firstProfile = await first.repository.getProfile();
+    const firstCourses = await first.repository.getCourses();
+    expect(firstProfile?.stats.totalQuestions).toBe(42);
+    expect(firstProfile?.stats.accuracy).toBeCloseTo(30 / 42, 10);
+    expect(firstCourses).toEqual([
+      expect.objectContaining({ id: "cs101", progress: 0.5 }),
+    ]);
+
+    const persistedSnapshot = JSON.parse(JSON.stringify(migrated)) as RuntimeState;
+    const second = loadRepository(rows);
+    await second.repository.initialize({});
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(persistedSnapshot);
+    expect(await second.repository.getCourses()).toEqual(firstCourses);
+  });
+
+  it("自由回答的已覆盖与有遗漏都只保留自评事实，不改变客观题统计", () => {
+    const state = reducer.createEmptyState();
+    expect(reducer.applyLearningInsightEvent(state, {
+      id: "lesson-objective",
+      type: "lesson_activity",
+      timestamp: "2026-07-17T08:00:00.000Z",
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      source: "lesson_interactive",
+      difficulty: "medium",
+      tags: ["树结构"],
+      totalQuestions: 1,
+      correctCount: 1,
+    })).toBe(true);
+    const objectiveSnapshot = JSON.parse(JSON.stringify(state.tagInsights));
+
+    for (const covered of [true, false]) {
+      expect(reducer.applyLearningInsightEvent(state, {
+        id: `lesson-self-assessment-covered-${covered.toString()}`,
+        type: "lesson_activity",
+        timestamp: covered ? "2026-07-17T09:00:00.000Z" : "2026-07-17T10:00:00.000Z",
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        source: "lesson_self_assessment",
+        difficulty: "medium",
+        tags: ["树结构"],
+      })).toBe(true);
+    }
+
+    expect(state.tagInsights).toEqual(objectiveSnapshot);
+    expect(state.appliedInsightEventIds).toEqual([
+      "lesson-objective",
+      "lesson-self-assessment-covered-true",
+      "lesson-self-assessment-covered-false",
+    ]);
+
+    const selfAssessSource = pageMethod(lessonPageSource, "selfAssess").source;
+    expect(selfAssessSource).toContain("this.markActivityAttempted(activity, covered, true)");
+    expect(lessonPageSource).toContain("this.selfAssess(this.activeActivity()!, false)");
+    expect(lessonPageSource).toContain("this.selfAssess(this.activeActivity()!, true)");
+    const persistSource = pageMethod(lessonPageSource, "persistActivityEvidence").source;
+    const selfAssessedBranch = persistSource.slice(
+      persistSource.indexOf("if (selfAssessed)"),
+      persistSource.indexOf("} else {")
+    );
+    expect(selfAssessedBranch).toContain("source: 'lesson_self_assessment'");
+    expect(selfAssessedBranch).not.toContain("totalQuestions");
+    expect(selfAssessedBranch).not.toContain("correctCount");
+    expect(selfAssessedBranch).not.toContain("accuracy:");
+  });
+
+  it("先错后对仍按累计正确率记为未掌握，保存重读后 milestone 与课程进度不突变", async () => {
+    const state = reducer.createEmptyState();
+    reducer.applyResult(state, result("quiz-wrong-first", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(state, result("quiz-correct-second", "2026-07-17T12:00:00.000Z", true));
+
+    expect(state.topicMastery[0]).toMatchObject({
+      attempts: 2,
+      totalQuestions: 2,
+      correctQuestions: 1,
+      accuracy: 0.5,
+      mastered: false,
+    });
+    expect(state.quizEvents.map((event) => event.type)).toEqual([
+      "quiz_submitted",
+      "quiz_submitted",
+    ]);
+    expect(state.quizEvents.map((event) => event.accuracy)).toEqual([0, 0.5]);
+    expect(state.masteryMilestones).toEqual([]);
+
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(11), updatedAt: 100 });
+    rows.set("study_events", { payload: JSON.stringify([]), updatedAt: 101 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(state), updatedAt: 102 });
+    const first = loadRepository(rows);
+    await first.repository.initialize({});
+    const firstPersisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    const firstCourses = await first.repository.getCourses();
+    expect(firstPersisted.masteryMilestones).toEqual([]);
+    expect(firstCourses).toEqual([
+      expect.objectContaining({ id: "cs101", progress: 0 }),
+    ]);
+
+    const second = loadRepository(rows);
+    await second.repository.initialize({});
+    const reloaded = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    const secondCourses = await second.repository.getCourses();
+    expect(reloaded).toEqual(firstPersisted);
+    expect(reloaded.masteryMilestones).toEqual([]);
+    expect(secondCourses).toEqual(firstCourses);
   });
 
   it("同一 quizId 重试只累计一次，并同步五类派生状态", () => {

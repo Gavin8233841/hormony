@@ -24,7 +24,7 @@ import { QuizLearningStateReducer } from './QuizLearningStateReducer';
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 8;
+const SCHEMA_VERSION: number = 11;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -35,8 +35,16 @@ const KEY_STUDY_EVENTS: string = 'study_events';
 const KEY_LESSON_PROGRESS: string = 'lesson_progress';
 const KEY_REVIEW_ITEMS: string = 'review_items';
 const KEY_TOPIC_MASTERY: string = 'topic_mastery';
+const KEY_QUIZ_STATS: string = 'quiz_stats';
 const KEY_QUIZ_LEARNING_STATE: string = 'quiz_learning_state';
 const KEY_FORM_IDS: string = 'form_ids';
+
+interface LegacyQuizStatsAggregate {
+  totalQuestions: number;
+  accuracy: number;
+  studyDates: string[];
+  updatedAt: string;
+}
 
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
@@ -118,7 +126,7 @@ export class LocalLearningRepository {
       for (const result of results.slice().reverse()) QuizLearningStateReducer.applyResult(state, result);
       await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, state.topicMastery);
     }
-    if (previousVersion < 8) {
+    if (previousVersion < 11) {
       await LocalLearningRepository.migrateQuizLearningState();
     }
   }
@@ -135,8 +143,19 @@ export class LocalLearningRepository {
         QuizLearningStateReducer.preparePersistentState(existing);
         LocalLearningRepository.sanitizeQuizLearningState(existing);
         QuizLearningStateReducer.applyPendingResults(existing);
+        const legacyStats = await LocalLearningRepository.getValue<LegacyQuizStatsAggregate>(KEY_QUIZ_STATS);
+        const appendLegacyHistory = LocalLearningRepository.legacyHistoryPrecedesState(existing, legacyStats);
+        const legacyMastery = await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY);
+        LocalLearningRepository.mergeLegacyTopicMastery(existing, legacyMastery, appendLegacyHistory);
+        const legacyResults = (await LocalLearningRepository.getValue<QuizResult[]>(KEY_QUIZ_RESULTS)) ?? [];
+        LocalLearningRepository.mergeLegacyRecentResults(existing, legacyResults);
+        const legacyReviews = await LocalLearningRepository.getValue<ReviewItem[]>(KEY_REVIEW_ITEMS);
+        LocalLearningRepository.mergeLegacyReviewItems(existing, legacyReviews);
+        LocalLearningRepository.mergeLegacyQuizEvents(existing, validLegacyEvents);
         for (const event of validLegacyEvents) QuizLearningStateReducer.applyLearningInsightEvent(existing, event);
         QuizLearningStateReducer.ensureMasteryMilestones(existing);
+        LocalLearningRepository.mergeLegacyQuizStats(existing, legacyStats, appendLegacyHistory);
+        QuizLearningStateReducer.refreshProfileTopics(existing);
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, existing);
         await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, retainedStudyEvents);
         return;
@@ -205,9 +224,121 @@ export class LocalLearningRepository {
       state.quizEvents = QuizLearningStateReducer.compactQuizEvents(state.quizEvents);
       QuizLearningStateReducer.ensureMasteryMilestones(state);
       QuizLearningStateReducer.refreshProfileTopics(state);
+      const legacyStats = await LocalLearningRepository.getValue<LegacyQuizStatsAggregate>(KEY_QUIZ_STATS);
+      LocalLearningRepository.mergeLegacyQuizStats(state, legacyStats, false);
       await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, retainedStudyEvents);
     });
+  }
+
+  private static legacyHistoryPrecedesState(state: QuizLearningState,
+    legacy: LegacyQuizStatsAggregate | null): boolean {
+    if (legacy === null || state.stats.firstSubmittedAt === undefined || legacy.updatedAt.length === 0) return false;
+    const legacyUpdatedAt = new Date(legacy.updatedAt).getTime();
+    const currentFirstSubmittedAt = new Date(state.stats.firstSubmittedAt).getTime();
+    return !Number.isNaN(legacyUpdatedAt) && !Number.isNaN(currentFirstSubmittedAt) &&
+      legacyUpdatedAt < currentFirstSubmittedAt;
+  }
+
+  private static mergeLegacyQuizStats(state: QuizLearningState, legacy: LegacyQuizStatsAggregate | null,
+    appendLegacyHistory: boolean): void {
+    if (legacy === null || !Number.isFinite(legacy.totalQuestions) || legacy.totalQuestions < 0 ||
+      !Number.isFinite(legacy.accuracy) || legacy.accuracy < 0 || legacy.accuracy > 1) return;
+    const legacyCorrectQuestions = Math.round(legacy.totalQuestions * legacy.accuracy);
+    if (appendLegacyHistory) {
+      state.stats.totalQuestions += legacy.totalQuestions;
+      state.stats.correctQuestions += legacyCorrectQuestions;
+    } else if (legacy.totalQuestions >= state.stats.totalQuestions) {
+      state.stats.totalQuestions = legacy.totalQuestions;
+      state.stats.correctQuestions = legacyCorrectQuestions;
+    }
+    for (const date of legacy.studyDates) {
+      if (date.length > 0 && !state.stats.quizDates.includes(date)) state.stats.quizDates.push(date);
+    }
+  }
+
+  private static mergeLegacyTopicMastery(state: QuizLearningState, legacy: TopicMastery[] | null,
+    appendLegacyHistory: boolean): void {
+    if (legacy === null) return;
+    const validLegacy = legacy.filter((item: TopicMastery): boolean =>
+      LocalLearningRepository.isExactCourseTopic(item.courseId, item.topic));
+    let addedAttempts = 0;
+    for (const source of validLegacy) {
+      const index = state.topicMastery.findIndex((item: TopicMastery): boolean =>
+        item.courseId === source.courseId && item.topic === source.topic);
+      if (index < 0) {
+        state.topicMastery.push(source);
+        addedAttempts += source.attempts;
+        continue;
+      }
+      const target = state.topicMastery[index];
+      if (appendLegacyHistory) {
+        target.attempts += source.attempts;
+        target.totalQuestions += source.totalQuestions;
+        target.correctQuestions += source.correctQuestions;
+        target.accuracy = target.totalQuestions > 0 ? target.correctQuestions / target.totalQuestions : 0;
+        target.mastered = QuizLearningStateReducer.isTopicMastered(
+          target.correctQuestions, target.totalQuestions);
+        if (target.lastPracticedAt === undefined ||
+          (source.lastPracticedAt !== undefined && source.lastPracticedAt > target.lastPracticedAt)) {
+          target.lastPracticedAt = source.lastPracticedAt;
+        }
+        addedAttempts += source.attempts;
+      } else if (source.totalQuestions >= target.totalQuestions) {
+        state.topicMastery[index] = source;
+      }
+    }
+    if (appendLegacyHistory) {
+      state.stats.totalAttempts += addedAttempts;
+    } else {
+      const legacyTotals = QuizLearningStateReducer.masteryTotals(validLegacy);
+      if (legacyTotals.totalQuestions >= QuizLearningStateReducer.masteryTotals(state.topicMastery).totalQuestions) {
+        state.stats.totalAttempts = Math.max(state.stats.totalAttempts, legacyTotals.totalAttempts);
+      }
+    }
+  }
+
+  private static mergeLegacyRecentResults(state: QuizLearningState, legacy: QuizResult[]): void {
+    for (const result of legacy) {
+      if (!LocalLearningRepository.isExactCourseTopic(result.courseId, result.topic)) continue;
+      if (!state.appliedQuizIds.includes(result.quizId)) state.appliedQuizIds.push(result.quizId);
+      if (!state.recentResults.some((item: QuizResult): boolean => item.quizId === result.quizId)) {
+        state.recentResults.push(result);
+      }
+    }
+    state.recentResults.sort((left: QuizResult, right: QuizResult): number =>
+      right.submittedAt.localeCompare(left.submittedAt));
+    state.recentResults = state.recentResults.slice(0, 20);
+  }
+
+  private static mergeLegacyReviewItems(state: QuizLearningState, legacy: ReviewItem[] | null): void {
+    if (legacy === null) return;
+    for (const item of legacy) {
+      if (!LocalLearningRepository.isExactCourseTopic(item.courseId, item.topic)) continue;
+      const existing = state.reviewItems.find((current: ReviewItem): boolean =>
+        current.id === item.id || (current.courseId === item.courseId && current.topic === item.topic &&
+          current.questionId === item.questionId && current.stem === item.stem));
+      if (existing === undefined) {
+        state.reviewItems.push(item);
+      } else if ((existing.options ?? []).length === 0 && (item.options ?? []).length > 0) {
+        existing.options = item.options;
+        existing.quizId = item.quizId;
+      }
+    }
+  }
+
+  private static mergeLegacyQuizEvents(state: QuizLearningState, legacy: StudyEvent[]): void {
+    for (const event of legacy) {
+      if (event.type !== 'quiz_mastered' && event.type !== 'quiz_submitted') continue;
+      const exists = state.quizEvents.some((current: StudyEvent): boolean => current.id === event.id ||
+        (current.timestamp === event.timestamp && current.courseId === event.courseId &&
+          current.topic === event.topic && current.totalQuestions === event.totalQuestions &&
+          current.correctCount === event.correctCount));
+      if (!exists) state.quizEvents.push(event);
+    }
+    state.quizEvents.sort((left: StudyEvent, right: StudyEvent): number =>
+      left.timestamp.localeCompare(right.timestamp));
+    state.quizEvents = QuizLearningStateReducer.compactQuizEvents(state.quizEvents);
   }
 
   private static async ensureDefaults(): Promise<void> {
@@ -707,6 +838,7 @@ export class LocalLearningRepository {
     }
     const tags = (event.tags ?? []).filter((tag: string): boolean => tag.trim().length > 0);
     if (tags.length === 0) throw new Error('课程互动缺少标签');
+    if (event.source === 'lesson_self_assessment') return;
     const totalQuestions = event.totalQuestions ?? 1;
     const correctCount = event.correctCount ?? 0;
     if (totalQuestions <= 0 || correctCount < 0 || correctCount > totalQuestions) {

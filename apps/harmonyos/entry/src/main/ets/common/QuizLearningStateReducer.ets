@@ -15,8 +15,13 @@ const QUIZ_STATE_SCHEMA_VERSION: number = 2;
 const RECENT_RESULT_LIMIT: number = 20;
 const QUIZ_EVENT_LIMIT: number = 500;
 const RESOLVED_REVIEW_LIMIT: number = 200;
+const TOPIC_MASTERY_THRESHOLD: number = 0.8;
 
 export class QuizLearningStateReducer {
+  static isTopicMastered(correctQuestions: number, totalQuestions: number): boolean {
+    return totalQuestions > 0 && correctQuestions / totalQuestions >= TOPIC_MASTERY_THRESHOLD;
+  }
+
   static createEmptyState(): QuizLearningState {
     const stats: QuizLearningStats = {
       totalAttempts: 0,
@@ -93,11 +98,11 @@ export class QuizLearningStateReducer {
       state.stats.firstSubmittedAt = result.submittedAt;
     }
 
-    QuizLearningStateReducer.applyTopicMastery(state.topicMastery, result);
+    const topicMastery = QuizLearningStateReducer.applyTopicMastery(state.topicMastery, result);
     QuizLearningStateReducer.recordMasteryMilestone(state, result);
     QuizLearningStateReducer.applyReviewItems(state, result);
     QuizLearningStateReducer.applyTagInsights(state.tagInsights, result);
-    QuizLearningStateReducer.appendQuizEvent(state.quizEvents, result);
+    QuizLearningStateReducer.appendQuizEvent(state.quizEvents, result, topicMastery);
     state.quizEvents = QuizLearningStateReducer.compactQuizEvents(state.quizEvents);
     QuizLearningStateReducer.refreshProfileTopics(state);
     return true;
@@ -145,20 +150,43 @@ export class QuizLearningStateReducer {
   }
 
   static ensureMasteryMilestones(state: QuizLearningState): void {
-    for (const event of state.quizEvents) {
-      if (event.type !== 'quiz_mastered' || event.courseId === undefined || event.topic === undefined) continue;
+    const cumulativeMastery: TopicMastery[] = [];
+    const orderedEvents = state.quizEvents.slice().sort((left: StudyEvent, right: StudyEvent): number =>
+      left.timestamp.localeCompare(right.timestamp));
+    for (const event of orderedEvents) {
+      if ((event.type !== 'quiz_mastered' && event.type !== 'quiz_submitted') ||
+        event.courseId === undefined || event.topic === undefined || event.totalQuestions === undefined ||
+        event.correctCount === undefined || event.totalQuestions <= 0 || event.correctCount < 0 ||
+        event.correctCount > event.totalQuestions) continue;
+      let eventMastery = cumulativeMastery.find((item: TopicMastery): boolean =>
+        item.courseId === event.courseId && item.topic === event.topic);
+      if (eventMastery === undefined) {
+        eventMastery = {
+          courseId: event.courseId,
+          topic: event.topic,
+          attempts: 0,
+          totalQuestions: 0,
+          correctQuestions: 0,
+          accuracy: 0,
+          mastered: false
+        };
+        cumulativeMastery.push(eventMastery);
+      }
+      eventMastery.attempts += 1;
+      eventMastery.totalQuestions += event.totalQuestions;
+      eventMastery.correctQuestions += event.correctCount;
+      eventMastery.accuracy = eventMastery.correctQuestions / eventMastery.totalQuestions;
+      eventMastery.mastered = QuizLearningStateReducer.isTopicMastered(
+        eventMastery.correctQuestions, eventMastery.totalQuestions);
+      eventMastery.lastPracticedAt = event.timestamp;
+      if (event.type !== 'quiz_mastered' || !eventMastery.mastered) continue;
       const existing = state.masteryMilestones.find((item: TopicMasteryMilestone): boolean =>
         item.courseId === event.courseId && item.topic === event.topic);
       if (existing !== undefined) continue;
-      let masteredAt = event.timestamp;
-      for (const related of state.quizEvents) {
-        if (related.type === 'quiz_mastered' && related.courseId === event.courseId && related.topic === event.topic &&
-          related.timestamp < masteredAt) masteredAt = related.timestamp;
-      }
       state.masteryMilestones.push({
         courseId: event.courseId,
         topic: event.topic,
-        masteredAt: masteredAt
+        masteredAt: event.timestamp
       });
     }
     for (const mastery of state.topicMastery) {
@@ -197,7 +225,7 @@ export class QuizLearningStateReducer {
     return stats;
   }
 
-  private static applyTopicMastery(mastery: TopicMastery[], result: QuizResult): void {
+  private static applyTopicMastery(mastery: TopicMastery[], result: QuizResult): TopicMastery {
     let item = mastery.find((value: TopicMastery): boolean =>
       value.courseId === result.courseId && value.topic === result.topic);
     if (item === undefined) {
@@ -216,8 +244,9 @@ export class QuizLearningStateReducer {
     item.totalQuestions += result.totalQuestions;
     item.correctQuestions += result.correctCount;
     item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
-    item.mastered = item.accuracy >= 0.8;
+    item.mastered = QuizLearningStateReducer.isTopicMastered(item.correctQuestions, item.totalQuestions);
     item.lastPracticedAt = result.submittedAt;
+    return item;
   }
 
   private static recordMasteryMilestone(state: QuizLearningState, result: QuizResult): void {
@@ -390,6 +419,7 @@ export class QuizLearningStateReducer {
     }
     if (normalizedTags.length === 0 || state.appliedInsightEventIds.includes(event.id)) return false;
     state.appliedInsightEventIds.push(event.id);
+    if (event.source === 'lesson_self_assessment') return true;
     const totalQuestions = Math.max(0, event.totalQuestions ?? 1);
     const correctQuestions = Math.max(0, Math.min(totalQuestions, event.correctCount ?? 0));
     const difficulty = event.difficulty ?? 'easy';
@@ -467,16 +497,16 @@ export class QuizLearningStateReducer {
     };
   }
 
-  private static appendQuizEvent(events: StudyEvent[], result: QuizResult): void {
+  private static appendQuizEvent(events: StudyEvent[], result: QuizResult, topicMastery: TopicMastery): void {
     const event: StudyEvent = {
       id: 'quiz_' + result.quizId,
-      type: result.accuracy >= 0.8 ? 'quiz_mastered' : 'quiz_submitted',
+      type: topicMastery.mastered ? 'quiz_mastered' : 'quiz_submitted',
       timestamp: result.submittedAt,
       courseId: result.courseId,
       topic: result.topic,
       source: result.source,
       difficulty: result.difficulty,
-      accuracy: result.accuracy,
+      accuracy: topicMastery.accuracy,
       tags: QuizLearningStateReducer.collectResultTags(result),
       totalQuestions: result.totalQuestions,
       correctCount: result.correctCount
