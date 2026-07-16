@@ -6141,3 +6141,41 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次是文档接力批次，未重新运行 Web `pnpm lint/typecheck/test/build`。
 - 本批次未重新运行 HarmonyOS HAP 构建；沿用上一批 `Chat.ets` 静态诊断、HAP 构建、线上 Health/Chat SSE 与模拟器 fallback 证据。
 - 工作区仍保留 `.trae/progress.json` 和未跟踪本地资产；未执行清理、回滚、目录移动或删除。
+
+---
+
+## 2026-07-17 [WS02] 精确 Topic 防污染边界
+
+背景：Quiz API 和部分 HarmonyOS 入口此前允许“综合”、搜索词或近似名称进入测验上下文，会污染后续 Topic 掌握度、错题和复习统计。本批次以题库、知识切片和 Topic 关系共同覆盖的 33 个精确 `courseId:Topic` 为唯一有效集合，先封闭生成、精选题和页面导航入口。
+
+文件：
+- `apps/web/src/lib/data/index.ts`
+- `apps/web/src/app/api/quiz/route.ts`
+- `apps/web/src/app/api/quiz/quiz-flow.test.ts`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`
+- `docs/workstreams/02-quiz-mastery-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Web 新增课程与 Topic 精确匹配函数；`POST /api/quiz` 对缺失、空白、近似和跨课程 Topic 返回 HTTP 400 与 `INVALID_TOPIC`。
+- Quiz 从 `LearningContentRepository` 读取正式 Topic；Course、Practice、Lesson、Knowledge 不再写入“综合”、空值或搜索词，无正式 Topic 时阻止导航或保存并显示明确原因。
+- 数据契约测试固定 33 个精确 Topic，校验关系图、Web 题库、Web 选择题、HarmonyOS 题库、知识切片五方一致，并约束端侧题库字段和 12 个 Topic 入口。
+- Quiz 的 `questions` 与 `grading` 分离保持不变，未向展示题泄露答案。
+
+验证：
+- `python scripts/validate-topic-relations.py`：exit 0，`ALL CHECKS PASSED`。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm exec vitest run src/lib/data/data-integrity.test.ts src/app/api/quiz/quiz-flow.test.ts`：exit 0，2 个文件、22 项测试通过。
+- `cd apps/web; pnpm test`：exit 0，13 个文件、169 项测试通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建完成。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 8 s 193 ms`；仍提示未配置 `signingConfigs`，跳过签名。
+
+失败或未验证：
+- 模拟器、真机和线上流程未验证；本批次证据止于静态诊断通过和构建通过。
+- 幂等五类写回、终身统计、失败恢复、重启恢复、到期复习和再练留待 WS02 后续批次实现。

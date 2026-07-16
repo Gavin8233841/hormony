@@ -307,9 +307,13 @@ struct LessonPage {
   }
 
   private openFocusedQuizForActivity(activity: LearningActivity): void {
+    if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
+      this.message = '当前主题无效，无法生成专项测验';
+      return;
+    }
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic.length > 0 ? this.topic : '综合');
+    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic);
     AppStorage.setOrCreate<string>('selectedQuizFocusTag', this.primaryActivityTag(activity));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,

@@ -41,7 +41,14 @@ struct PracticePage {
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
-    this.topic = AppStorage.get<string>('selectedPracticeTopic') ?? '';
+    const selectedTopic = (AppStorage.get<string>('selectedPracticeTopic') ?? '').trim();
+    const courseTopics = LearningContentRepository.getTopics(this.courseId);
+    this.topic = courseTopics.includes(selectedTopic) ? selectedTopic : '';
+    if (this.topic.length === 0) {
+      this.message = selectedTopic.length > 0 ?
+        '入口主题不属于当前课程，无法加载精选练习' : '请选择课程中的正式主题后再练习';
+      return;
+    }
     this.loadQuestions().catch((): void => {
       this.message = '本地练习加载失败，请重新进入';
     });
@@ -98,9 +105,13 @@ struct PracticePage {
   }
 
   private openQuiz(): void {
+    if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
+      this.message = '当前主题无效，无法进入 AI 测验';
+      return;
+    }
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic.length > 0 ? this.topic : '综合');
+    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'PracticePage Quiz navigation failed: %{public}s', err.message);
@@ -118,6 +129,10 @@ struct PracticePage {
 
   private async submit(): Promise<void> {
     if (this.saving || !this.allAnswered()) return;
+    if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
+      this.message = '当前主题无效，答题记录未保存';
+      return;
+    }
     this.saving = true;
     const nextDetails: QuizResultDetail[] = [];
     let totalCorrect = 0;
@@ -141,7 +156,7 @@ struct PracticePage {
       quizId: 'curated-' + Date.now().toString(),
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
-      topic: this.topic.length > 0 ? this.topic : '综合',
+      topic: this.topic,
       source: 'curated',
       difficulty: this.dominantDifficulty(),
       totalQuestions: this.questions.length,

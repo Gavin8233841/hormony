@@ -60,3 +60,7 @@ export function getQuizzesByCourse(courseId: string) {
       return [];
   }
 }
+
+export function isCourseTopic(courseId: string, topic: string): boolean {
+  return getQuizzesByCourse(courseId).some((quiz) => quiz.topic === topic);
+}

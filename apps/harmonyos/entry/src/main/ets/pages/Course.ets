@@ -38,9 +38,14 @@ export struct CourseContent {
   }
 
   private openQuiz(course: Course): void {
+    const topic = course.topics[0] ?? '';
+    if (topic.length === 0) {
+      this.message = '当前课程还没有可出题主题';
+      return;
+    }
     AppStorage.setOrCreate<string>('selectedCourseId', course.id);
     AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', '综合');
+    AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'CourseContent quiz router.pushUrl failed: %{public}s', err.message);

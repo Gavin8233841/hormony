@@ -15,6 +15,90 @@ const MINIMUM_COUNTS = {
   cs103: { chunks: 40, questions: 20, choices: 20 },
 };
 
+type CourseId = (typeof COURSE_IDS)[number];
+
+const EXPECTED_TOPICS_BY_COURSE: Record<CourseId, readonly string[]> = {
+  cs101: [
+    "数组与线性表",
+    "链表",
+    "栈与队列",
+    "二叉树与BST",
+    "AVL树与红黑树",
+    "图的表示与遍历",
+    "最短路径算法",
+    "排序算法",
+    "动态规划",
+    "贪心算法与分治",
+    "哈希表",
+    "堆与优先队列",
+  ],
+  cs102: [
+    "进程与线程",
+    "CPU调度算法",
+    "内存管理基础",
+    "虚拟内存与分页",
+    "分段与段页式",
+    "文件系统",
+    "I/O系统与磁盘调度",
+    "死锁",
+    "同步与互斥",
+    "进程间通信",
+  ],
+  cs103: [
+    "OSI与TCP/IP模型",
+    "物理层与数据链路层",
+    "网络层与IP协议",
+    "TCP握手与挥手",
+    "TCP流量控制与拥塞控制",
+    "UDP协议",
+    "HTTP协议",
+    "HTTPS与TLS",
+    "DNS系统",
+    "路由算法与协议",
+    "网络安全基础",
+  ],
+};
+
+const EXPECTED_RAW_QUIZ_FIELDS = [
+  "answer",
+  "courseId",
+  "difficulty",
+  "explanation",
+  "id",
+  "options",
+  "question",
+  "tags",
+  "topic",
+];
+
+const HARMONY_TOPIC_ENTRY_FILES = [
+  "ActivityRecords.ets",
+  "Course.ets",
+  "CourseDetail.ets",
+  "HomeContent.ets",
+  "Knowledge.ets",
+  "LearningMap.ets",
+  "Lesson.ets",
+  "MistakeBook.ets",
+  "Plan.ets",
+  "Practice.ets",
+  "Profile.ets",
+  "Quiz.ets",
+] as const;
+const TOPIC_CONTEXT_MARKERS = [
+  "selectedQuizTopic",
+  "selectedPracticeTopic",
+  "@State topic:",
+  "this.topic =",
+  "topic:",
+] as const;
+const QUIZ_TOPIC_CONTEXT_MARKERS = ["this.suggestions =", "this.selectTopic("] as const;
+const TOPIC_STORAGE_KEYS = new Set([
+  "selectedContentTopic",
+  "selectedQuizTopic",
+  "selectedPracticeTopic",
+]);
+
 interface RawQuizQuestion {
   id: string;
   courseId: string;
@@ -37,6 +121,20 @@ const harmonyResourceUrl = (fileName: string) =>
     `../../../../harmonyos/entry/src/main/resources/rawfile/learning/${fileName}`,
     import.meta.url
   );
+
+const harmonyPageUrl = (fileName: string) =>
+  new URL(
+    `../../../../harmonyos/entry/src/main/ets/pages/${fileName}`,
+    import.meta.url
+  );
+
+const expectedTopicKeys = COURSE_IDS.flatMap((courseId) =>
+  EXPECTED_TOPICS_BY_COURSE[courseId].map((topic) => `${courseId}:${topic}`)
+).sort();
+
+const expectedTopicTitles = COURSE_IDS.flatMap(
+  (courseId) => EXPECTED_TOPICS_BY_COURSE[courseId]
+);
 
 const rawQuizQuestions = JSON.parse(
   readFileSync(fileURLToPath(harmonyResourceUrl("quizzes.json")), "utf8")
@@ -153,8 +251,25 @@ describe("课程数据资产完整性", () => {
       (question) => `${question.courseId}:${question.topic}`
     ))).sort();
 
-    expect(rawTopics).toEqual(relationTopics);
-    expect(webTopics).toEqual(relationTopics);
+    const webQuizTopics = allQuizzes.map(
+      (quiz) => `${quiz.courseId}:${quiz.topic}`
+    ).sort();
+
+    const knowledgeTopics = Array.from(new Set(allKnowledgeChunks.map(
+      (chunk) => `${chunk.courseId}:${chunk.topic}`
+    ))).sort();
+
+    expect(expectedTopicKeys).toHaveLength(33);
+    expect(new Set(expectedTopicTitles).size).toBe(33);
+    expect(relationTopics).toEqual(expectedTopicKeys);
+    expect(rawTopics).toEqual(expectedTopicKeys);
+    expect(webTopics).toEqual(expectedTopicKeys);
+    expect(webQuizTopics).toEqual(expectedTopicKeys);
+    expect(knowledgeTopics).toEqual(expectedTopicKeys);
+
+    for (const question of rawQuizQuestions) {
+      expect(Object.keys(question).sort()).toEqual(EXPECTED_RAW_QUIZ_FIELDS);
+    }
 
     for (const relation of topicRelations) {
       const topicQuestions = webQuestions.filter(
@@ -178,6 +293,33 @@ describe("课程数据资产完整性", () => {
         expect(question.explanation.match(/[^。！？.!?]+[。！？.!?]/g)?.length ?? 0)
           .toBeGreaterThanOrEqual(2);
       }
+    }
+  });
+
+  it("HarmonyOS 测验与练习入口只能写入 33 个正式 Topic", () => {
+    for (const fileName of HARMONY_TOPIC_ENTRY_FILES) {
+      const source = readFileSync(fileURLToPath(harmonyPageUrl(fileName)), "utf8");
+      const lines = source.split(/\r?\n/);
+      let contextLineCount = 0;
+      const contextMarkers = fileName === "Quiz.ets" ?
+        [...TOPIC_CONTEXT_MARKERS, ...QUIZ_TOPIC_CONTEXT_MARKERS] : TOPIC_CONTEXT_MARKERS;
+
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (!contextMarkers.some((marker) => line.includes(marker))) continue;
+        contextLineCount += 1;
+
+        const literals = Array.from(line.matchAll(/(['"])(.*?)\1/g), (match) => match[2]);
+        for (const literal of literals) {
+          if (literal.length === 0 || TOPIC_STORAGE_KEYS.has(literal)) continue;
+          expect(
+            expectedTopicTitles,
+            `${fileName}:${index + 1} 写入了非正式 Topic：${literal}`
+          ).toContain(literal);
+        }
+      }
+
+      expect(contextLineCount, `${fileName} 未匹配到 Topic 入口`).toBeGreaterThan(0);
     }
   });
 

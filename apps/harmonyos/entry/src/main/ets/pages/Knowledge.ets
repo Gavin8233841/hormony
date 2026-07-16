@@ -61,7 +61,12 @@ struct KnowledgePage {
   }
 
   private startTopicQuiz(): void {
-    const topic = this.query.trim().length > 0 ? this.query.trim() : '综合';
+    const topic = this.resultTopic();
+    if (topic.length === 0) {
+      this.message = '检索结果未对应当前课程的正式主题，无法开始测验';
+      this.hasError = true;
+      return;
+    }
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
     AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
@@ -69,6 +74,15 @@ struct KnowledgePage {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage quiz router.pushUrl failed: %{public}s', err.message);
     });
+  }
+
+  private resultTopic(): string {
+    const courseTopics = LearningContentRepository.getTopics(this.courseId);
+    for (const item of this.results) {
+      const topic = item.topic ?? '';
+      if (item.courseId === this.courseId && courseTopics.includes(topic)) return topic;
+    }
+    return '';
   }
 
   aboutToAppear(): void {
@@ -169,7 +183,7 @@ struct KnowledgePage {
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ left: 16, bottom: 8 })
 
-        Button('复习后，针对“' + this.query + '”开始测验')
+        Button('复习后，开始“' + this.resultTopic() + '”测验')
           .height(42)
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)

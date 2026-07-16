@@ -6,7 +6,11 @@ import { runQuizAgent } from "@/lib/agents/quiz-agent";
 import { store } from "@/lib/store/db";
 import { sanitizeUserId } from "@/lib/utils";
 import type { Quiz, QuizCatalogItem } from "@/lib/types";
-import { getQuizzesByCourse as getSeedQuizzesByCourse, isCourseId } from "@/lib/data";
+import {
+  getQuizzesByCourse as getSeedQuizzesByCourse,
+  isCourseId,
+  isCourseTopic,
+} from "@/lib/data";
 import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
 import { modelErrorResponse, SafetyBlockedError } from "@/lib/api-errors";
 import type { QuizPackage } from "@/lib/types";
@@ -67,10 +71,10 @@ export async function POST(req: Request) {
   if (typeof courseId !== "string" || !isCourseId(courseId)) {
     return Response.json({ error: "不支持的课程", code: "INVALID_COURSE" }, { status: 400 });
   }
-  if (body.topic !== undefined && typeof body.topic !== "string") {
+  if (typeof body.topic !== "string") {
     return Response.json({ error: "主题必须是字符串", code: "INVALID_TOPIC" }, { status: 400 });
   }
-  const topic = (body.topic ?? "综合").trim();
+  const topic = body.topic.trim();
   const count = readBoundedInteger(body.count, 5, 1, 20, "INVALID_COUNT", "count");
   if (!count.ok) return count.response;
   const difficulty = body.difficulty ?? "medium";
@@ -84,6 +88,9 @@ export async function POST(req: Request) {
 
   if (topic.length === 0 || topic.length > 100) {
     return Response.json({ error: "主题长度必须为 1-100 字符", code: "INVALID_TOPIC" }, { status: 400 });
+  }
+  if (!isCourseTopic(courseId, topic)) {
+    return Response.json({ error: "主题不属于所选课程", code: "INVALID_TOPIC" }, { status: 400 });
   }
   if (focusTag.length > 12) {
     return Response.json({ error: "重点标签长度必须为 1-12 字符", code: "INVALID_FOCUS_TAG" }, { status: 400 });
