@@ -1,27 +1,33 @@
 import { formBindingData, formProvider } from '@kit.FormKit';
 import { LocalLearningRepository } from './LocalLearningRepository';
-import { PlanTask, StudyPlan } from '../model/DataModels';
+import { ProactiveLearningAction, ProactiveLearningService } from './ProactiveLearningService';
 
 export interface LearningFormData {
-  taskTitle: string;
-  taskMeta: string;
+  kind: string;
+  badge: string;
+  title: string;
+  subtitle: string;
+  cta: string;
+  courseId: string;
+  courseTitle: string;
+  topic: string;
+  focusTag: string;
+  taskAction: string;
+  targetPage: string;
+  evidence: string;
   progressText: string;
 }
 
 export class LearningFormUpdater {
   static defaultData(): LearningFormData {
-    return {
-      taskTitle: '打开鸿学伴制定今日计划',
-      taskMeta: '计划保存在本机',
-      progressText: '今日待开始'
-    };
+    return LearningFormUpdater.buildData(ProactiveLearningService.fallback());
   }
 
   static async refreshForm(formId: string): Promise<void> {
     try {
-      const plan = await LocalLearningRepository.getPlan();
+      const action = await ProactiveLearningService.resolve();
       await formProvider.updateForm(formId,
-        formBindingData.createFormBindingData(LearningFormUpdater.buildData(plan)));
+        formBindingData.createFormBindingData(LearningFormUpdater.buildData(action)));
     } catch (error) {
       throw new Error('服务卡片更新失败: ' + String(error));
     }
@@ -42,29 +48,21 @@ export class LearningFormUpdater {
     }
   }
 
-  private static buildData(plan: StudyPlan | null): LearningFormData {
-    if (plan === null || plan.tasks.length === 0) return LearningFormUpdater.defaultData();
-    const now = new Date();
-    const month = (now.getMonth() + 1).toString();
-    const day = now.getDate().toString();
-    const today = now.getFullYear().toString() + '-' + (month.length === 1 ? '0' + month : month) + '-' +
-      (day.length === 1 ? '0' + day : day);
-    const todayTasks = plan.tasks.filter((task: PlanTask): boolean => task.date === today);
-    if (todayTasks.length === 0) {
-      return { taskTitle: '今天没有安排', taskMeta: plan.goal, progressText: '查看完整计划' };
-    }
-    const pending = todayTasks.filter((task: PlanTask): boolean => task.done !== true);
-    if (pending.length === 0) {
-      return {
-        taskTitle: '今天的任务已全部完成',
-        taskMeta: plan.goal,
-        progressText: todayTasks.length.toString() + '/' + todayTasks.length.toString() + ' 已完成'
-      };
-    }
+  private static buildData(action: ProactiveLearningAction): LearningFormData {
     return {
-      taskTitle: pending[0].title,
-      taskMeta: pending[0].estimatedMin.toString() + ' 分钟 · ' + plan.goal,
-      progressText: (todayTasks.length - pending.length).toString() + '/' + todayTasks.length.toString() + ' 已完成'
+      kind: action.kind,
+      badge: action.badge,
+      title: action.title,
+      subtitle: action.subtitle,
+      cta: action.cta,
+      courseId: action.courseId,
+      courseTitle: action.courseTitle,
+      topic: action.topic,
+      focusTag: action.focusTag,
+      taskAction: action.taskAction,
+      targetPage: action.targetPage,
+      evidence: action.evidence,
+      progressText: action.progressText
     };
   }
 }

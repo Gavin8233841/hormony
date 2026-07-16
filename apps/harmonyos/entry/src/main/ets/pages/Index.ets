@@ -8,6 +8,8 @@ import { ChatContent } from './Chat';
 import { CourseContent } from './Course';
 import { HomeContent } from './HomeContent';
 import { ProfileContent } from './Profile';
+import { ProactiveLearningService } from '../common/ProactiveLearningService';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Entry
 @Component
@@ -18,6 +20,12 @@ struct Index {
   @State contentOffset: number = 0;
   @StorageProp('safeAreaTopVp') safeAreaTopVpValue: number = 0;
   @StorageProp('safeAreaBottomVp') safeAreaBottomVpValue: number = 0;
+  @StorageLink('proactiveLaunchVersion') @Watch('consumeProactiveLaunch') proactiveLaunchVersion: number = 0;
+  private consumedLaunchVersion: number = -1;
+
+  aboutToAppear(): void {
+    this.consumeProactiveLaunch();
+  }
 
   private safeAreaTopVp(): number {
     return Math.max(0, this.safeAreaTopVpValue);
@@ -33,6 +41,26 @@ struct Index {
 
   private navigationBottomPadding(): number {
     return 12 + this.safeAreaBottomVp();
+  }
+
+  private consumeProactiveLaunch(): void {
+    if (this.consumedLaunchVersion === this.proactiveLaunchVersion) return;
+    this.consumedLaunchVersion = this.proactiveLaunchVersion;
+    const targetPage = AppStorage.get<string>('proactiveTargetPage') ?? '';
+    if (targetPage.length === 0) return;
+    AppStorage.setOrCreate<string>('proactiveTargetPage', '');
+    if (targetPage === 'pages/Index') {
+      const targetTab = AppStorage.get<number>('proactiveTargetTab') ?? 0;
+      this.selectTab(targetTab >= 0 && targetTab <= 3 ? targetTab : 0);
+      return;
+    }
+    if (!ProactiveLearningService.isTargetPage(targetPage)) return;
+    setTimeout((): void => {
+      this.getUIContext().getRouter().pushUrl({ url: targetPage }).catch((error: Error): void => {
+        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+          'Index proactive launch navigation failed: %{public}s', error.message);
+      });
+    }, 0);
   }
 
   private selectTab(index: number): void {

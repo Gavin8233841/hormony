@@ -6291,3 +6291,43 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前 PowerShell 会话无法从 PATH 解析 `hdc`，未执行安装、四个 CTA 点击、ArkData 写回后重进成就页、截图或字体缩放；模拟器与真机均未验证。
 - HAP 未配置正式签名，构建通过不证明可发布安装包通过。
 - 当前门禁证明源码、数据与排序/路由契约，不把静态检查或离线 fixture 写成动态 UI 通过。
+
+---
+
+## 2026-07-17 [WS04] 统一主动行动与系统触达
+
+背景：WS04 将首页、系统通知和服务卡片从各自读取部分状态，收敛为同一条本机 next-best-action。排序只消费 ArkData 中的到期错题、标签答题证据、今日计划和学习事件，不使用随机数据或演示统计；通知和卡片点击需携带同一课程、Topic、标签与目标页面回到应用。
+
+文件：
+- `DEVLOG.md`
+- `apps/harmonyos/entry/src/main/ets/common/ProactiveLearningService.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LearningFormUpdater.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LearningReminder.ets`
+- `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Index.ets`
+- `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
+- `apps/harmonyos/entry/src/main/resources/base/element/string.json`
+- `scripts/test-proactive-learning-service.mjs`
+
+行为变化：
+- 新增 `ProactiveLearningService`，按“到期错题 -> 未掌握标签 -> 今日未完成任务 -> 最近真实学习事件对应课程 -> 制定计划”生成统一行动，并携带推荐依据、进度、CTA、课程、Topic、标签和目标页面。
+- 首页只消费统一行动，展示推荐依据和真实进度；创建系统提醒时区分创建中、成功和失败，权限失败不再显示成功图标。
+- 通知使用 API 12 `WantAgent` 绑定行动参数；`EntryAbility.onCreate/onNewWant` 与 `Index` 的 `@StorageLink + @Watch` 同时处理冷启动和热启动回流。
+- 服务卡片显示同一行动、依据和进度，`FormLink` 传递精确路由参数；卡片更新器复用统一服务，默认态明确引导制定计划。
+- 新增零依赖行为测试，直接加载当前 `.ets` 的 `resolve()`，覆盖错题/标签/计划/最近事件优先级、掌握值 72 边界和无状态空态。
+
+验证：
+- `node --check scripts/test-proactive-learning-service.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs`：exit 0，4/4 通过；Node 24 输出 `stripTypeScriptTypes` 实验性 API 警告，不影响本次执行结果。
+- `cd apps/harmonyos; .\hvigorw.bat --help`：exit 0，确认 `--no-daemon` 与增量构建参数存在。
+- `cd apps/harmonyos; .\hvigorw.bat tasks --no-daemon`：exit 0，`BUILD SUCCESSFUL in 5 s 816 ms`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS`、资源编译和 HAP 打包完成，`BUILD SUCCESSFUL in 24 s 488 ms`；仍提示未配置 `signingConfigs`。
+- DevEco Studio API 12 SDK 类型声明源码确认：`NotificationRequest.wantAgent`、`wantAgent.getWantAgent()`、`UIAbility.onNewWant()`、`@Watch` 及 `FormLink` 的 `router/params` 均存在。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe version`：exit 0，版本 `3.2.0e`。
+- 同一 `hdc.exe list targets`：exit 0，返回 `[Empty]`。
+
+失败或未验证：
+- 当前任务没有可用 DevEco MCP，未取得单文件 ArkTS 静态诊断证据；HAP 构建仅记为构建通过。
+- 当前无 HarmonyOS 设备目标，首页视觉、通知授权与点击、服务卡片桌面渲染与点击回流均为未验证；不得记为模拟器或真机通过。
+- 当前 HAP 未签名，安装与远程评审设备可用性未验证。
