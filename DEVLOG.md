@@ -6337,3 +6337,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 当前无可用模拟器或设备，未安装本批 HAP；检索结果展开、Lesson/Chat 跳转、手机和平板布局、真机均未验证。
 - 线上检索响应及业务字段未验证。
+
+---
+
+## 2026-07-17 [WS03] 真实续学状态契约测试
+
+背景：课程列表与详情已改为读取 `LessonProgress` 生成开始状态、最近 Topic 和 CTA，但提交审查指出这一语义没有可执行回归测试，仍可能退回只看聚合 `course.progress` 的旧行为。本批补齐页面契约，不修改 WS02 独占仓储。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `scripts/test_course_resume_contract.py`
+
+行为变化：
+- 约束续学纯函数只接纳同课程、已知 Topic 且有真实 `completedChunkIds` 的断点；`completedAt` 进入完成集合，未完成项按 `updatedAt` 选择最近 Topic。
+- 约束 Course 调用 `getLessonProgress()`，即使聚合进度为 0，只要有真实断点仍显示“继续课程 / 上次学到”。
+- 约束 CourseDetail 调用 `getLessonProgress(this.courseId)`，合并完成 Topic，并优先把最近未完成 Topic 显示为“继续”。
+- 测试不写数据库、不使用产品种子状态，不修改应用源码或 `LocalLearningRepository.ets`。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts/test_course_resume_contract.py scripts/test_knowledge_navigation_contract.py scripts/test_validate_topic_relations.py`：退出码 0，19 项通过。
+- `python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过，`ALL CHECKS PASSED`。
+- 本批未改应用源码；同一应用源码已在上一批执行 `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0，`BUILD SUCCESSFUL in 22 s 525 ms`。
+
+失败或未验证：
+- 当前 `hdc list targets` 输出 `[Empty]`；尚无“完成部分切片后退出 → 课程显示继续 → 返回最近 Topic”的模拟器、手机、平板或真机证据。
