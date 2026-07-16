@@ -6,7 +6,8 @@ import {
   QuizResultDetail,
   ReviewItem,
   StudyEvent,
-  TagInsight
+  TagInsight,
+  TopicMastery
 } from './DataModels';
 
 export interface LearningTagInsight extends TagInsight {
@@ -53,4 +54,49 @@ export interface LearningReviewItem extends ReviewItem {
 export interface LearningCuratedQuestion extends CuratedQuestion {
   difficulty?: string;
   tags?: string[];
+}
+
+export interface QuizLearningStats {
+  totalAttempts: number;
+  totalQuestions: number;
+  correctQuestions: number;
+  quizDates: string[];
+  firstSubmittedAt?: string;
+}
+
+export interface TopicMasteryMilestone {
+  courseId: string;
+  topic: string;
+  masteredAt: string;
+}
+
+export interface QuizLearningState {
+  schemaVersion: number;
+  pendingResults: LearningQuizResult[];
+  appliedQuizIds: string[];
+  appliedInsightEventIds: string[];
+  recentResults: LearningQuizResult[];
+  stats: QuizLearningStats;
+  reviewItems: LearningReviewItem[];
+  topicMastery: TopicMastery[];
+  tagInsights: LearningTagInsight[];
+  quizEvents: LearningStudyEvent[];
+  masteryMilestones: TopicMasteryMilestone[];
+  weakTopics: string[];
+  strongTopics: string[];
+}
+
+export interface QuizWriteReceipt {
+  quizId: string;
+  applied: boolean;
+  totalAttempts: number;
+  totalQuestions: number;
+  accuracy: number;
+  activeReviewCount: number;
+  dueReviewCount: number;
+  topicAttempts: number;
+  topicAccuracy: number;
+  topicMastered: boolean;
+  activityCount: number;
+  courseProgress: number;
 }

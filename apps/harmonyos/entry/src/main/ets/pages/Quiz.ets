@@ -16,7 +16,8 @@ import {
   LearningQuizGradingItem as QuizGradingItem,
   LearningQuizQuestionView as QuizQuestionView,
   LearningQuizResult as QuizResult,
-  LearningQuizResultDetail as QuizResultDetail
+  LearningQuizResultDetail as QuizResultDetail,
+  QuizWriteReceipt
 } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
@@ -76,9 +77,18 @@ struct QuizPage {
   @State resultCoachTitle: string = '';
   @State resultCoachBody: string = '';
   @State resultTagSummaries: QuizTagSummary[] = [];
+  @State writeBackStatus: string = '';
+  @State writeBackTotalQuestions: number = 0;
+  @State writeBackActiveReviews: number = 0;
+  @State writeBackTopicAccuracy: number = 0;
+  @State writeBackActivityCount: number = 0;
+  @State writeBackCourseProgress: number = 0;
   @State progressStep: number = 0;
   @State progressTick: number = 0;
   private grading: QuizGradingItem[] = [];
+  private attemptId: string = '';
+  private attemptSubmittedAt: string = '';
+  private attemptCounter: number = 0;
   private answerLabels: string[] = ['A', 'B', 'C', 'D'];
   private suggestions: string[] = [];
   private difficultyOptions: DifficultyOption[] = [
@@ -199,7 +209,15 @@ struct QuizPage {
     this.resultCoachTitle = '';
     this.resultCoachBody = '';
     this.resultTagSummaries = [];
+    this.writeBackStatus = '';
+    this.writeBackTotalQuestions = 0;
+    this.writeBackActiveReviews = 0;
+    this.writeBackTopicAccuracy = 0;
+    this.writeBackActivityCount = 0;
+    this.writeBackCourseProgress = 0;
     this.grading = [];
+    this.attemptId = '';
+    this.attemptSubmittedAt = '';
   }
 
   private reviewTopic(topic: string): void {
@@ -244,6 +262,9 @@ struct QuizPage {
       }
       const nextAnswers = new Array<string>(validation.questions.length).fill('');
       this.quizId = validation.quizId;
+      this.attemptCounter += 1;
+      this.attemptId = 'quiz_attempt_' + validation.quizId + '_' + Date.now().toString() + '_' +
+        this.attemptCounter.toString();
       this.grading = validation.grading;
       // 先提交答案槽位，最后提交题目，避免 ArkUI 在两次状态更新之间读取未初始化答案。
       this.answers = nextAnswers;
@@ -266,7 +287,7 @@ struct QuizPage {
   }
 
   async submitQuiz(): Promise<void> {
-    if (this.submitting || this.quizId.length === 0) return;
+    if (this.submitting || this.quizId.length === 0 || this.attemptId.length === 0) return;
     if (!this.allQuestionsAnswered()) {
       this.message = '请先完成全部题目';
       return;
@@ -294,6 +315,7 @@ struct QuizPage {
       const detail: QuizResultDetail = {
         questionId: question.id,
         stem: question.stem,
+        options: question.options ?? [],
         userAnswer: userAnswer,
         correctAnswer: this.correctOption(question, grading.answer),
         isCorrect: isCorrect,
@@ -307,8 +329,10 @@ struct QuizPage {
     const wrongCount = this.questions.length - correctCount;
     const weakTopics: string[] = wrongCount > 0 ? [this.topic] : [];
     const accuracy = this.questions.length > 0 ? correctCount / this.questions.length : 0;
+    if (this.attemptSubmittedAt.length === 0) this.attemptSubmittedAt = new Date().toISOString();
     const result: QuizResult = {
-      quizId: this.quizId,
+      quizId: this.attemptId,
+      sourceQuizId: this.quizId,
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
       topic: this.topic,
@@ -320,10 +344,10 @@ struct QuizPage {
       details: details,
       evaluation: this.learningEvaluation(correctCount, this.questions.length),
       weakTopics: weakTopics,
-      submittedAt: new Date().toISOString()
+      submittedAt: this.attemptSubmittedAt
     };
     try {
-      await LocalLearningRepository.appendQuizResult(result);
+      const receipt = await LocalLearningRepository.appendQuizResult(result);
       this.progressStep = 2;
       this.resultAccuracy = result.accuracy;
       this.resultCorrectCount = result.correctCount;
@@ -335,12 +359,22 @@ struct QuizPage {
       this.resultCoachTitle = this.coachTitle(result.accuracy, wrongCount);
       this.resultCoachBody = this.coachBody(result.accuracy, wrongCount);
       this.resultTagSummaries = this.buildTagSummaries(result.details);
+      this.applyWriteReceipt(receipt);
       this.resultReady = true;
     } catch (e) {
       this.message = '答题结果保存失败，请稍后重试';
     } finally {
       this.submitting = false;
     }
+  }
+
+  private applyWriteReceipt(receipt: QuizWriteReceipt): void {
+    this.writeBackStatus = receipt.applied ? '本次真实答题已写回本机' : '已恢复上次写回，未重复累计';
+    this.writeBackTotalQuestions = receipt.totalQuestions;
+    this.writeBackActiveReviews = receipt.activeReviewCount;
+    this.writeBackTopicAccuracy = receipt.topicAccuracy;
+    this.writeBackActivityCount = receipt.activityCount;
+    this.writeBackCourseProgress = receipt.courseProgress;
   }
 
   private validateQuizPackage(response: QuizPackage | null): QuizValidationResult {
@@ -1149,6 +1183,39 @@ struct QuizPage {
       .padding(18)
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
+
+      if (this.writeBackStatus.length > 0) {
+        Column({ space: 10 }) {
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+              .fontSize(18)
+              .fontColor([Constants.COLOR_SUCCESS])
+            Text(this.writeBackStatus)
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          }
+          .width('100%')
+          Text('画像累计 ' + this.writeBackTotalQuestions.toString() + ' 题 · 当前错题 ' +
+            this.writeBackActiveReviews.toString() + ' 道')
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.topic + ' 掌握度 ' + Math.round(this.writeBackTopicAccuracy * 100).toString() +
+            '% · 学习活动累计 ' + this.writeBackActivityCount.toString() + ' 次')
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text('课程进度 ' + Math.round(this.writeBackCourseProgress * 100).toString() + '%')
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_BRAND)
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+      }
 
       if (this.resultCoachTitle.length > 0) {
         Column({ space: 10 }) {
