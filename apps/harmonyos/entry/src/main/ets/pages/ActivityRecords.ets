@@ -31,16 +31,25 @@ struct ActivityRecordsPage {
   }
 
   private async loadEvents(): Promise<void> {
+    this.loading = true;
+    this.message = '';
     try {
-      this.events = (await LocalLearningRepository.getStudyEvents()).slice().reverse();
-      this.visibleEvents = this.events.filter((event: StudyEvent): boolean =>
+      const events: StudyEvent[] = (await LocalLearningRepository.getStudyEvents()).slice().reverse();
+      const visibleEvents: StudyEvent[] = events.filter((event: StudyEvent): boolean =>
         this.eventMatchesFilter(event, this.selectedFilter));
-      this.courses = await LocalLearningRepository.getCourses() ?? [];
+      const courses: Course[] = await LocalLearningRepository.getCourses() ?? [];
       const plan = await LocalLearningRepository.getPlan();
-      this.planTasks = plan?.tasks ?? [];
-      this.recentDays = this.buildActivityDays(this.events);
+      const planTasks: PlanTask[] = plan?.tasks ?? [];
+      const recentDays: ActivityDay[] = this.buildActivityDays(events);
       const profile = await LocalLearningRepository.getProfile();
-      this.streakDays = profile?.stats.streakDays ?? 0;
+      const streakDays: number = profile?.stats.streakDays ?? 0;
+
+      this.events = events;
+      this.visibleEvents = visibleEvents;
+      this.courses = courses;
+      this.planTasks = planTasks;
+      this.recentDays = recentDays;
+      this.streakDays = streakDays;
     } catch (error) {
       this.message = '学习记录读取失败';
     } finally {
@@ -193,6 +202,12 @@ struct ActivityRecordsPage {
       best.count.toString() + ' 条' : '暂无记录';
   }
 
+  private activityOverviewAccessibilityText(): string {
+    return '近 4 周学习节奏，连续 ' + this.streakDays.toString() + ' 天，' +
+      this.activeDaysCount().toString() + ' 天有学习，共 ' + this.recentEventCount().toString() +
+      ' 条本机学习事件，记录最多：' + this.bestDayLabel();
+  }
+
   private activityDayColor(day: ActivityDay): string {
     if (day.count === 0) return Constants.COLOR_BG_TAG;
     if (day.completed) return Constants.COLOR_SUCCESS;
@@ -211,6 +226,10 @@ struct ActivityRecordsPage {
     if (value === 'lesson') return '课程';
     if (value === 'task') return '任务';
     return '全部';
+  }
+
+  private filterAccessibilityText(value: string): string {
+    return this.filterLabel(value) + '记录筛选，' + (this.selectedFilter === value ? '已选中' : '未选中');
   }
 
   private eventMatchesFilter(event: StudyEvent, filter: string): boolean {
@@ -269,6 +288,13 @@ struct ActivityRecordsPage {
     return event.courseId !== undefined ? '查看课程' : '';
   }
 
+  private eventAccessibilityText(event: StudyEvent): string {
+    const summary = this.dateLabel(event.timestamp) + ' ' + this.timeLabel(event.timestamp) + '，' +
+      this.title(event) + '，' + this.detail(event);
+    if (!this.canOpenEvent(event)) return summary + '，仅供回顾';
+    return summary + '，操作：' + this.eventActionLabel(event);
+  }
+
   private openEvent(event: StudyEvent): void {
     if (event.type === 'task_completed') {
       this.pushPage('pages/Plan', '无法打开学习计划，请重试');
@@ -307,11 +333,15 @@ struct ActivityRecordsPage {
         .fontSize(12)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.selectedFilter === value ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_TERTIARY)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
-    .height(44)
-    .padding({ left: 14, right: 14 })
+    .layoutWeight(1)
+    .constraintSize({ minHeight: 48 })
+    .padding({ left: 8, right: 8, top: 8, bottom: 8 })
     .backgroundColor(this.selectedFilter === value ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
     .borderRadius(20)
+    .accessibilityText(this.filterAccessibilityText(value))
     .onClick((): void => { this.selectFilter(value); })
   }
 
@@ -351,7 +381,8 @@ struct ActivityRecordsPage {
                   .fontColor(this.activityDayTextColor(day))
               }
               .layoutWeight(1)
-              .height(42)
+              .constraintSize({ minHeight: 42 })
+              .padding({ top: 4, bottom: 4 })
               .justifyContent(FlexAlign.Center)
               .backgroundColor(this.activityDayColor(day))
               .borderRadius(Constants.RADIUS_SM)
@@ -362,7 +393,7 @@ struct ActivityRecordsPage {
       }
       .width('100%')
 
-      Row() {
+      Column({ space: 8 }) {
         Text('记录最多：' + this.bestDayLabel())
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_TERTIARY)
@@ -376,12 +407,14 @@ struct ActivityRecordsPage {
         }
       }
       .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
+      .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
     .padding(16)
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
+    .accessibilityGroup(true)
+    .accessibilityText(this.activityOverviewAccessibilityText())
   }
 
   build() {
@@ -393,13 +426,31 @@ struct ActivityRecordsPage {
           () => this.getUIContext().getRouter().back())
       }
       if (this.loading) {
-        Column().width('90%').height(180).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
+        Column()
+          .width('90%')
+          .height(180)
+          .backgroundColor(Constants.COLOR_BG_SKELETON)
+          .borderRadius(Constants.RADIUS_LG)
+          .accessibilityGroup(true)
+          .accessibilityText('正在读取本机学习记录')
       } else if (this.events.length === 0) {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.clock')).fontSize(38).fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
           Text(this.message.length > 0 ? this.message : '完成第一次学习后，记录会出现在这里')
             .fontSize(14)
             .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+          if (this.message.length > 0) {
+            Button('重新读取')
+              .width(144)
+              .constraintSize({ minHeight: 48 })
+              .fontSize(13)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .border({ width: 1, color: Constants.COLOR_BRAND })
+              .borderRadius(24)
+              .accessibilityText('重新读取本机学习记录')
+              .onClick((): void => { this.loadEvents(); })
+          }
         }
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
@@ -409,7 +460,7 @@ struct ActivityRecordsPage {
             this.ActivityOverview()
           }
           ListItem() {
-            Row({ space: 8 }) {
+            Row({ space: 6 }) {
               this.FilterPill('all')
               this.FilterPill('quiz')
               this.FilterPill('lesson')
@@ -419,13 +470,26 @@ struct ActivityRecordsPage {
           }
           if (this.message.length > 0) {
             ListItem() {
-              Text(this.message)
-                .width('100%')
-                .fontSize(12)
-                .fontColor(Constants.COLOR_ERROR)
-                .padding(12)
-                .backgroundColor(Constants.COLOR_ERROR_LIGHT)
-                .borderRadius(Constants.RADIUS_MD)
+              Column({ space: 10 }) {
+                Text(this.message)
+                  .width('100%')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_ERROR)
+                Button('重新读取')
+                  .width('100%')
+                  .constraintSize({ minHeight: 48 })
+                  .fontSize(13)
+                  .fontColor(Constants.COLOR_ERROR)
+                  .backgroundColor(Constants.COLOR_BG_CARD)
+                  .border({ width: 1, color: Constants.COLOR_ERROR })
+                  .borderRadius(24)
+                  .accessibilityText('重新读取本机学习记录')
+                  .onClick((): void => { this.loadEvents(); })
+              }
+              .width('100%')
+              .padding(12)
+              .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
             }
           }
           ForEach(this.visibleEvents, (event: StudyEvent, index: number): void => {
@@ -468,26 +532,29 @@ struct ActivityRecordsPage {
                       .fontSize(15)
                       .fontWeight(FontWeight.Medium)
                       .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                      .maxLines(2)
                     Text(this.detail(event))
                       .fontSize(12)
                       .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      .maxLines(1)
+                      .maxLines(2)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    Flex({ wrap: FlexWrap.Wrap }) {
+                      Text(this.timeLabel(event.timestamp))
+                        .fontSize(11)
+                        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                        .margin({ right: 10, top: 2 })
+                      if (this.canOpenEvent(event)) {
+                        Text(this.eventActionLabel(event))
+                          .fontSize(10)
+                          .fontWeight(FontWeight.Medium)
+                          .fontColor(Constants.COLOR_BRAND)
+                          .margin({ top: 2 })
+                      }
+                    }
+                    .width('100%')
                   }
                   .layoutWeight(1)
                   .alignItems(HorizontalAlign.Start)
-                  Column({ space: 3 }) {
-                    Text(this.timeLabel(event.timestamp))
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                    if (this.canOpenEvent(event)) {
-                      Text(this.eventActionLabel(event))
-                        .fontSize(10)
-                        .fontWeight(FontWeight.Medium)
-                        .fontColor(Constants.COLOR_BRAND)
-                    }
-                  }
-                  .alignItems(HorizontalAlign.End)
                   if (this.canOpenEvent(event)) {
                     SymbolGlyph($r('sys.symbol.chevron_right'))
                       .fontSize(15)
@@ -499,7 +566,11 @@ struct ActivityRecordsPage {
                 .padding({ left: 14, right: 14, top: 10, bottom: 10 })
                 .backgroundColor(Constants.COLOR_BG_CARD)
                 .borderRadius(Constants.RADIUS_LG)
-                .onClick((): void => { this.openEvent(event); })
+                .accessibilityGroup(true)
+                .accessibilityText(this.eventAccessibilityText(event))
+                .onClick((): void => {
+                  if (this.canOpenEvent(event)) this.openEvent(event);
+                })
               }
               .width('100%')
             }

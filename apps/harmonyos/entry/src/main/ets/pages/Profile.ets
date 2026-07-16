@@ -6,35 +6,56 @@
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { UserProfile } from '../model/DataModels';
-import { LearningTagInsight as TagInsight } from '../model/LearningMetadataModels';
+import { Course, TopicMastery, UserProfile } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct ProfileContent {
   @State profile: UserProfile | null = null;
-  @State tagInsights: TagInsight[] = [];
+  @State courses: Course[] = [];
+  @State topicMastery: TopicMastery[] = [];
   @State loading: boolean = false;
   @State message: string = '';
 
-  aboutToAppear() {
-    this.loading = true;
+  aboutToAppear(): void {
     this.loadProfile();
   }
 
-  async loadProfile() {
+  async loadProfile(): Promise<void> {
+    if (this.loading) return;
+    this.loading = true;
+    this.message = '';
     try {
-      this.profile = await LocalLearningRepository.getProfile();
-      this.tagInsights = await LocalLearningRepository.getTagInsights(5);
-    } catch (e) {
-      this.message = '本地学习画像加载失败，请重新打开应用';
+      const profile = await LocalLearningRepository.getProfile();
+      const courses = (await LocalLearningRepository.getCourses()) ?? [];
+      const mastery = await LocalLearningRepository.getTopicMastery();
+      this.profile = profile;
+      this.courses = courses;
+      this.topicMastery = this.sortTopicMastery(mastery.filter((item: TopicMastery): boolean =>
+        courses.some((course: Course): boolean =>
+          course.id === item.courseId && course.topics.includes(item.topic)))).slice(0, 6);
+    } catch (_) {
+      this.profile = null;
+      this.courses = [];
+      this.topicMastery = [];
+      this.message = '本地学习画像加载失败';
     } finally {
       this.loading = false;
     }
   }
 
+  private sortTopicMastery(items: TopicMastery[]): TopicMastery[] {
+    return items.slice().sort((left: TopicMastery, right: TopicMastery): number => {
+      if (left.mastered !== right.mastered) return left.mastered ? 1 : -1;
+      const accuracyDelta = left.accuracy - right.accuracy;
+      if (accuracyDelta !== 0) return accuracyDelta;
+      return (right.lastPracticedAt ?? '').localeCompare(left.lastPracticedAt ?? '');
+    });
+  }
+
   private openLearningMap(): void {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/LearningMap' }).catch((error: Error): void => {
+      this.message = '学习星图打开失败，请重试';
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ProfileContent LearningMap navigation failed: %{public}s', error.message);
     });
@@ -42,31 +63,34 @@ export struct ProfileContent {
 
   private openPage(url: string): void {
     this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
+      this.message = '页面打开失败，请重试';
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ProfileContent page navigation failed: %{public}s', error.message);
     });
   }
 
-  private courseTitle(courseId: string): string {
-    if (courseId === 'cs101') return '数据结构';
-    if (courseId === 'cs102') return '操作系统';
-    if (courseId === 'cs103') return '计算机网络';
-    return '课程';
+  private findCourse(item: TopicMastery): Course | undefined {
+    return this.courses.find((course: Course): boolean =>
+      course.id === item.courseId && course.topics.includes(item.topic));
   }
 
-  private masteryColor(item: TagInsight): string {
-    if (item.masteryPoints >= 88) return Constants.COLOR_SUCCESS;
-    if (item.masteryPoints >= 72) return Constants.COLOR_BRAND;
-    if (item.masteryPoints >= 48) return Constants.COLOR_WARNING;
-    return Constants.COLOR_ERROR;
+  private topicCourseTitle(item: TopicMastery): string {
+    const course = this.findCourse(item);
+    return course === undefined ? '课程目录已更新' : course.title;
   }
 
-  private openFocusedQuiz(item: TagInsight): void {
-    AppStorage.setOrCreate<string>('selectedCourseId', item.courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(item.courseId));
+  private openFocusedQuiz(item: TopicMastery): void {
+    const course = this.findCourse(item);
+    if (course === undefined) {
+      this.message = '课程目录已更新，请重新加载画像';
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', course.id);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
     AppStorage.setOrCreate<string>('selectedQuizTopic', item.topic);
-    AppStorage.setOrCreate<string>('selectedQuizFocusTag', item.tag);
+    AppStorage.setOrCreate<string>('selectedQuizFocusTag', '');
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
+      this.message = '练习页面打开失败，请重试';
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ProfileContent focused quiz navigation failed: %{public}s', error.message);
     });
@@ -88,8 +112,12 @@ export struct ProfileContent {
       SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(17).fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
     }
     .width('100%')
-    .height(62)
+    .constraintSize({ minHeight: 64 })
+    .padding({ top: 8, bottom: 8 })
     .onClick((): void => { this.openPage(url); })
+    .accessibilityGroup(true)
+    .accessibilityText(title)
+    .accessibilityDescription(subtitle)
   }
 
   @Builder
@@ -108,71 +136,49 @@ export struct ProfileContent {
   }
 
   @Builder
-  TagInsightRow(item: TagInsight) {
-    Column({ space: 8 }) {
-      Row() {
-        Row({ space: 7 }) {
-          Text(item.tag)
-            .fontSize(13)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(item.masteryLevel)
-            .fontSize(10)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.masteryColor(item))
-            .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-            .backgroundColor(Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_SM)
-        }
-        Text(item.correctQuestions.toString() + '/' + item.totalQuestions.toString())
+  TopicMasteryRow(item: TopicMastery) {
+    Column({ space: 10 }) {
+      Flex({ wrap: FlexWrap.Wrap }) {
+        Text(this.topicCourseTitle(item) + ' · ' + item.topic)
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .margin({ right: 8, bottom: 6 })
+        Text(item.mastered ? '已掌握' : '待巩固')
           .fontSize(11)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(item.mastered ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(item.mastered ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_SURFACE_TINT)
+          .borderRadius(Constants.RADIUS_SM)
+          .margin({ bottom: 6 })
       }
       .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
       Progress({ value: Math.round(item.accuracy * 100), total: 100, type: ProgressType.Linear })
         .width('100%')
-        .color(item.accuracy >= 0.8 ? Constants.COLOR_SUCCESS : (item.accuracy >= 0.6 ? Constants.COLOR_WARNING :
+        .color(item.mastered ? Constants.COLOR_SUCCESS : (item.accuracy >= 0.6 ? Constants.COLOR_WARNING :
           Constants.COLOR_ERROR))
         .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
         .borderRadius(4)
-      Text(item.wrongQuestions > 0 ? '错题 ' + item.wrongQuestions.toString() + ' 道，建议优先复盘' : '当前表现稳定')
+        .accessibilityText(item.topic + '累计正确率' + Math.round(item.accuracy * 100).toString() + '%')
+      Text('累计答对 ' + item.correctQuestions.toString() + '/' + item.totalQuestions.toString() +
+        ' 题 · ' + item.attempts.toString() + ' 次测验')
         .fontSize(11)
-        .fontColor(item.wrongQuestions > 0 ? Constants.COLOR_TEXT_TERTIARY : Constants.COLOR_SUCCESS)
-      Row({ space: 6 }) {
-        Text('基础 ' + item.easyQuestions.toString())
-          .fontSize(10)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Text('进阶 ' + item.mediumQuestions.toString())
-          .fontSize(10)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Text('挑战 ' + item.hardQuestions.toString())
-          .fontSize(10)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-      }
-      .width('100%')
-      Text(item.weakReason)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Text(item.mastered ? '掌握依据：累计正确率达到 80%' : '下一步：继续测验，新的答题结果会更新这里')
         .fontSize(11)
         .fontColor(Constants.COLOR_TEXT_TERTIARY)
         .lineHeight(18)
-      Text('下一步：' + item.nextStep)
-        .fontSize(11)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Constants.COLOR_BRAND)
-      Row({ space: 8 }) {
-        Text(this.courseTitle(item.courseId) + ' · ' + item.topic + ' · 掌握值 ' + item.masteryPoints.toString())
-          .layoutWeight(1)
-          .fontSize(10)
-          .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
-        Button('练这个标签')
-          .height(30)
-          .fontSize(11)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(Constants.COLOR_BRAND)
-          .borderRadius(Constants.RADIUS_SM)
-          .onClick((): void => { this.openFocusedQuiz(item); })
-      }
-      .width('100%')
+      Button('练习 ' + item.topic)
+        .width('100%')
+        .constraintSize({ minHeight: 48 })
+        .fontSize(13)
+        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+        .backgroundColor(Constants.COLOR_BRAND)
+        .borderRadius(Constants.RADIUS_SM)
+        .onClick((): void => { this.openFocusedQuiz(item); })
+        .accessibilityText('练习' + this.topicCourseTitle(item) + item.topic)
+        .accessibilityDescription('打开测验，新结果将更新知识点画像')
     }
     .width('100%')
   }
@@ -193,6 +199,8 @@ export struct ProfileContent {
     }
     .width('100%')
     .padding(16)
+    .accessibilityGroup(true)
+    .accessibilityText('正在加载学习画像')
   }
 
   build() {
@@ -216,6 +224,35 @@ export struct ProfileContent {
       } else if (this.profile) {
         Scroll() {
           Column({ space: 12 }) {
+            if (this.message.length > 0) {
+              Column({ space: 10 }) {
+                Row({ space: 10 }) {
+                  SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+                    .fontSize(20)
+                    .fontColor([Constants.COLOR_ERROR])
+                  Text(this.message)
+                    .layoutWeight(1)
+                    .fontSize(13)
+                    .fontColor(Constants.COLOR_ERROR)
+                    .lineHeight(20)
+                }
+                .width('100%')
+                Button('重新加载')
+                  .width('100%')
+                  .constraintSize({ minHeight: 48 })
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .backgroundColor(Constants.COLOR_ERROR)
+                  .borderRadius(Constants.RADIUS_SM)
+                  .onClick((): void => { this.loadProfile(); })
+                  .accessibilityText('重新加载学习画像')
+              }
+              .width('100%')
+              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+            }
+
             Row({ space: 16 }) {
               Text(this.profile.name.charAt(0))
                 .fontSize(28)
@@ -231,7 +268,7 @@ export struct ProfileContent {
                   .fontSize(18)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                Text(this.profile.stage + ' · ' + this.profile.learningStyle)
+                Text(this.profile.stage)
                   .fontSize(13)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   .margin({ top: 4 })
@@ -244,6 +281,8 @@ export struct ProfileContent {
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
             .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+            .accessibilityGroup(true)
+            .accessibilityText(this.profile.name + '，' + this.profile.stage)
 
             Column() {
               this.GrowthEntry('学习记录', '按时间回看练习与任务', $r('sys.symbol.clock'), 'pages/ActivityRecords')
@@ -257,54 +296,20 @@ export struct ProfileContent {
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
 
-            Stack({ alignContent: Alignment.Center }) {
-              Column()
-                .width('100%')
-                .height(184)
-                .backgroundColor(Constants.COLOR_MAP_SURFACE)
-                .borderRadius(Constants.RADIUS_LG)
-
-              Line()
-                .width(250)
-                .height(116)
-                .startPoint([125, 58])
-                .endPoint([30, 22])
-                .stroke(Constants.COLOR_MAP_LINE)
-                .strokeWidth(1)
-              Line()
-                .width(250)
-                .height(116)
-                .startPoint([125, 58])
-                .endPoint([218, 18])
-                .stroke(Constants.COLOR_MAP_LINE)
-                .strokeWidth(1)
-              Line()
-                .width(250)
-                .height(116)
-                .startPoint([125, 58])
-                .endPoint([207, 102])
-                .stroke(Constants.COLOR_MAP_LINE)
-                .strokeWidth(1)
-
+            Row({ space: 14 }) {
               Stack({ alignContent: Alignment.Center }) {
                 Column()
-                  .width(62)
-                  .height(42)
+                  .width(48)
+                  .height(48)
                   .backgroundColor(Constants.COLOR_MAP_CORE)
-                  .borderRadius(14)
+                  .borderRadius(16)
                   .shadow({ radius: 7, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 2 })
                 SymbolGlyph($r('sys.symbol.book_open_fill'))
                   .fontSize(20)
                   .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
               }
-              .width(62)
-              .height(42)
-              Column().width(30).height(30).backgroundColor(Constants.COLOR_BRAND).borderRadius(15).opacity(0.12).position({ x: 29, y: 31 })
-              Column().width(10).height(10).backgroundColor(Constants.COLOR_BRAND).borderRadius(5).position({ x: 39, y: 41 })
-              Column().width(28).height(28).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(14).opacity(0.14).position({ x: 239, y: 23 })
-              Column().width(12).height(12).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(6).position({ x: 247, y: 31 })
-              Column().width(24).height(24).backgroundColor(Constants.COLOR_WARNING).borderRadius(12).opacity(0.14).position({ x: 227, y: 124 })
-              Column().width(9).height(9).backgroundColor(Constants.COLOR_WARNING).borderRadius(5).position({ x: 235, y: 132 })
+              .width(48)
+              .height(48)
 
               Column({ space: 5 }) {
                 Text('学习星图')
@@ -314,53 +319,71 @@ export struct ProfileContent {
                 Text('查看知识之间的联系与掌握状态')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+                  .lineHeight(18)
               }
+              .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
-              .position({ x: 22, y: 118 })
 
               SymbolGlyph($r('sys.symbol.chevron_right'))
                 .fontSize(20)
                 .fontColor([Constants.COLOR_TEXT_PRIMARY])
-                .position({ x: 292, y: 137 })
             }
             .width('100%')
-            .height(184)
+            .constraintSize({ minHeight: 96 })
+            .padding(18)
+            .backgroundColor(Constants.COLOR_MAP_SURFACE)
+            .borderRadius(Constants.RADIUS_LG)
             .onClick((): void => { this.openLearningMap(); })
+            .accessibilityGroup(true)
+            .accessibilityText('打开学习星图')
+            .accessibilityDescription('查看知识之间的联系与掌握状态')
 
-            Row() {
-              this.Metric(Math.round(this.profile.stats.accuracy * 100).toString() + '%', '正确率', Constants.COLOR_SUCCESS)
-              Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
-              this.Metric(this.profile.stats.totalQuestions.toString(), '累计答题', Constants.COLOR_TEXT_PRIMARY)
-              Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
-              this.Metric(this.profile.stats.streakDays.toString(), '连续天数', Constants.COLOR_BRAND)
+            Column({ space: 10 }) {
+              Row() {
+                this.Metric(Math.round(this.profile.stats.accuracy * 100).toString() + '%', '正确率', Constants.COLOR_SUCCESS)
+                Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
+                this.Metric(this.profile.stats.totalQuestions.toString(), '累计答题', Constants.COLOR_TEXT_PRIMARY)
+                Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
+                this.Metric(this.profile.stats.streakDays.toString(), '连续天数', Constants.COLOR_BRAND)
+              }
+              .width('100%')
+              Text('累计活跃 ' + this.profile.stats.studyDays.toString() + ' 天 · 来自本机答题与学习事件')
+                .width('100%')
+                .fontSize(11)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                .textAlign(TextAlign.Center)
+                .lineHeight(18)
             }
             .width('100%')
             .padding({ top: 16, bottom: 16 })
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
             .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+            .accessibilityGroup(true)
+            .accessibilityText('学习统计，正确率' + Math.round(this.profile.stats.accuracy * 100).toString() +
+              '%，累计答题' + this.profile.stats.totalQuestions.toString() + '题，连续学习' +
+              this.profile.stats.streakDays.toString() + '天，累计活跃' +
+              this.profile.stats.studyDays.toString() + '天')
+            .accessibilityDescription('统计来自本机已保存的答题与学习事件')
 
             Column({ space: 12 }) {
-              Row() {
-                Text('标签洞察')
-                  .fontSize(15)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                Text('错因与下一步')
-                  .fontSize(11)
-                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.SpaceBetween)
-              if (this.tagInsights.length === 0) {
-                Text('完成带标签的练习后，这里会显示能力短板和复习优先级')
+              Text('知识点画像')
+                .fontSize(15)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              Text('按课程与知识点汇总本机测验，优先显示尚未掌握且正确率较低的项目')
+                .fontSize(11)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                .lineHeight(18)
+              if (this.topicMastery.length === 0) {
+                Text('完成一次测验后，这里会显示累计答题、正确率与掌握依据')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   .lineHeight(20)
               } else {
-                ForEach(this.tagInsights, (item: TagInsight, index: number): void => {
-                  this.TagInsightRow(item)
-                  if (index < this.tagInsights.length - 1) {
+                ForEach(this.topicMastery, (item: TopicMastery, index: number): void => {
+                  this.TopicMasteryRow(item)
+                  if (index < this.topicMastery.length - 1) {
                     Divider().color(Constants.COLOR_BORDER)
                   }
                 })
@@ -371,50 +394,6 @@ export struct ProfileContent {
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
             .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
-
-            Column() {
-              Text('薄弱知识点')
-                .fontSize(15)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              Flex({ wrap: FlexWrap.Wrap }) {
-                ForEach(this.profile.weakTopics, (t: string) => {
-                  Text(t)
-                    .fontSize(12)
-                    .fontColor(Constants.COLOR_ERROR)
-                    .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                    .backgroundColor(Constants.COLOR_ERROR_LIGHT)
-                    .borderRadius(10)
-                    .margin({ right: 6, bottom: 6, top: 8 })
-                })
-              }
-              .width('100%')
-
-              Divider().color(Constants.COLOR_BORDER).margin({ top: 10, bottom: 14 })
-
-              Text('已掌握知识点')
-                .fontSize(15)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              Flex({ wrap: FlexWrap.Wrap }) {
-                ForEach(this.profile.strongTopics, (t: string) => {
-                  Text(t)
-                    .fontSize(12)
-                    .fontColor(Constants.COLOR_SUCCESS)
-                    .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                    .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
-                    .borderRadius(10)
-                    .margin({ right: 6, bottom: 6, top: 8 })
-                })
-              }
-              .width('100%')
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor(Constants.COLOR_BG_CARD)
-            .borderRadius(Constants.RADIUS_LG)
-            .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
-            .alignItems(HorizontalAlign.Start)
           }
           .width('100%')
           .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
@@ -430,9 +409,20 @@ export struct ProfileContent {
           Text(this.message.length > 0 ? this.message : '暂无学习画像')
             .fontSize(15)
             .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+            .textAlign(TextAlign.Center)
+            .lineHeight(22)
+          Button('重新加载')
+            .constraintSize({ minHeight: 48 })
+            .fontSize(14)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(Constants.RADIUS_SM)
+            .onClick((): void => { this.loadProfile(); })
+            .accessibilityText('重新加载学习画像')
         }
         .width('100%')
         .layoutWeight(1)
+        .padding({ left: 24, right: 24 })
         .justifyContent(FlexAlign.Center)
       }
     }

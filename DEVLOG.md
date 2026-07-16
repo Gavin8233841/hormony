@@ -6558,3 +6558,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前没有模拟器或真机目标；真实通知权限、通知发布/点击、桌面服务卡片并发刷新、TalkBack 播报、字体放大和 48vp 触控仍未取得设备证据。
 - HAP 未配置正式签名，安装和竞赛提交包可用性未验证。
 - 本批未修改 Web、ArkData schema、Quiz reducer 或内容产物，因此没有重复运行 Web 四项和内容关系全套。
+
+---
+
+## 2026-07-17 [MAIN+WS04] 真实知识点画像与可恢复学习记录
+
+背景：现有画像页直接展示未按课程/Topic 隔离的标签洞察以及静态学习风格、强项和弱项，容易把缺少事实来源的描述呈现给真实学习者；学习记录页在多次 Repository 读取中逐步写 UI，任一后续读取失败会留下混合快照，错误态也没有可执行恢复入口。本批选择性复核 WS04 `d54e2d5`，只采用两页产品实现和当前源码契约。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+- `scripts/test-profile-accessibility-contracts.mjs`
+- `scripts/test-activity-records-accessibility-contracts.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- 画像页从 ArkData `TopicMastery` 与本地课程目录读取知识点状态，按“未掌握优先、累计正确率较低优先、最近练习时间”排序；不再展示未隔离标签洞察或无法从学习事实推导的学习风格、静态强弱项。
+- 知识点练习入口先校验精确 `courseId + topic` 目录对，再写入 Quiz 上下文；课程标题来自本地目录，并清空可能遗留的标签筛选。
+- 画像统计明确标注来自本机答题与学习事件；知识点卡展示累计答题、正确率、掌握阈值和下一步，并提供至少 48vp 的真实测验入口。
+- 画像和记录页都只在全部 Repository 读取成功后一次提交完整 UI 快照；失败会清空不完整数据并显示可聚焦的 48vp 重新读取入口。
+- 学习记录四周节奏合并为可解释的无障碍摘要；筛选项等分窄屏空间并播报选中状态，事件卡允许两行证据、时间与动作自动换行，只有真实可达事件才响应点击。
+- 页面导航失败显示明确错误与重载入口；保留本地状态单一来源，没有新增静态画像、云端进程内持久化或猜测课程映射。
+
+验证：
+- `node --check scripts/test-profile-accessibility-contracts.mjs`：exit 0。
+- `node --check scripts/test-activity-records-accessibility-contracts.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs scripts/test-profile-accessibility-contracts.mjs scripts/test-activity-records-accessibility-contracts.mjs`：exit 0，52/52 通过；包含 40 项主动服务/触达回归与 12 项画像/记录来源、恢复、窄屏和无障碍契约。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 30 s 344 ms`；无新增 ArkTS 警告，仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：exit 0，返回 `[Empty]`。
+- `git diff --check`：exit 0，仅有既有 LF/CRLF 工作区提示。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；画像排序、页面重载、记录筛选、屏幕阅读器播报、字体放大、窄屏换行和真实点击流程均未取得设备证据。
+- HAP 未配置正式签名，安装和竞赛提交包可用性未验证。
+- 本批未修改 Repository schema；终身测验统计和 v10 迁移仍由 WS02 独立审查，主线暂不把现有画像统计宣称为设备重启验证通过。
