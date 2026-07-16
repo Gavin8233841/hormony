@@ -8,17 +8,22 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { HttpClient } from '../common/HttpClient';
-import { HealthResponse } from '../model/DataModels';
+import { Course, HealthResponse } from '../model/DataModels';
 import { LearningContentRepository } from '../common/LearningContentRepository';
-import { Course } from '../model/DataModels';
 import { SafeAreaInsets } from '../common/SafeArea';
+import { ProactiveLearningService } from '../common/ProactiveLearningService';
 
 export default class EntryAbility extends UIAbility {
   private mainWindow: window.Window | null = null;
   private avoidAreaChangeCallback: ((options: window.AvoidAreaOptions) => void) | null = null;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    this.handleProactiveWant(want);
     console.info('EntryAbility onCreate');
+  }
+
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    this.handleProactiveWant(want);
   }
 
   onDestroy(): void {
@@ -98,6 +103,24 @@ export default class EntryAbility extends UIAbility {
       this.buildCourse('cs103', '计算机网络')
     ];
     await LocalLearningRepository.syncCourseCatalog(catalog);
+  }
+
+  private handleProactiveWant(want: Want): void {
+    const source = this.wantString(want, 'source');
+    if (source !== 'proactive_learning_card' && source !== 'proactive_learning_reminder') return;
+    ProactiveLearningService.requestLaunch(
+      this.wantString(want, 'targetPage'),
+      this.wantString(want, 'courseId'),
+      this.wantString(want, 'courseTitle'),
+      this.wantString(want, 'topic'),
+      this.wantString(want, 'focusTag'),
+      this.wantString(want, 'taskAction')
+    );
+  }
+
+  private wantString(want: Want, key: string): string {
+    const value = want.parameters?.[key];
+    return typeof value === 'string' ? value : '';
   }
 
   private buildCourse(id: string, title: string): Course {

@@ -1,14 +1,11 @@
 import { Constants } from '../common/Constants';
 import { Course, PlanTask, StudyPlan } from '../model/DataModels';
-import {
-  LearningReviewItem as ReviewItem,
-  LearningStudyEvent as StudyEvent,
-  LearningTagInsight as TagInsight
-} from '../model/LearningMetadataModels';
+import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningReminder } from '../common/LearningReminder';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
+import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
 import { common } from '@kit.AbilityKit';
 
 interface AgentPlanTask extends PlanTask {
@@ -29,6 +26,7 @@ export struct HomeContent {
   };
   @State quickAsk: string = '';
   @State notificationOpen: boolean = false;
+  @State notificationState: string = 'idle';
   @State pressedTask: number = -1;
   @State notificationMessage: string = '学习计划已同步，完成任务会自动更新进度';
   @State nextActionKind: string = 'course';
@@ -41,6 +39,9 @@ export struct HomeContent {
   @State nextActionTopic: string = '';
   @State nextActionFocusTag: string = '';
   @State nextActionTaskAction: string = '';
+  @State nextActionTargetPage: string = 'pages/Index';
+  @State nextActionEvidence: string = '正在读取本机学习状态';
+  @State nextActionProgressText: string = '等待同步';
   @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [];
 
   aboutToAppear(): void {
@@ -137,21 +138,17 @@ export struct HomeContent {
 
   private async publishReminder(): Promise<void> {
     this.notificationOpen = true;
+    this.notificationState = 'loading';
+    this.notificationMessage = '正在创建系统学习提醒';
     try {
       const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       const taskTitle = await LearningReminder.publishNextTask(hostContext);
+      this.notificationState = 'success';
       this.notificationMessage = '系统提醒已创建：' + taskTitle;
     } catch (e) {
+      this.notificationState = 'error';
       this.notificationMessage = '未能创建系统提醒，请检查通知权限';
     }
-  }
-
-  private currentTaskTitle(): string {
-    for (const task of this.todayTasks()) {
-      if (!task.done) return task.title;
-    }
-    if (this.planTasks.length === 0) return '制定今日学习计划';
-    return this.todayTasks().length === 0 ? '今天没有安排' : '今日任务已完成';
   }
 
   private submitQuickAsk(): void {
@@ -172,144 +169,63 @@ export struct HomeContent {
     });
   }
 
-  private courseTitle(courseId: string): string {
-    if (courseId === 'cs101') return '数据结构';
-    if (courseId === 'cs102') return '操作系统';
-    if (courseId === 'cs103') return '计算机网络';
-    return this.currentCourse.title;
-  }
-
   private async loadNextAction(): Promise<void> {
     try {
-      const dueReviews = await LocalLearningRepository.getDueReviewItems();
-      if (dueReviews.length > 0) {
-        const first = dueReviews[0];
-        this.setReviewAction(first, dueReviews.length);
-        return;
-      }
-
-      const tags = await LocalLearningRepository.getTagInsights(1);
-      if (tags.length > 0 && (tags[0].wrongQuestions > 0 || tags[0].masteryPoints < 72)) {
-        this.setTagAction(tags[0]);
-        return;
-      }
-
-      const plan = await LocalLearningRepository.getPlan();
-      const tasks = plan?.tasks ?? this.planTasks;
-      const today = this.todayDate();
-      const pending = tasks.find((task: PlanTask): boolean => task.date === today && task.done !== true);
-      if (pending !== undefined) {
-        this.setTaskAction(pending);
-        return;
-      }
-
-      this.setCourseAction();
+      this.applyNextAction(await ProactiveLearningService.resolve());
     } catch (e) {
-      this.setCourseAction();
+      this.applyNextAction(ProactiveLearningService.fallback(this.currentCourse));
     }
   }
 
-  private setReviewAction(item: ReviewItem, dueCount: number): void {
-    this.nextActionKind = 'review';
-    this.nextActionBadge = '到期复习';
-    this.nextActionTitle = dueCount.toString() + ' 道错题今天该复习';
-    this.nextActionSubtitle = item.topic + ' · ' + item.stem;
-    this.nextActionCta = '打开错题本';
-    this.nextActionCourseId = item.courseId;
-    this.nextActionCourseTitle = this.courseTitle(item.courseId);
-    this.nextActionTopic = item.topic;
-    this.nextActionFocusTag = (item.tags ?? [])[0] ?? item.topic;
-    this.nextActionTaskAction = '';
-  }
-
-  private setTagAction(item: TagInsight): void {
-    this.nextActionKind = 'tag';
-    this.nextActionBadge = item.masteryLevel;
-    this.nextActionTitle = '优先补强：' + item.tag;
-    this.nextActionSubtitle = this.courseTitle(item.courseId) + ' · ' + item.topic +
-      ' · 掌握值 ' + item.masteryPoints.toString();
-    this.nextActionCta = '练这个标签';
-    this.nextActionCourseId = item.courseId;
-    this.nextActionCourseTitle = this.courseTitle(item.courseId);
-    this.nextActionTopic = item.topic;
-    this.nextActionFocusTag = item.tag;
-    this.nextActionTaskAction = '';
-  }
-
-  private setTaskAction(task: PlanTask): void {
-    this.nextActionKind = 'task';
-    this.nextActionBadge = '今日任务';
-    this.nextActionTitle = task.title;
-    this.nextActionSubtitle = task.topic !== undefined ?
-      this.courseTitle(task.courseId ?? this.currentCourse.id) + ' · ' + task.topic :
-      task.estimatedMin.toString() + ' 分钟';
-    this.nextActionCta = task.action === 'quiz' ? '开始测验' : (task.action === 'practice' ? '开始练习' : '继续学习');
-    this.nextActionCourseId = task.courseId ?? this.currentCourse.id;
-    this.nextActionCourseTitle = this.courseTitle(this.nextActionCourseId);
-    this.nextActionTopic = task.topic ?? '';
-    this.nextActionFocusTag = '';
-    this.nextActionTaskAction = task.action ?? '';
-  }
-
-  private setCourseAction(): void {
-    this.nextActionKind = 'course';
-    this.nextActionBadge = '继续';
-    this.nextActionTitle = '继续当前课程';
-    this.nextActionSubtitle = this.currentCourse.title + ' · ' + Math.round(this.currentCourse.progress * 100).toString() + '%';
-    this.nextActionCta = '进入课程';
-    this.nextActionCourseId = this.currentCourse.id;
-    this.nextActionCourseTitle = this.currentCourse.title;
-    this.nextActionTopic = '';
-    this.nextActionFocusTag = '';
-    this.nextActionTaskAction = '';
+  private applyNextAction(action: ProactiveLearningAction): void {
+    this.nextActionKind = action.kind;
+    this.nextActionBadge = action.badge;
+    this.nextActionTitle = action.title;
+    this.nextActionSubtitle = action.subtitle;
+    this.nextActionCta = action.cta;
+    this.nextActionCourseId = action.courseId;
+    this.nextActionCourseTitle = action.courseTitle;
+    this.nextActionTopic = action.topic;
+    this.nextActionFocusTag = action.focusTag;
+    this.nextActionTaskAction = action.taskAction;
+    this.nextActionTargetPage = action.targetPage;
+    this.nextActionEvidence = action.evidence;
+    this.nextActionProgressText = action.progressText;
   }
 
   private openNextAction(): void {
-    if (this.nextActionKind === 'review') {
-      this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeBook' }).catch((err: Error): void => {
-        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-          'HomeContent MistakeBook navigation failed: %{public}s', err.message);
-      });
+    const action: ProactiveLearningAction = {
+      kind: this.nextActionKind,
+      badge: this.nextActionBadge,
+      title: this.nextActionTitle,
+      subtitle: this.nextActionSubtitle,
+      cta: this.nextActionCta,
+      courseId: this.nextActionCourseId,
+      courseTitle: this.nextActionCourseTitle,
+      topic: this.nextActionTopic,
+      focusTag: this.nextActionFocusTag,
+      taskAction: this.nextActionTaskAction,
+      targetPage: this.nextActionTargetPage,
+      evidence: this.nextActionEvidence,
+      progressText: this.nextActionProgressText
+    };
+    ProactiveLearningService.applySelection(action);
+    if (this.nextActionTargetPage === 'pages/Index') {
+      this.selectedTab = 1;
       return;
     }
-    if (this.nextActionKind === 'tag') {
-      AppStorage.setOrCreate<string>('selectedCourseId', this.nextActionCourseId);
-      AppStorage.setOrCreate<string>('selectedCourseTitle', this.nextActionCourseTitle);
-      AppStorage.setOrCreate<string>('selectedQuizTopic', this.nextActionTopic);
-      AppStorage.setOrCreate<string>('selectedQuizFocusTag', this.nextActionFocusTag);
-      this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
-        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-          'HomeContent Quiz navigation failed: %{public}s', err.message);
-      });
-      return;
-    }
-    if (this.nextActionKind === 'task') {
-      AppStorage.setOrCreate<string>('selectedCourseId', this.nextActionCourseId);
-      AppStorage.setOrCreate<string>('selectedCourseTitle', this.nextActionCourseTitle);
-      if (this.nextActionTaskAction === 'quiz') {
-        AppStorage.setOrCreate<string>('selectedQuizTopic', this.nextActionTopic);
-        this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
-          hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-            'HomeContent task Quiz navigation failed: %{public}s', err.message);
-        });
-        return;
-      }
-      if (this.nextActionTaskAction === 'practice') {
-        AppStorage.setOrCreate<string>('selectedPracticeTopic', this.nextActionTopic);
-        this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((err: Error): void => {
-          hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-            'HomeContent task Practice navigation failed: %{public}s', err.message);
-        });
-        return;
-      }
-      AppStorage.setOrCreate<string>('selectedContentTopic', this.nextActionTopic);
-      this.getUIContext().getRouter().pushUrl({ url: 'pages/Lesson' }).catch((err: Error): void => {
-        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-          'HomeContent task Lesson navigation failed: %{public}s', err.message);
-      });
-      return;
-    }
-    this.selectedTab = 1;
+    this.getUIContext().getRouter().pushUrl({ url: this.nextActionTargetPage }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'HomeContent proactive action navigation failed: %{public}s', err.message);
+    });
+  }
+
+  private nextActionIcon(): Resource {
+    if (this.nextActionKind === 'review') return $r('sys.symbol.clock');
+    if (this.nextActionKind === 'tag') return $r('sys.symbol.rays');
+    if (this.nextActionKind === 'task') return $r('sys.symbol.calendar_fill');
+    if (this.nextActionKind === 'plan') return $r('sys.symbol.calendar_badge_plus');
+    return $r('sys.symbol.book_open_fill');
   }
 
   @Builder
@@ -369,17 +285,25 @@ export struct HomeContent {
 
       if (this.notificationOpen) {
         Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-            .fontSize(18)
-            .fontColor([Constants.COLOR_SUCCESS])
+          if (this.notificationState === 'loading') {
+            LoadingProgress()
+              .width(18)
+              .height(18)
+              .color(Constants.COLOR_BRAND)
+          } else {
+            SymbolGlyph(this.notificationState === 'error' ? $r('sys.symbol.xmark_circle_fill') :
+              $r('sys.symbol.checkmark_circle_fill'))
+              .fontSize(18)
+              .fontColor([this.notificationState === 'error' ? Constants.COLOR_ERROR : Constants.COLOR_SUCCESS])
+          }
           Text(this.notificationMessage)
             .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(this.notificationState === 'error' ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
         }
         .width('100%')
         .padding({ left: 14, right: 14, top: 10, bottom: 10 })
         .margin({ top: 12 })
-        .backgroundColor(Constants.COLOR_BG_CARD)
+        .backgroundColor(this.notificationState === 'error' ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_CARD)
         .borderRadius(Constants.RADIUS_MD)
       }
     }
@@ -398,7 +322,7 @@ export struct HomeContent {
                 .height(30)
                 .backgroundColor(Constants.COLOR_BRAND)
                 .borderRadius(9)
-              SymbolGlyph($r('sys.symbol.book_open_fill'))
+              SymbolGlyph(this.nextActionIcon())
                 .fontSize(16)
                 .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
             }
@@ -407,11 +331,13 @@ export struct HomeContent {
               .fontColor(Constants.COLOR_BRAND)
           }
 
-          Text(this.nextActionKind === 'course' ? this.currentCourse.title : this.nextActionTitle)
+          Text(this.nextActionTitle)
             .fontSize(24)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .margin({ top: 14 })
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
 
           Row({ space: 10 }) {
             Stack({ alignContent: Alignment.Center }) {
@@ -420,18 +346,19 @@ export struct HomeContent {
                 .height(34)
                 .backgroundColor(Constants.COLOR_BG_CARD)
                 .borderRadius(10)
-              SymbolGlyph($r('sys.symbol.book_open_fill'))
+              SymbolGlyph(this.nextActionIcon())
                 .fontSize(17)
                 .fontColor([Constants.COLOR_BRAND])
             }
             Column() {
-              Text('下一步最好做什么')
+              Text('推荐依据')
                 .fontSize(12)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
-              Text(this.nextActionKind === 'course' ? this.currentTaskTitle() : this.nextActionSubtitle)
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              Text(this.nextActionEvidence)
+                .fontSize(13)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                .lineHeight(19)
                 .margin({ top: 3 })
                 .maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -457,8 +384,8 @@ export struct HomeContent {
             .height(68)
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(34)
-          SymbolGlyph($r('sys.symbol.book_pages_fill_1'))
-            .fontSize(46)
+          SymbolGlyph(this.nextActionIcon())
+            .fontSize(42)
             .fontColor([Constants.COLOR_BRAND])
             .renderingStrategy(SymbolRenderingStrategy.SINGLE)
         }
@@ -468,27 +395,20 @@ export struct HomeContent {
       .width('100%')
 
       Row({ space: 14 }) {
-        Column() {
-          Row() {
-            Text('学习进度')
-              .fontSize(12)
-              .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            Text(Math.round(this.currentCourse.progress * 100).toString() + '%')
-              .fontSize(22)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_BRAND)
-          }
-          .width('100%')
-          .justifyContent(FlexAlign.SpaceBetween)
-
-          Progress({ value: this.currentCourse.progress * 100, total: 100, type: ProgressType.Linear })
-            .width('100%')
-            .height(5)
-            .color(Constants.COLOR_BRAND)
-            .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-            .borderRadius(3)
-            .margin({ top: 8 })
+        Column({ space: 4 }) {
+          Text(this.nextActionSubtitle)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(this.nextActionProgressText)
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_BRAND)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
+        .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
 
         Button() {
@@ -517,7 +437,7 @@ export struct HomeContent {
     .width('100%')
     .padding(18)
     .backgroundColor(Constants.COLOR_BG_CARD)
-    .borderRadius(Constants.RADIUS_XL)
+    .borderRadius(Constants.RADIUS_LG)
     .shadow({ radius: 8, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
   }
 

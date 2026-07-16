@@ -7,6 +7,6 @@
     { "name": "EntryFormAbility_label", "value": "今日学习" },
     { "name": "EntryFormAbility_desc", "value": "在桌面查看下一项学习任务" },
     { "name": "widget_display_name", "value": "鸿学伴今日学习" },
-    { "name": "widget_desc", "value": "显示本地学习计划中的下一项任务" }
+    { "name": "widget_desc", "value": "显示由本机学习状态推导的下一项行动" }
   ]
 }
