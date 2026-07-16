@@ -363,6 +363,72 @@ def segment_worked_example_contract_errors(experience):
     return errors
 
 
+SOCKET_STEP_KEYS = ["A", "B", "C", "D", "E", "F", "G"]
+SOCKET_REQUIRED_OPTIONS = {
+    "A": "客户端连接到达后，服务器的 accept() 返回用于本次连接的新套接字",
+    "G": "客户端调用 connect() 向服务器发起连接请求",
+}
+SOCKET_DEPENDENCIES = [
+    ("B", "C"),
+    ("C", "E"),
+    ("E", "G"),
+    ("G", "A"),
+    ("A", "F"),
+    ("F", "D"),
+]
+
+
+def socket_step_contract_errors(activity):
+    errors = []
+    options = activity.get("options", [])
+    answer_indexes = activity.get("answerIndexes", [])
+    prompt = activity.get("prompt", "")
+    feedback = activity.get("feedback", "")
+    if "按必然的先后依赖" not in prompt:
+        errors.append("prompt must ask for necessary event dependencies")
+    if "服务器可以在客户端 connect 前调用 accept 并阻塞" not in feedback:
+        errors.append("feedback must distinguish the accept call from its return")
+    if "accept 返回”必然发生在连接到达之后" not in feedback:
+        errors.append("feedback must place the accept return after connection arrival")
+    if "知识切片 cs102_k48" not in activity.get("source", ""):
+        errors.append("Socket activity source must cite cs102_k48")
+    if len(options) != len(SOCKET_STEP_KEYS):
+        return [
+            f"expected {len(SOCKET_STEP_KEYS)} Socket options, got {len(options)}"
+        ]
+    if len(set(options)) != len(options):
+        errors.append("Socket options must not contain duplicates")
+
+    option_by_key = dict(zip(SOCKET_STEP_KEYS, options))
+    for key, expected in SOCKET_REQUIRED_OPTIONS.items():
+        if option_by_key.get(key) != expected:
+            errors.append(
+                f"Socket option {key} is {option_by_key.get(key)!r}, expected {expected!r}"
+            )
+
+    valid_indexes = set(range(len(options)))
+    if (
+        len(answer_indexes) != len(options)
+        or set(answer_indexes) != valid_indexes
+        or len(set(answer_indexes)) != len(answer_indexes)
+    ):
+        errors.append("answerIndexes must be a complete permutation without duplicates")
+        return errors
+
+    ordered_keys = [SOCKET_STEP_KEYS[index] for index in answer_indexes]
+    rendered_answer = " → ".join(ordered_keys)
+    if activity.get("answer") != rendered_answer:
+        errors.append(
+            f"answer {activity.get('answer')!r} does not match indexes {rendered_answer!r}"
+        )
+
+    positions = {key: index for index, key in enumerate(ordered_keys)}
+    for before, after in SOCKET_DEPENDENCIES:
+        if positions[before] >= positions[after]:
+            errors.append(f"Socket dependency requires {before} before {after}")
+    return errors
+
+
 class LessonContentFactsTest(unittest.TestCase):
     def setUp(self):
         self.experiences = load_json(EXPERIENCES_PATH)
@@ -586,6 +652,41 @@ class LessonContentFactsTest(unittest.TestCase):
         self.assertIn(
             "worked example must require segment limit greater than offset",
             segment_worked_example_contract_errors(wrong_experience),
+        )
+
+    def test_socket_step_contract_accepts_generated_dependency_order(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "进程间通信",
+            "cs102-进程间通信-2",
+        )
+
+        self.assertEqual([], socket_step_contract_errors(activity))
+        self.assertEqual(
+            ["B", "C", "E", "G", "A", "F", "D"],
+            [SOCKET_STEP_KEYS[index] for index in activity["answerIndexes"]],
+        )
+        self.assertEqual("B → C → E → G → A → F → D", activity["answer"])
+
+    def test_socket_step_contract_rejects_accept_before_connect_fixture(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "进程间通信",
+            "cs102-进程间通信-2",
+        )
+        wrong_activity = {
+            **activity,
+            "answerIndexes": [1, 2, 4, 0, 6, 5, 3],
+            "answer": "B → C → E → A → G → F → D",
+        }
+
+        errors = socket_step_contract_errors(wrong_activity)
+
+        self.assertEqual(
+            ["Socket dependency requires G before A"],
+            errors,
         )
 
     def test_red_black_root_step_is_kept_in_the_source_spec(self):

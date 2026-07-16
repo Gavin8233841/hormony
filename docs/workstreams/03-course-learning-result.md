@@ -586,3 +586,31 @@
 
 - 子 agent 在旧生成内容上首次执行目标测试精准红灯，定位到逐步示例仍使用 `>= 8202`；生成后转绿。主代理随后一度把题库句式改成重复主语，目标测试退出码 1；收敛到契约精确句式并重新生成后，12 项内容事实测试全部通过。
 - **未验证**：当前无模拟器、手机、平板或真机；逐步示例、活动反馈与题库解析在实际设备上的换行、滚动和同标签跳转未验证。
+
+## 批次二十二：Socket 并发事件的可执行依赖顺序
+
+### 行为
+
+- 修正 `cs102-进程间通信-2` 把服务端 `accept()` 调用与客户端 `connect()` 发起强行排成错误顺序的问题；选项 A 现在明确表示“连接到达后 `accept()` 返回”，不再表示可能更早发生并阻塞的调用动作。
+- 题面要求按必然先后依赖排序，答案收敛为 `B → C → E → G → A → F → D`：服务端创建/绑定/监听后，客户端发起连接，连接到达后 `accept` 返回新套接字，随后通信并关闭。
+- 反馈保留并发事实：服务端可以先调用 `accept` 并阻塞，但 `accept` 返回必然晚于连接到达；学习者操作的是可判定事件依赖，而不是伪造的全局调用时间线。
+- 子 agent 实现步骤契约：从 `answerIndexes` 还原 A-G，校验选项与索引完整无重复、答案逐字一致，并执行依赖边 `B→C→E→G→A→F→D`；旧顺序 fixture 仅因违反 `G→A` 精确红灯。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：POSIX.1-2024 `accept()` 从待处理连接队列取出首个连接并创建新套接字；`connect()` 发起连接。因此 `accept` 调用可以先阻塞，但本题定义的 `accept 返回` 必须在客户端发起并使连接到达之后。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；33/33 Topic、59 个活动，类型分布不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts scripts.test_lesson_content_consistency_cs102 -v`，退出码 0；19 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；51 项运行，50 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 18 s 607 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器、手机、平板或真机；七步排序的拖动、提交反馈和长文本滚动未验证。

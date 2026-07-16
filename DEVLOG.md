@@ -6702,3 +6702,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：两个生成器退出码 0，33 Topic/59 活动与 165 道端侧题一致；目标 17 项、关系校验、WS03 49 项回归均通过（1 项既有 expected failure）；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 35 s 794 ms`。
 
 失败或未验证：旧生成内容首次精准红灯；一次题库句式与测试精确片段不一致使目标测试退出码 1，统一句式并重新生成后通过。无模拟器或真机，同标签跳转和长文本实际显示未验证；HAP 未配置 `signingConfigs`。
+
+---
+
+## 2026-07-17 [WS03] Socket 并发事件依赖顺序修正
+
+背景：`cs102-进程间通信-2` 旧选项 A 表示服务端调用 `accept()` 并等待，G 表示客户端调用 `connect()`，这两个调用可以并发且服务端可先阻塞；旧答案却把 A 固定排在 G 前，无法形成唯一可验证顺序。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS102.md`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_facts.py`。
+
+行为变化：A 改为“连接到达后 `accept()` 返回”，题面要求按必然依赖排序，答案修为 `B→C→E→G→A→F→D`；反馈明确调用可先阻塞而返回必须等待连接。子 agent 新增索引还原与逐边依赖执行，旧答案 fixture 仅触发 `G before A` 错误；主代理补充题面、反馈和 `cs102_k48` 来源约束后采用。
+
+验证：生成器退出码 0，33 Topic/59 活动；目标 19 项、关系校验、WS03 51 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 18 s 607 ms`。
+
+失败或未验证：无模拟器或真机，七步排序拖动、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。
