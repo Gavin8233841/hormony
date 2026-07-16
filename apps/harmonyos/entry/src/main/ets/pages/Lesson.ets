@@ -19,6 +19,7 @@ const EMPTY_CHUNK: CuratedKnowledgeChunk = {
 @Component
 struct LessonPage {
   private contentScroller: Scroller = new Scroller();
+  private activityOffset: number = 0;
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '';
@@ -42,6 +43,13 @@ struct LessonPage {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topic = AppStorage.get<string>('selectedContentTopic') ?? '';
+    this.completedChunkIds = [];
+    this.currentIndex = 0;
+    this.message = '';
+    this.activeActivityIndex = 0;
+    this.attemptedActivityIds = [];
+    this.activityOffset = 0;
+    this.resetActivityInput();
     const content = LearningContentRepository.getKnowledge(this.courseId, this.topic);
     this.experience = LearningContentRepository.getLessonExperience(this.courseId, this.topic);
     this.conceptStepIndex = 0;
@@ -84,6 +92,7 @@ struct LessonPage {
       const nextIndex = this.experience.activities.findIndex((activity: LearningActivity): boolean =>
         !attemptedIds.includes(activity.id));
       this.activeActivityIndex = nextIndex >= 0 ? nextIndex : this.experience.activities.length - 1;
+      this.resetActivityInput();
     } catch (error) {
       if (this.message.length === 0) this.message = '互动断点读取失败，可继续当前练习';
     }
@@ -277,8 +286,40 @@ struct LessonPage {
   private finalActionLabel(): string {
     if (this.saving) return '保存中...';
     if (this.currentIndex < this.chunks.length - 1) return '学完本节，继续';
-    if (!this.allActivitiesAttempted()) return '完成互动练习后继续';
+    if (this.needsActivityResume() && this.experience !== null) {
+      return '继续互动 ' + (this.activeActivityIndex + 1).toString() + '/' +
+        this.experience.activities.length.toString();
+    }
     return '完成主题并练习';
+  }
+
+  private needsActivityResume(): boolean {
+    return this.experience !== null && this.experience.activities.length > 0 &&
+      this.currentIndex === this.chunks.length - 1 && !this.allActivitiesAttempted();
+  }
+
+  private focusActiveActivity(): void {
+    if (!this.needsActivityResume()) return;
+    this.message = '';
+    setTimeout((): void => {
+      if (this.activityOffset > 0) {
+        this.contentScroller.scrollTo({
+          xOffset: 0,
+          yOffset: Math.max(this.activityOffset - 12, 0),
+          animation: true
+        });
+      } else {
+        this.contentScroller.scrollPage({ next: true });
+      }
+    }, 50);
+  }
+
+  private handlePrimaryAction(): void {
+    if (this.needsActivityResume()) {
+      this.focusActiveActivity();
+      return;
+    }
+    this.completeCurrent();
   }
 
   private contentBeats(): string[] {
@@ -961,6 +1002,10 @@ struct LessonPage {
         .backgroundColor(Constants.COLOR_BG_CARD)
         .border({ width: 1, color: Constants.COLOR_BORDER })
         .borderRadius(Constants.RADIUS_LG)
+        .onAreaChange((_: Area, newValue: Area): void => {
+          const nextOffset = Number(newValue.position.y);
+          if (nextOffset >= 0) this.activityOffset = nextOffset;
+        })
       }
     }
   }
@@ -1134,7 +1179,7 @@ struct LessonPage {
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
             .backgroundColor(Constants.COLOR_BRAND)
             .borderRadius(Constants.RADIUS_MD)
-            .onClick((): void => { this.completeCurrent(); })
+            .onClick((): void => { this.handlePrimaryAction(); })
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 12, bottom: 20 + SafeAreaInsets.bottomVp() })

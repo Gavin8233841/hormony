@@ -1,0 +1,157 @@
+import re
+import unittest
+from pathlib import Path
+
+from scripts.test_knowledge_navigation_contract import compact, extract_method
+
+
+ROOT = Path(__file__).resolve().parents[1]
+LESSON_PAGE = ROOT / "apps/harmonyos/entry/src/main/ets/pages/Lesson.ets"
+
+
+class LessonActivityResumeContractTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = LESSON_PAGE.read_text(encoding="utf-8")
+
+    def test_restore_accepts_only_current_experience_activity_events(self):
+        restore = compact(extract_method(self.source, "restoreActivityProgress"))
+
+        self.assertIn(
+            "const activityIds = this.experience.activities.map((activity: "
+            "LearningActivity): string => activity.id);",
+            restore,
+        )
+        self.assertRegex(
+            restore,
+            re.compile(
+                r"if \(event\.type !== 'lesson_activity' \|\| "
+                r"event\.courseId !== this\.courseId \|\| "
+                r"event\.topic !== this\.topic \|\| "
+                r"event\.taskId === undefined \|\| "
+                r"!activityIds\.includes\(event\.taskId\) \|\| "
+                r"attemptedIds\.includes\(event\.taskId\)\) "
+                r"\{ continue; \}"
+            ),
+        )
+
+    def test_restore_deduplicates_and_selects_the_first_unfinished_activity(self):
+        restore = compact(extract_method(self.source, "restoreActivityProgress"))
+
+        duplicate_guard = restore.find("attemptedIds.includes(event.taskId)")
+        append = restore.find("attemptedIds.push(event.taskId)")
+        publish = restore.find("this.attemptedActivityIds = attemptedIds")
+        first_unfinished = restore.find(
+            "!attemptedIds.includes(activity.id)", publish
+        )
+        select_index = restore.find(
+            "this.activeActivityIndex = nextIndex >= 0 ? nextIndex : "
+            "this.experience.activities.length - 1",
+            first_unfinished,
+        )
+
+        self.assertGreaterEqual(duplicate_guard, 0)
+        self.assertGreater(append, duplicate_guard)
+        self.assertGreater(publish, append)
+        self.assertGreater(first_unfinished, publish)
+        self.assertGreater(select_index, first_unfinished)
+
+    def test_resume_resets_stale_input_and_primary_action_focuses_activity(self):
+        appear = compact(extract_method(self.source, "aboutToAppear"))
+        restore = compact(extract_method(self.source, "restoreActivityProgress"))
+        label = compact(extract_method(self.source, "finalActionLabel"))
+        focus = compact(extract_method(self.source, "focusActiveActivity"))
+        primary = compact(extract_method(self.source, "handlePrimaryAction"))
+
+        self.assertIn("this.activeActivityIndex = 0", appear)
+        self.assertIn("this.attemptedActivityIds = []", appear)
+        self.assertIn("this.resetActivityInput()", appear)
+
+        selected_activity = restore.find("this.activeActivityIndex = nextIndex")
+        reset_input = restore.find("this.resetActivityInput()", selected_activity)
+        self.assertGreaterEqual(selected_activity, 0)
+        self.assertGreater(reset_input, selected_activity)
+
+        self.assertIn("this.needsActivityResume()", label)
+        self.assertIn("'继续互动 '", label)
+        self.assertIn("this.activityOffset", focus)
+        self.assertIn("this.contentScroller.scrollTo", focus)
+        self.assertIn("this.contentScroller.scrollPage({ next: true })", focus)
+
+        focus_call = primary.find("this.focusActiveActivity()")
+        return_call = primary.find("return;", focus_call)
+        complete_call = primary.find("this.completeCurrent()", return_call)
+        self.assertGreaterEqual(focus_call, 0)
+        self.assertGreater(return_call, focus_call)
+        self.assertGreater(complete_call, return_call)
+
+        self.assertIn(".onAreaChange((_: Area, newValue: Area): void =>", self.source)
+        self.assertIn(".onClick((): void => { this.handlePrimaryAction(); })", self.source)
+
+    def test_event_read_failure_preserves_the_loaded_lesson_content(self):
+        appear = compact(extract_method(self.source, "aboutToAppear"))
+        restore = compact(extract_method(self.source, "restoreActivityProgress"))
+
+        load_chunks = appear.find("this.chunks = content")
+        load_experience = appear.find(
+            "this.experience = LearningContentRepository.getLessonExperience"
+        )
+        load_progress = appear.find("this.loadProgress()")
+        self.assertGreaterEqual(load_chunks, 0)
+        self.assertGreaterEqual(load_experience, 0)
+        self.assertGreater(load_progress, load_chunks)
+        self.assertGreater(load_progress, load_experience)
+
+        catch_start = restore.find("catch (error)")
+        self.assertGreaterEqual(catch_start, 0)
+        failure_path = restore[catch_start:]
+        self.assertIn(
+            "if (this.message.length === 0) this.message = "
+            "'互动断点读取失败，可继续当前练习'",
+            failure_path,
+        )
+        for assignment in (
+            "this.chunks =",
+            "this.activeChunk =",
+            "this.experience =",
+            "this.completedChunkIds =",
+            "this.currentIndex =",
+            "this.attemptedActivityIds =",
+            "this.activeActivityIndex =",
+        ):
+            self.assertNotIn(assignment, failure_path)
+
+    def test_self_assessment_has_provenance_but_no_objective_mastery_fields(self):
+        self_assess = compact(extract_method(self.source, "selfAssess"))
+        persist = compact(extract_method(self.source, "persistActivityEvidence"))
+
+        self.assertIn(
+            "this.markActivityAttempted(activity, covered, true);",
+            self_assess,
+        )
+
+        self_start = persist.find("if (selfAssessed) {")
+        interactive_start = persist.find("} else {", self_start)
+        append_start = persist.find(
+            "LocalLearningRepository.appendStudyEvent(event)", interactive_start
+        )
+        self.assertGreaterEqual(self_start, 0)
+        self.assertGreater(interactive_start, self_start)
+        self.assertGreater(append_start, interactive_start)
+
+        self_assessed_branch = persist[self_start:interactive_start]
+        interactive_branch = persist[interactive_start:append_start]
+        self.assertIn("type: 'lesson_activity'", self_assessed_branch)
+        self.assertIn("source: 'lesson_self_assessment'", self_assessed_branch)
+        self.assertIn("taskId: activity.id", self_assessed_branch)
+        for objective_field in ("accuracy:", "totalQuestions:", "correctCount:"):
+            self.assertNotIn(objective_field, self_assessed_branch)
+
+        self.assertIn("source: 'lesson_interactive'", interactive_branch)
+        self.assertIn("accuracy:", interactive_branch)
+        self.assertIn("totalQuestions: 1", interactive_branch)
+        self.assertIn("correctCount:", interactive_branch)
+
+
+if __name__ == "__main__":
+    unittest.main()
