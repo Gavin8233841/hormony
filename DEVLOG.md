@@ -6447,3 +6447,46 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Node 行为测试中的 HarmonyOS Kit 为受控替身，不能替代模拟器或真机证据；ArkUI 页面只做源码契约检查。
 - HAP 未配置签名，安装和提交包可用性未验证。
 - 本批未修改 Web、Repository、ArkData schema 或 `Achievements.ets`，因此未运行 Web 验证，也没有重跑 WS02 reducer 测试。
+
+---
+
+## 2026-07-17 [MAIN+WS03] 课程续学、互动证据与下一动作闭环
+
+背景：主线逐提交审查 WS03 `4fd5bef` 至 `3b41877` 后确认课程路径、断点续学、Lesson 互动、学习星图和资料证据均有产品价值；同时发现自由回答自评会被算成客观错题、学习事件并发读改写可能丢失、失败互动会提前标完成、跨节点星图 CTA 可能打开错误页面、旧检索响应可覆盖新结果，以及课程列表不显示续学读取失败。本批在合入 WS03 最终补丁时同步关闭这些阻断。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseResumeState.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `docs/workstreams/03-course-learning-result.md`
+- `scripts/test_course_resume_contract.py`
+- `scripts/test_knowledge_navigation_contract.py`
+- `scripts/test_learning_map_navigation_contract.py`
+- `scripts/test_lesson_activity_resume_contract.py`
+- `DEVLOG.md`
+
+行为变化：
+- 课程列表和详情使用真实 `LessonProgress` 解析最近未完成 Topic、已开始/已完成状态和继续 CTA；课程目录已加载但断点读取失败时显示非阻断提示和重试。
+- Lesson 提供概念推演、固定互动、同标签测验和学伴追问；重进页面只恢复同课程、同 Topic、当前 experience 的事件并定位首个未完成互动。
+- 互动写入通过 Repository Promise 队列串行读改写并按事件 ID 幂等；只有 ArkData 写入成功后才增加已练计数，失败保留当前反馈并允许重试。
+- `lesson_self_assessment` 保留为非计分学习证据，不写客观题字段，也不进入标签题数、正确数或错误数；客观互动继续按真实结果统计。
+- 学习星图展示前置/后继方向与真实状态；跨节点 CTA 根据目标节点是否已学 Lesson 或已有 mastery 决定进入 Lesson/Practice，文案同步使用“学习/练习”。
+- Knowledge 只允许当前课程精确 Topic 进入 Lesson，证据选择与 Chat 追问复用同一片段；单调请求版本保证只有最新检索能发布云端结果、本地 fallback 和 loading 状态。
+
+验证：
+- `python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_learning_map_navigation_contract scripts.test_validate_topic_relations -v`：exit 0，33/33 通过。
+- `node scripts/test-achievements-next-action.mjs`：exit 0，4/4 通过。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，33/33 通过。
+- `.\scripts\harmonyos-app-smoke.ps1 -SelfTest`：exit 0，9/9 通过；仅证明脚本解析和边界门禁。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 26 s 207 ms`；CompileArkTS 和 HAP 打包完成，仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：exit 0，返回 `[Empty]`。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；课程续学提示、互动断点/写入失败重试、星图 CTA、资料检索并发和手机/平板布局均未取得设备证据。
+- 真实 ArkData 写失败、进程中断和并发恢复尚未做设备故障注入；当前证据为源码契约、可执行脚本与构建通过。
+- HAP 未配置正式签名，安装和竞赛提交包可用性未验证。
+- WS02 的统一 Quiz reducer 与 schema 迁移仍在独立修复，主线尚未集成；本批只保证现有 Repository 的学习事件写入和自评统计边界。

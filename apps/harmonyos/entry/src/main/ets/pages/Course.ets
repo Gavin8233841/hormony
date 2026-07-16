@@ -3,13 +3,15 @@
  */
 
 import { Constants } from '../common/Constants';
-import { Course } from '../model/DataModels';
+import { Course, LessonProgress } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { CourseResumeState, hasCourseStarted, resolveCourseResumeState } from './CourseResumeState';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct CourseContent {
   @State courses: Course[] = [];
+  @State lessonProgress: LessonProgress[] = [];
   @State loading: boolean = false;
   @State message: string = '';
 
@@ -19,8 +21,16 @@ export struct CourseContent {
   }
 
   async loadCourses() {
+    this.loading = true;
+    this.message = '';
     try {
       this.courses = (await LocalLearningRepository.getCourses()) ?? [];
+      try {
+        this.lessonProgress = await LocalLearningRepository.getLessonProgress();
+      } catch (error) {
+        this.lessonProgress = [];
+        this.message = '课程已加载，续学位置读取失败';
+      }
     } catch (e) {
       this.message = '本地课程加载失败，请重新打开应用';
     } finally {
@@ -37,14 +47,17 @@ export struct CourseContent {
     });
   }
 
-  private openQuiz(course: Course): void {
-    AppStorage.setOrCreate<string>('selectedCourseId', course.id);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', '综合');
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
-      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'CourseContent quiz router.pushUrl failed: %{public}s', err.message);
-    });
+  private resumeState(course: Course): CourseResumeState {
+    return resolveCourseResumeState(course.id, course.topics, this.lessonProgress);
+  }
+
+  private courseActionLabel(course: Course): string {
+    return course.progress > 0 || hasCourseStarted(this.resumeState(course)) ? '继续课程' : '进入课程';
+  }
+
+  private courseProgressLabel(course: Course): string {
+    const recentTopic = this.resumeState(course).recentTopic;
+    return recentTopic.length > 0 ? '上次学到 · ' + recentTopic : '学习进度';
   }
 
   @Builder
@@ -99,6 +112,31 @@ export struct CourseContent {
         .layoutWeight(1)
         .padding({ left: 16, right: 16 })
       } else if (this.courses.length > 0) {
+        if (this.message.length > 0) {
+          Row({ space: 10 }) {
+            SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+              .fontSize(16)
+              .fontColor([Constants.COLOR_WARNING])
+            Text(this.message)
+              .layoutWeight(1)
+              .fontSize(12)
+              .lineHeight(18)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Button('重试')
+              .height(36)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_SM)
+              .onClick((): void => { this.loadCourses(); })
+          }
+          .width('100%')
+          .padding({ left: 14, right: 10, top: 10, bottom: 10 })
+          .margin({ left: 16, right: 16, bottom: 10 })
+          .backgroundColor(Constants.COLOR_SURFACE_TINT)
+          .border({ width: 1, color: Constants.COLOR_BORDER })
+          .borderRadius(Constants.RADIUS_MD)
+        }
         List({ space: 10 }) {
           ForEach(this.courses, (c: Course) => {
             ListItem() {
@@ -130,9 +168,13 @@ export struct CourseContent {
 
                 // 进度行
                 Row() {
-                  Text('学习进度')
+                  Text(this.courseProgressLabel(c))
+                    .layoutWeight(1)
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .margin({ right: 12 })
                   Text(Math.round(c.progress * 100).toString() + '%')
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
@@ -149,9 +191,9 @@ export struct CourseContent {
                   .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
                   .borderRadius(4)
 
-                // 知识点标签
+                // 课程主题预览
                 Flex({ wrap: FlexWrap.Wrap }) {
-                  ForEach(c.topics, (t: string) => {
+                  ForEach(c.topics.slice(0, 3), (t: string) => {
                     Text(t)
                       .fontSize(11)
                       .fontColor(Constants.COLOR_TEXT_TERTIARY)
@@ -160,34 +202,44 @@ export struct CourseContent {
                       .borderRadius(8)
                       .margin({ right: 6, bottom: 6 })
                   })
+                  if (c.topics.length > 3) {
+                    Text('+' + (c.topics.length - 3).toString())
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                      .backgroundColor(Constants.COLOR_BG_TAG)
+                      .borderRadius(8)
+                      .margin({ right: 6, bottom: 6 })
+                  }
                 }
                 .width('100%')
                 .margin({ top: 12 })
 
-                Row({ space: 10 }) {
-                  Button('进入课程')
-                    .layoutWeight(1)
-                    .height(42)
-                    .fontSize(13)
-                    .fontColor(Constants.COLOR_BRAND)
-                    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                    .borderRadius(Constants.RADIUS_MD)
-                    .onClick(() => {
-                      this.openCourse(c);
-                    })
-                  Button('AI 出题')
-                    .layoutWeight(1)
-                    .height(42)
-                    .fontSize(13)
-                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                    .backgroundColor(Constants.COLOR_BRAND)
-                    .borderRadius(Constants.RADIUS_MD)
-                    .onClick(() => {
-                      this.openQuiz(c);
-                    })
+                Button({ type: ButtonType.Normal }) {
+                  Row({ space: 8 }) {
+                    SymbolGlyph($r('sys.symbol.book_open_fill'))
+                      .fontSize(16)
+                      .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                    Text(this.courseActionLabel(c))
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                    Blank()
+                    SymbolGlyph($r('sys.symbol.chevron_right'))
+                      .fontSize(14)
+                      .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                  }
+                  .width('100%')
                 }
                 .width('100%')
+                .height(44)
                 .margin({ top: 6 })
+                .padding({ left: 14, right: 14 })
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick(() => {
+                  this.openCourse(c);
+                })
               }
               .width('100%')
               .padding(16)

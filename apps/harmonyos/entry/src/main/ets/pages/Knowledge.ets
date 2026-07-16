@@ -16,19 +16,25 @@ interface LocalKnowledgeMatch {
   score: number;
 }
 
+interface KnowledgeEvidence {
+  label: string;
+  text: string;
+}
+
 @Entry
 @Component
 struct KnowledgePage {
   @State query: string = '';
+  @State resultQuery: string = '';
   @State results: KnowledgeChunk[] = [];
   @State loading: boolean = false;
   @State message: string = '';
-  @State pressedIndex: number = -1;
   @State expandedIndex: number = -1;
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State hasError: boolean = false;
   private suggestions: string[] = ['二叉搜索树', '图的遍历', '动态规划'];
+  private searchRequestVersion: number = 0;
 
   get canSearch(): boolean {
     return !this.loading && this.query.trim().length > 0;
@@ -60,14 +66,114 @@ struct KnowledgePage {
     });
   }
 
-  private startTopicQuiz(): void {
-    const topic = this.query.trim().length > 0 ? this.query.trim() : '综合';
+  private exactTopic(item: KnowledgeChunk): string {
+    if (item.topic === undefined || typeof item.topic !== 'string') return '';
+    return LearningContentRepository.getTopics(this.courseId).includes(item.topic) ? item.topic : '';
+  }
+
+  private firstSentence(text: string): string {
+    const value = text.trim();
+    if (value.length <= 96) return value;
+    const stops: string[] = ['。', '；', '？', '！'];
+    let endIndex = -1;
+    for (const stop of stops) {
+      const index = value.indexOf(stop);
+      if (index >= 24 && (endIndex < 0 || index < endIndex)) endIndex = index;
+    }
+    if (endIndex >= 24 && endIndex < 108) return value.substring(0, endIndex + 1);
+    return value.substring(0, 96) + '...';
+  }
+
+  private evidenceSegments(text: string): string[] {
+    return text
+      .replace(/\r\n/g, '\n')
+      .split(/[。；？！\n]/)
+      .map((segment: string): string => segment.trim())
+      .filter((segment: string): boolean => segment.length > 0);
+  }
+
+  private matchedEvidence(segments: string[], needle: string): string {
+    const normalizedNeedle = needle.trim().toLowerCase();
+    if (normalizedNeedle.length < 2) return '';
+    for (const segment of segments) {
+      const matchIndex = segment.toLowerCase().indexOf(normalizedNeedle);
+      if (matchIndex >= 0) return this.clipMatchedEvidence(segment, matchIndex);
+    }
+    return '';
+  }
+
+  private clipMatchedEvidence(segment: string, matchIndex: number): string {
+    if (segment.length <= 120) return segment + '。';
+    const leadingContext = 36;
+    let start = Math.max(matchIndex - leadingContext, 0);
+    let end = Math.min(start + 120, segment.length);
+    if (end - start < 120) start = Math.max(end - 120, 0);
+    const before = start > 0 ? '...' : '';
+    const after = end < segment.length ? '...' : '。';
+    return before + segment.substring(start, end) + after;
+  }
+
+  private evidenceFor(item: KnowledgeChunk): KnowledgeEvidence {
+    const segments = this.evidenceSegments(item.text);
+    const query = this.resultQuery.trim();
+    let evidence = this.matchedEvidence(segments, query);
+    if (evidence.length === 0) {
+      const queryTerms = query.split(/\s+/).filter((term: string): boolean => term.length >= 2);
+      for (const term of queryTerms) {
+        evidence = this.matchedEvidence(segments, term);
+        if (evidence.length > 0) break;
+      }
+    }
+    if (evidence.length > 0) return { label: '检索词命中', text: evidence };
+
+    evidence = this.matchedEvidence(segments, this.exactTopic(item));
+    if (evidence.length > 0) return { label: 'Topic 关联', text: evidence };
+    return { label: '课程资料摘要', text: this.firstSentence(item.text) };
+  }
+
+  private scoreLabel(item: KnowledgeChunk): string {
+    if (item.score === undefined || typeof item.score !== 'number') return '课程资料';
+    const score = Math.max(0, Math.min(item.score, 1));
+    return '相关度 ' + (score * 100).toFixed(0) + '%';
+  }
+
+  private hasNumericScore(item: KnowledgeChunk): boolean {
+    return item.score !== undefined && typeof item.score === 'number';
+  }
+
+  private validCourseResult(item: KnowledgeChunk): boolean {
+    if (typeof item.text !== 'string' || typeof item.source !== 'string') return false;
+    if (item.text.trim().length === 0 || item.source.trim().length === 0) return false;
+    return typeof item.courseId === 'string' && item.courseId === this.courseId;
+  }
+
+  private openLesson(item: KnowledgeChunk): void {
+    const topic = this.exactTopic(item);
+    if (topic.length === 0) {
+      this.message = '该结果未关联当前课程 Topic，无法进入 Lesson';
+      this.hasError = true;
+      return;
+    }
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+    AppStorage.setOrCreate<string>('selectedContentTopic', topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Lesson' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'KnowledgePage quiz router.pushUrl failed: %{public}s', err.message);
+        'KnowledgePage Lesson router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
+  private askTutor(item: KnowledgeChunk): void {
+    const topic = this.exactTopic(item);
+    const evidence = this.evidenceFor(item);
+    const context = topic.length > 0 ? '课程 Topic 是“' + topic + '”' : '当前结果没有精确 Topic';
+    AppStorage.setOrCreate<string>('pendingChatQuestion',
+      '我在“' + this.courseTitle + '”中检索“' + this.resultQuery + '”时读到以下课程资料，' + context +
+        '。请只结合这段资料解释关键概念，给出一个例子和两个主动回忆问题。来源：' + item.source.trim() +
+        '。匹配依据（' + evidence.label + '）：' + evidence.text);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'KnowledgePage Chat router.pushUrl failed: %{public}s', err.message);
     });
   }
 
@@ -110,7 +216,131 @@ struct KnowledgePage {
       })
     }
     .width('100%')
-    .padding({ left: 16, right: 16 })
+    .padding({ left: 16, right: 16, bottom: 20 + SafeAreaInsets.bottomVp() })
+  }
+
+  @Builder
+  private ResultCard(item: KnowledgeChunk, index: number) {
+    Column({ space: 10 }) {
+      Row({ space: 10 }) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.book_pages_fill_1'))
+            .fontSize(16)
+            .fontColor([Constants.COLOR_BRAND])
+          Text(item.source.trim())
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_BRAND)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .layoutWeight(1)
+        Text(this.scoreLabel(item))
+          .fontSize(11)
+          .fontColor(this.hasNumericScore(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+
+      if (this.exactTopic(item).length > 0) {
+        Text(this.exactTopic(item))
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND)
+          .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .alignSelf(ItemAlign.Start)
+      }
+
+      Column({ space: 5 }) {
+        Text(this.evidenceFor(item).label)
+          .width('100%')
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Text(this.evidenceFor(item).text)
+          .width('100%')
+          .fontSize(14)
+          .lineHeight(23)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      }
+      .width('100%')
+      .padding(12)
+      .backgroundColor(Constants.COLOR_SURFACE_TINT)
+      .borderRadius(Constants.RADIUS_SM)
+
+      if (this.expandedIndex === index) {
+        Text(item.text)
+          .width('100%')
+          .fontSize(13)
+          .lineHeight(22)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          .maxLines(40)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+
+      Row({ space: 5 }) {
+        Text(this.expandedIndex === index ? '收起全文' : '展开全文')
+          .fontSize(12)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        if (this.expandedIndex === index) {
+          SymbolGlyph($r('sys.symbol.chevron_up'))
+            .fontSize(11)
+            .fontColor([Constants.COLOR_TEXT_SECONDARY])
+        } else {
+          SymbolGlyph($r('sys.symbol.chevron_down'))
+            .fontSize(11)
+            .fontColor([Constants.COLOR_TEXT_SECONDARY])
+        }
+      }
+      .height(32)
+      .alignSelf(ItemAlign.Start)
+      .onClick((): void => { this.expandedIndex = this.expandedIndex === index ? -1 : index; })
+
+      if (this.exactTopic(item).length > 0) {
+        Row({ space: 8 }) {
+          Button({ type: ButtonType.Normal }) {
+            Row({ space: 6 }) {
+              SymbolGlyph($r('sys.symbol.book_open_fill'))
+                .fontSize(15)
+                .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+              Text('进入主题')
+                .fontSize(13)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            }
+          }
+          .layoutWeight(1)
+          .height(44)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.openLesson(item); })
+          Button('问学伴')
+            .width(94)
+            .height(44)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_BRAND)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.askTutor(item); })
+        }
+        .width('100%')
+      } else {
+        Button('问学伴解释这段资料')
+          .width('100%')
+          .height(44)
+          .fontSize(13)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.askTutor(item); })
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_MD)
+    .alignItems(HorizontalAlign.Start)
   }
 
   build() {
@@ -138,7 +368,7 @@ struct KnowledgePage {
           .onClick(() => { this.search(); })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 16 + SafeAreaInsets.bottomVp() })
+      .padding({ left: 16, right: 16, bottom: 16 })
 
       if (this.message.length > 0) {
         Row({ space: 8 }) {
@@ -146,10 +376,6 @@ struct KnowledgePage {
             SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
               .fontSize(16)
               .fontColor([Constants.COLOR_ERROR])
-          } else {
-            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-              .fontSize(16)
-              .fontColor([Constants.COLOR_SUCCESS])
           }
           Text(this.message)
             .fontSize(12)
@@ -169,82 +395,10 @@ struct KnowledgePage {
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ left: 16, bottom: 8 })
 
-        Button('复习后，针对“' + this.query + '”开始测验')
-          .height(42)
-          .fontSize(13)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(Constants.COLOR_BRAND)
-          .borderRadius(Constants.RADIUS_MD)
-          .margin({ left: 16, right: 16, bottom: 10 })
-          .onClick(() => { this.startTopicQuiz(); })
-
         List({ space: 12 }) {
           ForEach(this.results, (item: KnowledgeChunk, i: number) => {
             ListItem() {
-              Column() {
-                Row() {
-                  Row({ space: 8 }) {
-                    SymbolGlyph($r('sys.symbol.book_pages_fill_1'))
-                      .fontSize(16)
-                      .fontColor([Constants.COLOR_BRAND])
-                    Text(item.source)
-                      .fontSize(13)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor(Constants.COLOR_BRAND)
-                  }
-                  .layoutWeight(1)
-                  if (item.score !== undefined) {
-                    Text('相关度 ' + (item.score * 100).toFixed(0) + '%')
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_SUCCESS)
-                  }
-                }
-                .width('100%')
-                .margin({ bottom: 6 })
-
-                Text(item.text)
-                  .fontSize(13)
-                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                  .maxLines(this.expandedIndex === i ? 20 : 3)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                Row({ space: 4 }) {
-                  Text(this.expandedIndex === i ? '收起全文' : '展开全文')
-                    .fontSize(12)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                  if (this.expandedIndex === i) {
-                    SymbolGlyph($r('sys.symbol.chevron_up'))
-                      .fontSize(11)
-                      .fontColor([Constants.COLOR_TEXT_SECONDARY])
-                  } else {
-                    SymbolGlyph($r('sys.symbol.chevron_down'))
-                      .fontSize(11)
-                      .fontColor([Constants.COLOR_TEXT_SECONDARY])
-                  }
-                }
-                .height(36)
-                .margin({ top: 6 })
-              }
-              .width('100%')
-              .padding(16)
-              .backgroundColor(Constants.COLOR_BG_CARD)
-              .borderRadius(Constants.RADIUS_MD)
-              .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
-              .alignItems(HorizontalAlign.Start)
-              .scale({ x: this.pressedIndex === i ? 0.98 : 1, y: this.pressedIndex === i ? 0.98 : 1 })
-              .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
-              .onTouch((event?: TouchEvent) => {
-                if (event) {
-                  if (event.type === TouchType.Down) {
-                    this.pressedIndex = i;
-                  } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                    this.pressedIndex = -1;
-                  }
-                }
-              })
-              .onClick(() => {
-                this.expandedIndex = this.expandedIndex === i ? -1 : i;
-              })
+              this.ResultCard(item, i)
             }
           })
         }
@@ -253,7 +407,7 @@ struct KnowledgePage {
         .layoutWeight(1)
         .cachedCount(5)
         .scrollBar(BarState.Off)
-        .padding({ left: 16, right: 16 })
+        .padding({ left: 16, right: 16, bottom: 20 + SafeAreaInsets.bottomVp() })
       } else {
         Column({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.magnifyingglass'))
@@ -267,7 +421,7 @@ struct KnowledgePage {
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .textAlign(TextAlign.Center)
-          Row({ space: 8 }) {
+          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
             ForEach(this.suggestions, (suggestion: string) => {
               Button(suggestion)
                 .height(40)
@@ -275,6 +429,7 @@ struct KnowledgePage {
                 .fontColor(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(20)
+                .margin({ right: 8, bottom: 8 })
                 .onClick(() => {
                   this.query = suggestion;
                   this.search();
@@ -286,7 +441,7 @@ struct KnowledgePage {
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
-        .padding({ left: 28, right: 28, bottom: 24 })
+        .padding({ left: 28, right: 28, bottom: 24 + SafeAreaInsets.bottomVp() })
       }
     }
     .width('100%')
@@ -295,15 +450,19 @@ struct KnowledgePage {
   }
 
   async search(): Promise<void> {
-    const q = this.query.toLowerCase().trim();
-    if (q.length === 0) {
+    const submittedQuery = this.query.trim();
+    if (submittedQuery.length === 0) {
       return;
     }
+    const requestVersion = ++this.searchRequestVersion;
+    const q = submittedQuery.toLowerCase();
 
     this.loading = true;
+    this.resultQuery = submittedQuery;
     this.message = '';
     this.hasError = false;
     this.results = [];
+    this.expandedIndex = -1;
     const request: KnowledgeSearchRequest = {
       userId: Constants.DEMO_USER_ID,
       query: q,
@@ -313,12 +472,16 @@ struct KnowledgePage {
 
     try {
       const response = await HttpClient.post<KnowledgeSearchResponse>(Constants.API_KNOWLEDGE_SEARCH, JSON.stringify(request));
-      this.results = response.chunks;
+      if (requestVersion !== this.searchRequestVersion) return;
+      this.results = response.chunks.filter((item: KnowledgeChunk): boolean => this.validCourseResult(item)).slice(0, 5);
       if (this.results.length === 0) {
         this.results = this.searchLocal(q);
         this.message = this.results.length > 0 ? '云端未命中，以下来自本地课程资料' : '未找到相关资料，试试更具体的关键词';
+      } else {
+        this.message = '已返回当前课程的相关资料';
       }
     } catch (e) {
+      if (requestVersion !== this.searchRequestVersion) return;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage API failed: %{public}s', (e as Error).message);
       this.results = this.searchLocal(q);
@@ -326,7 +489,7 @@ struct KnowledgePage {
         '云端检索暂不可用，本地课程资料也未命中';
       this.hasError = this.results.length === 0;
     } finally {
-      this.loading = false;
+      if (requestVersion === this.searchRequestVersion) this.loading = false;
     }
   }
 

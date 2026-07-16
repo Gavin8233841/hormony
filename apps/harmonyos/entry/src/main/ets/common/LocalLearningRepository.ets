@@ -34,6 +34,7 @@ const KEY_FORM_IDS: string = 'form_ids';
 
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
+  private static studyEventWriteQueue: Promise<void> = Promise.resolve();
 
   static async initialize(context: common.Context): Promise<void> {
     if (LocalLearningRepository.store !== null) return;
@@ -524,7 +525,7 @@ export class LocalLearningRepository {
     }
     const events = await LocalLearningRepository.getStudyEvents();
     for (const event of events) {
-      if (event.type !== 'lesson_activity') continue;
+      if (event.type !== 'lesson_activity' || event.source === 'lesson_self_assessment') continue;
       const tags = event.tags ?? [];
       const totalQuestions = event.totalQuestions ?? 1;
       const correctQuestions = event.correctCount ?? 0;
@@ -636,10 +637,15 @@ export class LocalLearningRepository {
     return (await LocalLearningRepository.getValue<StudyEvent[]>(KEY_STUDY_EVENTS)) ?? [];
   }
 
-  static async appendStudyEvent(event: StudyEvent): Promise<void> {
-    const events = await LocalLearningRepository.getStudyEvents();
-    events.push(event);
-    await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, events.slice(-500));
+  static appendStudyEvent(event: StudyEvent): Promise<void> {
+    const operation = LocalLearningRepository.studyEventWriteQueue.then(async (): Promise<void> => {
+      const events = await LocalLearningRepository.getStudyEvents();
+      if (events.some((value: StudyEvent): boolean => value.id === event.id)) return;
+      events.push(event);
+      await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, events.slice(-500));
+    });
+    LocalLearningRepository.studyEventWriteQueue = operation.catch((): void => {});
+    return operation;
   }
 
   static async getAchievements(): Promise<AchievementProgress[]> {

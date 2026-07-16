@@ -19,6 +19,7 @@ const EMPTY_CHUNK: CuratedKnowledgeChunk = {
 @Component
 struct LessonPage {
   private contentScroller: Scroller = new Scroller();
+  private activityOffset: number = 0;
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '';
@@ -34,6 +35,8 @@ struct LessonPage {
   @State responseText: string = '';
   @State feedbackVisible: boolean = false;
   @State attemptedActivityIds: string[] = [];
+  @State pendingActivityIds: string[] = [];
+  @State conceptStepIndex: number = 0;
   @State codeRunStepIndex: number = -1;
   @State activityEvidenceMessage: string = '';
 
@@ -41,8 +44,17 @@ struct LessonPage {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topic = AppStorage.get<string>('selectedContentTopic') ?? '';
+    this.completedChunkIds = [];
+    this.currentIndex = 0;
+    this.message = '';
+    this.activeActivityIndex = 0;
+    this.attemptedActivityIds = [];
+    this.pendingActivityIds = [];
+    this.activityOffset = 0;
+    this.resetActivityInput();
     const content = LearningContentRepository.getKnowledge(this.courseId, this.topic);
     this.experience = LearningContentRepository.getLessonExperience(this.courseId, this.topic);
+    this.conceptStepIndex = 0;
     this.chunks = content;
     this.activeChunk = content.length > 0 ? content[0] : EMPTY_CHUNK;
     this.loadProgress();
@@ -61,6 +73,30 @@ struct LessonPage {
       }
     } catch (error) {
       this.message = '学习进度读取失败，但课程内容仍可查看';
+    }
+    await this.restoreActivityProgress();
+  }
+
+  private async restoreActivityProgress(): Promise<void> {
+    if (this.experience === null || this.experience.activities.length === 0) return;
+    try {
+      const activityIds = this.experience.activities.map((activity: LearningActivity): string => activity.id);
+      const events = await LocalLearningRepository.getStudyEvents();
+      const attemptedIds: string[] = [];
+      for (const event of events) {
+        if (event.type !== 'lesson_activity' || event.courseId !== this.courseId || event.topic !== this.topic ||
+          event.taskId === undefined || !activityIds.includes(event.taskId) || attemptedIds.includes(event.taskId)) {
+          continue;
+        }
+        attemptedIds.push(event.taskId);
+      }
+      this.attemptedActivityIds = attemptedIds;
+      const nextIndex = this.experience.activities.findIndex((activity: LearningActivity): boolean =>
+        !attemptedIds.includes(activity.id));
+      this.activeActivityIndex = nextIndex >= 0 ? nextIndex : this.experience.activities.length - 1;
+      this.resetActivityInput();
+    } catch (error) {
+      if (this.message.length === 0) this.message = '互动断点读取失败，可继续当前练习';
     }
   }
 
@@ -85,8 +121,21 @@ struct LessonPage {
     this.activityEvidenceMessage = '';
   }
 
-  private experienceStepCount(): number {
+  private conceptStepCount(): number {
     return this.experience === null ? 0 : this.experience.visualSteps.length;
+  }
+
+  private conceptStepButtonLabel(): string {
+    const total = this.conceptStepCount();
+    if (total === 0) return '暂无推演步骤';
+    if (this.conceptStepIndex >= total - 1) return '重新推演';
+    return '对照第 ' + (this.conceptStepIndex + 2).toString() + ' 步';
+  }
+
+  private advanceConceptStep(): void {
+    const total = this.conceptStepCount();
+    if (total === 0) return;
+    this.conceptStepIndex = this.conceptStepIndex >= total - 1 ? 0 : this.conceptStepIndex + 1;
   }
 
   private chooseSingle(index: number): void {
@@ -118,40 +167,71 @@ struct LessonPage {
     this.feedbackVisible = true;
   }
 
-  private selfAssess(activity: LearningActivity, correct: boolean): void {
-    this.markActivityAttempted(activity, correct);
+  private selfAssess(activity: LearningActivity, covered: boolean): void {
+    this.markActivityAttempted(activity, covered, true);
   }
 
-  private markActivityAttempted(activity: LearningActivity, correct: boolean): void {
-    if (!this.attemptedActivityIds.includes(activity.id)) {
-      this.attemptedActivityIds = this.attemptedActivityIds.concat([activity.id]);
-      this.persistActivityEvidence(activity, correct);
-    }
-  }
-
-  private persistActivityEvidence(activity: LearningActivity, correct: boolean): void {
-    const now = new Date().toISOString();
-    const event: LearningStudyEvent = {
-      id: 'lesson_activity_' + now + '_' + activity.id,
-      type: 'lesson_activity',
-      timestamp: now,
-      courseId: this.courseId,
-      topic: this.topic,
-      taskId: activity.id,
-      source: 'lesson_interactive',
-      difficulty: this.activityDifficulty(activity),
-      accuracy: correct ? 1 : 0,
-      tags: this.activityTags(activity),
-      totalQuestions: 1,
-      correctCount: correct ? 1 : 0
-    };
-    LocalLearningRepository.appendStudyEvent(event).then((): void => {
-      this.activityEvidenceMessage = correct ?
-        '已记录为掌握证据：画像、成就和标签洞察会同步更新。' :
-        '已记录为复盘证据：建议问学伴讲清错因，或进入同标签测验。';
+  private markActivityAttempted(activity: LearningActivity, correct: boolean, selfAssessed: boolean = false): void {
+    if (this.attemptedActivityIds.includes(activity.id) || this.pendingActivityIds.includes(activity.id)) return;
+    const courseId = this.courseId;
+    const topic = this.topic;
+    this.pendingActivityIds = this.pendingActivityIds.concat([activity.id]);
+    this.activityEvidenceMessage = '正在保存互动记录...';
+    this.persistActivityEvidence(activity, correct, selfAssessed).then((): void => {
+      if (this.courseId !== courseId || this.topic !== topic) return;
+      this.pendingActivityIds = this.pendingActivityIds.filter((id: string): boolean => id !== activity.id);
+      if (!this.attemptedActivityIds.includes(activity.id)) {
+        this.attemptedActivityIds = this.attemptedActivityIds.concat([activity.id]);
+      }
+      if (selfAssessed) {
+        this.activityEvidenceMessage = correct ?
+          '已记录本次自我对照：关键点已覆盖。请用同标签测验做客观验证。' :
+          '已记录本次自我对照：关键点有遗漏。建议先看对照重点再练习。';
+      } else {
+        this.activityEvidenceMessage = correct ?
+          '已记录本次客观题结果：回答正确。' :
+          '已记录本次客观题结果：回答有误，建议查看对照重点。';
+      }
     }).catch((): void => {
-      this.activityEvidenceMessage = '互动记录保存失败，本次仍可继续学习。';
+      if (this.courseId !== courseId || this.topic !== topic) return;
+      this.pendingActivityIds = this.pendingActivityIds.filter((id: string): boolean => id !== activity.id);
+      this.activityEvidenceMessage = '互动记录保存失败，请重试保存后再继续。';
     });
+  }
+
+  private async persistActivityEvidence(activity: LearningActivity, correct: boolean,
+    selfAssessed: boolean): Promise<void> {
+    const now = new Date().toISOString();
+    let event: LearningStudyEvent;
+    if (selfAssessed) {
+      event = {
+        id: 'lesson_activity_' + now + '_' + activity.id,
+        type: 'lesson_activity',
+        timestamp: now,
+        courseId: this.courseId,
+        topic: this.topic,
+        taskId: activity.id,
+        source: 'lesson_self_assessment',
+        difficulty: this.activityDifficulty(activity),
+        tags: this.activityTags(activity)
+      };
+    } else {
+      event = {
+        id: 'lesson_activity_' + now + '_' + activity.id,
+        type: 'lesson_activity',
+        timestamp: now,
+        courseId: this.courseId,
+        topic: this.topic,
+        taskId: activity.id,
+        source: 'lesson_interactive',
+        difficulty: this.activityDifficulty(activity),
+        accuracy: correct ? 1 : 0,
+        tags: this.activityTags(activity),
+        totalQuestions: 1,
+        correctCount: correct ? 1 : 0
+      };
+    }
+    await LocalLearningRepository.appendStudyEvent(event);
   }
 
   private appendUniqueTag(tags: string[], value: string): void {
@@ -162,6 +242,7 @@ struct LessonPage {
   private activityTags(activity: LearningActivity): string[] {
     const tags: string[] = [];
     this.appendUniqueTag(tags, this.topic);
+    this.appendUniqueTag(tags, activity.focusTag);
     this.appendUniqueTag(tags, activity.title);
     this.appendUniqueTag(tags, this.activityModeLabel(activity));
     if (activity.language.length > 0) this.appendUniqueTag(tags, activity.language);
@@ -217,8 +298,40 @@ struct LessonPage {
   private finalActionLabel(): string {
     if (this.saving) return '保存中...';
     if (this.currentIndex < this.chunks.length - 1) return '学完本节，继续';
-    if (!this.allActivitiesAttempted()) return '完成互动练习后继续';
+    if (this.needsActivityResume() && this.experience !== null) {
+      return '继续互动 ' + (this.activeActivityIndex + 1).toString() + '/' +
+        this.experience.activities.length.toString();
+    }
     return '完成主题并练习';
+  }
+
+  private needsActivityResume(): boolean {
+    return this.experience !== null && this.experience.activities.length > 0 &&
+      this.currentIndex === this.chunks.length - 1 && !this.allActivitiesAttempted();
+  }
+
+  private focusActiveActivity(): void {
+    if (!this.needsActivityResume()) return;
+    this.message = '';
+    setTimeout((): void => {
+      if (this.activityOffset > 0) {
+        this.contentScroller.scrollTo({
+          xOffset: 0,
+          yOffset: Math.max(this.activityOffset - 12, 0),
+          animation: true
+        });
+      } else {
+        this.contentScroller.scrollPage({ next: true });
+      }
+    }, 50);
+  }
+
+  private handlePrimaryAction(): void {
+    if (this.needsActivityResume()) {
+      this.focusActiveActivity();
+      return;
+    }
+    this.completeCurrent();
   }
 
   private contentBeats(): string[] {
@@ -271,9 +384,9 @@ struct LessonPage {
   }
 
   private codeRunButtonLabel(activity: LearningActivity): string {
-    if (this.codeRunStepIndex < 0) return '运行推演';
-    if (this.codeRunStepIndex < this.codeRunSteps(activity).length - 1) return '下一步';
-    return '已完成推演';
+    if (this.codeRunStepIndex < 0) return '开始逐步推演';
+    if (this.codeRunStepIndex < this.codeRunSteps(activity).length - 1) return '对照下一步';
+    return '推演完成';
   }
 
   private advanceCodeRun(activity: LearningActivity): void {
@@ -306,9 +419,13 @@ struct LessonPage {
   }
 
   private openFocusedQuizForActivity(activity: LearningActivity): void {
+    if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
+      this.message = '当前主题无效，无法生成专项测验';
+      return;
+    }
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic.length > 0 ? this.topic : '综合');
+    AppStorage.setOrCreate<string>('selectedQuizTopic', this.topic);
     AppStorage.setOrCreate<string>('selectedQuizFocusTag', this.primaryActivityTag(activity));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
@@ -420,7 +537,7 @@ struct LessonPage {
           .fontSize(11)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-        Text('阅读后再作答')
+        Text('课程固定示例 · 不执行输入')
           .fontSize(11)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
       }
@@ -449,22 +566,22 @@ struct LessonPage {
     Column({ space: 10 }) {
       Row() {
         Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.play_circle_fill'))
+          SymbolGlyph($r('sys.symbol.book_open_fill'))
             .fontSize(17)
             .fontColor([Constants.COLOR_BRAND])
-          Text('代码推演器')
+          Text('固定示例推演')
             .fontSize(13)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
         }
-        Text('本地状态演算')
+        Text('只读状态演算')
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      Text('不是远程沙盒：它按“入口 → 状态 → 出口”帮你手动运行一遍，先形成预测，再对照答案。')
+      Text('按课程内容给定的“入口 → 状态 → 出口”展示变化；不执行输入内容，也不连接代码沙盒。')
         .width('100%')
         .fontSize(12)
         .lineHeight(19)
@@ -523,7 +640,7 @@ struct LessonPage {
       .width('100%')
 
       if (this.codeRunStepIndex >= this.codeRunSteps(activity).length - 1) {
-        Text(this.feedbackVisible ? '推演、作答、对照都已完成，这一题形成了可复盘闭环。' : '推演完成：现在作答，再用解析检查自己的状态链。')
+        Text(this.feedbackVisible ? '固定示例、作答和对照均已完成。' : '固定示例推演完成：现在作答，再用解析检查状态链。')
           .width('100%')
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
@@ -567,40 +684,88 @@ struct LessonPage {
   }
 
   @Builder
+  private FeedbackSection(label: string, value: string) {
+    Column({ space: 4 }) {
+      Text(label)
+        .width('100%')
+        .fontSize(11)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Text(value)
+        .width('100%')
+        .fontSize(13)
+        .lineHeight(21)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
   private IntroExperience() {
     if (this.experience !== null) {
       Column({ space: 14 }) {
-        Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.book_open_fill'))
-            .fontSize(18)
-            .fontColor([Constants.COLOR_BRAND])
-          Text('一眼看懂')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Row() {
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.book_open_fill'))
+              .fontSize(18)
+              .fontColor([Constants.COLOR_BRAND])
+            Text('概念推演')
+              .fontSize(17)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          }
+          Text((this.conceptStepIndex + 1).toString() + ' / ' + this.conceptStepCount().toString())
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
         .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
         Text(this.experience.visualTitle)
           .width('100%')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Row({ space: 6 }) {
+
+        Column({ space: 8 }) {
           ForEach(this.experience.visualSteps, (step: string, index: number): void => {
-            Text(step)
-              .layoutWeight(1)
-              .constraintSize({ minHeight: 44 })
-              .fontSize(11)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(index === this.experienceStepCount() - 1 ?
-                Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-              .textAlign(TextAlign.Center)
-              .padding({ left: 4, right: 4, top: 6, bottom: 6 })
-              .backgroundColor(index === this.experienceStepCount() - 1 ?
-                Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(Constants.RADIUS_SM)
+            Row({ space: 10 }) {
+              Text((index + 1).toString())
+                .width(24)
+                .height(24)
+                .fontSize(11)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(index <= this.conceptStepIndex ?
+                  Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
+                .textAlign(TextAlign.Center)
+                .backgroundColor(index <= this.conceptStepIndex ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+                .borderRadius(12)
+              Text(index <= this.conceptStepIndex ? step : '待推演')
+                .layoutWeight(1)
+                .constraintSize({ minHeight: 46 })
+                .fontSize(13)
+                .fontWeight(index === this.conceptStepIndex ? FontWeight.Bold : FontWeight.Regular)
+                .lineHeight(21)
+                .fontColor(index <= this.conceptStepIndex ?
+                  Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_PLACEHOLDER)
+                .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+                .backgroundColor(index === this.conceptStepIndex ?
+                  Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
+                .borderRadius(Constants.RADIUS_SM)
+            }
+            .width('100%')
           })
         }
         .width('100%')
+
+        Button(this.conceptStepButtonLabel())
+          .width('100%')
+          .height(44)
+          .enabled(this.conceptStepCount() > 0)
+          .fontSize(13)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.advanceConceptStep(); })
       }
       .width('100%')
 
@@ -751,23 +916,16 @@ struct LessonPage {
           }
 
           if (this.feedbackVisible) {
-            Column({ space: 8 }) {
+            Column({ space: 12 }) {
               Text(this.activeActivity()!.interactionMode === 'free_response' ?
-                '标准答案' : (this.activityIsCorrect() ? '回答正确' : '对照正确答案'))
+                '自由回答 · 对照关键点' : (this.activityIsCorrect() ? '客观判定 · 回答正确' : '客观判定 · 需要复盘'))
                 .fontSize(13)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
                   Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-              Text(this.activeActivity()!.answer)
-                .width('100%')
-                .fontSize(13)
-                .lineHeight(21)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              Text(this.activeActivity()!.feedback)
-                .width('100%')
-                .fontSize(12)
-                .lineHeight(20)
-                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+              this.FeedbackSection('你的回答', this.activityAnswerText(this.activeActivity()!))
+              this.FeedbackSection('参考答案', this.activeActivity()!.answer)
+              this.FeedbackSection('对照重点', this.activeActivity()!.feedback)
               Text('来源：' + this.activeActivity()!.source)
                 .width('100%')
                 .fontSize(11)
@@ -792,22 +950,40 @@ struct LessonPage {
             if (this.activeActivity()!.interactionMode === 'free_response' &&
               !this.attemptedActivityIds.includes(this.activeActivity()!.id)) {
               Row({ space: 10 }) {
-                Button('还需巩固')
+                Button('关键点有遗漏')
                   .layoutWeight(1)
                   .height(44)
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   .backgroundColor(Constants.COLOR_BG_TAG)
                   .borderRadius(Constants.RADIUS_MD)
+                  .enabled(!this.pendingActivityIds.includes(this.activeActivity()!.id))
                   .onClick((): void => { this.selfAssess(this.activeActivity()!, false); })
-                Button('我答对了')
+                Button('关键点已覆盖')
                   .layoutWeight(1)
                   .height(44)
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   .backgroundColor(Constants.COLOR_SUCCESS)
                   .borderRadius(Constants.RADIUS_MD)
+                  .enabled(!this.pendingActivityIds.includes(this.activeActivity()!.id))
                   .onClick((): void => { this.selfAssess(this.activeActivity()!, true); })
               }
               .width('100%')
+            }
+
+            if (this.activeActivity()!.interactionMode !== 'free_response' &&
+              !this.attemptedActivityIds.includes(this.activeActivity()!.id) &&
+              !this.pendingActivityIds.includes(this.activeActivity()!.id) &&
+              this.activityEvidenceMessage.includes('保存失败')) {
+              Button('重试保存记录')
+                .width('100%')
+                .height(42)
+                .fontSize(12)
+                .fontColor(Constants.COLOR_ERROR)
+                .backgroundColor(Constants.COLOR_BG_TAG)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => {
+                  this.markActivityAttempted(this.activeActivity()!, this.activityIsCorrect());
+                })
             }
 
             Row({ space: 10 }) {
@@ -856,6 +1032,10 @@ struct LessonPage {
         .backgroundColor(Constants.COLOR_BG_CARD)
         .border({ width: 1, color: Constants.COLOR_BORDER })
         .borderRadius(Constants.RADIUS_LG)
+        .onAreaChange((_: Area, newValue: Area): void => {
+          const nextOffset = Number(newValue.position.y);
+          if (nextOffset >= 0) this.activityOffset = nextOffset;
+        })
       }
     }
   }
@@ -1029,7 +1209,7 @@ struct LessonPage {
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
             .backgroundColor(Constants.COLOR_BRAND)
             .borderRadius(Constants.RADIUS_MD)
-            .onClick((): void => { this.completeCurrent(); })
+            .onClick((): void => { this.handlePrimaryAction(); })
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 12, bottom: 20 + SafeAreaInsets.bottomVp() })
