@@ -69,7 +69,8 @@ function compileService() {
 function compileReminder() {
   const abilityImport = "import { common, Want, wantAgent } from '@kit.AbilityKit';";
   const notificationImport = "import { notificationManager } from '@kit.NotificationKit';";
-  const serviceImport = "import { ProactiveLearningService } from './ProactiveLearningService';";
+  const serviceImport =
+    "import { ProactiveLearningAction, ProactiveLearningService } from './ProactiveLearningService';";
   let source = removeImports(readSource(reminderPath),
     [abilityImport, notificationImport, serviceImport], reminderPath);
   assert.equal(source.includes('export class LearningReminder'), true, 'LearningReminder export changed');
@@ -158,11 +159,41 @@ globalThis.__EntryAbility = EntryAbility;
   return stripTypeScriptTypes(source, { mode: 'transform', sourceMap: false });
 }
 
+function compileHomeReminderHarness() {
+  const source = readSource(homeContentPath);
+  const methodStart = source.indexOf('  private async publishReminder(): Promise<void> {');
+  const methodEnd = source.indexOf('\n  private submitQuickAsk(', methodStart);
+  assert.notEqual(methodStart, -1, 'HomeContent.publishReminder missing');
+  assert.notEqual(methodEnd, -1, 'HomeContent.publishReminder boundary changed');
+  const method = source.slice(methodStart, methodEnd);
+  const transformed = `const LearningReminder = globalThis.__reminder;
+const LearningFormUpdater = globalThis.__formUpdater;
+class HomeReminderHarness {
+  notificationOpen = false;
+  notificationState = 'idle';
+  notificationMessage = '';
+
+  getUIContext() {
+    return { getHostContext: () => globalThis.__hostContext };
+  }
+
+  applyNextAction(action) {
+    globalThis.__appliedActions.push(action);
+  }
+
+${method}
+}
+globalThis.__HomeReminderHarness = HomeReminderHarness;
+`;
+  return stripTypeScriptTypes(transformed, { mode: 'transform', sourceMap: false });
+}
+
 const compiledService = compileService();
 const compiledReminder = compileReminder();
 const compiledFormUpdater = compileFormUpdater();
 const compiledEntryFormAbility = compileEntryFormAbility();
 const compiledEntryAbility = compileEntryAbility();
+const compiledHomeReminderHarness = compileHomeReminderHarness();
 
 function serviceRepository() {
   return {
@@ -261,6 +292,27 @@ function loadEntryFormAbility(formUpdater, repository) {
   return context.__EntryFormAbility;
 }
 
+function loadHomeReminderHarness(reminder, formUpdater) {
+  const appliedActions = [];
+  const hostContext = { name: 'home-context' };
+  const context = vm.createContext({
+    __reminder: reminder,
+    __formUpdater: formUpdater,
+    __appliedActions: appliedActions,
+    __hostContext: hostContext
+  });
+  vm.runInContext(compiledHomeReminderHarness, context, { filename: homeContentPath });
+  return {
+    instance: new context.__HomeReminderHarness(),
+    appliedActions,
+    hostContext
+  };
+}
+
+function formDataSnapshot(data) {
+  return JSON.parse(JSON.stringify(data));
+}
+
 function validWant() {
   return {
     parameters: {
@@ -353,7 +405,7 @@ test('提醒和服务卡片共享真实主动行动的页面、动作、课程�
     updateForm: async (formId, data) => formUpdates.push({ formId, data })
   });
 
-  await reminder.publishNextTask({ name: 'ui-context' });
+  const reminderAction = await reminder.publishNextTask({ name: 'ui-context' });
   await formUpdater.refreshForm('form-1');
 
   assert.equal(resolveCalls, 2);
@@ -365,6 +417,11 @@ test('提醒和服务卡片共享真实主动行动的页面、动作、课程�
   const executableFields = ['targetPage', 'taskAction', 'courseId', 'courseTitle', 'topic', 'focusTag'];
   for (const key of executableFields) {
     assert.equal(reminderWant.parameters[key], cardData[key], `${key} must match across proactive surfaces`);
+    assert.equal(reminderAction[key], cardData[key], `${key} must be returned for HomeContent reuse`);
+  }
+  const presentationFields = ['kind', 'badge', 'title', 'subtitle', 'cta', 'evidence', 'progressText'];
+  for (const key of presentationFields) {
+    assert.equal(reminderAction[key], cardData[key], `${key} must be returned for HomeContent reuse`);
   }
 
   const cardSource = readSource(planCardPath);
@@ -373,6 +430,117 @@ test('提醒和服务卡片共享真实主动行动的页面、动作、课程�
     assert.equal(cardSource.includes(`${key}: this.${key}`), true,
       `LearningPlanCard must route with refreshed ${key}`);
   }
+});
+
+test('首页提醒成功后以通知返回行动同步首页和所有服务卡片', async () => {
+  const action = await loadService().resolve(fixedNow);
+  const refreshedActions = [];
+  const reminder = {
+    publishNextTask: async (context) => {
+      assert.equal(context.name, 'home-context');
+      return action;
+    }
+  };
+  const formUpdater = {
+    refreshAllWithAction: async (resolvedAction) => {
+      refreshedActions.push(resolvedAction);
+    }
+  };
+  const harness = loadHomeReminderHarness(reminder, formUpdater);
+
+  await harness.instance.publishReminder();
+
+  assert.equal(harness.instance.notificationOpen, true);
+  assert.equal(harness.instance.notificationState, 'success');
+  assert.equal(harness.instance.notificationMessage, '系统提醒已创建：' + action.title);
+  assert.equal(harness.appliedActions.length, 1);
+  assert.equal(refreshedActions.length, 1);
+  assert.equal(harness.appliedActions[0], action, 'HomeContent must apply the exact notification action object');
+  assert.equal(refreshedActions[0], action, 'cards must receive the exact notification action object');
+});
+
+test('两张服务卡片一次解析并共享同一行动快照', async () => {
+  const action = await loadService().resolve(fixedNow);
+  let resolveCalls = 0;
+  const updates = [];
+  const formUpdater = loadFormUpdater({
+    resolve: async () => {
+      resolveCalls += 1;
+      return action;
+    },
+    fallback: () => action
+  }, {
+    updateForm: async (formId, data) => updates.push({ formId, data: formDataSnapshot(data) })
+  }, {
+    getFormIds: async () => ['form-1', 'form-2']
+  });
+
+  await formUpdater.refreshAll();
+
+  assert.equal(resolveCalls, 1, 'refreshAll must resolve next-best-action once per refresh batch');
+  assert.deepEqual(updates.map((update) => update.formId), ['form-1', 'form-2']);
+  assert.deepEqual(updates[0].data, updates[1].data, 'all forms must render one immutable action snapshot');
+});
+
+test('显式行动刷新所有服务卡片时不会再次解析状态', async () => {
+  const action = await loadService().resolve(fixedNow);
+  let resolveCalls = 0;
+  const updates = [];
+  const formUpdater = loadFormUpdater({
+    resolve: async () => {
+      resolveCalls += 1;
+      throw new Error('explicit action must not resolve again');
+    },
+    fallback: () => action
+  }, {
+    updateForm: async (formId, data) => updates.push({ formId, data: formDataSnapshot(data) })
+  }, {
+    getFormIds: async () => ['form-1', 'form-2']
+  });
+
+  await formUpdater.refreshAllWithAction(action);
+
+  assert.equal(resolveCalls, 0);
+  assert.equal(updates.length, 2);
+  assert.deepEqual(updates[0].data, formDataSnapshot(action));
+  assert.deepEqual(updates[1].data, formDataSnapshot(action));
+});
+
+test('本地状态变化后单张服务卡片重新解析新的 next-best-action', async () => {
+  const firstAction = await loadService().resolve(fixedNow);
+  const secondAction = {
+    kind: 'plan',
+    badge: '今日起步',
+    title: '制定今天的学习计划',
+    subtitle: '让学伴把目标拆成可执行任务',
+    cta: '制定计划',
+    courseId: '',
+    courseTitle: '',
+    topic: '',
+    focusTag: '',
+    taskAction: 'plan',
+    targetPage: 'pages/Plan',
+    evidence: '本机还没有可继续的课程状态或今日任务',
+    progressText: '等待制定计划'
+  };
+  const queuedActions = [firstAction, secondAction];
+  const updates = [];
+  const formUpdater = loadFormUpdater({
+    resolve: async () => queuedActions.shift(),
+    fallback: () => secondAction
+  }, {
+    updateForm: async (_formId, data) => updates.push(formDataSnapshot(data))
+  });
+
+  await formUpdater.refreshForm('form-1');
+  await formUpdater.refreshForm('form-1');
+
+  assert.equal(updates.length, 2);
+  assert.equal(updates[0].kind, firstAction.kind);
+  assert.equal(updates[0].targetPage, firstAction.targetPage);
+  assert.equal(updates[1].kind, 'plan');
+  assert.equal(updates[1].targetPage, 'pages/Plan');
+  assert.notDeepEqual(updates[0], updates[1]);
 });
 
 test('通知权限请求失败后下一次调用仍会重试并发布', async () => {
@@ -629,4 +797,66 @@ test('首页提醒以 loading 防并发并在错误态提供可执行重试', ()
   assert.notEqual(retryCallIndex, -1, 'HomeContent retry action missing');
   assert.equal(visibleErrorIndex < retryButtonIndex && retryButtonIndex < retryCallIndex, true,
     'HomeContent error branch must show a retry button that republishes');
+});
+
+test('首页提醒入口具备动态无障碍语义与 48vp 最小触控区', () => {
+  const source = readSource(homeContentPath);
+  const headerStart = source.indexOf('  @Builder\n  Header() {');
+  const headerEnd = source.indexOf('\n  @Builder\n  ContinueCard()', headerStart);
+  assert.notEqual(headerStart, -1, 'HomeContent.Header missing');
+  assert.notEqual(headerEnd, -1, 'HomeContent.Header boundary changed');
+  const header = source.slice(headerStart, headerEnd);
+
+  const bellIconIndex = header.indexOf("SymbolGlyph($r('sys.symbol.bell_fill'))");
+  const bellStart = header.lastIndexOf('          Button() {', bellIconIndex);
+  const bellEnd = header.indexOf('\n\n          Column()', bellIconIndex);
+  assert.notEqual(bellIconIndex, -1, 'HomeContent reminder bell missing');
+  assert.notEqual(bellStart, -1, 'HomeContent reminder button boundary changed');
+  assert.notEqual(bellEnd, -1, 'HomeContent reminder button end changed');
+  const bell = header.slice(bellStart, bellEnd);
+  assert.equal(bell.includes('.width(48)'), true, 'reminder button must be at least 48vp wide');
+  assert.equal(bell.includes('.height(48)'), true, 'reminder button must be at least 48vp high');
+  const bellAccessibility = bell.indexOf('.accessibilityText(');
+  assert.notEqual(bellAccessibility, -1, 'reminder button accessibility text missing');
+  assert.equal(bell.slice(bellAccessibility).includes("this.notificationState === 'loading'"), true,
+    'reminder accessibility text must expose loading state');
+
+  const retryStart = header.indexOf("            Button('重试')");
+  const retryEnd = header.indexOf('\n              .onClick(', retryStart);
+  assert.notEqual(retryStart, -1, 'HomeContent reminder retry button missing');
+  assert.notEqual(retryEnd, -1, 'HomeContent reminder retry boundary changed');
+  const retry = header.slice(retryStart, retryEnd);
+  assert.equal(retry.includes('.height(48)'), true, 'reminder retry must provide a 48vp touch target');
+  assert.equal(retry.includes(".accessibilityText('重试创建当前学习提醒')"), true,
+    'reminder retry must state its action instead of only reading “重试”');
+
+  const statusStart = header.indexOf('        Row({ space: 8 }) {', header.indexOf('if (this.notificationOpen)'));
+  const statusEnd = header.indexOf('\n      }\n    }', statusStart);
+  assert.notEqual(statusStart, -1, 'HomeContent reminder status row missing');
+  assert.notEqual(statusEnd, -1, 'HomeContent reminder status boundary changed');
+  const status = header.slice(statusStart, statusEnd);
+  assert.equal(status.includes(".accessibilityGroup(this.notificationState !== 'error')"), true,
+    'non-error status must be announced as one group while error keeps retry independently focusable');
+  assert.equal(status.includes(
+    ".accessibilityText(this.notificationState === 'error' ? '' : this.notificationMessage)"), true,
+  'reminder status must expose the current loading or success message');
+});
+
+test('服务卡片整卡入口播报行动、进度与推荐依据', () => {
+  const source = readSource(planCardPath);
+  const formLinkStart = source.indexOf('    FormLink({');
+  assert.notEqual(formLinkStart, -1, 'LearningPlanCard FormLink missing');
+  const formLink = source.slice(formLinkStart);
+  assert.equal(formLink.includes('.accessibilityGroup(true)'), true,
+    'LearningPlanCard must expose the whole FormLink as one action');
+  const textStart = formLink.indexOf('.accessibilityText(');
+  const descriptionStart = formLink.indexOf('.accessibilityDescription(');
+  assert.notEqual(textStart, -1, 'LearningPlanCard accessibility text missing');
+  assert.notEqual(descriptionStart, -1, 'LearningPlanCard accessibility description missing');
+  const textExpression = formLink.slice(textStart, descriptionStart);
+  assert.equal(textExpression.includes('this.cta'), true, 'card accessibility text must include the command');
+  assert.equal(textExpression.includes('this.title'), true, 'card accessibility text must include the task');
+  assert.equal(textExpression.includes('this.progressText'), true, 'card accessibility text must include progress');
+  assert.equal(formLink.slice(descriptionStart).includes('this.evidence'), true,
+    'card accessibility description must include the recommendation evidence');
 });

@@ -6255,3 +6255,44 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Node 行为测试中的 HarmonyOS Kit 为受控替身，不能替代模拟器或真机证据；ArkUI 页面只做源码契约检查。
 - HAP 未配置签名，安装和提交包可用性未验证。
 - 本批未修改 Web、Repository、ArkData schema 或 `Achievements.ets`，因此未运行 Web 验证，也没有重跑 WS02 reducer 测试。
+
+---
+
+## 2026-07-17 [WS04] 单快照触达与无障碍入口
+
+背景：读取主线整合分支后，确认 `38f571f` 已覆盖当前行动重算、latest-wins 和导航成功消费，本批不重复这些实现。新的缺口是同一次 `refreshAll` 会为每张服务卡片分别解析状态，通知成功后首页与卡片也没有复用通知已经发布的精确行动；首页图标入口和 2x2 卡片缺少明确的无障碍语义，错误重试触控区仅 32 vp。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `apps/harmonyos/entry/src/main/ets/common/LearningFormUpdater.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LearningReminder.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
+- `scripts/test-proactive-delivery-contracts.mjs`
+
+行为变化：
+- `LearningFormUpdater.refreshAll()` 先读取已注册卡片，再只解析一次真实 next-best-action，并用同一快照更新全部卡片；单张系统更新仍重新读取当前本机状态。
+- 新增 `refreshAllWithAction()`，允许通知成功后把已发布的同一个行动对象同步给所有卡片，不再次读取 ArkData 产生漂移。
+- `LearningReminder.publishNextTask()` 在系统发布成功后返回完整行动；首页用该对象更新主动行动卡，并同步服务卡片，再显示成功状态。
+- 首页头像、铃铛、主动行动按钮、计划任务行和快速提问入口补充无障碍文本；关键按钮、错误重试、空态计划入口和快速提问触控高度统一到至少 48 vp。
+- 提醒加载/成功状态作为单个无障碍组播报；错误状态不合并子项，保留“重试创建当前学习提醒”独立聚焦。
+- 服务卡片 `FormLink` 作为一个动作播报 CTA、任务、进度与推荐依据。
+
+验证：
+- `git rev-parse --verify origin/codex/harmony-integration-20260717`：exit 0，精确值 `38f571fcccfaaee2fc7729c6d475d1551cee3de2`；已读取其相关源码和测试，未重复修改行动重算、入口 latest-wins 或路由消费。
+- DevEco Studio API 12 SDK `component/common.d.ts` 源码确认：`accessibilityText`、`accessibilityGroup`、`accessibilityDescription` 均标注支持 API 12 与 Form。
+- `node --check scripts/test-proactive-learning-service.mjs`：exit 0。
+- `node --check scripts/test-proactive-delivery-contracts.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，35/35 通过；直接执行当前 `.ets` 服务、提醒、首页提醒方法、卡片更新、Form Ability 和 EntryAbility，并检查 ArkUI/Form 无障碍契约。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 20 s 559 ms`；无 ArkTS 业务告警，仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe version`：exit 0，版本 `3.2.0e`。
+- 同一 `hdc.exe list targets`：exit 0，返回 `[Empty]`。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 当前任务没有 DevEco MCP，单文件 ArkTS 静态诊断未验证；HAP 结果只记为构建通过。
+- 当前没有模拟器或真机目标，系统权限弹窗、真实通知与卡片点击、屏幕阅读器播报顺序、字体放大布局、48 vp 实际触控和设备 AppStorage 时序均为未验证。
+- Node 中的 HarmonyOS Kit 为受控替身，ArkUI/Form 仅做精确源码契约检查，不能替代设备证据。
+- HAP 未配置签名，安装和竞赛提交包可用性未验证。
+- 本批未修改 Web、Repository、ArkData schema、`Achievements.ets` 或整合分支已增强的入口与路由文件。

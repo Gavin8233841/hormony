@@ -1,9 +1,9 @@
 import { common, Want, wantAgent } from '@kit.AbilityKit';
 import { notificationManager } from '@kit.NotificationKit';
-import { ProactiveLearningService } from './ProactiveLearningService';
+import { ProactiveLearningAction, ProactiveLearningService } from './ProactiveLearningService';
 
 export class LearningReminder {
-  static async publishNextTask(context: common.UIAbilityContext): Promise<string> {
+  static async publishNextTask(context: common.UIAbilityContext): Promise<ProactiveLearningAction> {
     await LearningReminder.ensureNotificationEnabled(context);
     try {
       const action = await ProactiveLearningService.resolve();
@@ -41,7 +41,7 @@ export class LearningReminder {
         }
       };
       await notificationManager.publish(request);
-      return action.title;
+      return action;
     } catch (_) {
       throw new Error('系统学习提醒发布失败，请稍后重试');
     }

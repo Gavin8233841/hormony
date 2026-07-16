@@ -143,9 +143,11 @@ export struct HomeContent {
     this.notificationMessage = '正在创建系统学习提醒';
     try {
       const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      const taskTitle = await LearningReminder.publishNextTask(hostContext);
+      const action = await LearningReminder.publishNextTask(hostContext);
+      this.applyNextAction(action);
+      await LearningFormUpdater.refreshAllWithAction(action);
       this.notificationState = 'success';
-      this.notificationMessage = '系统提醒已创建：' + taskTitle;
+      this.notificationMessage = '系统提醒已创建：' + action.title;
     } catch (e) {
       this.notificationState = 'error';
       this.notificationMessage = e instanceof Error ? e.message : '未能创建系统提醒，请稍后重试';
@@ -251,10 +253,11 @@ export struct HomeContent {
             .fontSize(26)
             .fontColor([Constants.COLOR_BRAND])
         }
-        .width(44)
-        .height(44)
+        .width(48)
+        .height(48)
         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-        .borderRadius(22)
+        .borderRadius(24)
+        .accessibilityText('打开个人学习档案')
         .onClick(() => {
           this.selectedTab = 3;
         })
@@ -265,12 +268,14 @@ export struct HomeContent {
               .fontSize(23)
               .fontColor([Constants.COLOR_TEXT_PRIMARY])
           }
-          .width(44)
-          .height(44)
+          .width(48)
+          .height(48)
           .backgroundColor(Constants.COLOR_BG_CARD)
-          .borderRadius(22)
+          .borderRadius(24)
           .enabled(this.notificationState !== 'loading')
           .opacity(this.notificationState === 'loading' ? 0.56 : 1)
+          .accessibilityText(this.notificationState === 'loading' ? '正在创建当前学习提醒' :
+            '创建当前学习任务提醒')
           .onClick(() => {
             this.publishReminder();
           })
@@ -306,13 +311,15 @@ export struct HomeContent {
             .layoutWeight(1)
           if (this.notificationState === 'error') {
             Button('重试')
-              .height(32)
+              .width(64)
+              .height(48)
               .padding({ left: 12, right: 12 })
               .fontSize(12)
               .fontColor(Constants.COLOR_ERROR)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .border({ width: 1, color: Constants.COLOR_ERROR })
-              .borderRadius(16)
+              .borderRadius(24)
+              .accessibilityText('重试创建当前学习提醒')
               .onClick(() => {
                 this.publishReminder();
               })
@@ -323,6 +330,8 @@ export struct HomeContent {
         .margin({ top: 12 })
         .backgroundColor(this.notificationState === 'error' ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_CARD)
         .borderRadius(Constants.RADIUS_MD)
+        .accessibilityGroup(this.notificationState !== 'error')
+        .accessibilityText(this.notificationState === 'error' ? '' : this.notificationMessage)
       }
     }
     .width('100%')
@@ -440,11 +449,12 @@ export struct HomeContent {
               .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
           }
         }
-        .height(44)
+        .height(48)
         .padding({ left: 18, right: 16 })
         .backgroundColor(Constants.COLOR_BRAND)
-        .borderRadius(22)
+        .borderRadius(24)
         .shadow({ radius: 6, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 3 })
+        .accessibilityText(this.nextActionCta + '，' + this.nextActionTitle)
         .onClick(() => {
           this.openNextAction();
         })
@@ -511,6 +521,7 @@ export struct HomeContent {
     .padding({ top: 11, bottom: 11 })
     .scale({ x: this.pressedTask === index ? 0.98 : 1, y: this.pressedTask === index ? 0.98 : 1 })
     .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
+    .accessibilityText(task.title + '，' + this.taskStatus(task) + '，点击切换任务状态')
     .onTouch((event?: TouchEvent) => {
       if (event) {
         if (event.type === TouchType.Down) {
@@ -541,6 +552,9 @@ export struct HomeContent {
             .fontSize(13)
             .fontColor([Constants.COLOR_BRAND])
         }
+        .height(48)
+        .padding({ left: 12 })
+        .accessibilityText('查看完整学习计划')
         .onClick(() => this.openPlan())
       }
       .width('100%')
@@ -558,7 +572,7 @@ export struct HomeContent {
               .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Button('制定计划')
-              .height(36)
+              .height(48)
               .fontSize(13)
               .backgroundColor(Constants.COLOR_BRAND)
               .borderRadius(18)
@@ -576,7 +590,7 @@ export struct HomeContent {
               .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Button('查看完整计划')
-              .height(36)
+              .height(48)
               .fontSize(13)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .fontColor(Constants.COLOR_BRAND)
@@ -633,7 +647,7 @@ export struct HomeContent {
 
       TextInput({ text: this.quickAsk, placeholder: '输入问题...' })
         .layoutWeight(1)
-        .height(40)
+        .height(48)
         .fontSize(13)
         .backgroundColor(Constants.COLOR_BG_TAG)
         .borderRadius(20)
@@ -647,10 +661,11 @@ export struct HomeContent {
           .fontSize(18)
           .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
       }
-      .width(38)
-      .height(38)
+      .width(48)
+      .height(48)
       .backgroundColor(Constants.COLOR_BRAND)
-      .borderRadius(19)
+      .borderRadius(24)
+      .accessibilityText(this.quickAsk.trim().length > 0 ? '向学伴发送问题' : '打开学伴')
       .onClick(() => this.submitQuickAsk())
     }
     .width('100%')

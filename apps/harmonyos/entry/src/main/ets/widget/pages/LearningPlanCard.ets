@@ -106,5 +106,8 @@ struct LearningPlanCard {
       .padding(16)
       .backgroundColor('#F4F7FC')
     }
+    .accessibilityGroup(true)
+    .accessibilityText(this.cta + '，' + this.title + '，' + this.progressText)
+    .accessibilityDescription(this.evidence)
   }
 }

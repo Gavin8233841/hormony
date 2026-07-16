@@ -26,25 +26,51 @@ export class LearningFormUpdater {
   static async refreshForm(formId: string): Promise<void> {
     try {
       const action = await ProactiveLearningService.resolve();
-      await formProvider.updateForm(formId,
-        formBindingData.createFormBindingData(LearningFormUpdater.buildData(action)));
+      const updated = await LearningFormUpdater.updateFormWithAction(formId, action);
+      if (!updated) throw new Error('卡片写入失败');
     } catch (error) {
       throw new Error('服务卡片更新失败: ' + String(error));
     }
   }
 
   static async refreshAll(): Promise<void> {
-    let formIds: string[] = [];
+    const formIds = await LearningFormUpdater.registeredFormIds();
+    if (formIds.length === 0) return;
+    let action: ProactiveLearningAction;
     try {
-      formIds = await LocalLearningRepository.getFormIds();
+      action = await ProactiveLearningService.resolve();
     } catch (_) {
       return;
     }
+    await LearningFormUpdater.updateFormsWithAction(formIds, action);
+  }
+
+  static async refreshAllWithAction(action: ProactiveLearningAction): Promise<void> {
+    const formIds = await LearningFormUpdater.registeredFormIds();
+    await LearningFormUpdater.updateFormsWithAction(formIds, action);
+  }
+
+  private static async registeredFormIds(): Promise<string[]> {
+    try {
+      return await LocalLearningRepository.getFormIds();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  private static async updateFormsWithAction(formIds: string[], action: ProactiveLearningAction): Promise<void> {
     for (const formId of formIds) {
-      try {
-        await LearningFormUpdater.refreshForm(formId);
-      } catch (_) {
-      }
+      await LearningFormUpdater.updateFormWithAction(formId, action);
+    }
+  }
+
+  private static async updateFormWithAction(formId: string, action: ProactiveLearningAction): Promise<boolean> {
+    try {
+      await formProvider.updateForm(formId,
+        formBindingData.createFormBindingData(LearningFormUpdater.buildData(action)));
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

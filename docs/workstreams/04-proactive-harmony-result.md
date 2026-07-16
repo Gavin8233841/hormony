@@ -23,11 +23,14 @@
 - `HomeContent.ets` 只消费统一行动，不再维护第二套排序；首屏说明推荐依据和当前进度。
 - 首页通知入口区分创建中、创建成功和权限/发布失败，失败状态使用错误语义。
 - `LearningReminder.ets` 使用 API 12 `WantAgent`，通知正文和点击参数来自同一行动。
+- 提醒发布成功后返回完整行动快照；首页立即采用该快照，并把它同步给全部已注册服务卡片，避免一次触达中重复解析出不同任务。
 - 通知授权请求完成后再次读取系统开关；仍未授权时不发布通知，并在首页保留明确的错误状态和重试操作。API 12 不调用 API 13 才提供的应用内通知设置接口。
 - `EntryAbility.ets` 在 `onCreate` 与 `onNewWant` 消费卡片/通知参数；`Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动页面回流。
 - `EntryAbility.ets` 使用来源和本机校验后的页面、课程、Topic、动作生成稳定去重键；同一前台周期的重复 Want 只写入一次跳转，进入后台后释放去重状态，后续真实点击仍可再次回流。
 - `EntryAbility.ets` 先完成内容仓库与 ArkData 课程目录同步，再校验来源、128 字符长度上限、动作/页面映射、课程和精确 Topic；外部 `courseTitle` 被忽略，标题从本地目录推导，非法 Want 不写 `AppStorage`。
 - `LearningFormUpdater.ets` 与 `LearningPlanCard.ets` 展示同一行动、依据、进度和 CTA，`FormLink` 传递精确目标页面及学习上下文。
+- `LearningFormUpdater.refreshAll()` 每批只解析一次 next-best-action，再更新全部卡片；显式快照刷新不会重新读取状态，单卡系统更新仍会读取最新本机状态。
+- 首页图标按钮、主动行动、任务行和服务卡片补充 API 12 无障碍文本；关键按钮与错误重试触控区统一到至少 48 vp，错误态保留重试按钮独立聚焦。
 
 ### 记录、画像与成就反馈
 
@@ -50,6 +53,12 @@
 - `b301688`：采用“下一成就可执行”思路；实现改为使用当前 Repository 课程的精确 Topic，不使用固定文案 Topic。
 - `5f69a8f`：已读取薄弱标签直达思路；因当前标签洞察仍跨课程/Topic 混合，本批不采用该直达实现。
 
+## 整合分支校准
+
+- 已读取 `origin/codex/harmony-integration-20260717` 的 HEAD `38f571f` 及相关源码和测试。
+- 整合分支已包含当前行动重算、latest-wins、导航成功后消费目标和本地计划日期对齐，本批没有重复修改 `ProactiveLearningService.ets`、`EntryAbility.ets`、`Index.ets`、Repository 或计划日期逻辑。
+- 本批四个产品文件在 `38f571f` 上与 WS04 当前分支保持同一产品基线，便于主线精确重放。
+
 ## 文件
 
 - `apps/harmonyos/entry/src/main/ets/common/ProactiveLearningService.ets`
@@ -71,11 +80,12 @@
 |---|---|---|
 | **源码确认** | DevEco Studio API 12 SDK 类型声明 | 已确认 `NotificationRequest.wantAgent`、`wantAgent.getWantAgent()`、`UIAbility.onNewWant()`、`@Watch`、`FormLink` 的 `router/params` |
 | **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
+| **源码确认** | DevEco Studio API 12 `component/common.d.ts` | `accessibilityText`、`accessibilityGroup` 和 `accessibilityDescription` 均支持 API 12 与 Form 场景 |
 | **源码确认** | WS02 未提交 reducer 与测试 | 三元组分组与跨 Topic 隔离用例存在；本批未修改、未提交或运行 WS02 测试 |
 | **源码确认** | `node --test scripts/test-proactive-learning-service.mjs` | exit 0，17/17 通过；直接执行当前 `.ets` 服务，覆盖混合洞察零读取、零进度空态、旧计划四类无效任务、课程 Topic 和 Want 边界 |
-| **源码确认** | `node --test scripts/test-proactive-delivery-contracts.mjs` | exit 0，12/12 通过；直接执行当前服务、提醒、卡片更新器、Form Ability 与 EntryAbility，另对 ArkUI 绑定做精确静态契约检查 |
-| **源码确认** | 两个主动学习脚本合并执行 | exit 0，29/29 通过；覆盖六项触达参数一致、授权后二次确认、发布/卡片失败重试、冷热启动重复 Want 幂等和非法 payload 零导航写入 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 43 s 990 ms` |
+| **源码确认** | `node --test scripts/test-proactive-delivery-contracts.mjs` | exit 0，18/18 通过；直接执行当前服务、提醒、首页提醒方法、卡片更新器、Form Ability 与 EntryAbility，另对 ArkUI 和 Form 无障碍绑定做精确静态契约检查 |
+| **源码确认** | 两个主动学习脚本合并执行 | exit 0，35/35 通过；新增覆盖首页/通知/多卡片同一对象快照、两张卡片单次解析、显式快照零重复解析、状态变化后单卡重算和 48 vp 触控语义 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 20 s 559 ms`；无 ArkTS 业务告警 |
 | **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
 | **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
@@ -87,9 +97,11 @@
 - 首页、记录、成就、提醒和卡片已在源码中共享同一真实状态，但缺少设备上的“计划保存/答题事件 -> 首页和卡片刷新 -> 通知或卡片点击回流”证据。
 - 按课程/Topic/标签隔离的主动标签推荐依赖 WS02 reducer 先完成提交和集成，当前明确未启用。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
+- 屏幕阅读器播报顺序、字体放大后的文本适配和错误重试独立聚焦尚无设备证据。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
 - HAP 签名、安装、横屏、平板和真机均未验证。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。
 
 第一批提交：`a3d2ad4 feat: 统一主动学习触达`。
 第二批提交：`c6697ef fix: 修正主动学习状态与入口边界`。
+第三批提交：`17057cc fix: 强化主动触达幂等与失败恢复`。
