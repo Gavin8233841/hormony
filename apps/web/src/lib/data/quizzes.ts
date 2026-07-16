@@ -1,7 +1,7 @@
 // 题库数据文件
 // 覆盖三门课程：CS101 数据结构、CS102 操作系统、CS103 计算机网络
-// 每门课程至少 20 道选择题，按主题分组成多个 Quiz 对象
-// 题目类型混合：约 70% 选择题(choice)，30% 简答题(short)
+// 33 个 Topic 各含 5 道选择题；每门课程另含 7 道简答题
+// 当前共 165 道选择题和 21 道简答题
 
 import type { Quiz } from "@/lib/types";
 
@@ -15,34 +15,34 @@ type QuizSeed = Omit<Quiz, "questions"> & { questions: QuizSeedQuestion[] };
 
 const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q01": "easy",
-  "cs101_q02": "medium",
+  "cs101_q02": "hard",
   "cs101_q03": "medium",
   "cs101_q04": "hard",
   "cs101_q06": "easy",
   "cs101_q07": "medium",
   "cs101_q09": "medium",
   "cs101_q10": "medium",
-  "cs101_q11": "medium",
-  "cs101_q13": "medium",
+  "cs101_q11": "hard",
+  "cs101_q13": "hard",
   "cs101_q15": "easy",
   "cs101_q16": "medium",
-  "cs101_q17": "medium",
+  "cs101_q17": "hard",
   "cs101_q18": "medium",
   "cs101_q19": "medium",
   "cs101_q21": "medium",
   "cs101_q23": "medium",
   "cs101_q25": "medium",
   "cs101_q26": "medium",
-  "cs101_q27": "medium",
+  "cs101_q27": "hard",
   "cs101_q28": "easy",
   "cs101_q29": "easy",
-  "cs101_q30": "easy",
+  "cs101_q30": "medium",
   "cs101_q31": "easy",
   "cs101_q32": "easy",
   "cs101_q33": "hard",
   "cs101_q34": "easy",
-  "cs101_q35": "medium",
-  "cs101_q36": "medium",
+  "cs101_q35": "easy",
+  "cs101_q36": "easy",
   "cs101_q37": "easy",
   "cs101_q38": "easy",
   "cs101_q39": "easy",
@@ -52,12 +52,12 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q43": "medium",
   "cs101_q44": "easy",
   "cs101_q45": "medium",
-  "cs101_q46": "medium",
+  "cs101_q46": "hard",
   "cs101_q47": "medium",
-  "cs101_q48": "medium",
+  "cs101_q48": "easy",
   "cs101_q49": "hard",
   "cs101_q50": "easy",
-  "cs101_q51": "medium",
+  "cs101_q51": "hard",
   "cs101_q52": "medium",
   "cs101_q53": "easy",
   "cs101_q54": "medium",
@@ -65,7 +65,7 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q56": "medium",
   "cs101_q57": "medium",
   "cs101_q58": "easy",
-  "cs101_q59": "medium",
+  "cs101_q59": "hard",
   "cs101_q60": "easy",
   "cs101_q61": "medium",
   "cs101_q62": "medium",
@@ -74,62 +74,62 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q65": "easy",
   "cs101_q66": "hard",
   "cs101_q67": "medium",
-  "cs102_q01": "easy",
+  "cs102_q01": "medium",
   "cs102_q02": "easy",
-  "cs102_q04": "medium",
-  "cs102_q05": "easy",
-  "cs102_q07": "easy",
+  "cs102_q04": "hard",
+  "cs102_q05": "medium",
+  "cs102_q07": "medium",
   "cs102_q08": "medium",
-  "cs102_q10": "easy",
+  "cs102_q10": "medium",
   "cs102_q11": "medium",
-  "cs102_q13": "easy",
-  "cs102_q14": "easy",
-  "cs102_q16": "easy",
+  "cs102_q13": "hard",
+  "cs102_q14": "medium",
+  "cs102_q16": "medium",
   "cs102_q17": "easy",
   "cs102_q19": "medium",
   "cs102_q20": "easy",
   "cs102_q22": "easy",
-  "cs102_q23": "easy",
-  "cs102_q24": "easy",
-  "cs102_q25": "easy",
-  "cs102_q26": "medium",
-  "cs102_q27": "medium",
+  "cs102_q23": "medium",
+  "cs102_q24": "medium",
+  "cs102_q25": "hard",
+  "cs102_q26": "hard",
+  "cs102_q27": "hard",
   "cs102_q28": "easy",
-  "cs102_q29": "medium",
+  "cs102_q29": "hard",
   "cs102_q30": "easy",
   "cs102_q31": "easy",
-  "cs102_q32": "easy",
+  "cs102_q32": "medium",
   "cs102_q33": "easy",
-  "cs102_q34": "easy",
-  "cs102_q35": "medium",
+  "cs102_q34": "medium",
+  "cs102_q35": "hard",
   "cs102_q36": "easy",
-  "cs102_q37": "easy",
+  "cs102_q37": "medium",
   "cs102_q38": "easy",
   "cs102_q39": "easy",
   "cs102_q40": "easy",
-  "cs102_q41": "easy",
+  "cs102_q41": "medium",
   "cs102_q42": "medium",
-  "cs102_q43": "medium",
+  "cs102_q43": "hard",
   "cs102_q44": "medium",
   "cs102_q45": "medium",
   "cs102_q46": "easy",
   "cs102_q47": "easy",
   "cs102_q48": "easy",
-  "cs102_q49": "medium",
+  "cs102_q49": "hard",
   "cs102_q50": "easy",
   "cs102_q51": "medium",
   "cs102_q52": "easy",
   "cs102_q53": "easy",
-  "cs102_q54": "medium",
+  "cs102_q54": "hard",
   "cs102_q55": "easy",
   "cs102_q56": "easy",
-  "cs102_q57": "easy",
+  "cs102_q57": "medium",
   "cs103_q01": "easy",
   "cs103_q02": "easy",
   "cs103_q04": "medium",
   "cs103_q05": "easy",
   "cs103_q07": "easy",
-  "cs103_q08": "easy",
+  "cs103_q08": "medium",
   "cs103_q09": "easy",
   "cs103_q10": "easy",
   "cs103_q12": "medium",
@@ -137,47 +137,47 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs103_q15": "medium",
   "cs103_q16": "easy",
   "cs103_q18": "medium",
-  "cs103_q19": "medium",
+  "cs103_q19": "hard",
   "cs103_q21": "easy",
-  "cs103_q22": "easy",
-  "cs103_q24": "medium",
-  "cs103_q25": "medium",
-  "cs103_q26": "easy",
-  "cs103_q27": "medium",
-  "cs103_q28": "easy",
-  "cs103_q29": "easy",
+  "cs103_q22": "medium",
+  "cs103_q24": "hard",
+  "cs103_q25": "hard",
+  "cs103_q26": "medium",
+  "cs103_q27": "hard",
+  "cs103_q28": "medium",
+  "cs103_q29": "hard",
   "cs103_q30": "easy",
   "cs103_q31": "easy",
   "cs103_q32": "easy",
   "cs103_q33": "medium",
-  "cs103_q34": "medium",
-  "cs103_q35": "easy",
-  "cs103_q36": "easy",
+  "cs103_q34": "hard",
+  "cs103_q35": "medium",
+  "cs103_q36": "medium",
   "cs103_q37": "easy",
   "cs103_q38": "easy",
-  "cs103_q39": "easy",
-  "cs103_q40": "easy",
+  "cs103_q39": "medium",
+  "cs103_q40": "medium",
   "cs103_q41": "easy",
-  "cs103_q42": "easy",
+  "cs103_q42": "hard",
   "cs103_q43": "medium",
   "cs103_q44": "medium",
-  "cs103_q45": "medium",
-  "cs103_q46": "medium",
+  "cs103_q45": "hard",
+  "cs103_q46": "hard",
   "cs103_q47": "easy",
-  "cs103_q48": "easy",
-  "cs103_q49": "easy",
+  "cs103_q48": "medium",
+  "cs103_q49": "medium",
   "cs103_q50": "easy",
   "cs103_q51": "easy",
-  "cs103_q52": "easy",
-  "cs103_q53": "medium",
+  "cs103_q52": "medium",
+  "cs103_q53": "hard",
   "cs103_q54": "easy",
-  "cs103_q55": "easy",
+  "cs103_q55": "medium",
   "cs103_q56": "easy",
   "cs103_q57": "easy",
   "cs103_q58": "easy",
   "cs103_q59": "easy",
-  "cs103_q60": "easy",
-  "cs103_q61": "easy",
+  "cs103_q60": "hard",
+  "cs103_q61": "medium",
   "cs103_q62": "easy",
 };
 
@@ -218,17 +218,75 @@ const TOPIC_TAGS: Record<string, string> = {
 };
 
 function withQuizMetadata(quizzes: QuizSeed[]): Quiz[] {
-  return quizzes.map((quiz) => ({
-    ...quiz,
-    questions: quiz.questions.map((question) => {
-      const difficulty = question.difficulty ?? QUESTION_DIFFICULTY[question.id] ?? inferQuestionDifficulty(question);
-      return {
-        ...question,
-        difficulty,
-        tags: buildQuestionTags(quiz.topic, question, difficulty),
-      };
-    }),
-  }));
+  return quizzes.map((quiz) => {
+    const choiceTargetIndexes = buildChoiceTargetIndexes(quiz);
+    let choicePosition = 0;
+
+    return {
+      ...quiz,
+      questions: quiz.questions.map((question) => {
+        const balancedQuestion = question.type === "choice"
+          ? balanceChoiceOptions(question, choiceTargetIndexes[choicePosition++])
+          : question;
+        const difficulty = balancedQuestion.difficulty ?? QUESTION_DIFFICULTY[balancedQuestion.id] ??
+          inferQuestionDifficulty(balancedQuestion);
+        return {
+          ...balancedQuestion,
+          difficulty,
+          tags: buildQuestionTags(quiz.topic, balancedQuestion, difficulty),
+        };
+      }),
+    };
+  });
+}
+
+const CHOICE_LABELS = ["A", "B", "C", "D"] as const;
+
+function buildChoiceTargetIndexes(quiz: QuizSeed): number[] {
+  const firstFour = CHOICE_LABELS.map((_, index) => index).sort((left, right) =>
+    stableQuestionHash(`${quiz.quizId}:${CHOICE_LABELS[left]}`) -
+    stableQuestionHash(`${quiz.quizId}:${CHOICE_LABELS[right]}`)
+  );
+  return quiz.questions
+    .filter((question) => question.type === "choice")
+    .map((question, index) => index < CHOICE_LABELS.length
+      ? firstFour[index]
+      : stableQuestionHash(question.id) % CHOICE_LABELS.length);
+}
+
+function balanceChoiceOptions(question: QuizSeedQuestion, targetIndex: number): QuizSeedQuestion {
+  if (question.type !== "choice" || question.options?.length !== CHOICE_LABELS.length) {
+    return question;
+  }
+
+  const answerIndex = CHOICE_LABELS.indexOf(question.answer as typeof CHOICE_LABELS[number]);
+  const optionBodies = question.options.map((option, index) => {
+    const prefix = `${CHOICE_LABELS[index]}.`;
+    return option.startsWith(prefix) ? option.slice(prefix.length).trimStart() : "";
+  });
+  if (answerIndex < 0 || optionBodies.some((option) => option.length === 0)) {
+    return question;
+  }
+
+  const shift = (targetIndex - answerIndex + CHOICE_LABELS.length) % CHOICE_LABELS.length;
+  const rotatedBodies = optionBodies.map((_, index) =>
+    optionBodies[(index - shift + CHOICE_LABELS.length) % CHOICE_LABELS.length]
+  );
+
+  return {
+    ...question,
+    options: rotatedBodies.map((option, index) => `${CHOICE_LABELS[index]}. ${option}`),
+    answer: CHOICE_LABELS[targetIndex],
+  };
+}
+
+function stableQuestionHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function inferQuestionDifficulty(question: QuizSeedQuestion): QuizDifficulty {
@@ -267,11 +325,11 @@ function abilityTag(source: string): string {
 
 
 // ===========================================================================
-// CS101 数据结构（共 27 题：20 选择 + 7 简答）
+// CS101 数据结构（共 67 题：60 选择 + 7 简答）
 // ===========================================================================
 
 export const cs101Quizzes: Quiz[] = withQuizMetadata([
-  // ---- 数组与线性表（3 题）----
+  // ---- 数组与线性表 ----
   {
     quizId: "quiz_cs101_array",
     courseId: "cs101",
@@ -335,7 +393,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 链表（3 题）----
+  // ---- 链表 ----
   {
     quizId: "quiz_cs101_linkedlist",
     courseId: "cs101",
@@ -403,7 +461,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 栈与队列（3 题）----
+  // ---- 栈与队列 ----
   {
     quizId: "quiz_cs101_stackqueue",
     courseId: "cs101",
@@ -471,7 +529,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 二叉树与 BST（3 题）----
+  // ---- 二叉树与 BST ----
   {
     quizId: "quiz_cs101_tree",
     courseId: "cs101",
@@ -544,7 +602,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- AVL 树与红黑树（2 题）----
+  // ---- AVL 树与红黑树 ----
   {
     quizId: "quiz_cs101_avl",
     courseId: "cs101",
@@ -603,16 +661,16 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
       {
         id: "cs101_q41",
         type: "choice",
-        stem: "在 AVL 树中插入一个节点导致失衡后，恢复平衡最多需要进行几次旋转？",
+        stem: "在 AVL 树中插入一个节点导致 LR 或 RL 型失衡后，恢复平衡需要进行几次基本旋转？",
         options: ["A. 1 次", "B. 2 次", "C. 3 次", "D. log n 次"],
-        answer: "A",
+        answer: "B",
         explanation:
-          "AVL 树插入导致的失衡只需一次旋转（单旋或双旋）即可恢复平衡。LL 型和 RR 型失衡需一次单旋，LR 型和 RL 型失衡需一次双旋（两次旋转）。而删除操作可能需要 O(log n) 次旋转，因为删除后失衡可能向上传播。这是 AVL 树插入效率较高的原因。",
+          "LR 型和 RL 型失衡需要一次双旋，而双旋由两次基本旋转组成，因此答案为 2 次。LL 型和 RR 型只需一次基本旋转。一次插入只需在最低失衡祖先处完成一次重平衡操作，但不能把一次重平衡操作误写成一次基本旋转。",
       },
     ],
   },
 
-  // ---- 图的表示与遍历（3 题）----
+  // ---- 图的表示与遍历 ----
   {
     quizId: "quiz_cs101_graph",
     courseId: "cs101",
@@ -676,7 +734,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 排序算法（3 题）----
+  // ---- 排序算法 ----
   {
     quizId: "quiz_cs101_sort",
     courseId: "cs101",
@@ -749,7 +807,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 动态规划（2 题）----
+  // ---- 动态规划 ----
   {
     quizId: "quiz_cs101_dp",
     courseId: "cs101",
@@ -822,7 +880,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 哈希表（1 题）----
+  // ---- 哈希表 ----
   {
     quizId: "quiz_cs101_hash",
     courseId: "cs101",
@@ -860,10 +918,10 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
         id: "cs101_q51",
         type: "choice",
         stem: "采用链地址法处理冲突时，查找一个关键字的时间复杂度（设表长 m，n 个元素，每个链表平均长度为 α=n/m）为？",
-        options: ["A. O(1)", "B. O(α)", "C. O(m)", "D. O(n)"],
+        options: ["A. O(1)", "B. O(1 + α)", "C. O(m)", "D. O(n)"],
         answer: "B",
         explanation:
-          "链地址法中每个桶对应一个链表，平均链表长度为负载因子 α=n/m。查找时先通过哈希函数定位桶 O(1)，再在链表中顺序查找 O(α)。当 α 较小时查找接近 O(1)，因此链地址法在实践中性能优良。与开放地址法不同，链地址法的负载因子可以大于 1。",
+          "链地址法中每个桶对应一个链表，平均链表长度为负载因子 α=n/m。查找时先通过哈希函数定位桶 O(1)，再在链表中顺序查找 O(α)，合计期望时间为 O(1+α)。当 α 受控时查找接近 O(1)；与开放地址法不同，链地址法的负载因子可以大于 1。",
       },
       {
         id: "cs101_q52",
@@ -896,7 +954,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 堆与优先队列（1 题）----
+  // ---- 堆与优先队列 ----
   {
     quizId: "quiz_cs101_heap",
     courseId: "cs101",
@@ -969,7 +1027,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 最短路径算法（5 题）----
+  // ---- 最短路径算法 ----
   {
     quizId: "quiz_cs101_shortestpath",
     courseId: "cs101",
@@ -1038,7 +1096,7 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 贪心算法与分治（5 题）----
+  // ---- 贪心算法与分治 ----
   {
     quizId: "quiz_cs101_greedy",
     courseId: "cs101",
@@ -1047,11 +1105,11 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
       {
         id: "cs101_q63",
         type: "choice",
-        stem: "贪心算法能求得最优解的必要条件是问题具有以下哪个性质？",
+        stem: "贪心算法中，使当前局部最优选择能够扩展为整体最优解的核心性质是？",
         options: ["A. 重叠子问题", "B. 贪心选择性质", "C. 无后效性", "D. 对称性"],
         answer: "B",
         explanation:
-          "贪心选择性质是指所求问题的整体最优解可以通过一系列局部最优的选择来达到，这是贪心算法正确性的基础。贪心算法每次做出当前看来最优的选择且不回退。与动态规划不同，贪心算法不需要重叠子问题性质，且通常效率更高但适用范围更窄。",
+          "贪心选择性质是指整体最优解可由一系列局部最优选择构成，这是贪心算法正确性的核心依据。可用贪心法得到全局最优通常还需要最优子结构；重叠子问题则是动态规划常利用的性质。",
       },
       {
         id: "cs101_q64",
@@ -1109,11 +1167,11 @@ export const cs101Quizzes: Quiz[] = withQuizMetadata([
 ]);
 
 // ===========================================================================
-// CS102 操作系统（共 27 题：20 选择 + 7 简答）
+// CS102 操作系统（共 57 题：50 选择 + 7 简答）
 // ===========================================================================
 
 export const cs102Quizzes: Quiz[] = withQuizMetadata([
-  // ---- 进程与线程（3 题）----
+  // ---- 进程与线程 ----
   {
     quizId: "quiz_cs102_process",
     courseId: "cs102",
@@ -1191,7 +1249,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- CPU调度算法（3 题）----
+  // ---- CPU调度算法 ----
   {
     quizId: "quiz_cs102_schedule",
     courseId: "cs102",
@@ -1274,7 +1332,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 内存管理基础（3 题）----
+  // ---- 内存管理基础 ----
   {
     quizId: "quiz_cs102_memory",
     courseId: "cs102",
@@ -1343,16 +1401,16 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
       {
         id: "cs102_q35",
         type: "choice",
-        stem: "以下哪种存储管理方式会产生内部碎片但不产生外部碎片？",
-        options: ["A. 可变分区分配", "B. 分页存储管理", "C. 分段存储管理", "D. 段页式存储管理"],
+        stem: "以下哪种存储管理方式直接把逻辑地址空间划分为固定大小的页，并会产生内部碎片但不产生外部碎片？",
+        options: ["A. 可变分区分配", "B. 分页存储管理", "C. 分段存储管理", "D. 交换（Swapping）"],
         answer: "B",
         explanation:
-          "分页存储管理以固定大小的页为单位分配内存，进程所需的最后一页可能未填满，产生内部碎片。但由于页大小固定，不存在因空闲分区太小无法利用的外部碎片。可变分区和分段会产生外部碎片。段页式结合了两者，可能同时存在内部和外部碎片。",
+          "分页存储管理以固定大小的页为单位分配内存，最后一页可能未填满而产生内部碎片；物理内存按同样大小的页框分配，因此没有外部碎片。可变分区和分段会产生外部碎片，交换是换入换出进程的机制，不是固定页划分方式。",
       },
     ],
   },
 
-  // ---- 虚拟内存与分页（3 题）----
+  // ---- 虚拟内存与分页 ----
   {
     quizId: "quiz_cs102_vm",
     courseId: "cs102",
@@ -1435,7 +1493,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 文件系统（3 题）----
+  // ---- 文件系统 ----
   {
     quizId: "quiz_cs102_fs",
     courseId: "cs102",
@@ -1523,7 +1581,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 死锁（3 题）----
+  // ---- 死锁 ----
   {
     quizId: "quiz_cs102_deadlock",
     courseId: "cs102",
@@ -1606,7 +1664,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 同步与互斥（3 题）----
+  // ---- 同步与互斥 ----
   {
     quizId: "quiz_cs102_sync",
     courseId: "cs102",
@@ -1684,7 +1742,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- I/O系统与磁盘调度（2 题）----
+  // ---- I/O系统与磁盘调度 ----
   {
     quizId: "quiz_cs102_io",
     courseId: "cs102",
@@ -1763,7 +1821,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 分段与段页式（5 题）----
+  // ---- 分段与段页式 ----
   {
     quizId: "quiz_cs102_segmentation",
     courseId: "cs102",
@@ -1837,7 +1895,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 进程间通信（5 题）----
+  // ---- 进程间通信 ----
   {
     quizId: "quiz_cs102_ipc",
     courseId: "cs102",
@@ -1912,7 +1970,7 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
 // ===========================================================================
 
 export const cs103Quizzes: Quiz[] = withQuizMetadata([
-  // ---- OSI与TCP/IP模型（3 题）----
+  // ---- OSI与TCP/IP模型 ----
   {
     quizId: "quiz_cs103_model",
     courseId: "cs103",
@@ -1963,11 +2021,16 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
       {
         id: "cs103_q29",
         type: "choice",
-        stem: "以下协议中，工作在 TCP/IP 模型应用层的是？",
-        options: ["A. IP", "B. TCP", "C. HTTP", "D. ARP"],
-        answer: "C",
+        stem: "浏览器通过以太网发送一个 HTTP/1.1 请求时，从应用数据向外封装的协议顺序是？",
+        options: [
+          "A. HTTP -> TCP -> IP -> Ethernet",
+          "B. HTTP -> IP -> TCP -> Ethernet",
+          "C. TCP -> HTTP -> IP -> Ethernet",
+          "D. Ethernet -> IP -> TCP -> HTTP",
+        ],
+        answer: "A",
         explanation:
-          "HTTP 是应用层协议，用于 Web 页面传输。IP 工作在网络层（网际层），TCP 工作在传输层，ARP 工作在网络接口层。TCP/IP 模型将 OSI 上三层合并为应用层，因此 HTTP、DNS、SMTP、FTP 等协议均属于应用层。应用层协议直接为用户进程提供服务。",
+          "发送端按 TCP/IP 分层从内向外封装：应用层 HTTP 报文成为 TCP 负载，TCP 报文段成为 IP 数据报负载，IP 数据报再封装进 Ethernet 帧。接收端按相反顺序逐层解封装。该顺序体现了协议分层与服务关系。",
       },
       {
         id: "cs103_q30",
@@ -1990,7 +2053,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- TCP握手与挥手（5 题）----
+  // ---- TCP握手与挥手 ----
   {
     quizId: "quiz_cs103_tcp_hs",
     courseId: "cs103",
@@ -2059,7 +2122,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- TCP流量控制与拥塞控制（6 题）----
+  // ---- TCP流量控制与拥塞控制 ----
   {
     quizId: "quiz_cs103_tcp_fc",
     courseId: "cs103",
@@ -2147,7 +2210,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- UDP 协议（2 题）----
+  // ---- UDP 协议 ----
   {
     quizId: "quiz_cs103_udp",
     courseId: "cs103",
@@ -2221,7 +2284,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- HTTP 协议（3 题）----
+  // ---- HTTP 协议 ----
   {
     quizId: "quiz_cs103_http",
     courseId: "cs103",
@@ -2283,28 +2346,28 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
         type: "choice",
         stem: "HTTP 请求报文中，请求行的正确格式是？",
         options: [
-          "A. 方法 URL HTTP版本",
-          "B. URL 方法 HTTP版本",
-          "C. HTTP版本 方法 URL",
-          "D. URL HTTP版本 方法",
+          "A. 方法 请求目标 HTTP版本",
+          "B. 请求目标 方法 HTTP版本",
+          "C. HTTP版本 方法 请求目标",
+          "D. 请求目标 HTTP版本 方法",
         ],
         answer: "A",
         explanation:
-          "HTTP 请求行格式为：方法 URL HTTP版本，例如 GET /index.html HTTP/1.1。方法指明操作类型（GET、POST 等），URL 指明请求的资源路径，HTTP 版本标识协议版本号。请求行后跟请求头部和可选的请求体。响应报文的状态行格式为：HTTP版本 状态码 状态描述。",
+          "HTTP/1.1 请求行格式为：方法、请求目标、HTTP 版本，例如 GET /index.html HTTP/1.1。RFC 9112 使用 request-target，而不是笼统的 URL；请求目标可按请求形式表示为路径、绝对 URI、authority 或星号。请求行后跟请求头部和可选的请求体。",
       },
       {
         id: "cs103_q11",
         type: "short",
         stem: "比较 HTTP/1.1 和 HTTP/2 的主要改进。",
         answer:
-          "HTTP/2 相比 HTTP/1.1 的主要改进：1. 多路复用，单一 TCP 连接上并行传输多个请求响应，解决队头阻塞；2. 头部压缩（HPACK 算法），减少重复头部开销；3. 二进制分帧，取代文本格式提高解析效率；4. 服务器推送，主动推送资源到客户端。大幅提升了页面加载性能。",
+          "HTTP/2 相比 HTTP/1.1 的主要改进：1. 多路复用，在单一 TCP 连接上并行传输多个流，消除 HTTP/1.1 管线化的应用层队头阻塞；2. 使用 HPACK 压缩头部；3. 使用二进制分帧；4. 支持服务器推送。HTTP/2 仍基于 TCP，因此丢包时仍可能出现 TCP 层队头阻塞。",
         explanation:
-          "HTTP/1.1 采用文本格式且每个请求需独立连接或管线化受限。HTTP/2 引入二进制分帧层实现多路复用，单一连接并行处理多请求消除队头阻塞。HPACK 压缩头部减少冗余，服务器推送预取资源。这些改进显著提升了传输效率，但底层仍基于 TCP。",
+          "HTTP/1.1 使用文本报文，管线化受到响应顺序限制。HTTP/2 通过二进制分帧和多路复用让多个流并行传输，并用 HPACK 减少头部冗余；它解决的是 HTTP 层的顺序阻塞，不会消除同一 TCP 连接上的传输层队头阻塞。",
       },
     ],
   },
 
-  // ---- HTTPS 与 TLS（3 题）----
+  // ---- HTTPS 与 TLS ----
   {
     quizId: "quiz_cs103_https",
     courseId: "cs103",
@@ -2392,7 +2455,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- DNS 系统（3 题）----
+  // ---- DNS 系统 ----
   {
     quizId: "quiz_cs103_dns",
     courseId: "cs103",
@@ -2470,12 +2533,12 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
         options: ["A. TCP 53", "B. UDP 53", "C. UDP 80", "D. TCP 443"],
         answer: "B",
         explanation:
-          "DNS 默认使用 UDP 协议和 53 端口进行查询和响应，因为 DNS 查询报文通常很小，UDP 无需建立连接，响应速度快。当 DNS 响应超过 512 字节（如区域传输）或 UDP 响应被截断时，会切换到 TCP 53 端口。UDP 80 是 HTTP 默认端口，TCP 443 是 HTTPS 默认端口。",
+          "常规 DNS 查询默认使用 UDP 53。若 UDP 响应设置 TC（截断）标志，客户端通常改用 TCP 53 重试；区域传送使用 TCP。512 字节是未使用 EDNS(0) 时的传统 UDP DNS 报文上限，不能把所有较大响应一概写成固定超过 512 字节就切换。",
       },
     ],
   },
 
-  // ---- 路由算法与协议（3 题）----
+  // ---- 路由算法与协议 ----
   {
     quizId: "quiz_cs103_routing",
     courseId: "cs103",
@@ -2563,7 +2626,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 网络安全基础（3 题）----
+  // ---- 网络安全基础 ----
   {
     quizId: "quiz_cs103_security",
     courseId: "cs103",
@@ -2609,25 +2672,30 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
       {
         id: "cs103_q27",
         type: "choice",
-        stem: "非对称加密（如 RSA）在 HTTPS 中的主要用途是？",
+        stem: "现代 TLS 在 HTTPS 中使用非对称密码的主要用途是？",
         options: [
           "A. 加密全部应用数据",
           "B. 加密 DNS 查询",
-          "C. 安全协商对称会话密钥和验证服务器身份",
+          "C. 验证服务器身份并参与建立会话密钥",
           "D. 压缩 HTTP 响应",
         ],
         answer: "C",
         explanation:
-          "TLS 使用非对称密码完成服务器身份认证，并结合密钥交换机制安全建立对称会话密钥；现代 TLS 通常由 RSA 证书签名验证身份，由 (EC)DHE 完成密钥交换。握手完成后使用对称密钥保护应用数据，因为对称密码更适合高吞吐传输。",
+          "TLS 使用数字签名等非对称密码机制验证服务器身份，并通过 (EC)DHE 等密钥交换建立共享秘密，再派生对称会话密钥。RSA 证书可用于签名认证，但 TLS 1.3 不使用 RSA 密钥传输。握手完成后由对称 AEAD 算法保护应用数据。",
       },
       {
         id: "cs103_q51",
         type: "choice",
-        stem: "包过滤防火墙工作在 OSI 模型的哪一层？",
-        options: ["A. 物理层", "B. 数据链路层", "C. 网络层", "D. 应用层"],
+        stem: "传统包过滤防火墙主要依据哪一组报文字段执行访问控制？",
+        options: [
+          "A. 信号频率和传输介质",
+          "B. 仅依据源 MAC 地址",
+          "C. 源/目的 IP、协议号和传输层端口",
+          "D. HTTP 正文中的业务字段",
+        ],
         answer: "C",
         explanation:
-          "包过滤防火墙主要工作在网络层和传输层，通过检查数据包的源 IP、目的 IP、源端口、目的端口和协议类型来决定是否放行。状态检测防火墙还跟踪连接状态。应用层防火墙（WAF）工作在应用层，检查 HTTP 等应用层协议内容。包过滤防火墙速度快但无法检测应用层攻击。",
+          "传统包过滤同时检查网络层的源/目的 IP 和协议号，以及 TCP/UDP 源端口、目的端口等传输层字段。把它笼统归为单一 OSI 层会忽略端口条件；应用层防火墙才会进一步解析 HTTP 等应用协议内容。",
       },
       {
         id: "cs103_q52",
@@ -2646,7 +2714,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 物理层与数据链路层（5 题）----
+  // ---- 物理层与数据链路层 ----
   {
     quizId: "quiz_cs103_phy_dll",
     courseId: "cs103",
@@ -2715,7 +2783,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 
-  // ---- 网络层与IP协议（5 题）----
+  // ---- 网络层与IP协议 ----
   {
     quizId: "quiz_cs103_net_ip",
     courseId: "cs103",

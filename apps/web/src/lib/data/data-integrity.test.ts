@@ -15,6 +15,12 @@ const MINIMUM_COUNTS = {
   cs103: { chunks: 40, questions: 20, choices: 20 },
 };
 
+const ANSWER_LABELS = ["A", "B", "C", "D"] as const;
+const QUIZ_DIFFICULTIES = ["easy", "medium", "hard"] as const;
+
+type AnswerLabel = typeof ANSWER_LABELS[number];
+type QuizDifficulty = typeof QUIZ_DIFFICULTIES[number];
+
 interface RawQuizQuestion {
   id: string;
   courseId: string;
@@ -121,6 +127,73 @@ describe("课程数据资产完整性", () => {
         .flatMap((quiz) => quiz.questions)
         .filter((question) => question.type === "choice").length;
       expect(choiceCount).toBeGreaterThanOrEqual(MINIMUM_COUNTS[courseId].choices);
+    }
+  });
+
+  it("选择题答案位置应均衡且每门课程具备完整难度梯度", () => {
+    const choices = allQuizzes.flatMap((quiz) =>
+      quiz.questions
+        .filter((question) => question.type === "choice")
+        .map((question) => ({ courseId: quiz.courseId, question }))
+    );
+    expect(choices).toHaveLength(165);
+    expect(allQuizzes).toHaveLength(33);
+
+    const answerCounts: Record<AnswerLabel, number> = { A: 0, B: 0, C: 0, D: 0 };
+    const globalDifficultyCounts: Record<QuizDifficulty, number> = { easy: 0, medium: 0, hard: 0 };
+    for (const { question } of choices) {
+      answerCounts[question.answer as AnswerLabel] += 1;
+      globalDifficultyCounts[question.difficulty as QuizDifficulty] += 1;
+    }
+    const globalAnswerCounts = Object.values(answerCounts);
+    expect(Math.max(...globalAnswerCounts) - Math.min(...globalAnswerCounts))
+      .toBeLessThanOrEqual(10);
+    for (const count of globalAnswerCounts) {
+      expect(count / choices.length).toBeGreaterThanOrEqual(0.2);
+      expect(count / choices.length).toBeLessThanOrEqual(0.3);
+    }
+    expect(globalDifficultyCounts.easy / choices.length).toBeGreaterThanOrEqual(0.4);
+    expect(globalDifficultyCounts.easy / choices.length).toBeLessThanOrEqual(0.5);
+    expect(globalDifficultyCounts.medium / choices.length).toBeGreaterThanOrEqual(0.35);
+    expect(globalDifficultyCounts.medium / choices.length).toBeLessThanOrEqual(0.45);
+    expect(globalDifficultyCounts.hard / choices.length).toBeGreaterThanOrEqual(0.1);
+    expect(globalDifficultyCounts.hard / choices.length).toBeLessThanOrEqual(0.2);
+
+    for (const quiz of allQuizzes) {
+      const topicChoices = quiz.questions.filter((question) => question.type === "choice");
+      const topicAnswerCounts: Record<AnswerLabel, number> = { A: 0, B: 0, C: 0, D: 0 };
+      const topicDifficulties = new Set<QuizDifficulty>();
+      expect(topicChoices).toHaveLength(5);
+
+      for (const question of topicChoices) {
+        topicAnswerCounts[question.answer as AnswerLabel] += 1;
+        topicDifficulties.add(question.difficulty as QuizDifficulty);
+      }
+      for (const answer of ANSWER_LABELS) {
+        expect(topicAnswerCounts[answer]).toBeGreaterThanOrEqual(1);
+        expect(topicAnswerCounts[answer]).toBeLessThanOrEqual(2);
+      }
+      expect(topicDifficulties).toEqual(new Set(QUIZ_DIFFICULTIES));
+    }
+
+    for (const courseId of COURSE_IDS) {
+      const courseQuestions = choices
+        .filter((entry) => entry.courseId === courseId)
+        .map((entry) => entry.question);
+      const courseAnswerCounts: Record<AnswerLabel, number> = { A: 0, B: 0, C: 0, D: 0 };
+      const difficultyCounts: Record<QuizDifficulty, number> = { easy: 0, medium: 0, hard: 0 };
+
+      for (const question of courseQuestions) {
+        courseAnswerCounts[question.answer as AnswerLabel] += 1;
+        difficultyCounts[question.difficulty as QuizDifficulty] += 1;
+      }
+
+      const answerPositions = Object.values(courseAnswerCounts);
+      expect(Math.max(...answerPositions) - Math.min(...answerPositions))
+        .toBeLessThanOrEqual(5);
+      expect(difficultyCounts.easy).toBeGreaterThanOrEqual(20);
+      expect(difficultyCounts.medium).toBeGreaterThanOrEqual(20);
+      expect(difficultyCounts.hard).toBeGreaterThanOrEqual(9);
     }
   });
 

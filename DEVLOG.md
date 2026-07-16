@@ -6141,3 +6141,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次是文档接力批次，未重新运行 Web `pnpm lint/typecheck/test/build`。
 - 本批次未重新运行 HarmonyOS HAP 构建；沿用上一批 `Chat.ets` 静态诊断、HAP 构建、线上 Health/Chat SSE 与模拟器 fallback 证据。
 - 工作区仍保留 `.trae/progress.json` 和未跟踪本地资产；未执行清理、回滚、目录移动或删除。
+
+---
+
+## 2026-07-17 [WS06]：题库答案位置、难度梯度与事实修正
+
+背景：竞赛内容核验确认 165 道选择题的答案位置为 A=20、B=106、C=34、D=5，且仅 4 道 hard，容易泄漏答题模式，也不能形成可演示的学习梯度。本批次只修改 Web 单一题库源、生成产物和直接数据测试。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/06-competition-release-result.md`
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/data-integrity.test.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+
+行为变化：
+- 通过稳定题目 ID 对选项做确定性轮换；每个 Topic 的 5 道选择题覆盖 A-D，单一答案位置最多出现 2 次。
+- 题库最终答案位置为 A=42、B=43、C=41、D=39；难度为 easy=66、medium=66、hard=33，33 个 Topic 均覆盖三级难度。
+- 修正 AVL 双旋次数的错误答案、链地址法期望复杂度、分页碎片题双正确项，并收紧 HTTP 请求目标、HTTP/2 队头阻塞、现代 TLS、DNS TCP 回退和包过滤字段表述。
+- 将题库源码旧计数修正为 165 道选择题、21 道简答题；端侧 JSON 继续只由生成器产生。
+- Web 数据完整性测试新增全局、分课程和逐 Topic 的答案位置与难度分布门禁。
+
+验证：
+- `node scripts/generate-quizzes-json.mjs`：exit 0，生成 165 道题，Web 与 HarmonyOS JSON 完全一致。
+- `python scripts/validate-topic-relations.py`：exit 0，`ALL CHECKS PASSED`。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，13 个测试文件、168 项测试通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建成功。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 34 s 387 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 本批未执行模拟器逐题答题、真机或线上 API 回归，不能标记为模拟器通过、真机通过或线上通过。
+- HAP 仍未配置正式签名；当前证据等级仅为构建通过。
