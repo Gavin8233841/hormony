@@ -6592,3 +6592,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前没有模拟器或真机目标；画像排序、页面重载、记录筛选、屏幕阅读器播报、字体放大、窄屏换行和真实点击流程均未取得设备证据。
 - HAP 未配置正式签名，安装和竞赛提交包可用性未验证。
 - 本批未修改 Repository schema；终身测验统计和 v10 迁移仍由 WS02 独立审查，主线暂不把现有画像统计宣称为设备重启验证通过。
+
+---
+
+## 2026-07-17 [MAIN+WS03] Lesson 追问保留学习证据
+
+背景：WS03 `368cd34` 为课程互动到学伴追问补充专项标签和资料来源，但其分支基线早于主线的互动写入失败恢复。主线只移植追问与页面证据增量，保留现有 `pendingActivityIds`、写入成功后完成、失败重试、Chat 历史上限和本地日期契约。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `scripts/test_lesson_activity_resume_contract.py`
+- `DEVLOG.md`
+
+行为变化：
+- Lesson 向学伴追问时携带当前题面、精确 Topic、专项标签、学习者答案、参考答案和资料来源，并明确要求回答以当前资料依据为边界。
+- 各段证据分别限长，最终问题不超过 1800 字符，低于 Chat 2000 字输入边界；超长练习不会挤掉其余证据或导致学伴输入失效。
+- 主动练习卡在题面前显示“本练聚焦”及 `focusTag`，让“问学伴讲解”和“同标签测验”的依据对学习者可见。
+- 没有采用 WS03 整份 Lesson、旧 DEVLOG 或仅凭源码字符串宣称真实闭环的测试；主线互动保存与失败恢复保持不变。
+
+验证：
+- `python -B -m unittest scripts.test_lesson_activity_resume_contract -v`：exit 0，10/10 通过；这是源码契约，约束证据组成、限长、写入顺序和既有失败恢复，不等同设备运行。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，8/8 通过；Chat 输入、历史、SSE 与 Plan 契约未回退。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 21 s 298 ms`；仍提示未配置 `signingConfigs`。
+- `git diff --check`：exit 0，仅有既有 LF/CRLF 工作区提示。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；“问学伴讲解”路由、预填问题可读性、真实 SSE 回答、返回 Lesson 和同标签测验点击均未取得设备证据。
+- HAP 未配置正式签名，安装和竞赛提交包可用性未验证。
+- 本批未修改用户保留的 `lesson-experiences.json`，也未把课程事实抽检结果写成已修复；CS102 知识切片修订仍在 WS03 独立内容批次中。

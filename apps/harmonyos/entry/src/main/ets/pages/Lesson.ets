@@ -408,10 +408,25 @@ struct LessonPage {
     return answers.length > 0 ? answers.join(' → ') : '未作答';
   }
 
+  private tutorExcerpt(value: string, maxLength: number): string {
+    const normalized = value.trim();
+    if (normalized.length <= maxLength) return normalized;
+    return normalized.substring(0, maxLength) + '...';
+  }
+
+  private buildTutorQuestion(activity: LearningActivity): string {
+    const question = '请结合课程资料讲解这道互动练习：' + this.tutorExcerpt(activity.prompt, 620) +
+      '。主题是“' + this.tutorExcerpt(this.topic, 80) + '”，专项标签是“' +
+      this.tutorExcerpt(activity.focusTag, 24) + '”，我的答案是“' +
+      this.tutorExcerpt(this.activityAnswerText(activity), 360) + '”，参考答案是“' +
+      this.tutorExcerpt(activity.answer, 400) + '”。资料依据是“' +
+      this.tutorExcerpt(activity.source, 160) +
+      '”。请以这条资料依据为边界，先指出关键概念与错因，再给一个同标签的下一步练习建议。';
+    return question.length <= 1800 ? question : question.substring(0, 1797) + '...';
+  }
+
   private askTutorForActivity(activity: LearningActivity): void {
-    const question = '请结合课程资料讲解这道互动练习：' + activity.prompt +
-      '。主题是“' + this.topic + '”，我的答案是“' + this.activityAnswerText(activity) +
-      '”，参考答案是“' + activity.answer + '”。请指出关键概念、错因和下一步练习建议。';
+    const question = this.buildTutorQuestion(activity);
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';
@@ -855,6 +870,19 @@ struct LessonPage {
           }
           .width('100%')
           .justifyContent(FlexAlign.SpaceBetween)
+          Row({ space: 8 }) {
+            Text('本练聚焦')
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Text(this.activeActivity()!.focusTag)
+              .layoutWeight(1)
+              .fontSize(12)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_BRAND)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .width('100%')
           Text(this.activeActivity()!.prompt)
             .width('100%')
             .fontSize(16)

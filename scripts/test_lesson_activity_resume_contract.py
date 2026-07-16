@@ -184,6 +184,47 @@ class LessonActivityResumeContractTest(unittest.TestCase):
         )
         self.assertIn("Button('重试保存记录')", self.source)
 
+    def test_tutor_handoff_preserves_bounded_learning_evidence(self):
+        build_question = compact(
+            extract_method(self.source, "buildTutorQuestion")
+        )
+        ask_tutor = compact(
+            extract_method(self.source, "askTutorForActivity")
+        )
+
+        for evidence in (
+            "this.tutorExcerpt(activity.prompt, 620)",
+            "this.tutorExcerpt(this.topic, 80)",
+            "this.tutorExcerpt(activity.focusTag, 24)",
+            "this.tutorExcerpt(this.activityAnswerText(activity), 360)",
+            "this.tutorExcerpt(activity.answer, 400)",
+            "this.tutorExcerpt(activity.source, 160)",
+        ):
+            self.assertIn(evidence, build_question)
+        self.assertIn("question.length <= 1800", build_question)
+        self.assertIn("question.substring(0, 1797) + '...'", build_question)
+        self.assertIn(
+            "const question = this.buildTutorQuestion(activity);", ask_tutor
+        )
+        self.assertLess(
+            ask_tutor.find("'pendingChatQuestion', question"),
+            ask_tutor.find("url: 'pages/Chat'"),
+        )
+
+    def test_activity_focus_is_named_before_prompt_and_follow_up_actions(self):
+        practice = compact(extract_method(self.source, "PracticeExperience"))
+
+        focus_label = practice.find("Text('本练聚焦')")
+        focus_value = practice.find("Text(this.activeActivity()!.focusTag)")
+        prompt = practice.find("Text(this.activeActivity()!.prompt)")
+        ask_tutor = practice.find("Button('问学伴讲解')")
+        same_tag_quiz = practice.find("Button('同标签测验')")
+        self.assertGreaterEqual(focus_label, 0)
+        self.assertGreater(focus_value, focus_label)
+        self.assertGreater(prompt, focus_value)
+        self.assertGreater(ask_tutor, prompt)
+        self.assertGreater(same_tag_quiz, ask_tutor)
+
     def test_self_assessment_is_not_aggregated_as_an_objective_question(self):
         insights = compact(
             extract_method(self.repository_source, "getTagInsights")
