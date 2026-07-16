@@ -6181,3 +6181,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 无 HDC 运行目标，TextInput 新输入后的端侧 POST、SSE done/error/cancel UI、Plan 慢请求、ArkData 保存失败注入与重启恢复均为模拟器未验证；真机未验证。
 - `LearningFormUpdater.ets` 归 WS04、`scripts/harmonyos-app-smoke.ps1` 归 WS06，本批不暂存、不提交；精确续批要求记录在 WS01 结果文档。
 - Web 源码未修改，未重复运行 Web `pnpm lint/typecheck/test/build`。
+
+---
+
+## 2026-07-17 [WS01] Chat / Plan 可执行源契约回归保护
+
+背景：首批真实闭环已完成 HAP 构建和线上契约验证，但当前环境没有 HDC 目标，仓库也没有现成 HarmonyOS 单测文件。为避免输入、取消、SSE 终态、ArkData 历史和 Plan 保存恢复在后续并行开发中静默回退，本批补充无设备可执行的源码控制流测试，并逐项复核六个旧实现提交，不整枝合并。
+
+文件：
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `docs/workstreams/01-chat-plan-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 新增 7 组 Node 内置测试，按方法区间、语句顺序和负向断言验证 Chat 输入到真实 SSE、POST/SSE 取消前置、done/error 终态、完整问答历史、引用/代码/表格阅读，以及 Plan 读写竞态、旧计划保留、仅重试本机保存、等待/取消/键盘/安全区契约。
+- 测试只读取当前 ArkTS 源码，不注入静态回答、随机数据或模型替身，不把源码测试表述为模拟器、真机或线上通过。
+- 复核 `ffe0e85`、`23fdeb5`、`62a31d5`、`bd11a54`、`4ee53b8`、`2208dca`；当前已覆盖的代码/表格/计划恢复行为保留现实现，Span 解析未在无视觉证据时替换，通用冒烟脚本继续归 WS06。
+
+验证：
+- `node --check scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，7/7 通过。
+- `git diff --check`：exit 0。
+- 首批产品提交 `d9834c5` 的 API 12 增量 HAP 构建已通过；本批只新增测试与结果记录，未修改 ArkTS 产品源码。
+
+失败或未验证：
+- `hdc list targets` 仍无运行目标；模拟器和真机链路未验证，源码契约测试不替代 UI 树、POST 日志、SSE done 或 ArkData 重启证据。
+- `LearningFormUpdater.ets` 和 `scripts/harmonyos-app-smoke.ps1` 的共享工作区改动未触碰、未暂存；服务卡片回执等待 WS04 集成，通用 UI 冒烟等待 WS06 集成。

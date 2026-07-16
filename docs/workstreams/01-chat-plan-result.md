@@ -51,14 +51,39 @@ Plan 的旧实现还存在三个闭环缺口：生成开始即隐藏旧任务；
 - `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
 - `docs/workstreams/01-chat-plan-result.md`
 - `DEVLOG.md`
+
+## 可执行回归保护
+
+第二批新增 `scripts/test-ws01-chat-plan-source-contract.mjs`，使用 Node 内置测试运行器读取当前 ArkTS 源码，并按方法边界、调用顺序和负向断言保护七组 P0 契约：
+
+1. TextInput 双向绑定、`SubmitEvent.text` 和按钮输入最终进入真实 `Constants.API_CHAT` SSE 请求。
+2. 普通 POST 与 SSE 取消均先于备用地址重试退出。
+3. SSE done、HTTP error、结构化状态码与业务错误码终态互斥。
+4. 失败、取消和流式残片不进入 ArkData，历史写入串行合并。
+5. 引用折叠、代码横向阅读、表格原生展示与窄屏可读降级同时保留。
+6. Plan 读取代次、请求参数冻结、旧计划保留，以及保存失败只重试 ArkData。
+7. Plan 长等待节点、取消边界、键盘收起和底部安全区保持可观察。
+
+该测试不替代模拟器交互、网络抓包或 ArkData 重启验证；它用于在无 HDC 目标时阻止已确认控制流被后续改动静默回退。
+
+## 旧提交选择性复核
+
+- `ffe0e85`：当前 `Chat.ets` 已有代码语言标签、行号、横向滚动和“解释这段”入口，保留当前实现，不整提交合并。
+- `23fdeb5` 与 `bd11a54`：当前实现已将连续表格合并为表格块，提供原生横向表格和窄屏分组阅读，保留当前解析与 Builder，不覆盖本批 SSE/历史状态机。
+- `62a31d5`：该提交的 Span 行内解析不在本批真实闭环范围；当前 `cleanInline` 与 Markdown Builder 已通过 HAP 构建，未在无设备视觉证据时替换整套解析器。
+- `4ee53b8`：旧计划保留、计划进度和规划依据在当前 `Plan.ets` 中已有等价且更完整的失败保存恢复路径，保留当前实现。
+- `2208dca`：页面侧目标建议和生成恢复已由当前实现覆盖；其通用冒烟脚本改动归 WS06，本批不移植、不暂存。
 
 ## 验证证据
 
 | 等级 | 命令或流程 | 结果 |
 | --- | --- | --- |
 | 源码确认 | 17 项 Chat/Plan/HttpClient 源码不变量断言 | exit 0，`SOURCE_INVARIANTS_OK count=17` |
+| 静态诊断通过 | `node --check scripts/test-ws01-chat-plan-source-contract.mjs` | exit 0 |
+| 静态诊断通过 | `node --test scripts/test-ws01-chat-plan-source-contract.mjs` | exit 0，7/7 通过 |
 | 静态诊断通过 | `git diff --check`（WS01 三个产品文件） | exit 0，仅 Git 的 LF/CRLF 工作区提示 |
 | 构建通过 | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | exit 0，`CompileArkTS`、`PackageHap` 成功，最终 `BUILD SUCCESSFUL in 27 s 625 ms`；未配置 signingConfigs 的既有警告保留 |
 | 线上通过 | `GET https://hormony-ruddy.vercel.app/api/health` | HTTP 200；`status=ready`、`deploymentMode=stateless`、`model.configured=true`、`model.mode=model`、`model.name=doubao-seed-2-1-pro-260628` |
