@@ -6202,3 +6202,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 从仓库根目录调用 wrapper 时，Hvigor 在错误目录查找配置并以退出码 124、`00304004` 结束；切换到 `apps/harmonyos` 后验证通过。
 - 切换目录后的第一次工具调用因 5 秒调用超时以退出码 124 结束；随后完整重跑并构建通过。
 - 本批尚无模拟器 UI 树或点击证据；手机与平板布局、真机均未验证。
+
+---
+
+## 2026-07-17 [WS03] Lesson 概念推演与可信反馈
+
+背景：Lesson 的概念流程一次性平铺，固定示例使用“代码推演器/运行”措辞；自由回答只有“还需巩固/我答对了”自评，并将单次自评写成掌握证据和标签掌握值。本批把交互证据边界收紧，同时提升主动回忆和反馈可读性。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+
+行为变化：
+- 概念流程改为逐步揭示的原生步骤器，单一主动作对照下一环并支持重新推演。
+- 固定示例明确为只读状态演算，不执行输入内容、不连接代码沙盒。
+- 反馈拆为“你的回答 / 参考答案 / 对照重点”；自由回答只记录“关键点有遗漏 / 关键点已覆盖”的自我对照。
+- `lesson_self_assessment` 事件不写入客观题数量、正确数和正确率；仓储 reducer 排除规则留待 WS02 在其独占文件中集成。客观互动记录补入精确 `focusTag`。
+- 同标签测验只接受当前课程的精确 Topic；非法或空 Topic 停止导航，不回退为“综合”。
+- 保存提示只陈述本次结果，不再声称单次自评证明掌握。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：最终退出码 0，`BUILD SUCCESSFUL in 24 s 41 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 概念步骤切换、自由回答自评、客观互动反馈及同标签测验尚无模拟器 UI 树和点击证据。
+- WS02 尚未集成 `lesson_self_assessment` 的 reducer 排除规则，当前不能把标签洞察隔离标记为通过。
+- 手机与平板视觉布局、真机均未验证。
