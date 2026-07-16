@@ -1,13 +1,19 @@
 // GET /api/health — 服务健康检查
 
 import { getModelRuntimeInfo } from "@/lib/agents/model";
-import { getDeploymentMode } from "@/lib/deployment";
+import { getDeploymentMode, isStatelessDeployment } from "@/lib/deployment";
+import { isAppStatePersistenceEnabled } from "@/lib/store/persistence";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const modelInfo = getModelRuntimeInfo();
   const status = modelInfo.configured ? "ready" : "degraded";
+  const persistenceMode = isStatelessDeployment()
+    ? "stateless"
+    : isAppStatePersistenceEnabled()
+      ? "file"
+      : "disabled";
 
   return Response.json({
     status,
@@ -20,6 +26,9 @@ export async function GET() {
       name: modelInfo.modelName,
     },
     deploymentMode: getDeploymentMode(),
+    persistence: {
+      mode: persistenceMode,
+    },
     version: "1.0.1",
   }, { status: modelInfo.configured ? 200 : 503 });
 }

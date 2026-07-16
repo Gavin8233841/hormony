@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { middleware } from "./middleware";
 
 const originalDeploymentMode = process.env.DEPLOYMENT_MODE;
 const originalOriginAllowlist = process.env.ORIGIN_ALLOWLIST;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_KEY_CAPACITY = 1000;
 
 const STATEFUL_API_PREFIXES = [
   "/api/conversations",
@@ -37,20 +39,23 @@ afterEach(() => {
   if (originalDeploymentMode === undefined) delete process.env.DEPLOYMENT_MODE;
   else process.env.DEPLOYMENT_MODE = originalDeploymentMode;
 
+  vi.unstubAllEnvs();
+
   if (originalOriginAllowlist === undefined) delete process.env.ORIGIN_ALLOWLIST;
   else process.env.ORIGIN_ALLOWLIST = originalOriginAllowlist;
 });
 
 function apiRequest(
   path: string,
-  options: { method?: string; origin?: string; ip?: string } = {}
+  options: { method?: string; origin?: string; forwardedFor?: string; runtimeIp?: string } = {}
 ): NextRequest {
   const headers = new Headers();
   if (options.origin) headers.set("Origin", options.origin);
-  if (options.ip) headers.set("X-Forwarded-For", options.ip);
+  if (options.forwardedFor) headers.set("X-Forwarded-For", options.forwardedFor);
   return new NextRequest(`http://localhost:3000${path}`, {
     method: options.method ?? "GET",
     headers,
+    ip: options.runtimeIp,
   });
 }
 
@@ -82,6 +87,17 @@ describe("middleware API gateway", () => {
     process.env.DEPLOYMENT_MODE = "stateless";
 
     const response = middleware(apiRequest(path, {
+      origin: "http://localhost:3000",
+    }));
+
+    await expectEndpointDisabled(response);
+  });
+
+  it("disables stateful endpoints by default in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.DEPLOYMENT_MODE;
+
+    const response = middleware(apiRequest("/api/profile", {
       origin: "http://localhost:3000",
     }));
 
@@ -158,7 +174,7 @@ describe("middleware API gateway", () => {
     const path = `/api/rate-limit-test-${Date.now()}`;
     const options = {
       origin: "http://localhost:3000",
-      ip: "198.51.100.42",
+      forwardedFor: "198.51.100.42",
     };
 
     for (let index = 0; index < 30; index++) {
@@ -174,5 +190,103 @@ describe("middleware API gateway", () => {
       error: "请求过于频繁，请稍后重试",
       code: "RATE_LIMITED",
     });
+  });
+
+  it("does not let a forged X-Forwarded-For bypass rate limiting when runtime IP is available", async () => {
+    delete process.env.DEPLOYMENT_MODE;
+    const path = `/api/runtime-ip-rate-limit-test-${Date.now()}`;
+
+    for (let index = 0; index < 30; index++) {
+      const response = middleware(apiRequest(path, {
+        forwardedFor: `198.51.100.${index + 1}`,
+        runtimeIp: "203.0.113.10",
+      }));
+      expect(response.status).toBe(200);
+    }
+
+    const response = middleware(apiRequest(path, {
+      forwardedFor: "198.51.100.31",
+      runtimeIp: "203.0.113.10",
+    }));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "请求过于频繁，请稍后重试",
+      code: "RATE_LIMITED",
+    });
+  });
+
+  it("uses a shared limited bucket when only untrusted forwarded IPs are available", async () => {
+    delete process.env.DEPLOYMENT_MODE;
+    const path = `/api/untrusted-forwarded-rate-limit-test-${Date.now()}`;
+
+    for (let index = 0; index < 30; index++) {
+      const response = middleware(apiRequest(path, {
+        forwardedFor: `198.51.100.${index + 1}`,
+      }));
+      expect(response.status).toBe(200);
+    }
+
+    const response = middleware(apiRequest(path, {
+      forwardedFor: "198.51.100.31",
+    }));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "请求过于频繁，请稍后重试",
+      code: "RATE_LIMITED",
+    });
+  });
+
+  it("bounds rate-limit keys and accepts a new key after the window expires", async () => {
+    delete process.env.DEPLOYMENT_MODE;
+    const baseTime = Date.now() + RATE_LIMIT_WINDOW_MS + 1;
+    const runtimeIp = "203.0.113.20";
+    const blockedPath = "/api/rate-limit-capacity-blocked";
+    vi.resetModules();
+    const { middleware: isolatedMiddleware } = await import("./middleware");
+    vi.useFakeTimers();
+    vi.setSystemTime(baseTime);
+
+    try {
+      for (let index = 0; index < RATE_LIMIT_KEY_CAPACITY; index++) {
+        const response = isolatedMiddleware(apiRequest(`/api/rate-limit-capacity-${index}`, {
+          runtimeIp,
+        }));
+        expect(response.status).toBe(200);
+      }
+
+      for (let count = 1; count < 30; count++) {
+        const response = isolatedMiddleware(apiRequest("/api/rate-limit-capacity-0", {
+          runtimeIp,
+        }));
+        expect(response.status).toBe(200);
+      }
+      expect(isolatedMiddleware(apiRequest("/api/rate-limit-capacity-0", {
+        runtimeIp,
+      })).status).toBe(429);
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = isolatedMiddleware(apiRequest(blockedPath, {
+          origin: "http://localhost:3000",
+          runtimeIp,
+        }));
+
+        expect(response.status).toBe(429);
+        expectCorsHeaders(response, "http://localhost:3000");
+        expectSecurityHeaders(response);
+        expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
+        await expect(response.json()).resolves.toEqual({
+          error: "请求过于频繁，请稍后重试",
+          code: "RATE_LIMITED",
+        });
+      }
+
+      vi.setSystemTime(baseTime + RATE_LIMIT_WINDOW_MS);
+      expect(isolatedMiddleware(apiRequest(blockedPath, { runtimeIp })).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+      vi.resetModules();
+    }
   });
 });

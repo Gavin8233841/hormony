@@ -8,6 +8,7 @@ import { isStatelessDeployment } from "@/lib/deployment";
 // 速率限制配置
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 分钟窗口
 const RATE_LIMIT_MAX_REQUESTS = 30;  // 每窗口最大请求数
+const RATE_LIMIT_MAX_KEYS = 1000;
 
 const STATEFUL_API_PREFIXES = [
   "/api/conversations",
@@ -21,6 +22,7 @@ const STATEFUL_API_PREFIXES = [
 
 // 内存存储（单实例够用，多实例需换 Redis）
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+let nextRateLimitExpiry = Number.POSITIVE_INFINITY;
 
 // 安全响应头
 const SECURITY_HEADERS: Record<string, string> = {
@@ -69,6 +71,29 @@ function applyCorsHeaders(res: NextResponse, req: NextRequest) {
   res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
+function cleanupExpiredRateLimits(now: number): void {
+  let earliestResetTime = Number.POSITIVE_INFINITY;
+  for (const [key, record] of rateLimitMap) {
+    if (now >= record.resetTime) {
+      rateLimitMap.delete(key);
+    } else {
+      earliestResetTime = Math.min(earliestResetTime, record.resetTime);
+    }
+  }
+  nextRateLimitExpiry = earliestResetTime;
+}
+
+function rateLimitedResponse(req: NextRequest, now: number, resetTime: number): NextResponse {
+  const res = NextResponse.json(
+    { error: "请求过于频繁，请稍后重试", code: "RATE_LIMITED" },
+    { status: 429 }
+  );
+  res.headers.set("Retry-After", String(Math.max(1, Math.ceil((resetTime - now) / 1000))));
+  addSecurityHeaders(res);
+  applyCorsHeaders(res, req);
+  return res;
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -95,33 +120,31 @@ export function middleware(req: NextRequest) {
 
   // 仅对 API 路由执行速率限制
   if (pathname.startsWith("/api/")) {
-    // 速率限制（基于 IP）
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    // 只信任运行时提供的 IP；自托管环境缺失可信 IP 时进入共享受限桶。
+    // 直接采用 X-Forwarded-For 会让客户端轮换伪造值绕过限流并撑大 Map。
+    const clientIp = req.ip?.trim() || "unknown";
     const now = Date.now();
     const key = `${clientIp}:${pathname}`;
     const record = rateLimitMap.get(key);
 
+    // 最早窗口尚未到期时不扫描，避免容量攻击让每次请求都遍历整个 Map。
+    if (!record && now >= nextRateLimitExpiry) {
+      cleanupExpiredRateLimits(now);
+    }
+
+    if (!record && rateLimitMap.size >= RATE_LIMIT_MAX_KEYS) {
+      return rateLimitedResponse(req, now, nextRateLimitExpiry);
+    }
+
     if (record && now < record.resetTime) {
       record.count++;
       if (record.count > RATE_LIMIT_MAX_REQUESTS) {
-        const res = NextResponse.json(
-          { error: "请求过于频繁，请稍后重试", code: "RATE_LIMITED" },
-          { status: 429 }
-        );
-        res.headers.set("Retry-After", String(Math.ceil((record.resetTime - now) / 1000)));
-        addSecurityHeaders(res);
-        applyCorsHeaders(res, req);
-        return res;
+        return rateLimitedResponse(req, now, record.resetTime);
       }
     } else {
-      rateLimitMap.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    }
-
-    // 定期清理过期记录（防止内存泄漏）
-    if (rateLimitMap.size > 1000) {
-      for (const [k, v] of rateLimitMap) {
-        if (now >= v.resetTime) rateLimitMap.delete(k);
-      }
+      const resetTime = now + RATE_LIMIT_WINDOW_MS;
+      rateLimitMap.set(key, { count: 1, resetTime });
+      nextRateLimitExpiry = Math.min(nextRateLimitExpiry, resetTime);
     }
   }
 

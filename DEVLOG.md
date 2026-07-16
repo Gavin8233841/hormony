@@ -6691,3 +6691,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前环境没有 Browser 插件，仓库也未新增浏览器依赖；浏览器交互、视觉截图和移动端真实渲染未验证。
 - 当前分支未部署，线上通过未验证；真实模型 Chat SSE、Plan、Quiz 未验证。
 - HarmonyOS 模拟器与真机未验证，本批未修改 HarmonyOS 文件。
+
+---
+
+## [WS05] 2026-07-17：生产无状态网关与 Health 契约加固
+
+背景：生产进程不能因缺失或误写部署变量启用文件状态；中间件直接信任客户端 `X-Forwarded-For` 会让攻击者轮换伪造地址绕过限流并撑大内存键表。独立 production 黑盒回归还确认 Health 未公开持久化真值。
+
+文件：
+- `apps/web/src/lib/deployment.ts`、`apps/web/src/lib/deployment.test.ts`
+- `apps/web/src/lib/store/persistence.test.ts`
+- `apps/web/src/middleware.ts`、`apps/web/src/middleware.test.ts`
+- `apps/web/src/app/api/health/route.ts`
+- `apps/web/src/app/api/stateless-agent.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- `NODE_ENV=production` 时强制采用 `stateless`，即使误设 `DEPLOYMENT_MODE` 或 `APP_STATE_PERSISTENCE=on` 也不读写状态文件；Docker 既有 stateless/off 配置保持一致。
+- 限流只使用运行时可信 `req.ip`，缺失时进入共享受限桶；Map 最多保留 1000 个窗口键，容量满时返回带安全头、CORS 与 `Retry-After` 的 `429/RATE_LIMITED`，到期后恢复接收新键。
+- Health 新增不含秘密的 `persistence.mode`；生产无状态精确返回 `stateless`，同时保留既有模型与部署摘要。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/middleware.test.ts src/app/api/stateless-agent.test.ts src/lib/deployment.test.ts src/lib/store/persistence.test.ts`：exit 0，4 个测试文件、58 项通过。
+- `cd apps/web; pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，21 个测试文件、343 项通过；`pnpm build`：exit 0，生产构建通过，middleware 产物 26.8 kB。
+- 本地 production 实例 `http://127.0.0.1:3118`，显式 stateless/off 且模型 Key 为空：严格断言脚本 exit 0；Profile 为 `404/ENDPOINT_DISABLED`，Health 为 `503/degraded`、`model.configured=false`、`deploymentMode=stateless`、`persistence.mode=stateless`，轮换伪造 XFF 的第 31 次同路径请求为 `429/RATE_LIMITED`。实例 PID 55608 已停止，未影响既有 3105 实例。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 当前分支尚未部署，以上 production 证据为本地新构建，不等同线上通过。
+- 真实模型调用、浏览器交互、HarmonyOS 模拟器与真机未验证；本批未修改 HarmonyOS 文件。
