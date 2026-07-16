@@ -6179,3 +6179,46 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 模拟器、真机和线上流程未验证；本批次证据止于静态诊断通过和构建通过。
 - 幂等五类写回、终身统计、失败恢复、重启恢复、到期复习和再练留待 WS02 后续批次实现。
+
+---
+
+## 2026-07-17 [WS02] ArkData 测验掌握度与到期复习闭环
+
+背景：旧实现以最近 20 次结果重建统计并分散写入画像、错题、活动和 Topic 掌握度，明细截断会丢失终身累计，多键中断会留下部分状态；AI 固定题包 ID 还会把再次真实作答误判为重复写回。本批次将真实答题事实和派生学习状态收敛到可恢复的 ArkData 单键，并补齐到期复习与全量复合标签契约。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/model/LearningMetadataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+- `apps/web/src/lib/data/mistake-review-flow.test.ts`
+- `docs/workstreams/02-quiz-mastery-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- AI `sourceQuizId` 与每次真实作答的稳定 `quizId/attemptId` 分离；保存重试沿用同一 ID 和提交时间，同一题包的不同作答分别累计。
+- `quiz_learning_state` 的公开读写共用一个静态 Promise 队列；答题先持久化 pending，再幂等归并并二次持久化，读取时恢复未完成 pending，队列内部不回调加锁 getter。
+- 数据库 schema 升至 8、测验状态 schema 升至 2；迁移按当前 33 Topic 的精确课程集合清洗旧结果、错题、掌握度、标签、活动和 milestone，并持久保存终身统计、首次掌握 milestone、复习队列、复合标签洞察、画像主题和活动派生状态。
+- 最近结果、活动明细和已解决错题可分别截断为 20、500、200 条，但终身题数/正确数/尝试数、Topic 累计、首次掌握和标签累计不随明细截断。
+- 错题保留原题选项和精确 `reviewItemId`，按 1/3/7/14 天推进；未到期不推进且 UI 禁止提前进入，到期后优先重练原题，旧记录缺选项时明确使用同 Topic 精选题。
+- 标签身份固定为 `courseId + topic + tag` 的 JSON 复合键；`lesson_activity` 幂等写入持久聚合，`getAllTagInsights()` 返回未截断全量状态，不再从最多 500 条明细重算。
+- 结果页展示逐题复盘及画像、错题、Topic 掌握度、活动数和课程进度回执；成就和课程进度由真实首次掌握 milestone 推导，不因后续正确率下降撤销。
+
+验证：
+- `python scripts/validate-topic-relations.py`：exit 0，`ALL CHECKS PASSED`，33 个 Topic 的结构、唯一性、引用、DAG、连通性、层级和数据一致性通过。
+- `cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts src/lib/data/mistake-review-flow.test.ts`：exit 0，定向契约通过。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，15 个文件、188 项测试通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建完成。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，最终增量构建 `BUILD SUCCESSFUL in 30 s 379 ms`；仍提示未配置 `signingConfigs`，跳过签名。
+- `& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；真实 ArkData 并发提交、进程中断恢复、应用重启后的五类写回读取及跨日到期复习均未验证，不能标记模拟器或真机通过。
+- 本批次未重新请求线上 Quiz；线上业务字段未验证。
+- HAP 未签名，安装、真机和多设备行为未验证。

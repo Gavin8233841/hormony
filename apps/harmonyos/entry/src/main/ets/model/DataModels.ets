@@ -130,15 +130,18 @@ export interface QuizSubmission {
 export interface QuizResultDetail {
   questionId: string;
   stem: string;
+  options?: string[];
   userAnswer: string;
   correctAnswer: string;
   isCorrect: boolean;
   explanation: string;
   tags?: string[];
+  reviewItemId?: string;
 }
 
 export interface QuizResult {
   quizId: string;
+  sourceQuizId?: string;
   userId: string;
   courseId: string;
   topic: string;
@@ -201,11 +204,13 @@ export interface TopicRelation {
 
 export interface ReviewItem {
   id: string;
+  quizId?: string;
   questionId: string;
   courseId: string;
   topic: string;
   source: string;
   stem: string;
+  options?: string[];
   userAnswer: string;
   correctAnswer: string;
   explanation: string;
