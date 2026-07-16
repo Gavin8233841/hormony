@@ -6207,3 +6207,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - `hdc list targets` 仍无运行目标；模拟器和真机链路未验证，源码契约测试不替代 UI 树、POST 日志、SSE done 或 ArkData 重启证据。
 - `LearningFormUpdater.ets` 和 `scripts/harmonyos-app-smoke.ps1` 的共享工作区改动未触碰、未暂存；服务卡片回执等待 WS04 集成，通用 UI 冒烟等待 WS06 集成。
+
+---
+
+## 2026-07-17 [WS01] Chat 页面重进与请求身份保护
+
+背景：主线已在 `9565aaf` 融合 WS01 两批，并补齐 Plan 原生输入同步和 Chat 云端 history 边界。本续批先精确比较 `origin/codex/harmony-integration-20260717`，不重复这些改动；继续处理 Chat 页面离开后，本机会话读取、Health 探活和延迟滚动仍可能在重进后回写新页面状态的恢复缺口。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 每次页面出现分配新的 `lifecycleRunId`，离开时先标记页面失活并使旧代次失效，再取消当前 SSE 请求。
+- 本机会话读取、读取失败、读取结束和云端 Health 探活的成功、失败、结束回调，仅允许当前可见页面代次更新 UI；旧页面慢结果不能覆盖重进后的状态。
+- 延迟滚动回调捕获页面代次，页面已离开或已重进时不再操作旧列表 Scroller。
+- 保留既有单调 `requestSequence` 和 `activeRequestId`；页面重进不重置请求序列，SSE 事件、完成、错误和延迟创建回调继续拒绝旧请求。
+- 子 agent 在独立测试文件中补充失败/取消回答精确重试，以及页面离开/重进、请求身份和生命周期回调的源契约；主代理逐行复核后采用。
+
+验证：
+- `node --check scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，9/9 通过。
+- `git diff --check -- apps/harmonyos/entry/src/main/ets/pages/Chat.ets scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0；仅保留 Git 的 LF/CRLF 工作区提示。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS`、`PackageHap` 成功，`BUILD SUCCESSFUL in 48 s 325 ms`；既有 `signingConfigs` 未配置警告保留。
+- 使用 DevEco 安装目录中已读取的精确 `hdc.exe` 执行 `list targets`：exit 0，返回 `[Empty]`。
+
+失败或未验证：
+- 当前 PowerShell PATH 中直接执行 `hdc` 失败；读取 DevEco 安装目录中的精确工具路径后重试成功，该首次失败未作为设备状态证据。
+- 无 HDC 运行目标，页面离开/重进、慢历史读取、慢 Health、SSE 取消和 ArkData 重启恢复均为模拟器未验证；真机未验证。
+- 本批未修改 Web、API、Agent、模型或安全实现，未重复运行 Web `pnpm lint/typecheck/test/build`，未重新调用线上 Chat/Plan。
