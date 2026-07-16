@@ -272,3 +272,31 @@
 
 - **未验证**：当前无可用模拟器或设备，证据标签、长句截取与输入框修改后的实际页面表现未验证。
 - **未验证**：线上 Knowledge 响应及业务字段未验证；本批未修改 Web API。
+
+## 批次十一：课程主动学习闭环契约
+
+### 行为
+
+- 新增 5 项页面契约，按方法边界固定 CourseDetail 写入课程与精确 Topic 后进入 Lesson、Lesson 读取同一上下文、互动进入同 Topic/同标签 Quiz、互动原题与作答进入 Chat、完成主题进入同 Topic 本地 Practice 的完整路径。
+- Quiz 契约继续固定 `c9572d2` 引入的精确 Topic 防污染守卫，并验证 `selectedQuizFocusTag` 被消费后清空且真实写入 `QuizRequest.focusTag`，避免“同标签测验”退化成只显示标签。
+- 新增 5 项自评证据边界契约：Lesson 的 `lesson_self_assessment` 不携带 `accuracy/totalQuestions/correctCount`，客观 `lesson_interactive` 继续携带完整计分字段，互动参与成就与 `quiz_mastered` 客观掌握分离。
+- WS02 独占的 `getTagInsights` 当前仍以 `totalQuestions ?? 1`、`correctCount ?? 0` 消费全部 `lesson_activity`；目标 reducer 契约以 `expected failure` 保留，等待 WS02 只接纳来源明确且字段完整的客观互动。本批未修改 `LocalLearningRepository.ets`。
+- 自评边界测试由并行子 agent 在独立文件实现；主代理逐项复核，修正为可持续执行的跨工作流预期失败，并补齐课程闭环测试。
+
+### 文件
+
+- `scripts/test_course_learning_path_contract.py`
+- `scripts/test_lesson_self_assessment_boundary.py`
+
+### 证据
+
+- **源码确认**：`CourseDetail.openTopic`、`Lesson.openFocusedQuizForActivity/askTutorForActivity/openPractice`、Quiz/Chat/Practice 消费方由同一组精确 AppStorage 键和路由目标连接；`Quiz.generateQuiz` 将非空 `focusTag` 写入请求。
+- **静态诊断通过**：`python -m unittest scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary -v`，退出码 0；10 项运行，9 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations -v`，退出码 0；36 项运行，35 项通过，1 项预期失败。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与同 Topic 标签门禁全部通过。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 4 s 396 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：WS02 尚未修改 `getTagInsights`，自评事件仍会被该标签洞察 reducer 误作 1 道错题；目标契约明确保留为预期失败。
+- **未验证**：无模拟器、手机、平板或真机证据证明 Course → Topic → Lesson → 互动 → Quiz/Chat/Practice 的实际点击与返回流程。

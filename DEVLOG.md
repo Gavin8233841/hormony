@@ -6419,3 +6419,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 当前无可用模拟器或设备，证据标签、长句截取、输入框修改后的实际页面表现、手机和平板布局均未验证。
 - 线上 Knowledge 响应及业务字段未验证；本批未修改 Web API。
+
+---
+
+## 2026-07-17 [WS03] 课程主动学习闭环契约
+
+背景：Course、Lesson、Quiz、Chat 与 Practice 已存在主动学习入口，但缺少一组跨页面可执行契约来证明精确 Topic、互动标签和原题追问确实抵达消费方；同时 `lesson_self_assessment` 虽不写客观计分字段，WS02 独占的标签洞察 reducer 仍会用默认值把它计作错题。本批固定闭环与跨工作流边界，不修改共享仓储。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `scripts/test_course_learning_path_contract.py`
+- `scripts/test_lesson_self_assessment_boundary.py`
+
+行为变化：
+- 新增 5 项课程闭环契约：CourseDetail 写入课程与精确 Topic 进入 Lesson；Lesson 同 Topic/同标签进入 Quiz；Quiz 消费后清空路由键并把标签写入真实请求；原互动题与作答进入 Chat；完成主题进入同 Topic Practice。
+- 固定 `c9572d2` 的精确 Topic 守卫，禁止 Lesson 专项测验回退到“综合”或任意 Topic。
+- 新增 5 项自评边界契约，证明 `lesson_self_assessment` 不携带客观字段，`lesson_interactive` 保留完整字段，参与成就不等同客观掌握。
+- `getTagInsights` 目标行为以 `expected failure` 精确记录：WS02 集成前仍会把无客观字段的自评默认成 1 题 0 对；未修改或提交 `LocalLearningRepository.ets`。
+- 并行子 agent 产出自评边界测试，主代理复核并补齐闭环测试。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary -v`：退出码 0，10 项运行，9 项通过，1 项预期失败。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations -v`：退出码 0，36 项运行，35 项通过，1 项预期失败。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与同 Topic 标签门禁通过，`ALL CHECKS PASSED`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 4 s 396 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- WS02 尚未修复 `getTagInsights`，对应契约为预期失败，不能把自评计为客观正确率证据。
+- 当前没有模拟器、手机、平板或真机证据验证完整点击与返回流程。
