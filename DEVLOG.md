@@ -6523,3 +6523,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本轮未重复线上模型调用；WS01 结果文档保留其原分支 Health/Chat/Plan 业务字段证据，但不作为本批新验证。
 - HAP 未配置正式签名，安装与竞赛提交包可用性未验证。
 - Web 严格 API 两批提交仍有 Web 停止竞态和 Plan Save 输入缺口，主线尚未集成，因此本批未运行 Web 四项。
+
+---
+
+## 2026-07-17 [MAIN+WS04] 主动提醒与服务卡片一致快照
+
+背景：WS04 `0e4f67f` 提出了让系统通知、首页行动与服务卡片复用同一主动学习行动，并补齐首页和卡片无障碍语义。主线审查发现原提交的多卡更新只在单次调用内复用行动，并发批次仍会交错；卡片注册表或部分写入失败也会被隐藏。原测试还基于旧版 EntryAbility/Index，会回退当前行动重算、latest-wins 和导航成功后消费。本批只选择性采用产品方向，在当前主线补齐跨调用队列、失败摘要和当前契约回归。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LearningFormUpdater.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LearningReminder.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
+- `scripts/test-proactive-delivery-contracts.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- 通知发布成功后返回完整 `ProactiveLearningAction`；首页立即使用同一对象更新当前行动，并把同一快照写入全部已注册服务卡片，不再为每张卡片重复解析状态。
+- 单卡刷新、自动整批刷新和显式行动整批刷新共用静态 Promise 队列；一个批次的多张卡片不会与另一个批次交错，后进入队列的最新行动最终覆盖全部卡片。
+- 显式整批刷新返回 `registered/updated/failed/lookupFailed` 摘要，区分零卡片、注册表读取失败和部分写入失败；每张卡片均会尝试写入，不因首个失败跳过其余卡片。
+- 通知已经发布但卡片未完全同步时，首页显示独立 warning 和真实完成数，提供只重试同一行动卡片同步的按钮，不把通知成功伪报为失败，也不重复解析另一行动。
+- 首页主要入口、提醒重试、计划动作、任务行和快捷提问提升至至少 48vp 并补充动态无障碍名称；服务卡片整卡播报命令、任务、进度和推荐依据。
+- 保留主线现有 EntryAbility 点击时行动重算、latest-wins、Index 导航成功后消费和失败重试契约；没有采用 WS04 旧测试与旧结果文档。
+
+验证：
+- `node --check scripts/test-proactive-learning-service.mjs`：exit 0。
+- `node --check scripts/test-proactive-delivery-contracts.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，40/40 通过；其中主动服务 21 项、提醒/卡片/Ability/无障碍 19 项。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 HAP 打包完成，最终 `BUILD SUCCESSFUL in 20 s 467 ms`；无新增 ArkTS 警告，仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：exit 0，返回 `[Empty]`。
+- `git diff --check`：exit 0，仅有既有 LF/CRLF 工作区提示。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；真实通知权限、通知发布/点击、桌面服务卡片并发刷新、TalkBack 播报、字体放大和 48vp 触控仍未取得设备证据。
+- HAP 未配置正式签名，安装和竞赛提交包可用性未验证。
+- 本批未修改 Web、ArkData schema、Quiz reducer 或内容产物，因此没有重复运行 Web 四项和内容关系全套。

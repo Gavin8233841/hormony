@@ -4,7 +4,7 @@ import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModel
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningReminder } from '../common/LearningReminder';
-import { LearningFormUpdater } from '../common/LearningFormUpdater';
+import { LearningFormRefreshResult, LearningFormUpdater } from '../common/LearningFormUpdater';
 import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
 import { common } from '@kit.AbilityKit';
 
@@ -43,6 +43,7 @@ export struct HomeContent {
   @State nextActionEvidence: string = '正在读取本机学习状态';
   @State nextActionProgressText: string = '等待同步';
   @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [];
+  private reminderAction: ProactiveLearningAction | null = null;
 
   aboutToAppear(): void {
     this.loadCourses();
@@ -143,13 +144,35 @@ export struct HomeContent {
     this.notificationMessage = '正在创建系统学习提醒';
     try {
       const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      const taskTitle = await LearningReminder.publishNextTask(hostContext);
+      const action = await LearningReminder.publishNextTask(hostContext);
+      this.reminderAction = action;
+      this.applyNextAction(action);
+      if (!(await this.syncReminderCards(action))) return;
       this.notificationState = 'success';
-      this.notificationMessage = '系统提醒已创建：' + taskTitle;
+      this.notificationMessage = '系统提醒已创建：' + action.title;
     } catch (e) {
       this.notificationState = 'error';
       this.notificationMessage = e instanceof Error ? e.message : '未能创建系统提醒，请稍后重试';
     }
+  }
+
+  private async syncReminderCards(action: ProactiveLearningAction): Promise<boolean> {
+    const result: LearningFormRefreshResult = await LearningFormUpdater.refreshAllWithAction(action);
+    if (!result.lookupFailed && result.failed === 0) return true;
+    this.notificationState = 'warning';
+    this.notificationMessage = result.lookupFailed ?
+      '系统提醒已创建；暂时无法读取服务卡片，请重试同步' :
+      '系统提醒已创建；服务卡片已同步 ' + result.updated.toString() + '/' + result.registered.toString();
+    return false;
+  }
+
+  private async retryReminderCards(): Promise<void> {
+    if (this.notificationState === 'loading' || this.reminderAction === null) return;
+    this.notificationState = 'loading';
+    this.notificationMessage = '正在重新同步服务卡片';
+    if (!(await this.syncReminderCards(this.reminderAction))) return;
+    this.notificationState = 'success';
+    this.notificationMessage = '系统提醒和服务卡片已同步：' + this.reminderAction.title;
   }
 
   private submitQuickAsk(): void {
@@ -251,10 +274,11 @@ export struct HomeContent {
             .fontSize(26)
             .fontColor([Constants.COLOR_BRAND])
         }
-        .width(44)
-        .height(44)
+        .width(48)
+        .height(48)
         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-        .borderRadius(22)
+        .borderRadius(24)
+        .accessibilityText('打开个人学习档案')
         .onClick(() => {
           this.selectedTab = 3;
         })
@@ -265,12 +289,14 @@ export struct HomeContent {
               .fontSize(23)
               .fontColor([Constants.COLOR_TEXT_PRIMARY])
           }
-          .width(44)
-          .height(44)
+          .width(48)
+          .height(48)
           .backgroundColor(Constants.COLOR_BG_CARD)
-          .borderRadius(22)
+          .borderRadius(24)
           .enabled(this.notificationState !== 'loading')
           .opacity(this.notificationState === 'loading' ? 0.56 : 1)
+          .accessibilityText(this.notificationState === 'loading' ? '正在创建当前学习提醒' :
+            '创建当前学习任务提醒')
           .onClick(() => {
             this.publishReminder();
           })
@@ -295,26 +321,46 @@ export struct HomeContent {
               .color(Constants.COLOR_BRAND)
           } else {
             SymbolGlyph(this.notificationState === 'error' ? $r('sys.symbol.xmark_circle_fill') :
-              $r('sys.symbol.checkmark_circle_fill'))
+              this.notificationState === 'warning' ? $r('sys.symbol.exclamationmark_triangle_fill') :
+                $r('sys.symbol.checkmark_circle_fill'))
               .fontSize(18)
-              .fontColor([this.notificationState === 'error' ? Constants.COLOR_ERROR : Constants.COLOR_SUCCESS])
+              .fontColor([this.notificationState === 'error' ? Constants.COLOR_ERROR :
+                this.notificationState === 'warning' ? Constants.COLOR_WARNING : Constants.COLOR_SUCCESS])
           }
           Text(this.notificationMessage)
             .fontSize(12)
-            .fontColor(this.notificationState === 'error' ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(this.notificationState === 'error' ? Constants.COLOR_ERROR :
+              this.notificationState === 'warning' ? Constants.COLOR_WARNING : Constants.COLOR_TEXT_SECONDARY)
             .maxLines(2)
             .layoutWeight(1)
           if (this.notificationState === 'error') {
             Button('重试')
-              .height(32)
+              .width(64)
+              .height(48)
               .padding({ left: 12, right: 12 })
               .fontSize(12)
               .fontColor(Constants.COLOR_ERROR)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .border({ width: 1, color: Constants.COLOR_ERROR })
-              .borderRadius(16)
+              .borderRadius(24)
+              .accessibilityText('重试创建当前学习提醒')
               .onClick(() => {
                 this.publishReminder();
+              })
+          }
+          if (this.notificationState === 'warning') {
+            Button('重试同步')
+              .width(80)
+              .height(48)
+              .padding({ left: 10, right: 10 })
+              .fontSize(12)
+              .fontColor(Constants.COLOR_WARNING)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .border({ width: 1, color: Constants.COLOR_WARNING })
+              .borderRadius(24)
+              .accessibilityText('重试同步当前学习任务到服务卡片')
+              .onClick(() => {
+                this.retryReminderCards();
               })
           }
         }
@@ -323,6 +369,9 @@ export struct HomeContent {
         .margin({ top: 12 })
         .backgroundColor(this.notificationState === 'error' ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_CARD)
         .borderRadius(Constants.RADIUS_MD)
+        .accessibilityGroup(this.notificationState !== 'error' && this.notificationState !== 'warning')
+        .accessibilityText(this.notificationState === 'error' || this.notificationState === 'warning' ? '' :
+          this.notificationMessage)
       }
     }
     .width('100%')
@@ -440,11 +489,12 @@ export struct HomeContent {
               .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
           }
         }
-        .height(44)
+        .height(48)
         .padding({ left: 18, right: 16 })
         .backgroundColor(Constants.COLOR_BRAND)
-        .borderRadius(22)
+        .borderRadius(24)
         .shadow({ radius: 6, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 3 })
+        .accessibilityText(this.nextActionCta + '，' + this.nextActionTitle)
         .onClick(() => {
           this.openNextAction();
         })
@@ -511,6 +561,7 @@ export struct HomeContent {
     .padding({ top: 11, bottom: 11 })
     .scale({ x: this.pressedTask === index ? 0.98 : 1, y: this.pressedTask === index ? 0.98 : 1 })
     .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
+    .accessibilityText(task.title + '，' + this.taskStatus(task) + '，点击切换任务状态')
     .onTouch((event?: TouchEvent) => {
       if (event) {
         if (event.type === TouchType.Down) {
@@ -541,6 +592,9 @@ export struct HomeContent {
             .fontSize(13)
             .fontColor([Constants.COLOR_BRAND])
         }
+        .height(48)
+        .padding({ left: 12 })
+        .accessibilityText('查看完整学习计划')
         .onClick(() => this.openPlan())
       }
       .width('100%')
@@ -558,7 +612,7 @@ export struct HomeContent {
               .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Button('制定计划')
-              .height(36)
+              .height(48)
               .fontSize(13)
               .backgroundColor(Constants.COLOR_BRAND)
               .borderRadius(18)
@@ -576,7 +630,7 @@ export struct HomeContent {
               .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Button('查看完整计划')
-              .height(36)
+              .height(48)
               .fontSize(13)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .fontColor(Constants.COLOR_BRAND)
@@ -633,7 +687,7 @@ export struct HomeContent {
 
       TextInput({ text: this.quickAsk, placeholder: '输入问题...' })
         .layoutWeight(1)
-        .height(40)
+        .height(48)
         .fontSize(13)
         .backgroundColor(Constants.COLOR_BG_TAG)
         .borderRadius(20)
@@ -647,10 +701,11 @@ export struct HomeContent {
           .fontSize(18)
           .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
       }
-      .width(38)
-      .height(38)
+      .width(48)
+      .height(48)
       .backgroundColor(Constants.COLOR_BRAND)
-      .borderRadius(19)
+      .borderRadius(24)
+      .accessibilityText(this.quickAsk.trim().length > 0 ? '向学伴发送问题' : '打开学伴')
       .onClick(() => this.submitQuickAsk())
     }
     .width('100%')

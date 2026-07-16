@@ -69,7 +69,8 @@ function compileService() {
 function compileReminder() {
   const abilityImport = "import { common, Want, wantAgent } from '@kit.AbilityKit';";
   const notificationImport = "import { notificationManager } from '@kit.NotificationKit';";
-  const serviceImport = "import { ProactiveLearningService } from './ProactiveLearningService';";
+  const serviceImport =
+    "import { ProactiveLearningAction, ProactiveLearningService } from './ProactiveLearningService';";
   let source = removeImports(readSource(reminderPath),
     [abilityImport, notificationImport, serviceImport], reminderPath);
   assert.equal(source.includes('export class LearningReminder'), true, 'LearningReminder export changed');
@@ -480,6 +481,165 @@ test('服务卡片更新失败后 refreshAll 下一次仍会重试', async () =>
   assert.equal(updateAttempts, 2);
 });
 
+test('两张服务卡片一次解析并共享同一行动快照', async () => {
+  const action = await loadService().resolve(fixedNow);
+  let resolveCalls = 0;
+  const updates = [];
+  const formUpdater = loadFormUpdater({
+    resolve: async () => {
+      resolveCalls += 1;
+      return action;
+    },
+    fallback: () => action
+  }, {
+    updateForm: async (formId, data) => updates.push({
+      formId,
+      data: JSON.parse(JSON.stringify(data))
+    })
+  }, {
+    getFormIds: async () => ['form-1', 'form-2']
+  });
+
+  await formUpdater.refreshAll();
+
+  assert.equal(resolveCalls, 1);
+  assert.deepEqual(updates.map((update) => update.formId), ['form-1', 'form-2']);
+  assert.deepEqual(updates[0].data, updates[1].data);
+});
+
+test('并发服务卡片批次保持整批串行且最新行动最终覆盖全部卡片', async () => {
+  const baseAction = await resolverFromProduct().resolve();
+  const firstAction = { ...baseAction, title: '第一批行动' };
+  const latestAction = { ...baseAction, title: '最新行动' };
+  const updates = [];
+  let releaseFirstUpdate;
+  const firstUpdateBlocked = new Promise((resolve) => {
+    releaseFirstUpdate = resolve;
+  });
+  let firstUpdateStarted;
+  const firstUpdateSeen = new Promise((resolve) => {
+    firstUpdateStarted = resolve;
+  });
+  let unexpectedResolveCalls = 0;
+  const formUpdater = loadFormUpdater({
+    resolve: async () => {
+      unexpectedResolveCalls += 1;
+      throw new Error('explicit action must not resolve again');
+    },
+    fallback: () => latestAction
+  }, {
+    updateForm: async (formId, data) => {
+      updates.push({ formId, title: data.title });
+      if (updates.length === 1) {
+        firstUpdateStarted();
+        await firstUpdateBlocked;
+      }
+    }
+  }, {
+    getFormIds: async () => ['form-1', 'form-2']
+  });
+
+  const firstBatch = formUpdater.refreshAllWithAction(firstAction);
+  await firstUpdateSeen;
+  const latestBatch = formUpdater.refreshAllWithAction(latestAction);
+  releaseFirstUpdate();
+  await Promise.all([firstBatch, latestBatch]);
+
+  assert.equal(unexpectedResolveCalls, 0);
+  assert.deepEqual(updates, [
+    { formId: 'form-1', title: '第一批行动' },
+    { formId: 'form-2', title: '第一批行动' },
+    { formId: 'form-1', title: '最新行动' },
+    { formId: 'form-2', title: '最新行动' }
+  ]);
+  assert.equal(updates.filter((item) => item.formId === 'form-1').at(-1).title, '最新行动');
+  assert.equal(updates.filter((item) => item.formId === 'form-2').at(-1).title, '最新行动');
+});
+
+test('显式行动同步尝试全部卡片并向首页暴露部分失败', async () => {
+  const action = await resolverFromProduct().resolve();
+  const attempted = [];
+  const formUpdater = loadFormUpdater(resolverFromProduct(), {
+    updateForm: async (formId) => {
+      attempted.push(formId);
+      if (formId === 'form-1') throw new Error('form update unavailable');
+    }
+  }, {
+    getFormIds: async () => ['form-1', 'form-2']
+  });
+
+  const result = await formUpdater.refreshAllWithAction(action);
+  assert.deepEqual({ ...result }, {
+    registered: 2,
+    updated: 1,
+    failed: 1,
+    lookupFailed: false
+  });
+  assert.deepEqual(attempted, ['form-1', 'form-2']);
+
+  const homeSource = readSource(homeContentPath);
+  assert.equal(homeSource.includes("this.notificationState = 'warning';"), true);
+  assert.equal(homeSource.includes("Button('重试同步')"), true);
+  assert.equal(homeSource.includes('this.retryReminderCards();'), true);
+  assert.equal(homeSource.includes('LearningFormUpdater.refreshAllWithAction(action)'), true);
+});
+
+test('服务卡片注册表读取失败与零卡片状态精确区分', async () => {
+  const action = await resolverFromProduct().resolve();
+  const lookupFailureUpdater = loadFormUpdater(resolverFromProduct(), {
+    updateForm: async () => {}
+  }, {
+    getFormIds: async () => {
+      throw new Error('repository unavailable');
+    }
+  });
+  const noFormsUpdater = loadFormUpdater(resolverFromProduct(), {
+    updateForm: async () => {
+      throw new Error('must not update');
+    }
+  }, {
+    getFormIds: async () => []
+  });
+
+  assert.deepEqual({ ...await lookupFailureUpdater.refreshAllWithAction(action) }, {
+    registered: 0,
+    updated: 0,
+    failed: 0,
+    lookupFailed: true
+  });
+  assert.deepEqual({ ...await noFormsUpdater.refreshAllWithAction(action) }, {
+    registered: 0,
+    updated: 0,
+    failed: 0,
+    lookupFailed: false
+  });
+});
+
+test('本地状态变化后单张服务卡片重新解析新的行动', async () => {
+  const firstAction = await loadService().resolve(fixedNow);
+  const latestAction = { ...firstAction, title: '状态变化后的行动', targetPage: 'pages/Plan', taskAction: 'plan' };
+  const queuedActions = [firstAction, latestAction];
+  const updates = [];
+  const formUpdater = loadFormUpdater({
+    resolve: async () => queuedActions.shift(),
+    fallback: () => latestAction
+  }, {
+    updateForm: async (_formId, data) => updates.push({
+      title: data.title,
+      targetPage: data.targetPage,
+      taskAction: data.taskAction
+    })
+  });
+
+  await formUpdater.refreshForm('form-1');
+  await formUpdater.refreshForm('form-1');
+
+  assert.deepEqual(updates, [
+    { title: firstAction.title, targetPage: firstAction.targetPage, taskAction: firstAction.taskAction },
+    { title: latestAction.title, targetPage: 'pages/Plan', taskAction: 'plan' }
+  ]);
+});
+
 test('Form Ability 更新失败后系统再次更新仍会委托刷新', async () => {
   let initializeCalls = 0;
   let refreshCalls = 0;
@@ -642,4 +802,51 @@ test('首页提醒以 loading 防并发并在错误态提供可执行重试', ()
   assert.notEqual(retryCallIndex, -1, 'HomeContent retry action missing');
   assert.equal(visibleErrorIndex < retryButtonIndex && retryButtonIndex < retryCallIndex, true,
     'HomeContent error branch must show a retry button that republishes');
+});
+
+test('首页提醒和卡片同步入口具备动态播报与 48vp 触控区', () => {
+  const source = readSource(homeContentPath);
+  const headerStart = source.indexOf('  @Builder\n  Header() {');
+  const headerEnd = source.indexOf('\n  @Builder\n  ContinueCard()', headerStart);
+  assert.notEqual(headerStart, -1);
+  assert.notEqual(headerEnd, -1);
+  const header = source.slice(headerStart, headerEnd);
+
+  const bellIconIndex = header.indexOf("SymbolGlyph($r('sys.symbol.bell_fill'))");
+  const bellStart = header.lastIndexOf('          Button() {', bellIconIndex);
+  const bellEnd = header.indexOf('\n\n          Column()', bellIconIndex);
+  const bell = header.slice(bellStart, bellEnd);
+  assert.notEqual(bellIconIndex, -1);
+  assert.notEqual(bellStart, -1);
+  assert.notEqual(bellEnd, -1);
+  assert.equal(bell.includes('.width(48)'), true);
+  assert.equal(bell.includes('.height(48)'), true);
+  assert.equal(bell.includes('.accessibilityText('), true);
+  assert.equal(bell.includes("this.notificationState === 'loading'"), true);
+
+  const warningRetryStart = header.indexOf("Button('重试同步')");
+  const warningRetryEnd = header.indexOf('\n              .onClick(', warningRetryStart);
+  const warningRetry = header.slice(warningRetryStart, warningRetryEnd);
+  assert.notEqual(warningRetryStart, -1);
+  assert.notEqual(warningRetryEnd, -1);
+  assert.equal(warningRetry.includes('.height(48)'), true);
+  assert.equal(warningRetry.includes(".accessibilityText('重试同步当前学习任务到服务卡片')"), true);
+  assert.equal(header.includes("this.notificationState !== 'warning'"), true);
+});
+
+test('服务卡片整卡入口播报行动、进度与推荐依据', () => {
+  const source = readSource(planCardPath);
+  const formLinkStart = source.indexOf('    FormLink({');
+  assert.notEqual(formLinkStart, -1);
+  const formLink = source.slice(formLinkStart);
+  assert.equal(formLink.includes('.accessibilityGroup(true)'), true);
+  const textStart = formLink.indexOf('.accessibilityText(');
+  const descriptionStart = formLink.indexOf('.accessibilityDescription(');
+  assert.notEqual(textStart, -1);
+  assert.notEqual(descriptionStart, -1);
+  const textExpression = formLink.slice(textStart, descriptionStart);
+  assert.equal(textExpression.includes('this.cta'), true);
+  assert.equal(textExpression.includes('this.title'), true);
+  assert.equal(textExpression.includes('this.progressText'), true);
+  assert.equal(formLink.slice(descriptionStart).includes('this.evidence'), true);
 });
