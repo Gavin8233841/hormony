@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MessageSquare, BookOpen, CalendarDays, Target, TrendingUp, ShieldCheck, Database } from "lucide-react";
 import type { DashboardStats } from "@/lib/types";
-import { requestJson, getErrorMessage } from "@/lib/client-api";
+import { requestJson, getErrorMessage, isEndpointDisabled } from "@/lib/client-api";
+import { DeviceDataNotice } from "@/components/device-data-notice";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [endpointDisabled, setEndpointDisabled] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
@@ -19,6 +21,7 @@ export default function DashboardPage() {
     const load = async () => {
       setLoading(true);
       setError(null);
+      setEndpointDisabled(false);
       try {
         const data = await requestJson<DashboardStats>(
           "/api/stats?userId=demo",
@@ -29,6 +32,11 @@ export default function DashboardPage() {
         setStats(data);
       } catch (e) {
         if (!active) return;
+        if (isEndpointDisabled(e)) {
+          setEndpointDisabled(true);
+          setStats(null);
+          return;
+        }
         const msg = getErrorMessage(e, "统计数据获取失败");
         if (msg === null) return; // AbortError：请求被取消，不作为业务失败
         setError(msg);
@@ -53,6 +61,7 @@ export default function DashboardPage() {
   const activeCourses = stats?.activeCourses ?? 0;
   const completedTasks = stats?.completedTasks ?? 0;
   const totalTasks = stats?.totalTasks ?? 0;
+  const statsUnavailable = error !== null || endpointDisabled;
 
   return (
     <div className="space-y-6">
@@ -62,15 +71,22 @@ export default function DashboardPage() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard icon={MessageSquare} label="累计提问" value={loading ? "…" : error ? "—" : String(totalQuestions)} color="text-brand-100" />
-        <StatCard icon={Target} label="答题正确率" value={loading ? "…" : error ? "—" : `${accuracy}%`} color="text-emerald-400" />
-        <StatCard icon={CalendarDays} label="连续学习" value={loading ? "…" : error ? "—" : `${studyDays} 天`} color="text-amber-400" />
-        <StatCard icon={BookOpen} label="进行中课程" value={loading ? "…" : error ? "—" : `${activeCourses} 门`} color="text-purple-400" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        <StatCard icon={MessageSquare} label="累计提问" value={loading ? "…" : statsUnavailable ? "—" : String(totalQuestions)} color="text-brand-100" />
+        <StatCard icon={Target} label="答题正确率" value={loading ? "…" : statsUnavailable ? "—" : `${accuracy}%`} color="text-emerald-400" />
+        <StatCard icon={CalendarDays} label="连续学习" value={loading ? "…" : statsUnavailable ? "—" : `${studyDays} 天`} color="text-amber-400" />
+        <StatCard icon={BookOpen} label="进行中课程" value={loading ? "…" : statsUnavailable ? "—" : `${activeCourses} 门`} color="text-purple-400" />
       </div>
 
+      {endpointDisabled && (
+        <DeviceDataNotice
+          title="学习统计仅保存在 HarmonyOS 设备"
+          description="无状态 Web 服务不会读取累计答题、正确率、连续学习和最近活动；请在鸿学伴 HarmonyOS App 中查看完整进度。"
+        />
+      )}
+
       {error && (
-        <div className="card flex items-center justify-between border-red-500/30">
+        <div className="card flex flex-col gap-3 border-red-500/30 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-red-400">统计数据暂不可用</p>
           <button
             type="button"
@@ -83,7 +99,7 @@ export default function DashboardPage() {
       )}
 
       {/* 快捷入口 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Link href="/chat" className="card transition hover:border-brand-500/50">
           <MessageSquare className="mb-2 text-brand-100" size={24} />
           <h3 className="font-semibold">AI 对话辅导</h3>
@@ -151,7 +167,7 @@ export default function DashboardPage() {
           <TrendingUp size={18} className="text-brand-100" />
           <h2 className="font-semibold">系统能力概览</h2>
         </div>
-        <div className="grid grid-cols-7 gap-2 text-center text-xs">
+        <div className="grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4 lg:grid-cols-7">
           {[
             { name: "画像", desc: "用户画像", color: "bg-blue-500/20 text-blue-300" },
             { name: "检索", desc: "知识库", color: "bg-emerald-500/20 text-emerald-300" },

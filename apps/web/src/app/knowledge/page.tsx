@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { Database, Search, FileText, Upload, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import type { KnowledgeChunk } from "@/lib/types";
-import { requestJson, getErrorMessage } from "@/lib/client-api";
+import { requestJson, getErrorMessage, isEndpointDisabled } from "@/lib/client-api";
+import { DeviceDataNotice } from "@/components/device-data-notice";
 
 export default function KnowledgePage() {
   const [query, setQuery] = useState("");
@@ -22,6 +23,7 @@ export default function KnowledgePage() {
   const [uploadText, setUploadText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [uploadEndpointDisabled, setUploadEndpointDisabled] = useState(false);
 
   const search = async () => {
     if (!query.trim()) return;
@@ -87,6 +89,11 @@ export default function KnowledgePage() {
       setUploadSource("");
       setUploadText("");
     } catch (e) {
+      if (isEndpointDisabled(e)) {
+        setUploadEndpointDisabled(true);
+        setUploadMsg(null);
+        return;
+      }
       const msg = getErrorMessage(e, "上传失败");
       // AbortError → msg 为 null；错误时保留用户输入的 source/text（仅在成功时清空）
       if (msg !== null) {
@@ -108,8 +115,8 @@ export default function KnowledgePage() {
 
       {/* 搜索区 */}
       <div className="card">
-        <div className="flex gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative min-w-full flex-1 sm:min-w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
             <input
               value={query}
@@ -122,14 +129,14 @@ export default function KnowledgePage() {
           <button
             onClick={search}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-40"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-40 sm:flex-none"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
             检索
           </button>
           <button
             onClick={() => setShowUpload(!showUpload)}
-            className="flex items-center gap-2 rounded-lg border border-slate-700/60 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-brand-500/50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-700/60 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-brand-500/50 sm:flex-none"
           >
             {showUpload ? <ChevronUp size={16} /> : <Upload size={16} />}
             上传
@@ -139,62 +146,75 @@ export default function KnowledgePage() {
 
       {/* 上传区 */}
       {showUpload && (
-        <div className="card space-y-4">
-          <div className="flex items-center gap-2">
-            <Upload size={18} className="text-brand-100" />
-            <h3 className="font-semibold">上传知识资料</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+        <>
+          {uploadEndpointDisabled && (
+            <DeviceDataNotice
+              title="Web 知识库不接收个人上传"
+              description="无状态部署不会保存上传资料；当前页面仍可检索已经部署的课程资料。"
+            />
+          )}
+          <div className="card space-y-4">
             <div>
-              <label className="text-sm text-slate-400">课程 ID</label>
-              <select
-                value={uploadCourseId}
-                onChange={(e) => setUploadCourseId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
-              >
-                <option value="cs101">数据结构 (cs101)</option>
-                <option value="cs102">操作系统 (cs102)</option>
-                <option value="cs103">计算机网络 (cs103)</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <Upload size={18} className="text-brand-100" />
+                <h3 className="font-semibold">上传知识资料</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-sm text-slate-400">课程 ID</label>
+                <select
+                  value={uploadCourseId}
+                  onChange={(e) => setUploadCourseId(e.target.value)}
+                  disabled={uploadEndpointDisabled}
+                  className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
+                >
+                  <option value="cs101">数据结构 (cs101)</option>
+                  <option value="cs102">操作系统 (cs102)</option>
+                  <option value="cs103">计算机网络 (cs103)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-slate-400">资料来源名称</label>
+                <input
+                  value={uploadSource}
+                  onChange={(e) => setUploadSource(e.target.value)}
+                  disabled={uploadEndpointDisabled}
+                  placeholder="如：算法导论.pdf"
+                  className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
+                />
+              </div>
             </div>
             <div>
-              <label className="text-sm text-slate-400">资料来源名称</label>
-              <input
-                value={uploadSource}
-                onChange={(e) => setUploadSource(e.target.value)}
-                placeholder="如：算法导论.pdf"
+              <label className="text-sm text-slate-400">知识内容</label>
+              <textarea
+                value={uploadText}
+                onChange={(e) => setUploadText(e.target.value)}
+                disabled={uploadEndpointDisabled}
+                placeholder="粘贴课程文本内容，系统会自动分块存入知识库..."
+                rows={5}
                 className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
               />
             </div>
+            {uploadMsg && (
+              <div className={`rounded-lg px-4 py-2.5 text-sm ${
+                uploadMsg.type === "success"
+                  ? "bg-emerald-500/10 text-emerald-300"
+                  : "bg-red-500/10 text-red-300"
+              }`}>
+                {uploadMsg.text}
+              </div>
+            )}
+            <button
+              onClick={upload}
+              disabled={uploadEndpointDisabled || uploading || !uploadSource.trim() || !uploadText.trim()}
+              className="flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-40"
+            >
+              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+              上传到知识库
+            </button>
           </div>
-          <div>
-            <label className="text-sm text-slate-400">知识内容</label>
-            <textarea
-              value={uploadText}
-              onChange={(e) => setUploadText(e.target.value)}
-              placeholder="粘贴课程文本内容，系统会自动分块存入知识库..."
-              rows={5}
-              className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
-            />
-          </div>
-          {uploadMsg && (
-            <div className={`rounded-lg px-4 py-2.5 text-sm ${
-              uploadMsg.type === "success"
-                ? "bg-emerald-500/10 text-emerald-300"
-                : "bg-red-500/10 text-red-300"
-            }`}>
-              {uploadMsg.text}
-            </div>
-          )}
-          <button
-            onClick={upload}
-            disabled={uploading || !uploadSource.trim() || !uploadText.trim()}
-            className="flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-40"
-          >
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            上传到知识库
-          </button>
-        </div>
+        </>
       )}
 
       {/* 错误提示 */}

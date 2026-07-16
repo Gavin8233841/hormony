@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Send, Loader2, Square } from "lucide-react";
-import type { AgentName, Citation, StreamEvent } from "@/lib/types";
+import { AlertCircle, Send, Loader2, Square } from "lucide-react";
+import type { AgentName, Citation } from "@/lib/types";
+import {
+  ChatRequestError,
+  ChatStreamProtocolError,
+  consumeChatEventStream,
+  readChatRequestError,
+} from "./sse-client";
 
 interface ChatItem {
   role: "user" | "assistant";
@@ -10,6 +16,7 @@ interface ChatItem {
   citations?: Citation[];
   trace?: { agent: AgentName; content: string }[];
   thinking?: AgentName[];
+  error?: { code: string | null; message: string };
 }
 
 interface MarkdownBlock {
@@ -108,50 +115,33 @@ export default function ChatPage() {
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: "未知错误" }));
-        throw new Error(errData.error || `请求失败 (HTTP ${res.status})`);
+        throw await readChatRequestError(res);
       }
 
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            const data = line.replace(/^data: /, "").trim();
-            if (!data) continue;
-            try {
-              const evt = JSON.parse(data) as StreamEvent;
-              if (evt.type === "done") {
-                sessionIdRef.current = evt.sessionId;
-                continue;
-              }
-              setMessages((m) => {
-                const last = m[m.length - 1];
-                if (!last || last.role !== "assistant") return m;
-                const updated: ChatItem = { ...last };
-                if (evt.type === "thinking") {
-                  updated.thinking = [...(last.thinking ?? []), evt.agent];
-                } else if (evt.type === "trace") {
-                  updated.trace = [...(last.trace ?? []), { agent: evt.agent, content: evt.content }];
-                } else if (evt.type === "delta") {
-                  updated.content = last.content + evt.content;
-                } else if (evt.type === "citation") {
-                  updated.citations = [...(last.citations ?? []), evt.source];
-                }
-                return [...m.slice(0, -1), updated];
-              });
-            } catch {
-              /* ignore parse errors */
-            }
+      const streamResult = await consumeChatEventStream(res.body, (evt) => {
+        if (evt.type === "done") return;
+        setMessages((m) => {
+          const last = m[m.length - 1];
+          if (!last || last.role !== "assistant") return m;
+          const updated: ChatItem = { ...last };
+          if (evt.type === "thinking") {
+            updated.thinking = [...(last.thinking ?? []), evt.agent];
+          } else if (evt.type === "trace") {
+            updated.trace = [...(last.trace ?? []), { agent: evt.agent, content: evt.content }];
+          } else if (evt.type === "delta") {
+            updated.content = last.content + evt.content;
+          } else if (evt.type === "citation") {
+            updated.citations = [...(last.citations ?? []), evt.source];
+          } else if (evt.type === "error") {
+            updated.error = { code: evt.code, message: evt.message };
+            updated.content = last.content || "响应未完成。";
           }
-        }
+          return [...m.slice(0, -1), updated];
+        });
+      });
+
+      if (streamResult.sessionId) {
+        sessionIdRef.current = streamResult.sessionId;
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
@@ -161,10 +151,22 @@ export default function ChatPage() {
           return [...m.slice(0, -1), { ...last, content: last.content || "（已取消）" }];
         });
       } else {
+        const failure = err instanceof ChatRequestError
+          ? { code: err.code, message: err.message }
+          : err instanceof ChatStreamProtocolError
+            ? { code: null, message: err.message }
+            : { code: null, message: err instanceof Error ? err.message : String(err) };
         setMessages((m) => {
           const last = m[m.length - 1];
           if (!last || last.role !== "assistant") return m;
-          return [...m.slice(0, -1), { ...last, content: `请求失败：${err instanceof Error ? err.message : String(err)}` }];
+          return [
+            ...m.slice(0, -1),
+            {
+              ...last,
+              content: last.content || "响应未完成。",
+              error: last.error ?? failure,
+            },
+          ];
         });
       }
     } finally {
@@ -194,7 +196,7 @@ export default function ChatPage() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    <div className="flex min-h-[calc(100dvh-10rem)] flex-col md:h-[calc(100vh-4rem)] md:min-h-0">
       <div className="mb-4">
         <h1 className="text-2xl font-bold">AI 对话辅导</h1>
         <p className="mt-1 text-sm text-slate-400">
@@ -223,12 +225,12 @@ export default function ChatPage() {
 
         {messages.map((msg, i) => (
           <div key={i} className={msg.role === "user" ? "flex justify-end" : ""}>
-            <div className={msg.role === "user" ? "max-w-[70%] rounded-xl bg-brand-600/30 px-4 py-3" : "w-full"}>
+            <div className={msg.role === "user" ? "max-w-[88%] rounded-xl bg-brand-600/30 px-4 py-3 sm:max-w-[70%]" : "w-full"}>
               {msg.role === "assistant" && msg.thinking && msg.thinking.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   {msg.thinking.map((a, j) => (
                     <span key={j} className={`agent-tag ${agentColors[a]}`}>
-                      {loading && j === msg.thinking!.length - 1 ? (
+                      {loading && i === messages.length - 1 && j === msg.thinking!.length - 1 ? (
                         <Loader2 size={11} className="animate-spin" />
                       ) : null}
                       {a}
@@ -251,6 +253,21 @@ export default function ChatPage() {
                   return <p key={blockIndex} className="whitespace-pre-wrap text-slate-200">{block.text}</p>;
                 })}
               </div>
+
+              {msg.error && (
+                <div
+                  className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-200"
+                  role="alert"
+                >
+                  <AlertCircle className="mt-0.5 shrink-0" size={16} />
+                  <div>
+                    {msg.error.code && (
+                      <code className="mb-1 block text-xs text-red-300">{msg.error.code}</code>
+                    )}
+                    <span>{msg.error.message}</span>
+                  </div>
+                </div>
+              )}
 
               {/* 执行轨迹 */}
               {msg.trace && msg.trace.length > 0 && (
@@ -285,19 +302,19 @@ export default function ChatPage() {
       </div>
 
       {/* 输入区 */}
-      <div className="mt-4 flex gap-3">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder="输入你的问题..."
-          className="flex-1 rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 text-sm outline-none transition focus:border-brand-500/50"
+          className="min-w-0 flex-1 rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 text-sm outline-none transition focus:border-brand-500/50"
           disabled={loading}
         />
         <button
           onClick={send}
           disabled={loading || !input.trim()}
-          className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-brand-600/70 disabled:text-white/70"
+          className="flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-brand-600/70 disabled:text-white/70"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           发送
@@ -305,7 +322,7 @@ export default function ChatPage() {
         {loading && (
           <button
             onClick={stop}
-            className="flex items-center gap-2 rounded-xl border border-red-500/40 px-4 py-3 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
+            className="flex items-center justify-center gap-2 rounded-xl border border-red-500/40 px-4 py-3 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
           >
             <Square size={14} /> 停止
           </button>

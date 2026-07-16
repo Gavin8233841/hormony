@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CalendarDays, Loader2, CheckCircle2, Clock, Circle } from "lucide-react";
 import type { PlanTask, StudyPlan } from "@/lib/types";
 import { requestJson, getErrorMessage, isNotFound, isEndpointDisabled } from "@/lib/client-api";
+import { DeviceDataNotice } from "@/components/device-data-notice";
 
 export default function PlanPage() {
   const [goal, setGoal] = useState("");
@@ -33,6 +34,7 @@ export default function PlanPage() {
         return;
       }
       if (isEndpointDisabled(e)) {
+        setTasks([]);
         setEndpointDisabled(true);
         return;
       }
@@ -81,6 +83,7 @@ export default function PlanPage() {
   };
 
   const toggleTask = async (taskId: string) => {
+    if (endpointDisabled) return;
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -97,6 +100,11 @@ export default function PlanPage() {
     } catch (e) {
       // 回滚乐观更新
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, done: task.done } : t));
+      if (isEndpointDisabled(e)) {
+        setError("");
+        setEndpointDisabled(true);
+        return;
+      }
       const msg = getErrorMessage(e, "打卡失败");
       if (msg) setError(msg);
     } finally {
@@ -124,7 +132,7 @@ export default function PlanPage() {
             className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="text-sm text-slate-400">周期（天）</label>
             <input
@@ -162,9 +170,10 @@ export default function PlanPage() {
 
       {/* ENDPOINT_DISABLED 提示 */}
       {endpointDisabled && (
-        <div className="card text-sm text-slate-300">
-          请在鸿学伴 HarmonyOS App 中查看或操作
-        </div>
+        <DeviceDataNotice
+          title="学习计划进度仅保存在 HarmonyOS 设备"
+          description="你仍可在 Web 生成一次性计划；已有计划、任务打卡与长期进度请在鸿学伴 HarmonyOS App 中查看和操作。"
+        />
       )}
 
       {/* 初始加载 */}
@@ -177,7 +186,7 @@ export default function PlanPage() {
 
       {/* 加载失败 + 重试 */}
       {loadFailed && !initialLoading && (
-        <div className="card flex items-center justify-between">
+        <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-red-400">加载学习计划失败，请重试</span>
           <button
             onClick={() => loadPlan()}
@@ -191,7 +200,7 @@ export default function PlanPage() {
       {/* 任务列表 */}
       {tasks.length > 0 && (
         <div className="card">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="font-semibold">计划任务（{tasks.length} 项）</h3>
             <div className="flex items-center gap-3">
               <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-700/50">
@@ -213,7 +222,8 @@ export default function PlanPage() {
               >
                 <button
                   onClick={() => toggleTask(t.id)}
-                  disabled={togglingId === t.id}
+                  disabled={endpointDisabled || togglingId === t.id}
+                  title={endpointDisabled ? "任务进度请在 HarmonyOS App 中更新" : "切换任务完成状态"}
                   className="shrink-0 transition hover:scale-110 disabled:opacity-50"
                 >
                   {togglingId === t.id ? (
@@ -228,7 +238,7 @@ export default function PlanPage() {
                   <div className={`text-sm font-medium ${t.done ? "text-slate-500 line-through" : ""}`}>
                     {t.title}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
                     <span>{t.date}</span>
                     <span className="flex items-center gap-1">
                       <Clock size={12} /> {t.estimatedMin} 分钟

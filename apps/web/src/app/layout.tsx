@@ -28,9 +28,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
-        <div className="flex min-h-screen">
+        <div className="min-h-screen">
           {/* 侧边栏 */}
-          <aside className="fixed left-0 top-0 z-20 flex h-screen w-56 flex-col border-r border-slate-700/60 bg-slate-900/80">
+          <aside className="fixed left-0 top-0 z-20 hidden h-screen w-56 flex-col border-r border-slate-700/60 bg-slate-900/80 md:flex">
             <div className="px-5 py-5">
               <h1 className="text-lg font-bold text-brand-100">鸿学伴</h1>
               <p className="mt-0.5 text-xs text-slate-400">智能学习助理</p>
@@ -55,8 +55,30 @@ export default function RootLayout({
             </div>
           </aside>
 
+          <header className="sticky top-0 z-20 border-b border-slate-700/60 bg-slate-900/95 px-4 py-3 backdrop-blur md:hidden">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h1 className="text-base font-bold text-brand-100">鸿学伴</h1>
+              <p className="text-xs text-slate-500">智能学习助理</p>
+            </div>
+            <nav className="flex gap-1 overflow-x-auto pb-1" aria-label="主导航">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs text-slate-300 transition hover:bg-slate-700/50 hover:text-white"
+                  >
+                    <Icon size={15} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </header>
+
           {/* 主内容 */}
-          <main className="ml-56 flex-1 p-8">{children}</main>
+          <main className="p-4 sm:p-6 md:ml-56 md:p-8">{children}</main>
         </div>
         <Analytics />
         <SpeedInsights />
