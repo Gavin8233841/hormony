@@ -388,3 +388,31 @@
 ### 未验证
 
 - **未验证**：`hdc list targets` 输出 `[Empty]`；增加第六个排序步骤后的手机/平板布局、拖动排序与反馈滚动没有模拟器或真机证据。
+
+## 批次十五：日志崩溃恢复顺序修正
+
+### 行为
+
+- 修正 `cs102-文件系统-2` 将正常 checkpoint、日志回收与后续崩溃重放串成错误单一路径的问题；旧顺序在日志已回收后才执行“重放未 checkpoint 事务”，前后条件矛盾。
+- 题设现明确为元数据日志已 commit、尚未 checkpoint 时崩溃，唯一顺序为 `B → D → E → C → A → F`：先预写并提交，随后发生崩溃并识别已提交事务，再重放到实际位置，最后标记 checkpoint 并允许回收。
+- 由唯一源规格生成端侧 JSON；新增真实产物契约，与知识切片 `cs102_k28` 的 WAL 先日志后实际位置语义交叉校验。
+- 并行子 agent 完成 CS102 全 16 个活动的可执行审计；主代理逐项复核后只采用本活动，其余修订继续隔离，未并入本提交。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：`cs102_k28` 明确元数据修改先写日志再应用到实际位置，并在崩溃后重放日志；修订后的每一步均满足该依赖。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；生成 33/33 Topic、59 个活动，类型分布保持不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts -v`，退出码 0；3 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：`python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations scripts.test_lesson_content_facts -v`，退出码 0；42 项运行，41 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 19 s 477 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前设备列表仍为空；六步排序的拖动、提交反馈和长文本滚动没有模拟器、手机、平板或真机证据。

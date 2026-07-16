@@ -6540,3 +6540,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 失败或未验证：
 - 当前无模拟器、手机、平板或真机；第六个排序步骤的实际布局、拖动排序与反馈滚动未验证。
+
+---
+
+## 2026-07-17 [WS03] 日志崩溃恢复顺序修正
+
+背景：`cs102-文件系统-2` 的旧步骤把 checkpoint、日志回收和之后的崩溃重放排在同一路径，形成“事务已应用并可回收后，才重放未 checkpoint 事务”的前后矛盾，学员无法得到唯一可执行顺序。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+行为变化：
+- 把题设限定为元数据日志已 commit、尚未 checkpoint 时崩溃，正确顺序修正为 `B → D → E → C → A → F`。
+- 步骤明确区分崩溃后扫描并识别已提交事务、重放元数据到实际位置、重放完成后 checkpoint 与回收日志。
+- 由现有生成器同步端侧 JSON；新增读取真实活动、源规格和 `cs102_k28` 的内容契约。
+- 并行子 agent 完成 CS102 16 个活动审计；本批只采用并复核该活动，其余差异未暂存。
+
+验证：
+- `node scripts/generate-learning-activities.mjs`：退出码 0，生成 33/33 Topic、59 个活动，类型分布保持不变。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_lesson_content_facts -v`：退出码 0，3 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations scripts.test_lesson_content_facts -v`：退出码 0，42 项运行，41 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 19 s 477 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 当前无模拟器、手机、平板或真机；六步排序的拖动、提交反馈和长文本滚动未验证。

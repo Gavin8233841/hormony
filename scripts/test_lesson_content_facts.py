@@ -12,7 +12,8 @@ KNOWLEDGE_PATH = (
     ROOT
     / "apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json"
 )
-SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS101.md"
+CS101_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS101.md"
+CS102_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS102.md"
 
 
 def load_json(path):
@@ -27,22 +28,32 @@ def find_unique(items, label, predicate):
     return matches[0]
 
 
+def find_activity(experiences, course_id, topic, activity_id):
+    experience = find_unique(
+        experiences,
+        f"{course_id}/{topic} experience",
+        lambda item: item.get("courseId") == course_id
+        and item.get("topic") == topic,
+    )
+    return find_unique(
+        experience["activities"],
+        f"{activity_id} activity",
+        lambda item: item.get("id") == activity_id,
+    )
+
+
 class LessonContentFactsTest(unittest.TestCase):
     def setUp(self):
-        experiences = load_json(EXPERIENCES_PATH)
-        experience = find_unique(
-            experiences,
-            "cs101/AVL树与红黑树 experience",
-            lambda item: item.get("courseId") == "cs101"
-            and item.get("topic") == "AVL树与红黑树",
-        )
-        self.activity = find_unique(
-            experience["activities"],
-            "cs101-AVL树与红黑树-2 activity",
-            lambda item: item.get("id") == "cs101-AVL树与红黑树-2",
+        self.experiences = load_json(EXPERIENCES_PATH)
+        self.knowledge_items = load_json(KNOWLEDGE_PATH)
+        self.activity = find_activity(
+            self.experiences,
+            "cs101",
+            "AVL树与红黑树",
+            "cs101-AVL树与红黑树-2",
         )
         self.knowledge = find_unique(
-            load_json(KNOWLEDGE_PATH),
+            self.knowledge_items,
             "cs101_k20 knowledge chunk",
             lambda item: item.get("id") == "cs101_k20",
         )
@@ -60,13 +71,40 @@ class LessonContentFactsTest(unittest.TestCase):
         self.assertIn("违反知识切片 cs101_k20 的\"根为黑\"性质", self.activity["feedback"])
 
     def test_red_black_root_step_is_kept_in_the_source_spec(self):
-        spec = SPEC_PATH.read_text(encoding="utf-8")
+        spec = CS101_SPEC_PATH.read_text(encoding="utf-8")
 
         self.assertIn(
             '- F. 循环结束后将根节点重新着色为黑色，完成修复',
             spec,
         )
         self.assertIn("- **正确顺序**：C → B → E → A → D → F", spec)
+
+    def test_journal_recovery_orders_crash_before_replay_and_reclaim(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "文件系统",
+            "cs102-文件系统-2",
+        )
+        knowledge = find_unique(
+            self.knowledge_items,
+            "cs102_k28 knowledge chunk",
+            lambda item: item.get("id") == "cs102_k28",
+        )
+        ordered_steps = [
+            activity["options"][index]
+            for index in activity["answerIndexes"]
+        ]
+
+        self.assertIn("元数据修改先写入日志区域再应用到实际位置", knowledge["text"])
+        self.assertIn("日志已提交、尚未 checkpoint 时系统崩溃", activity["prompt"])
+        self.assertEqual("B → D → E → C → A → F", activity["answer"])
+        self.assertIn("系统崩溃", ordered_steps[3])
+        self.assertIn("重放到磁盘实际位置", ordered_steps[4])
+        self.assertIn("允许回收对应日志空间", ordered_steps[5])
+
+        spec = CS102_SPEC_PATH.read_text(encoding="utf-8")
+        self.assertIn("- **正确顺序**：B → D → E → C → A → F", spec)
 
 
 if __name__ == "__main__":
