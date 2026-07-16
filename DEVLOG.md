@@ -6390,3 +6390,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 失败或未验证：
 - 当前无可用模拟器或设备，未安装本批 HAP；底部 CTA 到互动卡的实际滚动位置、手机和平板布局、真机恢复流程均未验证。
+
+---
+
+## 2026-07-17 [WS03] Knowledge 检索依据解释
+
+背景：Knowledge 结果卡把资料首句固定标为“关键句”，即使首句没有命中当前查询；用户编辑输入框但尚未重新检索时，卡片和学伴追问还会读取新的输入值，导致解释与当前结果批次不一致。本批让每条结果说明实际展示依据，并固定产生该结果的查询快照。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`
+- `scripts/test_knowledge_navigation_contract.py`
+
+行为变化：
+- 新增 `KnowledgeEvidence`，按完整检索词、空格词项、当前课程精确 Topic、课程首段摘要的顺序确定标签和片段。
+- 句段按真实标点和换行拆分，大小写归一化后选择首个命中；长句围绕命中位置截取，不使用随机数据或静态假回复。
+- 结果卡显示“检索词命中 / Topic 关联 / 课程资料摘要”，Chat 复用同一证据标签与片段。
+- 搜索提交时保存 `resultQuery`；只编辑输入框不会改变旧结果的依据或追问上下文。
+- 未修改 Web API、知识切片、RAG 评分或依赖，仍严格过滤非当前课程结果并保留精确 Topic 守卫。
+- 并行子 agent 将 Knowledge 页面契约扩展到 6 项，主代理复核后补入结果查询快照约束。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_validate_topic_relations -v`：退出码 0，26 项通过。
+- `python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过，`ALL CHECKS PASSED`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 26 s 96 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 当前无可用模拟器或设备，证据标签、长句截取、输入框修改后的实际页面表现、手机和平板布局均未验证。
+- 线上 Knowledge 响应及业务字段未验证；本批未修改 Web API。

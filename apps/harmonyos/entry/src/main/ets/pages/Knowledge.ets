@@ -16,10 +16,16 @@ interface LocalKnowledgeMatch {
   score: number;
 }
 
+interface KnowledgeEvidence {
+  label: string;
+  text: string;
+}
+
 @Entry
 @Component
 struct KnowledgePage {
   @State query: string = '';
+  @State resultQuery: string = '';
   @State results: KnowledgeChunk[] = [];
   @State loading: boolean = false;
   @State message: string = '';
@@ -77,6 +83,53 @@ struct KnowledgePage {
     return value.substring(0, 96) + '...';
   }
 
+  private evidenceSegments(text: string): string[] {
+    return text
+      .replace(/\r\n/g, '\n')
+      .split(/[。；？！\n]/)
+      .map((segment: string): string => segment.trim())
+      .filter((segment: string): boolean => segment.length > 0);
+  }
+
+  private matchedEvidence(segments: string[], needle: string): string {
+    const normalizedNeedle = needle.trim().toLowerCase();
+    if (normalizedNeedle.length < 2) return '';
+    for (const segment of segments) {
+      const matchIndex = segment.toLowerCase().indexOf(normalizedNeedle);
+      if (matchIndex >= 0) return this.clipMatchedEvidence(segment, matchIndex);
+    }
+    return '';
+  }
+
+  private clipMatchedEvidence(segment: string, matchIndex: number): string {
+    if (segment.length <= 120) return segment + '。';
+    const leadingContext = 36;
+    let start = Math.max(matchIndex - leadingContext, 0);
+    let end = Math.min(start + 120, segment.length);
+    if (end - start < 120) start = Math.max(end - 120, 0);
+    const before = start > 0 ? '...' : '';
+    const after = end < segment.length ? '...' : '。';
+    return before + segment.substring(start, end) + after;
+  }
+
+  private evidenceFor(item: KnowledgeChunk): KnowledgeEvidence {
+    const segments = this.evidenceSegments(item.text);
+    const query = this.resultQuery.trim();
+    let evidence = this.matchedEvidence(segments, query);
+    if (evidence.length === 0) {
+      const queryTerms = query.split(/\s+/).filter((term: string): boolean => term.length >= 2);
+      for (const term of queryTerms) {
+        evidence = this.matchedEvidence(segments, term);
+        if (evidence.length > 0) break;
+      }
+    }
+    if (evidence.length > 0) return { label: '检索词命中', text: evidence };
+
+    evidence = this.matchedEvidence(segments, this.exactTopic(item));
+    if (evidence.length > 0) return { label: 'Topic 关联', text: evidence };
+    return { label: '课程资料摘要', text: this.firstSentence(item.text) };
+  }
+
   private scoreLabel(item: KnowledgeChunk): string {
     if (item.score === undefined || typeof item.score !== 'number') return '课程资料';
     const score = Math.max(0, Math.min(item.score, 1));
@@ -111,11 +164,12 @@ struct KnowledgePage {
 
   private askTutor(item: KnowledgeChunk): void {
     const topic = this.exactTopic(item);
+    const evidence = this.evidenceFor(item);
     const context = topic.length > 0 ? '课程 Topic 是“' + topic + '”' : '当前结果没有精确 Topic';
     AppStorage.setOrCreate<string>('pendingChatQuestion',
-      '我在“' + this.courseTitle + '”中检索“' + this.query.trim() + '”时读到以下课程资料，' + context +
+      '我在“' + this.courseTitle + '”中检索“' + this.resultQuery + '”时读到以下课程资料，' + context +
         '。请只结合这段资料解释关键概念，给出一个例子和两个主动回忆问题。来源：' + item.source.trim() +
-        '。资料片段：' + this.firstSentence(item.text));
+        '。匹配依据（' + evidence.label + '）：' + evidence.text);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage Chat router.pushUrl failed: %{public}s', err.message);
@@ -198,12 +252,12 @@ struct KnowledgePage {
       }
 
       Column({ space: 5 }) {
-        Text('关键句')
+        Text(this.evidenceFor(item).label)
           .width('100%')
           .fontSize(11)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Text(this.firstSentence(item.text))
+        Text(this.evidenceFor(item).text)
           .width('100%')
           .fontSize(14)
           .lineHeight(23)
@@ -395,12 +449,14 @@ struct KnowledgePage {
   }
 
   async search(): Promise<void> {
-    const q = this.query.toLowerCase().trim();
-    if (q.length === 0) {
+    const submittedQuery = this.query.trim();
+    if (submittedQuery.length === 0) {
       return;
     }
+    const q = submittedQuery.toLowerCase();
 
     this.loading = true;
+    this.resultQuery = submittedQuery;
     this.message = '';
     this.hasError = false;
     this.results = [];

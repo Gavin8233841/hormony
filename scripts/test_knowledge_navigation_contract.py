@@ -123,11 +123,19 @@ class KnowledgeNavigationContractTest(unittest.TestCase):
         result_card = compact(extract_method(self.source, "ResultCard"))
 
         self.assertIn("const topic = this.exactTopic(item);", ask_tutor)
+        self.assertIn("const evidence = this.evidenceFor(item);", ask_tutor)
         self.assertNotIn("return;", ask_tutor)
         self.assertIn("'pendingChatQuestion'", ask_tutor)
         self.assertIn("item.source", ask_tutor)
-        self.assertIn("this.firstSentence(item.text)", ask_tutor)
+        self.assertIn("this.resultQuery", ask_tutor)
+        self.assertNotIn("this.query.trim()", ask_tutor)
+        self.assertIn("evidence.label", ask_tutor)
+        self.assertIn("evidence.text", ask_tutor)
+        self.assertNotIn("this.firstSentence(item.text)", ask_tutor)
         self.assertIn("url: 'pages/Chat'", ask_tutor)
+
+        self.assertIn("Text(this.evidenceFor(item).label)", result_card)
+        self.assertIn("Text(this.evidenceFor(item).text)", result_card)
 
         self.assertRegex(
             result_card,
@@ -137,6 +145,83 @@ class KnowledgeNavigationContractTest(unittest.TestCase):
                 r"\{.*this\.askTutor\(item\);",
             ),
         )
+
+    def test_evidence_prefers_query_then_topic_then_course_summary(self):
+        interface = compact(self.source)
+        evidence = compact(extract_method(self.source, "evidenceFor"))
+        search = compact(extract_method(self.source, "search"))
+
+        self.assertRegex(
+            interface,
+            re.compile(
+                r"interface KnowledgeEvidence \{ label: string; text: string; \}"
+            ),
+        )
+        self.assertIn("const query = this.resultQuery.trim()", evidence)
+        self.assertNotIn("const query = this.query.trim()", evidence)
+        self.assertIn("const submittedQuery = this.query.trim()", search)
+        self.assertIn("this.resultQuery = submittedQuery", search)
+        direct_query = evidence.find(
+            "let evidence = this.matchedEvidence(segments, query)"
+        )
+        query_terms = evidence.find(
+            "const queryTerms = query.split(/\\s+/).filter((term: string): "
+            "boolean => term.length >= 2)"
+        )
+        token_match = evidence.find(
+            "evidence = this.matchedEvidence(segments, term)", query_terms
+        )
+        query_label = evidence.find("label: '检索词命中'", token_match)
+        topic_match = evidence.find(
+            "evidence = this.matchedEvidence(segments, this.exactTopic(item))",
+            query_label,
+        )
+        topic_label = evidence.find("label: 'Topic 关联'", topic_match)
+        summary_label = evidence.find("label: '课程资料摘要'", topic_label)
+
+        self.assertGreaterEqual(direct_query, 0)
+        self.assertGreater(query_terms, direct_query)
+        self.assertGreater(token_match, query_terms)
+        self.assertGreater(query_label, token_match)
+        self.assertGreater(topic_match, query_label)
+        self.assertGreater(topic_label, topic_match)
+        self.assertGreater(summary_label, topic_label)
+        self.assertRegex(
+            evidence,
+            re.compile(
+                r"return \{ label: '课程资料摘要', "
+                r"text: this\.firstSentence\(item\.text\) \};"
+            ),
+        )
+
+    def test_evidence_matching_uses_the_first_normalized_sentence_match(self):
+        segments = compact(extract_method(self.source, "evidenceSegments"))
+        matched = compact(extract_method(self.source, "matchedEvidence"))
+
+        self.assertIn(".replace(/\\r\\n/g, '\\n')", segments)
+        self.assertIn(".split(/[。；？！\\n]/)", segments)
+        self.assertIn("segment.trim()", segments)
+        self.assertIn("segment.length > 0", segments)
+
+        self.assertIn(
+            "const normalizedNeedle = needle.trim().toLowerCase();",
+            matched,
+        )
+        self.assertIn("if (normalizedNeedle.length < 2) return '';", matched)
+        loop = matched.find("for (const segment of segments)")
+        normalize = matched.find(
+            "segment.toLowerCase().indexOf(normalizedNeedle)", loop
+        )
+        return_match = matched.find(
+            "if (matchIndex >= 0) return this.clipMatchedEvidence(segment, matchIndex)",
+            normalize,
+        )
+        no_match = matched.find("return '';", return_match)
+        self.assertGreaterEqual(loop, 0)
+        self.assertGreater(normalize, loop)
+        self.assertGreater(return_match, normalize)
+        self.assertGreater(no_match, return_match)
+        self.assertNotIn("Math.random", matched)
 
     def test_cloud_results_filter_empty_fields_and_other_courses(self):
         validator = compact(extract_method(self.source, "validCourseResult"))
