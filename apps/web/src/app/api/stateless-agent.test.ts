@@ -1,13 +1,21 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as chat } from "./chat/route";
 import { GET as health } from "./health/route";
+import { POST as searchKnowledge } from "./knowledge/search/route";
+import { POST as generateQuiz } from "./quiz/route";
+import { store } from "@/lib/store/db";
 
 const originalModelKey = process.env.MODEL_API_KEY;
+const originalDeploymentMode = process.env.DEPLOYMENT_MODE;
 
 afterEach(() => {
   delete process.env.TEST_MODEL_RESPONSE;
   if (originalModelKey === undefined) delete process.env.MODEL_API_KEY;
   else process.env.MODEL_API_KEY = originalModelKey;
+
+  if (originalDeploymentMode === undefined) delete process.env.DEPLOYMENT_MODE;
+  else process.env.DEPLOYMENT_MODE = originalDeploymentMode;
+  vi.restoreAllMocks();
 });
 
 describe("无状态真实 Agent 边界", () => {
@@ -63,5 +71,66 @@ describe("无状态真实 Agent 边界", () => {
     expect(response.status).toBe(200);
     expect(body).toContain("MODEL_INVALID_RESPONSE");
     expect(body).toContain('"type":"done"');
+  });
+
+  it("无状态健康检查应公开精确部署模式", async () => {
+    process.env.DEPLOYMENT_MODE = "stateless";
+
+    const response = await health();
+    const body = await response.json();
+
+    expect(body.deploymentMode).toBe("stateless");
+  });
+
+  it("无状态测验生成应返回评分包但不写入进程内测验状态", async () => {
+    process.env.DEPLOYMENT_MODE = "stateless";
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([{
+      type: "choice",
+      stem: "二叉搜索树中序遍历的结果是什么？",
+      options: ["A. 升序序列", "B. 降序序列", "C. 随机序列", "D. 层序序列"],
+      answer: "A",
+      explanation: "二叉搜索树的中序遍历会按键值从小到大访问节点。",
+      tags: ["遍历顺序"],
+    }]);
+    const saveQuiz = vi.spyOn(store, "saveQuiz");
+
+    const response = await generateQuiz(new Request("http://localhost/api/quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "demo",
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        count: 1,
+        difficulty: "medium",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.questions).toHaveLength(1);
+    expect(body.grading).toHaveLength(1);
+    expect(saveQuiz).not.toHaveBeenCalled();
+  });
+
+  it("无状态知识检索不记录用户活动", async () => {
+    process.env.DEPLOYMENT_MODE = "stateless";
+    const logActivity = vi.spyOn(store, "logActivity");
+
+    const response = await searchKnowledge(new Request("http://localhost/api/knowledge/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "demo",
+        courseId: "cs101",
+        query: "二叉搜索树",
+        topK: 3,
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(body.chunks)).toBe(true);
+    expect(logActivity).not.toHaveBeenCalled();
   });
 });

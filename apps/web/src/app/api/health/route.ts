@@ -1,6 +1,7 @@
 // GET /api/health — 服务健康检查
 
 import { getModelRuntimeInfo } from "@/lib/agents/model";
+import { getDeploymentMode } from "@/lib/deployment";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function GET() {
       provider: modelInfo.provider,
       name: modelInfo.modelName,
     },
-    deploymentMode: process.env.DEPLOYMENT_MODE?.trim() || "development",
+    deploymentMode: getDeploymentMode(),
     version: "1.0.1",
   }, { status: modelInfo.configured ? 200 : 503 });
 }

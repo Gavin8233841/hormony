@@ -34,6 +34,37 @@ export function readBoundedInteger(
   return { ok: true, value };
 }
 
+export function readBoundedQueryInteger(
+  value: string | null,
+  defaultValue: number,
+  min: number,
+  max: number,
+  code: string,
+  label: string
+): ValidationResult<number> {
+  if (value === null) return { ok: true, value: defaultValue };
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    return validationError(`${label} 必须是整数`, code);
+  }
+  return readBoundedInteger(Number(trimmed), defaultValue, min, max, code, label);
+}
+
+export function readUserId(value: unknown): ValidationResult<string> {
+  if (value === undefined || value === null) return { ok: true, value: "demo" };
+  if (typeof value !== "string") {
+    return validationError("userId 必须是字符串", "INVALID_USER_ID");
+  }
+  const userId = value.trim();
+  if (userId.length < 1 || userId.length > 50 || !/^[a-zA-Z0-9_]+$/.test(userId)) {
+    return validationError(
+      "userId 必须为 1-50 位字母、数字或下划线",
+      "INVALID_USER_ID"
+    );
+  }
+  return { ok: true, value: userId };
+}
+
 export function sanitizeLearningProfile(
   profile: unknown
 ): ValidationResult<LearningProfileSnapshot | undefined> {
@@ -86,7 +117,11 @@ function readOptionalString(
   if (typeof value !== "string") {
     return validationError(`${label} 必须是字符串`, "INVALID_PROFILE");
   }
-  return { ok: true, value: value.trim().slice(0, maxLength) };
+  const trimmed = value.trim();
+  if (trimmed.length > maxLength) {
+    return validationError(`${label} 长度不能超过 ${maxLength} 字符`, "INVALID_PROFILE");
+  }
+  return { ok: true, value: trimmed };
 }
 
 function readOptionalStringArray(
@@ -99,13 +134,22 @@ function readOptionalStringArray(
   if (!Array.isArray(value)) {
     return validationError(`${label} 必须是字符串数组`, "INVALID_PROFILE");
   }
+  if (value.length > maxItems) {
+    return validationError(`${label} 最多包含 ${maxItems} 项`, "INVALID_PROFILE");
+  }
   const items: string[] = [];
-  for (const item of value.slice(0, maxItems)) {
+  for (const item of value) {
     if (typeof item !== "string") {
       return validationError(`${label} 必须只包含字符串`, "INVALID_PROFILE");
     }
     const trimmed = item.trim();
-    if (trimmed.length > 0) items.push(trimmed.slice(0, maxLength));
+    if (trimmed.length > maxLength) {
+      return validationError(
+        `${label} 每项长度不能超过 ${maxLength} 字符`,
+        "INVALID_PROFILE"
+      );
+    }
+    if (trimmed.length > 0) items.push(trimmed);
   }
   return { ok: true, value: items };
 }
@@ -148,8 +192,13 @@ function readOptionalNonNegativeNumber(
   label: string
 ): ValidationResult<number> {
   if (value === undefined) return { ok: true, value: 0 };
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return validationError(`${label} 必须是非负数字`, "INVALID_PROFILE");
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 0
+  ) {
+    return validationError(`${label} 必须是非负整数`, "INVALID_PROFILE");
   }
   return { ok: true, value };
 }

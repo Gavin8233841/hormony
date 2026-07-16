@@ -147,7 +147,7 @@ describe("题库与资源 API 闭环", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           courseId: "cs101",
-          topic: "二叉树",
+          topic: "二叉树与BST",
         }),
       })
     );
@@ -359,22 +359,53 @@ describe("题库与资源 API 闭环", () => {
     await expect(response.json()).resolves.toMatchObject({ code: "SAFETY_BLOCKED" });
   });
 
-  it("缺少课程资料时应返回明确 404", async () => {
+  it("应拒绝不属于课程的近似主题", async () => {
     const response = await generateQuiz(
       new Request("http://localhost/api/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           courseId: "cs101",
-          topic: "zzzznohit",
+          topic: "二叉树",
           count: 1,
           difficulty: "medium",
         }),
       })
     );
 
-    expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toMatchObject({ code: "KNOWLEDGE_UNAVAILABLE" });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: "INVALID_TOPIC" });
+  });
+
+  it("应拒绝缺失主题或跨课程主题", async () => {
+    const missingTopicResponse = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          count: 1,
+          difficulty: "medium",
+        }),
+      })
+    );
+    const crossCourseResponse = await generateQuiz(
+      new Request("http://localhost/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: "cs101",
+          topic: "进程与线程",
+          count: 1,
+          difficulty: "medium",
+        }),
+      })
+    );
+
+    expect(missingTopicResponse.status).toBe(400);
+    await expect(missingTopicResponse.json()).resolves.toMatchObject({ code: "INVALID_TOPIC" });
+    expect(crossCourseResponse.status).toBe(400);
+    await expect(crossCourseResponse.json()).resolves.toMatchObject({ code: "INVALID_TOPIC" });
   });
 
   it("课程题库目录不应返回题目答案", async () => {

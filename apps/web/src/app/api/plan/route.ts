@@ -3,7 +3,6 @@
 
 import { runPlannerAgent } from "@/lib/agents/planner-agent";
 import { store } from "@/lib/store/db";
-import { sanitizeUserId } from "@/lib/utils";
 import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
 import { modelErrorResponse, SafetyBlockedError } from "@/lib/api-errors";
 import type { LearningProfileSnapshot, StudyPlan } from "@/lib/types";
@@ -11,14 +10,16 @@ import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
 import { readJsonObject } from "@/lib/request-json";
 import {
   readBoundedInteger,
+  readUserId,
   sanitizeLearningProfile,
 } from "@/lib/api-validation";
+import { isStatelessDeployment } from "@/lib/deployment";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function GET(req: Request) {
-  if (process.env.DEPLOYMENT_MODE === "stateless") {
+  if (isStatelessDeployment()) {
     return Response.json(
       { error: "学习计划仅保存在 HarmonyOS 设备", code: "ENDPOINT_DISABLED" },
       { status: 404 }
@@ -26,8 +27,9 @@ export async function GET(req: Request) {
   }
   try {
     const { searchParams } = new URL(req.url);
-    const userId = sanitizeUserId(searchParams.get("userId"));
-    const plan = store.getPlan(userId);
+    const userId = readUserId(searchParams.get("userId"));
+    if (!userId.ok) return userId.response;
+    const plan = store.getPlan(userId.value);
     if (!plan) {
       return Response.json({ error: "未找到学习计划", code: "NOT_FOUND" }, { status: 404 });
     }
@@ -43,7 +45,8 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
 
-  const userId = sanitizeUserId(body.userId);
+  const userId = readUserId(body.userId);
+  if (!userId.ok) return userId.response;
   if (body.goal === undefined) {
     return Response.json({ error: "缺少 goal 字段", code: "MISSING_FIELD" }, { status: 400 });
   }
@@ -100,7 +103,7 @@ export async function POST(req: Request) {
 
   try {
     const plan = await runPlannerAgent(
-      userId,
+      userId.value,
       goal,
       durationDays.value,
       dailyMinutes.value,

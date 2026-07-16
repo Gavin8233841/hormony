@@ -6141,3 +6141,42 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次是文档接力批次，未重新运行 Web `pnpm lint/typecheck/test/build`。
 - 本批次未重新运行 HarmonyOS HAP 构建；沿用上一批 `Chat.ets` 静态诊断、HAP 构建、线上 Health/Chat SSE 与模拟器 fallback 证据。
 - 工作区仍保留 `.trae/progress.json` 和未跟踪本地资产；未执行清理、回滚、目录移动或删除。
+
+---
+
+## [WS05] 2026-07-17：无状态 Agent API、Safety 与生产网关 P0
+
+背景：生产 Docker 仍默认开启文件状态，API 对部分非对象 JSON、未知枚举、字段长度/数量和用户标识采用静默转换或截断；直接路由测试也没有证明 Next middleware 在无状态生产中的真实拦截行为。本批按当前无状态架构修复这些 P0，并逐行吸收 `c9572d2` 的课程-Topic 防污染契约。
+
+文件：
+- `apps/web/Dockerfile`
+- `apps/web/src/middleware.ts`、`apps/web/src/middleware.test.ts`
+- `apps/web/src/app/api/**`
+- `apps/web/src/lib/agents/planner-agent.ts`、`apps/web/src/lib/agents/safety-agent.ts` 及测试
+- `apps/web/src/lib/api-validation.ts`、`apps/web/src/lib/request-json.ts` 及测试
+- `apps/web/src/lib/deployment.ts`、`apps/web/src/lib/store/persistence.ts` 及测试
+- `apps/web/src/lib/data/index.ts`
+
+行为变化：
+- Docker 显式设置 `DEPLOYMENT_MODE=stateless` 与 `APP_STATE_PERSISTENCE=off`，移除 `/data` 状态文件和 volume；文件持久化默认关闭，stateless 模式即使误设 `APP_STATE_PERSISTENCE=on` 也不会读写。
+- middleware 精确禁用 conversations、courses、knowledge upload、plan save、profile、quiz submit、stats 的路径与子路径；相似前缀不误封，OPTIONS 优先，禁用/限流响应保留 CORS 与全部安全头。
+- JSON 请求体按流累计，UTF-8 实际字节超过 256 KiB 时立即取消读取并返回 `413 PAYLOAD_TOO_LARGE`；伪小、非法或缺失 `Content-Length` 不能绕过。
+- Chat、Plan、Quiz、Knowledge、Safety、Courses、Profile、Resources 等外部字段统一执行结构、枚举、长度、数量和整数边界校验；Chat 历史超过 12 条或单条超过 1000 字符改为明确 `400 INVALID_HISTORY`，不再静默裁剪。
+- Safety 覆盖用户输入、模型输出和会展示的引用 `doc/snippet`；Knowledge 检索输出、课程/计划保存、Quiz submit 输入与最终评分结果均增加审核边界。
+- Plan 模型输出要求真实 Topic、动作、标题、原因和整数时长结构；任务时长不超过请求的每日分钟预算。
+- `/api/quiz` 强制 `topic` 必填且必须与 `courseId` 下真实 33 Topic 源逐字匹配；近似主题和跨课程主题返回 `400 INVALID_TOPIC`，展示题 `questions` 与本地评分 `grading` 继续分离。
+
+验证：
+- `cd apps/web; pnpm lint`：exit 0，无 ESLint warning/error，静态诊断通过。
+- `cd apps/web; pnpm typecheck`：exit 0，静态诊断通过。
+- `cd apps/web; pnpm test`：exit 0，17 个测试文件、299 项全部通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建通过，middleware 产物 26.7 kB。
+- 目标契约测试：exit 0，7 个文件、196 项通过；请求体与 API 输入边界组合测试 107 项通过。
+- 本地生产实例 `http://127.0.0.1:3105`，显式无模型秘密、stateless：严格断言脚本 exit 0；Health `503/degraded/unavailable` 且 `deploymentMode=stateless`，Profile `404/ENDPOINT_DISABLED`，OPTIONS 204，cs101 目录 12 Topic，近似 Topic `400/INVALID_TOPIC`，精确 Topic `503/MODEL_UNAVAILABLE`，Knowledge `200/chunks=2`，Chat `503/MODEL_UNAVAILABLE`，超限正文 `413/PAYLOAD_TOO_LARGE`，第 31 次同路由请求 `429/RATE_LIMITED`，不受信 Origin 未回显。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 流式正文改造首次 typecheck 因错误辅助函数返回联合类型过宽而 exit 2；收窄为纯错误结果后 typecheck 与全量验证均 exit 0。
+- 首轮本地 HTTP 脚本对多值响应头的 PowerShell 类型处理不正确，虽业务请求完成但未作为通过证据；改为严格停止模式和显式 header 归一化后 exit 0。
+- 当前分支未部署，线上行为未验证；无模型配置下未产生真实 Chat SSE 正文、Plan 或 Quiz 模型结果。
+- 浏览器交互、模拟器与真机未验证；本批未修改 HarmonyOS 文件。

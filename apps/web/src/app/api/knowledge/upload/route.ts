@@ -2,10 +2,12 @@
 // 支持单条文本上传，自动分块存储
 
 import { store } from "@/lib/store/db";
-import { generateId, sanitizeUserId } from "@/lib/utils";
+import { generateId } from "@/lib/utils";
 import { invalidateRagCache } from "@/lib/rag";
 import type { KnowledgeUploadRequest, KnowledgeChunk } from "@/lib/types";
 import { readJsonObject } from "@/lib/request-json";
+import { readUserId } from "@/lib/api-validation";
+import { validateUserInput } from "@/lib/agents/safety-agent";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +60,20 @@ export async function POST(req: Request) {
     if (!parsed.ok) return parsed.response;
     const body = parsed.body;
 
-    const courseId = String(body.courseId ?? "").trim();
-    const userId = sanitizeUserId(body.userId);
-    const source = String(body.source ?? "").trim();
-    const text = String(body.text ?? "").trim();
+    const userId = readUserId(body.userId);
+    if (!userId.ok) return userId.response;
+    if (body.courseId !== undefined && typeof body.courseId !== "string") {
+      return Response.json({ error: "courseId 必须是字符串", code: "INVALID_COURSE" }, { status: 400 });
+    }
+    if (body.source !== undefined && typeof body.source !== "string") {
+      return Response.json({ error: "source 必须是字符串", code: "INVALID_SOURCE" }, { status: 400 });
+    }
+    if (body.text !== undefined && typeof body.text !== "string") {
+      return Response.json({ error: "text 必须是字符串", code: "INVALID_TEXT" }, { status: 400 });
+    }
+    const courseId = body.courseId?.trim() ?? "";
+    const source = body.source?.trim() ?? "";
+    const text = body.text?.trim() ?? "";
 
     if (!courseId) {
       return Response.json({ error: "缺少 courseId", code: "MISSING_FIELD" }, { status: 400 });
@@ -72,9 +84,21 @@ export async function POST(req: Request) {
     if (!text) {
       return Response.json({ error: "缺少 text（知识内容）", code: "MISSING_FIELD" }, { status: 400 });
     }
+    if (courseId.length > 100) {
+      return Response.json({ error: "courseId 长度不能超过 100 字符", code: "INVALID_COURSE" }, { status: 400 });
+    }
+    if (source.length > 200) {
+      return Response.json({ error: "source 长度不能超过 200 字符", code: "INVALID_SOURCE" }, { status: 400 });
+    }
     if (text.length > MAX_TEXT_LENGTH) {
       return Response.json(
         { error: `文本过长（上限 ${MAX_TEXT_LENGTH} 字符，当前 ${text.length}）`, code: "TEXT_TOO_LONG" },
+        { status: 400 }
+      );
+    }
+    if (validateUserInput([courseId, source, text].join("\n")).length > 0) {
+      return Response.json(
+        { error: "知识内容不符合安全要求", code: "INPUT_REJECTED" },
         { status: 400 }
       );
     }
@@ -92,7 +116,7 @@ export async function POST(req: Request) {
     // 文档变更：清除 RAG 索引缓存，下次检索按新文档集重建
     invalidateRagCache();
     store.logActivity({
-      userId,
+      userId: userId.value,
       type: "study",
       description: `上传知识资料：${source}（${chunks.length} 个切片）`,
       timestamp: new Date().toISOString(),

@@ -3,9 +3,10 @@
 import { store } from "@/lib/store/db";
 import { runEvaluatorAgent } from "@/lib/agents/evaluator-agent";
 import { retrieve } from "@/lib/rag";
-import { sanitizeUserId } from "@/lib/utils";
 import type { QuizSubmission, QuizResult, QuizResultDetail } from "@/lib/types";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
+import { readUserId } from "@/lib/api-validation";
+import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +16,22 @@ export async function POST(req: Request) {
     if (!parsed.ok) return parsed.response;
     const body = parsed.body;
 
-    const quizId = String(body.quizId ?? "").trim();
-    const userId = sanitizeUserId(body.userId);
-    const answers = Array.isArray(body.answers) ? body.answers : [];
+    if (body.quizId !== undefined && typeof body.quizId !== "string") {
+      return Response.json({ error: "quizId 必须是字符串", code: "INVALID_QUIZ_ID" }, { status: 400 });
+    }
+    const quizId = body.quizId?.trim() ?? "";
+    const userId = readUserId(body.userId);
+    if (!userId.ok) return userId.response;
+    if (body.answers !== undefined && !Array.isArray(body.answers)) {
+      return Response.json({ error: "answers 必须是数组", code: "INVALID_ANSWERS" }, { status: 400 });
+    }
+    const answers = body.answers ?? [];
 
     if (!quizId) {
       return Response.json({ error: "缺少 quizId 字段", code: "MISSING_FIELD" }, { status: 400 });
+    }
+    if (quizId.length > 100) {
+      return Response.json({ error: "quizId 长度不能超过 100 字符", code: "INVALID_QUIZ_ID" }, { status: 400 });
     }
     if (answers.length === 0) {
       return Response.json({ error: "答案不能为空", code: "EMPTY_ANSWERS" }, { status: 400 });
@@ -41,12 +52,29 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      if (answer.questionId.length > 100) {
+        return Response.json(
+          { error: "questionId 长度不能超过 100 字符", code: "INVALID_ANSWERS" },
+          { status: 400 }
+        );
+      }
       if (typeof answer.userAnswer !== "string" || answer.userAnswer.length > 200) {
         return Response.json(
           { error: "答案内容必须是 200 字符以内字符串", code: "INVALID_ANSWERS" },
           { status: 400 }
         );
       }
+    }
+    if (
+      validateUserInput([
+        quizId,
+        ...answers.flatMap((answer) => [answer.questionId, answer.userAnswer]),
+      ].join("\n")).length > 0
+    ) {
+      return Response.json(
+        { error: "答案内容不符合安全要求", code: "INPUT_REJECTED" },
+        { status: 400 }
+      );
     }
 
     const quiz = store.getQuiz(quizId);
@@ -90,7 +118,7 @@ export async function POST(req: Request) {
     let evaluation = "";
     let weakTopics: string[] = [];
     try {
-      const evalResult = await runEvaluatorAgent(userId, evaluatorInput);
+      const evalResult = await runEvaluatorAgent(userId.value, evaluatorInput);
       evaluation = evalResult.content;
     } catch (err) {
       console.error("[quiz/submit] evaluator error:", err instanceof Error ? err.message : String(err));
@@ -112,7 +140,7 @@ export async function POST(req: Request) {
 
     const result: QuizResult = {
       quizId,
-      userId,
+      userId: userId.value,
       totalQuestions,
       correctCount,
       accuracy,
@@ -121,6 +149,24 @@ export async function POST(req: Request) {
       weakTopics,
       submittedAt: new Date().toISOString(),
     };
+
+    const outputSafety = await runSafetyAgent([
+      result.evaluation,
+      ...result.weakTopics,
+      ...result.details.flatMap((detail) => [
+        detail.stem,
+        detail.userAnswer,
+        detail.correctAnswer,
+        detail.explanation,
+        ...(detail.tags ?? []),
+      ]),
+    ].join("\n"), []);
+    if (!outputSafety.passed) {
+      return Response.json(
+        { error: "评分结果未通过安全审核", code: "SAFETY_BLOCKED" },
+        { status: 502 }
+      );
+    }
 
     // 持久化结果
     store.recordQuizResult(result);

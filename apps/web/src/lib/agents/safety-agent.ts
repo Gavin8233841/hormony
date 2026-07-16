@@ -34,6 +34,11 @@ const PII_PATTERNS = [
 
 export function validateUserInput(content: string): string[] {
   const flags: string[] = [];
+  for (const { pattern, label } of SENSITIVE_PATTERNS) {
+    if (pattern.test(content)) {
+      flags.push(`输入包含敏感内容：${label}`);
+    }
+  }
   for (const pattern of INJECTION_PATTERNS) {
     if (pattern.test(content)) {
       flags.push("疑似 Prompt 注入攻击");
@@ -52,17 +57,21 @@ export async function runSafetyAgent(
   citations: Citation[]
 ): Promise<SafetyResult> {
   const flags: string[] = [];
+  const visibleOutput = [
+    content,
+    ...citations.flatMap((citation) => [citation.doc, citation.snippet ?? ""]),
+  ].join("\n");
 
   // 1. 敏感内容检查
   for (const { pattern, label } of SENSITIVE_PATTERNS) {
-    if (pattern.test(content)) {
+    if (pattern.test(visibleOutput)) {
       flags.push(`敏感内容：${label}`);
     }
   }
 
   // 2. Prompt 注入检测
   for (const pattern of INJECTION_PATTERNS) {
-    if (pattern.test(content)) {
+    if (pattern.test(visibleOutput)) {
       flags.push("疑似 Prompt 注入攻击");
       break;
     }
@@ -71,13 +80,13 @@ export async function runSafetyAgent(
   // 3. PII 检测（仅检测输出内容中的 PII，防止泄露）
   for (const { pattern, label } of PII_PATTERNS) {
     pattern.lastIndex = 0;
-    if (pattern.test(content)) {
+    if (pattern.test(visibleOutput)) {
       flags.push(`输出包含敏感信息：${label}`);
     }
   }
 
   // 4. 学术诚信检查
-  if (/直接帮我写完整答案|帮我代写|直接给我代码答案|帮我作弊/i.test(content)) {
+  if (/直接帮我写完整答案|帮我代写|直接给我代码答案|帮我作弊/i.test(visibleOutput)) {
     flags.push("疑似直接代答，应引导思路而非直接给答案");
   }
 

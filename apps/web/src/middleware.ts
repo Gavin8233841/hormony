@@ -3,6 +3,7 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isStatelessDeployment } from "@/lib/deployment";
 
 // 速率限制配置
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 分钟窗口
@@ -10,6 +11,7 @@ const RATE_LIMIT_MAX_REQUESTS = 30;  // 每窗口最大请求数
 
 const STATEFUL_API_PREFIXES = [
   "/api/conversations",
+  "/api/courses",
   "/api/knowledge/upload",
   "/api/plan/save",
   "/api/profile",
@@ -79,7 +81,7 @@ export function middleware(req: NextRequest) {
   }
 
   if (
-    process.env.DEPLOYMENT_MODE === "stateless" &&
+    isStatelessDeployment() &&
     STATEFUL_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
   ) {
     const res = NextResponse.json(
