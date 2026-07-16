@@ -116,7 +116,8 @@ export async function POST(req: Request) {
       durationDays.value,
       dailyMinutes.value,
       startDate.value,
-      profile.value as LearningProfileSnapshot | undefined
+      profile.value as LearningProfileSnapshot | undefined,
+      req.signal
     );
     await assertSafePlan(plan);
     return Response.json(plan);
