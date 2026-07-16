@@ -64,6 +64,29 @@ struct LessonPage {
     } catch (error) {
       this.message = '学习进度读取失败，但课程内容仍可查看';
     }
+    await this.restoreActivityProgress();
+  }
+
+  private async restoreActivityProgress(): Promise<void> {
+    if (this.experience === null || this.experience.activities.length === 0) return;
+    try {
+      const activityIds = this.experience.activities.map((activity: LearningActivity): string => activity.id);
+      const events = await LocalLearningRepository.getStudyEvents();
+      const attemptedIds: string[] = [];
+      for (const event of events) {
+        if (event.type !== 'lesson_activity' || event.courseId !== this.courseId || event.topic !== this.topic ||
+          event.taskId === undefined || !activityIds.includes(event.taskId) || attemptedIds.includes(event.taskId)) {
+          continue;
+        }
+        attemptedIds.push(event.taskId);
+      }
+      this.attemptedActivityIds = attemptedIds;
+      const nextIndex = this.experience.activities.findIndex((activity: LearningActivity): boolean =>
+        !attemptedIds.includes(activity.id));
+      this.activeActivityIndex = nextIndex >= 0 ? nextIndex : this.experience.activities.length - 1;
+    } catch (error) {
+      if (this.message.length === 0) this.message = '互动断点读取失败，可继续当前练习';
+    }
   }
 
   private moveTo(index: number): void {

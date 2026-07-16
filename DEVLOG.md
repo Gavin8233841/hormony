@@ -6283,3 +6283,28 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：退出码 0，输出 `[Empty]`，当前无可用模拟器或设备。
 - 箭头实际渲染、横向滚动、节点局部聚焦、手机与平板布局、真机均未验证。
+
+---
+
+## 2026-07-17 [WS03] Lesson 互动断点恢复
+
+背景：Lesson 已把客观互动和自由回答自我对照写入本机学习事件，但页面重进时 `attemptedActivityIds` 始终为空。用户在最后一个知识切片完成部分或全部互动后退出，会被要求重复操作。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+
+行为变化：
+- Lesson 进入时读取本机事件，只恢复同课程、同 Topic 且 `taskId` 属于当前 experience 的 `lesson_activity`。
+- 已完成互动 ID 去重；自动定位首个未完成互动，全部已有记录时定位最后一项并允许继续完成 Topic。
+- 互动事件读取失败不阻断知识内容与 Lesson 进度，页面显示精确错误。
+- 未修改 WS02 独占仓储文件。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 个 experience 的活动 ID、答案、标签与路径契约全部通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 27 s 566 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 尚无模拟器证据证明“完成部分互动后退出 → 重进 Lesson 自动定位下一互动”。
+- 真机未验证。
