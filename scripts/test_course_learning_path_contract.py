@@ -89,12 +89,24 @@ class CourseLearningPathContractTest(unittest.TestCase):
 
     def test_lesson_activity_question_reaches_chat_once(self):
         ask_tutor = compact(extract_method(self.lesson, "askTutorForActivity"))
+        build_question = compact(extract_method(self.lesson, "buildTutorQuestion"))
         chat_appear = compact(extract_method(self.chat, "aboutToAppear"))
 
-        self.assertIn("activity.prompt", ask_tutor)
-        self.assertIn("this.topic", ask_tutor)
-        self.assertIn("this.activityAnswerText(activity)", ask_tutor)
-        self.assertIn("activity.answer", ask_tutor)
+        self.assertIn(
+            "const question = this.buildTutorQuestion(activity);",
+            ask_tutor,
+        )
+        self.assertIn("this.tutorExcerpt(activity.prompt, 620)", build_question)
+        self.assertIn("this.tutorExcerpt(this.topic, 80)", build_question)
+        self.assertIn("this.tutorExcerpt(activity.focusTag, 24)", build_question)
+        self.assertIn(
+            "this.tutorExcerpt(this.activityAnswerText(activity), 360)",
+            build_question,
+        )
+        self.assertIn("this.tutorExcerpt(activity.answer, 400)", build_question)
+        self.assertIn("this.tutorExcerpt(activity.source, 160)", build_question)
+        self.assertIn("question.length <= 1800", build_question)
+        self.assertIn("question.substring(0, 1797) + '...'", build_question)
         pending_write = ask_tutor.find("'pendingChatQuestion', question")
         route = ask_tutor.find("url: 'pages/Chat'")
         self.assertGreaterEqual(pending_write, 0)
@@ -106,6 +118,18 @@ class CourseLearningPathContractTest(unittest.TestCase):
         self.assertGreaterEqual(pending_read, 0)
         self.assertGreater(input_fill, pending_read)
         self.assertGreater(pending_clear, input_fill)
+
+    def test_lesson_names_activity_focus_before_the_same_tag_action(self):
+        practice = compact(extract_method(self.lesson, "PracticeExperience"))
+
+        focus_label = practice.find("Text('本练聚焦')")
+        focus_value = practice.find("Text(this.activeActivity()!.focusTag)")
+        prompt = practice.find("Text(this.activeActivity()!.prompt)")
+        quiz_action = practice.find("Button('同标签测验')")
+        self.assertGreaterEqual(focus_label, 0)
+        self.assertGreater(focus_value, focus_label)
+        self.assertGreater(prompt, focus_value)
+        self.assertGreater(quiz_action, prompt)
 
     def test_completed_lesson_opens_exact_topic_practice(self):
         open_practice = compact(extract_method(self.lesson, "openPractice"))

@@ -6448,3 +6448,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - WS02 尚未修复 `getTagInsights`，对应契约为预期失败，不能把自评计为客观正确率证据。
 - 当前没有模拟器、手机、平板或真机证据验证完整点击与返回流程。
+
+---
+
+## 2026-07-17 [WS03] Lesson 标签与来源随题追问
+
+背景：Lesson 已在作答反馈中展示活动来源，也能进入同标签 Quiz，但学员作答前看不到标签，“问学伴”跨页时只携带题目与答案，来源和专项标签丢失；自由回答也没有端侧总长守卫，可能超过 Chat API 源码确认的 2000 字上限。本批统一界面、Quiz 与 Chat 的证据语义。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `scripts/test_course_learning_path_contract.py`
+
+行为变化：
+- 在主动练习题干前增加单行“本练聚焦 + focusTag”，复用现有文字层级和品牌色，不增加嵌套卡片或装饰动效。
+- 学伴问题携带 Topic、同一 focusTag、个人回答、参考答案与同一 source，并明确要求以该资料依据为边界给出错因和下一步同标签练习。
+- 对问题各段做确定性限长，并用 1800 字总长守卫留出服务端 2000 字门禁余量；不执行用户输入或任意代码。
+- 扩展闭环契约，固定标签显示顺序、来源/标签随题追问、长度守卫与一次性 Chat 路由消费。
+- 按仓库 `impeccable` 产品 UI 规范复核层级，复用现有 ArkUI 与设计令牌；无新增依赖。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_learning_path_contract -v`：退出码 0，6 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations -v`：退出码 0，37 项运行，36 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与同 Topic 标签门禁通过，`ALL CHECKS PASSED`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，ArkTS 重新编译，`BUILD SUCCESSFUL in 20 s 238 ms`；仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：退出码 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前没有模拟器或真机；“本练聚焦”的手机/平板实际渲染、超长回答进入 Chat、返回 Lesson 和完整点击路径未验证。
+- 学伴线上响应及引用业务字段未验证；本批未修改 Web API。

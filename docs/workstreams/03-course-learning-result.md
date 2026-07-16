@@ -300,3 +300,32 @@
 
 - **未验证**：WS02 尚未修改 `getTagInsights`，自评事件仍会被该标签洞察 reducer 误作 1 道错题；目标契约明确保留为预期失败。
 - **未验证**：无模拟器、手机、平板或真机证据证明 Course → Topic → Lesson → 互动 → Quiz/Chat/Practice 的实际点击与返回流程。
+
+## 批次十二：Lesson 标签与来源随题追问
+
+### 行为
+
+- 主动练习在题干前直接显示受控 `focusTag`，让学员在作答前知道本练验证的概念，随后“同标签测验”继续使用同一字段；采用单行信息层级，没有新增嵌套卡片或装饰动效。
+- “问学伴讲解”把 Topic、专项标签、个人回答、参考答案与反馈区展示的同一 `source` 一并写入 `pendingChatQuestion`，避免跨页后丢失资料依据或标签目标。
+- 新增长文本摘录和总长守卫：题干、自由回答、参考答案与来源分别限长，最终问题不超过 1800 字，低于 `/api/chat` 源码确认的 2000 字请求上限。
+- 保留精确 Topic 和同标签 Quiz 路由语义；未修改 Web API、共享仓储或原始学习内容。
+- 按仓库 `impeccable` 产品 UI 规范复核信息层级：复用现有色彩令牌、系统字体和稳定单行布局，不新增依赖。
+
+### 文件
+
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `scripts/test_course_learning_path_contract.py`
+
+### 证据
+
+- **源码确认**：33 个 experience 共 59 个活动，`source` 空值为 0；Lesson 反馈区和学伴问题共用 `activity.source`，活动标签显示与 Quiz 路由共用 `activity.focusTag`。
+- **源码确认**：`apps/web/src/app/api/chat/route.ts` 明确拒绝长度大于 2000 的 `message`；Lesson 端最终守卫为 1800。
+- **静态诊断通过**：`python -m unittest scripts.test_course_learning_path_contract -v`，退出码 0；6 项通过。
+- **静态诊断通过**：`python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations -v`，退出码 0；37 项运行，36 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与同 Topic 标签门禁全部通过。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；ArkTS 重新编译，`BUILD SUCCESSFUL in 20 s 238 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：`hdc list targets` 输出 `[Empty]`；“本练聚焦”在手机和平板的实际单行渲染、超长回答跳转 Chat、返回 Lesson 与完整点击路径均无模拟器或真机证据。
+- **未验证**：学伴线上响应及引用业务字段；本批未调用线上 Chat，也未修改 Web API。
