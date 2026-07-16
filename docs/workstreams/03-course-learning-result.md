@@ -476,3 +476,30 @@
 
 - **未验证**：当前无模拟器或真机；逐步示例、中间窗口状态、两项活动反馈的手机/平板实际显示与滚动未验证。
 - **未验证**：本批未调用线上 API，不构成线上内容检索或学伴回答证据。
+
+## 批次十八：Dijkstra 精确可执行事实契约
+
+### 行为
+
+- 移除 `validate-topic-relations.py` 的通用自然语言箭头正则；该规则会把“不存在路径 C→A”等否定说明当成事实路径，也只能识别一种权重排版，不适合作为全部课程内容门禁。
+- 将 Dijkstra 事实校验收敛到精确活动 `cs101-最短路径算法-1`：从真实题面解析 5 条有向带权边和源点，使用优先队列执行 Dijkstra，再比对每轮定型距离、松弛的有向边与权重、全部出边覆盖和最终距离字典。
+- 新增旧错误答案 fixture：从 C 松弛 A 会明确得到 `relaxes undeclared directed edge C→A`，同时检出 A 以 6 错误定型及最终距离不匹配；当前生成活动作为正确 fixture 返回空错误集并固定 A=7、C=5。
+- 本批不修改或重新生成 `lesson-experiences.json`，不会覆盖并行保留的 CS102 内容差异。
+
+### 文件
+
+- `scripts/validate-topic-relations.py`
+- `scripts/test_validate_topic_relations.py`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：活动题面声明 `S→A=10`、`S→B=3`、`B→A=4`、`B→C=2`、`A→C=1`；真实最短距离为 S=0、B=3、C=5、A=7。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts scripts.test_validate_topic_relations -v`，退出码 0；18 项通过，包含错误 fixture 红灯断言和当前活动绿灯断言。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与结构关系契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；44 项运行，43 项通过，1 项跨 WS02 reducer 契约为预期失败。
+
+### 失败与未验证
+
+- 首次目标测试退出码 1，5 项因新增函数插入位置使 `find_activity` 缺少返回值而报错；修正返回位置后同一命令退出码 0，18 项全部通过。
+- **未验证**：本批只改校验与测试，没有改产品代码或资源，未重复执行 HAP、模拟器或真机验证；最近一次 HAP 构建证据属于前一 TCP Reno 批次。

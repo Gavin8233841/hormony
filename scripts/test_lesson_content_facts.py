@@ -1,4 +1,6 @@
+import heapq
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -16,6 +18,19 @@ WEB_CS103_KNOWLEDGE_PATH = ROOT / "apps/web/src/lib/data/cs103-knowledge.ts"
 CS101_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS101.md"
 CS102_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS102.md"
 CS103_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS103.md"
+
+DIJKSTRA_EDGE_PATTERN = re.compile(
+    r"([A-Z])\s*→\s*([A-Z])\s*\(权\s*(\d+)\)"
+)
+DIJKSTRA_SOURCE_PATTERN = re.compile(r"源点:\s*([A-Z])")
+DIJKSTRA_STEP_PATTERN = re.compile(
+    r"^\s*\d+\.\s*选\s+([A-Z])\((\d+)\)：([^\n]*)$",
+    re.MULTILINE,
+)
+DIJKSTRA_UPDATE_PATTERN = re.compile(
+    r"dist\[([A-Z])\]\s*=\s*min\([^,]+,\s*(\d+)\s*\+\s*(\d+)\)"
+)
+DIJKSTRA_FINAL_PATTERN = re.compile(r"([A-Z])=(\d+)")
 
 
 def load_json(path):
@@ -42,6 +57,99 @@ def find_activity(experiences, course_id, topic, activity_id):
         f"{activity_id} activity",
         lambda item: item.get("id") == activity_id,
     )
+
+
+def dijkstra_contract_errors(activity):
+    prompt = activity["prompt"]
+    answer = activity["answer"]
+    edge_matches = DIJKSTRA_EDGE_PATTERN.findall(prompt)
+    source_matches = DIJKSTRA_SOURCE_PATTERN.findall(prompt)
+    errors = []
+    if len(source_matches) != 1:
+        return [f"expected one source vertex, got {len(source_matches)}"]
+    if not edge_matches:
+        return ["expected at least one directed weighted edge"]
+
+    source = source_matches[0]
+    weights = {}
+    vertices = {source}
+    adjacency = {}
+    for start, end, raw_weight in edge_matches:
+        edge = (start, end)
+        weight = int(raw_weight)
+        if edge in weights:
+            errors.append(f"duplicate directed edge {start}→{end}")
+            continue
+        weights[edge] = weight
+        vertices.update(edge)
+        adjacency.setdefault(start, []).append((end, weight))
+
+    distances = {vertex: float("inf") for vertex in vertices}
+    distances[source] = 0
+    queue = [(0, source)]
+    while queue:
+        distance, vertex = heapq.heappop(queue)
+        if distance != distances[vertex]:
+            continue
+        for neighbor, weight in adjacency.get(vertex, []):
+            next_distance = distance + weight
+            if next_distance < distances[neighbor]:
+                distances[neighbor] = next_distance
+                heapq.heappush(queue, (next_distance, neighbor))
+
+    used_edges = set()
+    selected_vertices = []
+    for vertex, raw_distance, body in DIJKSTRA_STEP_PATTERN.findall(answer):
+        selected_vertices.append(vertex)
+        selected_distance = int(raw_distance)
+        if vertex not in distances:
+            errors.append(f"selected unknown vertex {vertex}")
+        elif selected_distance != distances[vertex]:
+            errors.append(
+                f"selected {vertex} at {selected_distance}, expected {distances[vertex]}"
+            )
+        for target, raw_base, raw_weight in DIJKSTRA_UPDATE_PATTERN.findall(body):
+            edge = (vertex, target)
+            used_edges.add(edge)
+            if edge not in weights:
+                errors.append(f"relaxes undeclared directed edge {vertex}→{target}")
+                continue
+            if int(raw_base) != selected_distance:
+                errors.append(
+                    f"relaxation {vertex}→{target} starts at {raw_base}, expected {selected_distance}"
+                )
+            if int(raw_weight) != weights[edge]:
+                errors.append(
+                    f"relaxation {vertex}→{target} uses weight {raw_weight}, expected {weights[edge]}"
+                )
+
+    if len(selected_vertices) != len(vertices) or set(selected_vertices) != vertices:
+        errors.append("selection trace must finalize every declared vertex exactly once")
+    missing_edges = set(weights) - used_edges
+    if missing_edges:
+        rendered = ", ".join(
+            f"{start}→{end}" for start, end in sorted(missing_edges)
+        )
+        errors.append(f"selection trace omits outgoing edges: {rendered}")
+
+    final_marker = answer.rfind("最终：")
+    if final_marker < 0:
+        errors.append("missing final distance line")
+        return errors
+    final_distances = {
+        vertex: int(raw_distance)
+        for vertex, raw_distance in DIJKSTRA_FINAL_PATTERN.findall(
+            answer[final_marker:]
+        )
+    }
+    expected_distances = {
+        vertex: int(distance) for vertex, distance in distances.items()
+    }
+    if final_distances != expected_distances:
+        errors.append(
+            f"final distances {final_distances} do not match {expected_distances}"
+        )
+    return errors
 
 
 class LessonContentFactsTest(unittest.TestCase):
@@ -71,6 +179,40 @@ class LessonContentFactsTest(unittest.TestCase):
         self.assertEqual(root_recolor, ordered_steps[-1])
         self.assertEqual("C → B → E → A → D → F", self.activity["answer"])
         self.assertIn("违反知识切片 cs101_k20 的\"根为黑\"性质", self.activity["feedback"])
+
+    def test_dijkstra_contract_rejects_reversed_relaxation_fixture(self):
+        activity = find_activity(
+            self.experiences,
+            "cs101",
+            "最短路径算法",
+            "cs101-最短路径算法-1",
+        )
+        wrong_answer = (
+            "1. 选 S(0)：dist[A]=min(∞,0+10)=10, dist[B]=min(∞,0+3)=3。S={S}\n"
+            "2. 选 B(3)：dist[A]=min(10,3+4)=7, dist[C]=min(∞,3+2)=5。S={S,B}\n"
+            "3. 选 C(5)：dist[A]=min(7,5+1)=6。S={S,B,C}\n"
+            "4. 选 A(6)：A 无出边。S={S,B,C,A}\n"
+            "5. 最终：S=0, B=3, C=5, A=6"
+        )
+        fixture = {**activity, "answer": wrong_answer}
+
+        errors = dijkstra_contract_errors(fixture)
+
+        self.assertIn("relaxes undeclared directed edge C→A", errors)
+        self.assertTrue(any(error.startswith("selected A at 6") for error in errors))
+        self.assertTrue(any(error.startswith("final distances") for error in errors))
+
+    def test_dijkstra_contract_accepts_generated_activity(self):
+        activity = find_activity(
+            self.experiences,
+            "cs101",
+            "最短路径算法",
+            "cs101-最短路径算法-1",
+        )
+
+        self.assertEqual([], dijkstra_contract_errors(activity))
+        self.assertIn("最终：S=0, B=3, C=5, A=7", activity["answer"])
+        self.assertIn("知识切片 cs101_k27", activity["feedback"])
 
     def test_red_black_root_step_is_kept_in_the_source_spec(self):
         spec = CS101_SPEC_PATH.read_text(encoding="utf-8")

@@ -6632,3 +6632,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 当前无模拟器、手机、平板或真机；逐步示例、中间窗口状态与两项活动反馈的实际布局和滚动未验证。
 - 本批未调用线上 API，不构成线上内容检索或学伴回答证据。
+
+---
+
+## 2026-07-17 [WS03] Dijkstra 精确可执行事实契约
+
+背景：主线复核确认 Dijkstra 修正文案正确，但 `invalid_directed_path_edges` 是面向全部自然语言的通用正则，会误判否定说明中的箭头，并漏掉未使用 `(权 n)` 的其他写法。本批删除不可靠的通用门禁，改为对精确活动执行图算法验证。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `scripts/validate-topic-relations.py`
+- `scripts/test_validate_topic_relations.py`
+- `scripts/test_lesson_content_facts.py`
+
+行为变化：
+- 删除 validator 中有向边/路径正则、自然语言路径检查及其两项泛化单测。
+- 精确读取 `cs101-最短路径算法-1`，解析真实题面的源点和 5 条有向带权边，用优先队列执行 Dijkstra。
+- 校验每轮选中顶点的最短距离、由当前顶点发起的松弛边和权重、出边覆盖及最终距离字典。
+- 错误 fixture 复现旧答案，断言 `C→A` 未声明松弛、A=6 错误定型和最终距离错误；当前生成活动作为正确 fixture 返回空错误集。
+- 未修改或重新生成 `lesson-experiences.json`。
+
+验证：
+- 首次 `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_lesson_content_facts scripts.test_validate_topic_relations -v`：退出码 1，新增函数插入位置导致 `find_activity` 缺少返回值，5 项报错；修正后重跑退出码 0，18 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与结构关系契约通过。
+- WS03 完整回归：退出码 0，44 项运行，43 项通过，1 项跨 WS02 reducer 契约为预期失败。
+
+失败或未验证：
+- 本批没有产品代码或资源变化，未重复执行 HAP、模拟器或真机验证；最近一次 HAP 构建属于前一 TCP Reno 批次。
