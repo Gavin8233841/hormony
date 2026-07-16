@@ -175,3 +175,31 @@
 - **未验证**：`hdc list targets` 返回 `[Empty]`；没有执行安装、启动、实时页面点击或截图，不能标记为模拟器通过或真机通过。
 - **未验证**：当前 WS06 分支尚未集成 WS03 `4fd5bef` 的页面改动；脚本按该已核实契约前置更新，需在主线集成后执行设备流程。
 - **未验证**：本批只修改无破坏性冒烟脚本与记录，未重新构建 HAP。
+
+## 批次 6：AI 引用能力真实性口径
+
+背景：架构与交接文档仍把“所有 AI 输出附带引用”写成产品原则，超过当前编排器可证明的行为，也会把 Plan 等不保证引用的输出误写成必有来源。
+
+文件：
+
+- `docs/architecture.md`
+- `docs/HANDOFF-TO-TRAE.md`
+- `docs/workstreams/06-competition-release-result.md`
+- `DEVLOG.md`
+
+行为变化：
+
+- 将引用能力收敛为：课程检索问答只在主 Agent 实际返回 `citations` 时展示引用，Plan 等输出不保证引用。
+- 架构流程图同步标注“主 Agent 实际返回的引用（如有）”，不再暗示结构化输出必然附带引用。
+- 文档使用源码中的精确结果字段 `citations`；SSE 单条引用事件的类型仍为 `citation`，两者不混写。
+
+验证：
+
+- **源码确认**：`apps/web/src/lib/agents/orchestrator.ts` 第 231 行返回 `citations: mainResult.citations ?? []`，第 269-270 行只对实际数组逐条发送 `type: "citation"` 事件。
+- **源码确认**：扫描 `README.md` 与 `docs/**/*.md` 的“所有 AI 输出/所有引用/保证引用/附带资料引用”类表述，exit 0；剩余命中均为禁止夸大、NOTICE 待确认项或与 AI 引用无关的设计说明。
+- **静态诊断通过**：`git diff --check -- docs/architecture.md docs/HANDOFF-TO-TRAE.md`，exit 0。
+
+未验证：
+
+- **未验证**：本批只纠正文档口径，未发起线上 Chat SSE 或 Plan 请求，不能证明当前线上部署的引用行为。
+- **未验证**：未运行 Web 四项或 HarmonyOS 构建；产品源码与数据未改变。
