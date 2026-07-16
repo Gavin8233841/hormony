@@ -137,6 +137,32 @@ class LessonFlowContractTest(unittest.TestCase):
             errors,
         )
 
+    def test_rejects_path_that_reverses_a_declared_directed_edge(self):
+        activity = self.experiences[0]["activities"][0]
+        activity["prompt"] = (
+            "有向带权图：S → B (权 3), B → C (权 2), A → C (权 1)"
+        )
+        activity["answer"] = "路径 S→B→C→A 的长度为 6"
+        activity["feedback"] = "不能把 A→C 当成 C→A 使用"
+
+        errors = self.validate()
+
+        self.assertIn(
+            'lessonExperience[0].activities[0] cs101/topic-a/activity-1: '
+            'directed path "S→B→C→A" uses undeclared edge "C→A"',
+            errors,
+        )
+
+    def test_accepts_paths_composed_from_declared_directed_edges(self):
+        activity = self.experiences[0]["activities"][0]
+        activity["prompt"] = (
+            "有向带权图：S → B (权 3), B → C (权 2), A → C (权 1)"
+        )
+        activity["answer"] = "最短路径是 S→B→C"
+        activity["feedback"] = "A→C 是另一条已声明的有向边"
+
+        self.assertEqual([], self.validate())
+
     def test_rejects_unanswerable_ordered_choice(self):
         activity = self.experiences[0]["activities"][0]
         activity.update({

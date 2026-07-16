@@ -329,3 +329,34 @@
 
 - **未验证**：`hdc list targets` 输出 `[Empty]`；“本练聚焦”在手机和平板的实际单行渲染、超长回答跳转 Chat、返回 Lesson 与完整点击路径均无模拟器或真机证据。
 - **未验证**：学伴线上响应及引用业务字段；本批未调用线上 Chat，也未修改 Web API。
+
+## 批次十三：Dijkstra 有向边事实修正
+
+### 行为
+
+- 修正“最短路径算法”主动练习 1：题面声明 `A→C`，旧答案却从 C 反向松弛 A 并构造不存在的 `S→B→C→A`。现按有向边方向得到 A=7、C=5，并明确 C 无出边、A→C 的候选距离 8 不会更新 C。
+- 只修改唯一源规格 `ACTIVE-LEARNING-SPEC-CS101.md`，随后运行既有 `generate-learning-activities.mjs` 生成端侧产物；JSON 仅改变该活动的 `answer/feedback`，其他 58 个活动未变化。
+- 内容校验器新增有向带权图路径门禁：从题干提取声明边，答案和反馈中使用箭头表示的每段路径都必须由已声明的同向边组成；不会执行题目代码或用户输入。
+- 新增正反两项单测，分别证明反向使用 `C→A` 被拒绝、由 `S→B` 和 `B→C` 组成的路径被接受。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS101.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/validate-topic-relations.py`
+- `scripts/test_validate_topic_relations.py`
+
+### 证据
+
+- **源码确认**：题面只声明 `S→A`、`S→B`、`B→A`、`B→C`、`A→C`；知识切片 `cs101_k27` 明确 Dijkstra 每轮用当前顶点更新其邻接顶点，旧路径中的 `C→A` 不存在。
+- **源码确认**：在重新生成前运行 `python scripts/validate-topic-relations.py`，退出码 1，唯一新增错误为 `directed path "S→B→C→A" uses undeclared edge "C→A"`，证明门禁先复现旧事实错误；该次命令不是通过证据。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；生成 33/33 Topic、59 个活动，52 个规格活动类型分布保持不变。
+- **静态诊断通过**：`python -m unittest scripts.test_validate_topic_relations -v`，退出码 0；13 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与有向路径门禁全部通过，`ALL CHECKS PASSED`。
+- **静态诊断通过**：`python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations -v`，退出码 0；39 项运行，38 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；内容资源与 ArkTS 重新编译，`BUILD SUCCESSFUL in 19 s 171 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器或真机证据检查修正后的答案、反馈换行和滚动显示。
+- **未验证**：本批没有逐题外部资料核验其他 58 个活动；门禁只证明显式有向路径使用题面声明边，不等同全量事实审校。

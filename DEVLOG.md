@@ -6478,3 +6478,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 当前没有模拟器或真机；“本练聚焦”的手机/平板实际渲染、超长回答进入 Chat、返回 Lesson 和完整点击路径未验证。
 - 学伴线上响应及引用业务字段未验证；本批未修改 Web API。
+
+---
+
+## 2026-07-17 [WS03] Dijkstra 有向边事实修正
+
+背景：“最短路径算法”主动练习 1 的题面是有向图且只声明 `A→C`，旧参考答案却在选中 C 后反向使用该边松弛 A，并给出不存在的路径 `S→B→C→A` 和错误结果 A=6。这会直接教错 Dijkstra 的出边松弛语义。本批修正唯一源并加入可复用内容门禁。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `docs/ACTIVE-LEARNING-SPEC-CS101.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/validate-topic-relations.py`
+- `scripts/test_validate_topic_relations.py`
+
+行为变化：
+- 正确推演为：选 C(5) 时 C 无出边，A 保持 7；选 A(7) 时沿 A→C 得到候选 8，C 仍保持 5；最终 A=7、C=5。
+- 反馈明确只沿有向边箭头方向松弛，并引用同 Topic 知识切片 `cs101_k27`。
+- 源规格修正后通过现有生成器同步 JSON，生成差异只包含该活动的答案和反馈。
+- 校验器从有向带权图题干提取声明边，拒绝答案/反馈中由未声明同向边组成的箭头路径；新增接受合法路径和拒绝反向路径两项测试。
+
+验证：
+- 修正产物前 `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 1，精确检出 `S→B→C→A` 使用未声明 `C→A`。
+- `node scripts/generate-learning-activities.mjs`：退出码 0，生成 33/33 Topic、59 个活动；52 个规格活动类型分布不变。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_validate_topic_relations -v`：退出码 0，13 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与有向路径门禁通过，`ALL CHECKS PASSED`。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations -v`：退出码 0，39 项运行，38 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 19 s 171 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 当前无模拟器或真机，修正后的长答案/反馈实际渲染未验证。
+- 本批未逐题外部核验其他 58 个活动；新增门禁不等同全量事实审校。

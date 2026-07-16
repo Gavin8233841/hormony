@@ -6,6 +6,7 @@ Course -> Topic -> Lesson -> 互动 -> 聚焦标签测验/本地练习可达
 用法：python scripts/validate-topic-relations.py
 """
 import json
+import re
 import sys
 from collections import Counter, deque
 from pathlib import Path
@@ -25,6 +26,14 @@ ACTIVITY_MODES = {
     "output_predict": {"single_choice", "free_response"},
 }
 MAX_FOCUS_TAG_LENGTH = 12
+DIRECTED_EDGE_PATTERN = re.compile(
+    r"([A-Za-z][A-Za-z0-9_]*)\s*→\s*([A-Za-z][A-Za-z0-9_]*)"
+    r"\s*\(权\s*-?\d+(?:\.\d+)?\)"
+)
+DIRECTED_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])"
+    r"([A-Za-z][A-Za-z0-9_]*(?:\s*→\s*[A-Za-z][A-Za-z0-9_]*)+)"
+)
 
 def load_json(path):
     with open(path, encoding="utf-8") as f:
@@ -36,6 +45,25 @@ def is_non_empty_string(value):
 def utf16_length(value):
     """Match the JavaScript/ArkTS String.length used by the Quiz request path."""
     return len(value.encode("utf-16-le")) // 2
+
+def invalid_directed_path_edges(prompt, answer, feedback):
+    declared_edges = set(DIRECTED_EDGE_PATTERN.findall(prompt))
+    if not declared_edges:
+        return []
+
+    invalid = []
+    seen = set()
+    for text in (answer, feedback):
+        for path_match in DIRECTED_PATH_PATTERN.finditer(text):
+            vertices = re.findall(r"[A-Za-z][A-Za-z0-9_]*", path_match.group(1))
+            path = "→".join(vertices)
+            for start, end in zip(vertices, vertices[1:]):
+                edge = (start, end)
+                key = (path, edge)
+                if edge not in declared_edges and key not in seen:
+                    seen.add(key)
+                    invalid.append((path, "→".join(edge)))
+    return invalid
 
 def topic_key(item):
     if not isinstance(item, dict):
@@ -309,6 +337,15 @@ def check_lesson_flow_contract(nodes, chunks, quizzes, experiences):
             for field in ("title", "focusTag", "prompt", "language", "answer", "feedback", "source"):
                 if not is_non_empty_string(activity.get(field)):
                     errors.append(f'{activity_location}: "{field}" must be non-empty string')
+
+            prompt = activity.get("prompt")
+            answer = activity.get("answer")
+            feedback = activity.get("feedback")
+            if all(isinstance(value, str) for value in (prompt, answer, feedback)):
+                for path, edge in invalid_directed_path_edges(prompt, answer, feedback):
+                    errors.append(
+                        f'{activity_location}: directed path "{path}" uses undeclared edge "{edge}"'
+                    )
 
             focus_tag = activity.get("focusTag")
             if isinstance(focus_tag, str):
