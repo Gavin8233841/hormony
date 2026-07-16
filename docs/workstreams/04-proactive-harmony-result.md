@@ -37,13 +37,17 @@
 - 学习事件按本地时区分组和显示，不再直接截取 UTC ISO 字符串。
 - 近 4 周学习节奏、连续天数、活跃天数、事件数和分类筛选全部由本机真实事件计算。
 - 每条计划、课程互动、课程完成、精选练习和 AI 测验记录按已有 AppStorage 契约回到真实页面；旧事件 Topic 不再属于当前课程时只回到课程详情。
+- `ActivityRecords.ets` 在 Repository 全部读取成功后一次提交事件、课程、计划、节奏和连续天数快照；重读失败保留上一份一致状态，空态和已有记录错误态均提供 48 vp 重试入口。
+- 学习记录筛选、四周节奏和事件卡片具有明确屏幕阅读器名称；筛选等分窄屏宽度，日格和重试入口采用最小高度，事件时间与操作允许换行。
+- `Profile.ets` 不再消费当前基线按标签混合聚合的洞察，也不展示没有真实更新链路的 `weakTopics`、`strongTopics` 和 `learningStyle`。
+- 画像改为读取 ArkData `TopicMastery`，与本地课程目录做精确 `courseId + topic` 校验后，按未掌握、累计正确率和最近答题时间排序；统计卡明确说明本机答题与学习事件来源。
+- 画像加载和导航失败均保留可见提示与 48 vp 重试入口；知识点练习只写入目录派生的课程标题和精确 Topic，并清空旧标签筛选。
 - `Achievements.ets` 展示每项里程碑的真实来源、剩余量和本地解锁日期；首个未解锁目标使用本地课程目录中的精确 Topic 提供可执行动作。
 
 ### WS02 标签洞察依赖
 
-- 已读取 `codex/ws02-quiz-mastery` 工作树 HEAD `c9572d2` 上的未提交 `QuizLearningStateReducer.ets`、`LocalLearningRepository.ets` 差异与 `quiz-learning-state.test.ts`。
-- 源码确认 reducer 的 `tagInsightKey(courseId, topic, tag)` 使用三元组分组，其测试包含“相同标签在不同精确 Topic 下分别累计”用例。
-- 当前 WS04 基线 Repository 仍按 `tag` 跨课程/Topic 聚合，所以本批主动服务、记录页和成就页不读取标签洞察，也没有修改 `LocalLearningRepository.ets`。
+- 已读取远端跟踪分支 `origin/codex/ws02-quiz-mastery` 的 HEAD `9658479`；源码确认 reducer 的 `tagInsightKey(courseId, topic, tag)` 使用三元组分组，其测试包含“相同标签在不同精确 Topic 下分别累计”用例。
+- 当前 WS04 基线 Repository 仍按 `tag` 跨课程/Topic 聚合，所以主动服务、记录、画像和成就不读取标签洞察，也没有修改 `LocalLearningRepository.ets`。
 - WS02 reducer 提交并集成后，再用独立补丁恢复薄弱标签主动推荐；若需新增完整集合 Repository API，必须单独提交以便在 WS02 之后精确重放。
 
 ## 旧提交复核
@@ -55,9 +59,9 @@
 
 ## 整合分支校准
 
-- 已读取 `origin/codex/harmony-integration-20260717` 的 HEAD `38f571f` 及相关源码和测试。
-- 整合分支已包含当前行动重算、latest-wins、导航成功后消费目标和本地计划日期对齐，本批没有重复修改 `ProactiveLearningService.ets`、`EntryAbility.ets`、`Index.ets`、Repository 或计划日期逻辑。
-- 本批四个产品文件在 `38f571f` 上与 WS04 当前分支保持同一产品基线，便于主线精确重放。
+- 最新已 fetch 并读取 `origin/codex/harmony-integration-20260717` 的 HEAD `9565aaf2910b27b726f0386ef0e58352de423ce2`。
+- 整合分支已包含当前行动重算、latest-wins、导航成功后消费目标、本地计划日期，以及 `Course/Lesson`、`Chat/Plan` 端侧闭环；本批不重复修改这些区域。
+- 本批只修改 `Profile.ets`、`ActivityRecords.ets` 与各自独立契约测试，不触碰 `0e4f67f` 已修改的 `HomeContent`、提醒、卡片更新器、服务卡片和交付契约测试。
 
 ## 文件
 
@@ -67,12 +71,15 @@
 - `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Index.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
 - `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
 - `apps/harmonyos/entry/src/main/resources/base/element/string.json`
 - `scripts/test-proactive-delivery-contracts.mjs`
 - `scripts/test-proactive-learning-service.mjs`
+- `scripts/test-profile-accessibility-contracts.mjs`
+- `scripts/test-activity-records-accessibility-contracts.mjs`
 
 ## 验证证据
 
@@ -85,7 +92,8 @@
 | **源码确认** | `node --test scripts/test-proactive-learning-service.mjs` | exit 0，17/17 通过；直接执行当前 `.ets` 服务，覆盖混合洞察零读取、零进度空态、旧计划四类无效任务、课程 Topic 和 Want 边界 |
 | **源码确认** | `node --test scripts/test-proactive-delivery-contracts.mjs` | exit 0，18/18 通过；直接执行当前服务、提醒、首页提醒方法、卡片更新器、Form Ability 与 EntryAbility，另对 ArkUI 和 Form 无障碍绑定做精确静态契约检查 |
 | **源码确认** | 两个主动学习脚本合并执行 | exit 0，35/35 通过；新增覆盖首页/通知/多卡片同一对象快照、两张卡片单次解析、显式快照零重复解析、状态变化后单卡重算和 48 vp 触控语义 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 20 s 559 ms`；无 ArkTS 业务告警 |
+| **源码确认** | 四个 WS04 契约脚本合并执行 | exit 0，47/47 通过；新增 12 项覆盖画像真实 Topic 来源、精确目录校验、一致快照、双错误态恢复、无障碍名称、窄屏换行和字体放大最小高度 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 21 s 159 ms`；无 ArkTS 业务告警 |
 | **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
 | **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
@@ -97,7 +105,7 @@
 - 首页、记录、成就、提醒和卡片已在源码中共享同一真实状态，但缺少设备上的“计划保存/答题事件 -> 首页和卡片刷新 -> 通知或卡片点击回流”证据。
 - 按课程/Topic/标签隔离的主动标签推荐依赖 WS02 reducer 先完成提交和集成，当前明确未启用。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
-- 屏幕阅读器播报顺序、字体放大后的文本适配和错误重试独立聚焦尚无设备证据。
+- Profile 与 ActivityRecords 的屏幕阅读器播报顺序、字体放大、窄屏排版、48 vp 实际触控和错误重试独立聚焦尚无设备证据。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
 - HAP 签名、安装、横屏、平板和真机均未验证。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。

@@ -6296,3 +6296,42 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Node 中的 HarmonyOS Kit 为受控替身，ArkUI/Form 仅做精确源码契约检查，不能替代设备证据。
 - HAP 未配置签名，安装和竞赛提交包可用性未验证。
 - 本批未修改 Web、Repository、ArkData schema、`Achievements.ets` 或整合分支已增强的入口与路由文件。
+
+---
+
+## 2026-07-17 [WS04] 真实画像与学习记录无障碍恢复
+
+背景：主线整合分支已推进到 `9565aaf`，并覆盖 `Course/Lesson` 与 `Chat/Plan` 闭环；本批保持独立，不修改 `0e4f67f` 的首页、提醒、卡片更新器、服务卡片和交付契约。源码复核发现 Profile 仍消费当前基线跨课程/Topic 混合的标签洞察，并展示没有真实更新链路的强弱数组和学习风格；ActivityRecords 重读过程中会逐步替换页面状态，失败时可能留下不同批次的证据。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+- `scripts/test-profile-accessibility-contracts.mjs`
+- `scripts/test-activity-records-accessibility-contracts.mjs`
+
+行为变化：
+- Profile 改用现有 ArkData `TopicMastery`，并以本地课程目录精确校验 `courseId + topic`；未掌握、累计正确率较低且最近练习的知识点优先展示。
+- Profile 停止读取当前混合聚合的 `getTagInsights()`，也不再展示没有真实更新链路的 `weakTopics`、`strongTopics` 和 `learningStyle`；统计卡明确标注本机答题与学习事件来源。
+- 画像练习入口只写入目录派生的课程标题和精确 Topic，清空旧标签筛选；页面加载和导航失败提供可见信息与最小 48 vp 重试入口。
+- 学习星图入口移除固定坐标排版；画像入口、统计、知识点操作补齐屏幕阅读器名称和说明，按钮与列表项使用可随字体增长的最小高度。
+- ActivityRecords 先在局部变量中读取事件、课程、计划、四周节奏和连续天数，全部成功后一次提交页面快照；失败保留上一份一致状态。
+- 学习记录空态和已有记录错误态均可重新读取；筛选项等分窄屏空间并播报选中状态，四周节奏汇总真实事件为单一播报，事件时间与操作可换行。
+
+验证：
+- `git fetch origin codex/harmony-integration-20260717`：exit 0；远端整合分支 HEAD 为 `9565aaf2910b27b726f0386ef0e58352de423ce2`。
+- `node --check scripts/test-profile-accessibility-contracts.mjs`：exit 0。
+- `node --check scripts/test-activity-records-accessibility-contracts.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs scripts/test-profile-accessibility-contracts.mjs scripts/test-activity-records-accessibility-contracts.mjs`：exit 0，47/47 通过；Node 24 仍输出 `stripTypeScriptTypes` 实验性 API 警告。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 21 s 159 ms`；无 ArkTS 业务告警，仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe version`：exit 0，版本 `3.2.0e`。
+- 同一 `hdc.exe list targets`：exit 0，返回 `[Empty]`。
+- `git diff --check`：exit 0；仅输出工作树 LF 将按 Git 配置转换为 CRLF 的提示。
+
+失败或未验证：
+- 当前任务没有 DevEco MCP，单文件 ArkTS 静态诊断未验证；HAP 结果只记为构建通过。
+- 当前没有模拟器或真机目标，Profile 与 ActivityRecords 的屏幕阅读器播报顺序、字体放大、窄屏排版、实际触控、错误重试、记录回流和画像测验回流均为未验证。
+- Node 页面测试是源码契约检查，不能替代 ArkUI 设备渲染或交互证据。
+- HAP 未配置签名，安装和竞赛提交包可用性未验证。
+- 本批未修改 Web、Repository、ArkData schema、Achievements、LearningMap、Course、Lesson、Chat、Plan 或 `0e4f67f` 的五个产品/测试文件。
