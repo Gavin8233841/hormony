@@ -6,6 +6,7 @@ import { AnswerOption, GradientHeader, ReviewDetailRow, StagedProgress, WorkStep
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { HttpClient } from '../common/HttpClient';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   QuizPackage,
@@ -52,7 +53,7 @@ interface QuizTagSummary {
 struct QuizPage {
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
-  @State topic: string = '综合';
+  @State topic: string = '';
   @State focusTag: string = '';
   @State quizId: string = '';
   @State questions: QuizQuestionView[] = [];
@@ -79,7 +80,7 @@ struct QuizPage {
   @State progressTick: number = 0;
   private grading: QuizGradingItem[] = [];
   private answerLabels: string[] = ['A', 'B', 'C', 'D'];
-  private suggestions: string[] = ['二叉树与BST', '图的遍历', '动态规划'];
+  private suggestions: string[] = [];
   private difficultyOptions: DifficultyOption[] = [
     { value: 'easy', label: '基础', description: '概念识别' },
     { value: 'medium', label: '进阶', description: '场景判断' },
@@ -105,18 +106,19 @@ struct QuizPage {
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
-    if (this.courseId === 'cs102') {
-      this.suggestions = ['进程与线程', 'CPU调度', '虚拟内存与分页'];
-    } else if (this.courseId === 'cs103') {
-      this.suggestions = ['TCP握手与流量控制', 'HTTP协议', 'DNS系统'];
-    } else {
-      this.suggestions = ['二叉树与BST', '图的遍历', '动态规划'];
-    }
+    this.suggestions = LearningContentRepository.getTopics(this.courseId);
     const selectedTopic = AppStorage.get<string>('selectedQuizTopic') ?? '';
-    if (selectedTopic.trim().length > 0) {
-      this.topic = selectedTopic.trim();
-      AppStorage.setOrCreate<string>('selectedQuizTopic', '');
+    const normalizedTopic = selectedTopic.trim();
+    if (normalizedTopic.length > 0 && this.suggestions.includes(normalizedTopic)) {
+      this.topic = normalizedTopic;
+    } else {
+      this.topic = this.suggestions[0] ?? '';
+      if (normalizedTopic.length > 0) {
+        this.message = '入口主题不属于当前课程，请重新选择正式主题';
+        this.hasError = true;
+      }
     }
+    AppStorage.setOrCreate<string>('selectedQuizTopic', '');
     const selectedFocusTag = AppStorage.get<string>('selectedQuizFocusTag') ?? '';
     if (selectedFocusTag.trim().length > 0) {
       this.focusTag = selectedFocusTag.trim().substring(0, 12);
@@ -167,6 +169,7 @@ struct QuizPage {
   }
 
   private selectTopic(nextTopic: string): void {
+    if (!this.suggestions.includes(nextTopic)) return;
     this.topic = nextTopic;
     this.focusTag = '';
   }
@@ -211,6 +214,11 @@ struct QuizPage {
 
   async generateQuiz(): Promise<void> {
     if (this.loading) return;
+    if (!this.suggestions.includes(this.topic)) {
+      this.message = '请选择当前课程中的正式主题';
+      this.hasError = true;
+      return;
+    }
     this.resetQuiz();
     this.loading = true;
     this.runGenerationProgress();
@@ -419,7 +427,7 @@ struct QuizPage {
     }
     if (nextTags.length > 0) return nextTags.slice(0, 3);
     const topicTag = this.topic.trim().substring(0, 12);
-    return [topicTag.length > 0 ? topicTag : '综合'];
+    return topicTag.length > 0 && this.suggestions.includes(this.topic) ? [topicTag] : [];
   }
 
   private quizDifficulty(value?: string): string | undefined {
@@ -815,14 +823,6 @@ struct QuizPage {
       .alignItems(HorizontalAlign.Start)
 
       Column({ space: 10 }) {
-        Button('综合练习')
-          .width('100%')
-          .height(48)
-          .fontSize(14)
-          .fontColor(this.topic === '综合' ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-          .backgroundColor(this.topic === '综合' ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
-          .borderRadius(Constants.RADIUS_MD)
-          .onClick(() => { this.selectTopic('综合'); })
         ForEach(this.suggestions, (suggestion: string): void => {
           Button(suggestion)
             .width('100%')

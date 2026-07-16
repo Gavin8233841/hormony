@@ -163,6 +163,22 @@ struct KnowledgePage {
     });
   }
 
+  private startTopicQuiz(): void {
+    const topic = this.resultTopic();
+    if (topic.length === 0) {
+      this.message = '检索结果未对应当前课程的正式主题，无法开始测验';
+      this.hasError = true;
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'KnowledgePage Quiz router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
   private askTutor(item: KnowledgeChunk): void {
     const topic = this.exactTopic(item);
     const evidence = this.evidenceFor(item);
@@ -175,6 +191,15 @@ struct KnowledgePage {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage Chat router.pushUrl failed: %{public}s', err.message);
     });
+  }
+
+  private resultTopic(): string {
+    const courseTopics = LearningContentRepository.getTopics(this.courseId);
+    for (const item of this.results) {
+      const topic = item.topic ?? '';
+      if (item.courseId === this.courseId && courseTopics.includes(topic)) return topic;
+    }
+    return '';
   }
 
   aboutToAppear(): void {
@@ -394,6 +419,15 @@ struct KnowledgePage {
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ left: 16, bottom: 8 })
+
+        Button('复习后，开始“' + this.resultTopic() + '”测验')
+          .height(42)
+          .fontSize(13)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .margin({ left: 16, right: 16, bottom: 10 })
+          .onClick(() => { this.startTopicQuiz(); })
 
         List({ space: 12 }) {
           ForEach(this.results, (item: KnowledgeChunk, i: number) => {
