@@ -230,6 +230,39 @@ struct QuizPage {
     });
   }
 
+  private openMistakeBook(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeBook' }).catch((err: Error): void => {
+      this.message = '无法打开错题本，请重试';
+      this.hasError = true;
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'QuizPage mistake book router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
+  private nextDifficulty(): string {
+    if (this.difficulty === 'easy') return 'medium';
+    return 'hard';
+  }
+
+  private nextQuizLabel(): string {
+    if (this.resultAccuracy < 0.8) return '再练一组';
+    if (this.difficulty === 'easy') return '提升到进阶难度';
+    if (this.difficulty === 'medium') return '提升到挑战难度';
+    return '保持挑战难度';
+  }
+
+  private startNextQuiz(): void {
+    if (this.resultAccuracy < 0.8) {
+      this.resetQuiz();
+      return;
+    }
+    const nextDifficulty = this.nextDifficulty();
+    const changed = nextDifficulty !== this.difficulty;
+    this.resetQuiz();
+    this.difficulty = nextDifficulty;
+    this.message = changed ? '已提升难度，确认题量后开始下一组' : '继续使用挑战难度';
+  }
+
   async generateQuiz(): Promise<void> {
     if (this.loading) return;
     if (!this.suggestions.includes(this.topic)) {
@@ -1366,14 +1399,36 @@ struct QuizPage {
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
 
-      Button('再练一组')
+      if (this.resultCorrectCount < this.resultTotalQuestions) {
+        Row({ space: 10 }) {
+          Button('查看错题本')
+            .layoutWeight(1)
+            .height(50)
+            .fontSize(14)
+            .fontColor(Constants.COLOR_WARNING)
+            .backgroundColor(Constants.COLOR_BG_TAG)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.openMistakeBook(); })
+          Button(this.nextQuizLabel())
+            .layoutWeight(1)
+            .height(50)
+            .fontSize(14)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.startNextQuiz(); })
+        }
         .width('100%')
-        .height(50)
-        .fontSize(15)
-        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-        .backgroundColor(Constants.COLOR_BRAND)
-        .borderRadius(Constants.RADIUS_MD)
-        .onClick(() => { this.resetQuiz(); })
+      } else {
+        Button(this.nextQuizLabel())
+          .width('100%')
+          .height(50)
+          .fontSize(15)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.startNextQuiz(); })
+      }
     }
     .width('100%')
   }
