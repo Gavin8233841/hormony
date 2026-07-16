@@ -6331,3 +6331,39 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前任务没有可用 DevEco MCP，未取得单文件 ArkTS 静态诊断证据；HAP 构建仅记为构建通过。
 - 当前无 HarmonyOS 设备目标，首页视觉、通知授权与点击、服务卡片桌面渲染与点击回流均为未验证；不得记为模拟器或真机通过。
 - 当前 HAP 未签名，安装与远程评审设备可用性未验证。
+
+---
+
+## 2026-07-17 [WS04] 主动入口边界与真实学习反馈
+
+背景：统一主动行动首批实现后，审查确认了三个必须阻断的边界：新用户的三门零进度目录不能伪装成续学状态；旧计划缺失课程、Topic 或合法动作时不能默认打开 Lesson；服务卡片和通知 Want 不能只信任 `source`。同时，WS02 当前正用 `courseId + topic + tag` reducer 修复标签混合，WS04 本批不读取旧聚合证据。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `apps/harmonyos/entry/src/main/ets/common/ProactiveLearningService.ets`
+- `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
+- `scripts/test-proactive-learning-service.mjs`
+
+行为变化：
+- 无学习事件且所有课程 `progress=0` 时返回“制定计划”；仅有真实事件或大于零的课程进度才会续学。
+- 今日计划任务必须具有存在的课程、归属该课程的精确 Topic 和 `lesson/practice/quiz/review` 动作；可跳过无效任务选择后续有效任务，全部无效时显示“计划待修复”并进入计划页。
+- `EntryAbility` 将冷启动 Want 保留到内容仓库与 ArkData 课程目录同步完成后处理；验证来源、128 字符长度上限、动作/页面映射、课程和精确 Topic，外部 `courseTitle` 不读取，非法 Want 不写 `AppStorage`。
+- 已读取 `codex/ws02-quiz-mastery` HEAD `c9572d2` 工作树中尚未提交的 `QuizLearningStateReducer.ets`、Repository 差异和 `quiz-learning-state.test.ts`；其三元组键与跨 Topic 隔离用例为源码确认，本批不运行、不修改 WS02 文件。
+- 当前 Repository 仍按 `tag` 跨课程/Topic 聚合，因此主动服务、记录页和成就页本批不读取标签洞察；`LocalLearningRepository.ets` 未修改且不进入提交。
+- 学习记录按本地时区分组和显示事件，新增由真实本机事件计算的近 4 周节奏、连续天数、活跃天数、峰值与练习/课程/任务筛选；旧 Topic 不属于当前课程时不直达练习或 Lesson。
+- 成就页展示本机事件来源、剩余量和本地解锁日期，并用当前本地课程目录的精确 Topic 为首个未解锁目标提供可执行动作。
+
+验证：
+- `node --check scripts/test-proactive-learning-service.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs`：exit 0，17/17 通过；直接执行当前 `.ets` 服务，覆盖混合洞察零读取、零进度空态、旧计划四类无效形态和 Want 边界；Node 24 输出 `stripTypeScriptTypes` 实验性 API 警告。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 24 s 351 ms`；仍提示未配置 `signingConfigs`。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 当前任务没有 DevEco MCP，单文件 ArkTS 静态诊断未验证。
+- `hdc 3.2.0e list targets` 返回 `[Empty]`，近 4 周节奏视觉、筛选交互、记录回流、成就动作、通知与卡片点击均未取得模拟器或真机证据。
+- WS02 reducer 未在本批集成，按课程/Topic/标签隔离的主动标签推荐为未验证且当前未启用。
+- Web 未修改，因此未运行 Web lint、typecheck、test 或 build。
