@@ -1,9 +1,52 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Brain, Loader2, CheckCircle2, XCircle, Target, TrendingDown, RefreshCw, History } from "lucide-react";
-import type { QuizView, QuizResult, QuizAnswer } from "@/lib/types";
+import type { QuizCatalogItem, QuizPackage, QuizResult } from "@/lib/types";
 import { requestJson, getErrorMessage, isEndpointDisabled } from "@/lib/client-api";
+import { DeviceDataNotice } from "@/components/device-data-notice";
+import { parseQuizPackage, scoreQuizLocally } from "./local-scoring";
+
+class QuizResponseContractError extends Error {
+  constructor() {
+    super("测验响应与请求的课程主题不一致");
+    this.name = "QuizResponseContractError";
+  }
+}
+
+function readQuizCatalog(value: unknown, courseId: string): QuizCatalogItem[] {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("题库目录响应格式无效");
+  }
+  const quizzes = (value as Record<string, unknown>).quizzes;
+  if (!Array.isArray(quizzes)) {
+    throw new Error("题库目录响应格式无效");
+  }
+
+  return quizzes.map((item) => {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("题库目录响应格式无效");
+    }
+    const record = item as Record<string, unknown>;
+    if (
+      typeof record.quizId !== "string" || record.quizId.trim().length === 0 ||
+      record.courseId !== courseId ||
+      typeof record.topic !== "string" || record.topic.trim().length === 0 ||
+      record.topic !== record.topic.trim() ||
+      typeof record.questionCount !== "number" ||
+      !Number.isInteger(record.questionCount) ||
+      record.questionCount < 0
+    ) {
+      throw new Error("题库目录响应格式无效");
+    }
+    return {
+      quizId: record.quizId,
+      courseId,
+      topic: record.topic,
+      questionCount: record.questionCount,
+    };
+  });
+}
 
 export default function QuizPage() {
   const [courseId, setCourseId] = useState("cs101");
@@ -12,16 +55,21 @@ export default function QuizPage() {
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
-  const [quiz, setQuiz] = useState<QuizView | null>(null);
+  const [quiz, setQuiz] = useState<QuizPackage | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<QuizResult | null>(null);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<QuizResult[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
   const [endpointDisabled, setEndpointDisabled] = useState(false);
+  const [catalog, setCatalog] = useState<QuizCatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogRetryKey, setCatalogRetryKey] = useState(0);
+  const catalogAbortRef = useRef<AbortController | null>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
 
   const loadHistory = useCallback(async (signal?: AbortSignal) => {
     setHistoryLoading(true);
@@ -54,59 +102,125 @@ export default function QuizPage() {
     return () => controller.abort();
   }, [loadHistory]);
 
+  useEffect(() => {
+    return () => {
+      generationAbortRef.current?.abort();
+      generationAbortRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    catalogAbortRef.current = controller;
+    setCatalogLoading(true);
+    setCatalogError("");
+    setCatalog([]);
+    setTopic("");
+
+    const loadCatalog = async () => {
+      try {
+        const data = await requestJson<unknown>(
+          `/api/quiz?courseId=${encodeURIComponent(courseId)}`,
+          undefined,
+          controller.signal,
+        );
+        if (catalogAbortRef.current !== controller) return;
+        const nextCatalog = readQuizCatalog(data, courseId);
+        setCatalog(nextCatalog);
+        setTopic(nextCatalog[0]?.topic ?? "");
+      } catch (e) {
+        if (catalogAbortRef.current !== controller) return;
+        const msg = getErrorMessage(e, "加载题库目录失败");
+        if (msg !== null) setCatalogError(msg);
+      } finally {
+        if (catalogAbortRef.current === controller && !controller.signal.aborted) {
+          setCatalogLoading(false);
+        }
+      }
+    };
+
+    loadCatalog();
+    return () => controller.abort();
+  }, [catalogRetryKey, courseId]);
+
+  const changeCourse = (nextCourseId: string) => {
+    catalogAbortRef.current?.abort();
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = null;
+    setCourseId(nextCourseId);
+    setCatalog([]);
+    setCatalogLoading(true);
+    setCatalogError("");
+    setTopic("");
+    setError("");
+    setLoading(false);
+  };
+
+  const retryCatalog = () => {
+    catalogAbortRef.current?.abort();
+    setCatalog([]);
+    setCatalogLoading(true);
+    setCatalogError("");
+    setTopic("");
+    setError("");
+    setCatalogRetryKey((key) => key + 1);
+  };
+
   const generate = async () => {
+    if (loading || catalogLoading || catalogError || !catalog.some((item) => item.topic === topic)) return;
+    generationAbortRef.current?.abort();
+    const controller = new AbortController();
+    generationAbortRef.current = controller;
+    const requestCourseId = courseId;
+    const requestTopic = topic;
     setLoading(true);
     setError("");
     setQuiz(null);
     setResult(null);
     setAnswers({});
     try {
-      const data = await requestJson<QuizView>("/api/quiz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: "demo",
-          courseId,
-          topic: topic.trim() || undefined,
-          focusTag: focusTag.trim() || undefined,
-          count,
-          difficulty,
-        }),
-      });
-      setQuiz(data);
+      const data = await requestJson<unknown>(
+        "/api/quiz",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: "demo",
+            courseId: requestCourseId,
+            topic: requestTopic,
+            focusTag: focusTag.trim() || undefined,
+            count,
+            difficulty,
+          }),
+        },
+        controller.signal,
+      );
+      if (generationAbortRef.current !== controller) return;
+      const nextQuiz = parseQuizPackage(data);
+      if (nextQuiz.courseId !== requestCourseId || nextQuiz.topic !== requestTopic) {
+        throw new QuizResponseContractError();
+      }
+      if (generationAbortRef.current === controller) setQuiz(nextQuiz);
     } catch (e) {
+      if (generationAbortRef.current !== controller) return;
       const msg = getErrorMessage(e, "生成测验失败");
-      if (msg) setError(msg);
+      if (msg !== null) setError(msg);
     } finally {
-      setLoading(false);
+      if (generationAbortRef.current === controller) {
+        generationAbortRef.current = null;
+        setLoading(false);
+      }
     }
   };
 
-  const submit = async () => {
+  const score = () => {
     if (!quiz) return;
-    setSubmitting(true);
     setError("");
     try {
-      const answerList: QuizAnswer[] = quiz.questions.map((q) => ({
-        questionId: q.id,
-        userAnswer: answers[q.id] ?? "",
-      }));
-      const data = await requestJson<QuizResult>("/api/quiz/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quizId: quiz.quizId,
-          userId: "demo",
-          answers: answerList,
-        }),
-      });
-      setResult(data);
-      loadHistory(); // 刷新历史
+      setResult(scoreQuizLocally(quiz, answers, "demo"));
     } catch (e) {
-      const msg = getErrorMessage(e, "提交测验失败");
+      const msg = getErrorMessage(e, "本地评分失败");
       if (msg) setError(msg);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -117,7 +231,9 @@ export default function QuizPage() {
     setError("");
   };
 
-  const answeredCount = quiz ? Object.keys(answers).filter((k) => answers[k]).length : 0;
+  const answeredCount = quiz
+    ? quiz.questions.filter((question) => (answers[question.id] ?? "").trim().length > 0).length
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -129,12 +245,12 @@ export default function QuizPage() {
       {/* 配置区 */}
       {!quiz && (
         <div className="card space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="text-sm text-slate-400">课程</label>
               <select
                 value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
+                onChange={(e) => changeCourse(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
               >
                 <option value="cs101">数据结构 (cs101)</option>
@@ -143,13 +259,47 @@ export default function QuizPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm text-slate-400">主题（可选）</label>
-              <input
+              <label className="text-sm text-slate-400">主题</label>
+              <select
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="如：二叉树、调度算法"
+                disabled={catalogLoading || catalogError.length > 0 || catalog.length === 0}
                 className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
-              />
+              >
+                {catalogLoading ? (
+                  <option value="">正在加载主题...</option>
+                ) : catalogError ? (
+                  <option value="">题库目录加载失败</option>
+                ) : catalog.length === 0 ? (
+                  <option value="">暂无可用主题</option>
+                ) : (
+                  catalog.map((item) => (
+                    <option key={item.quizId} value={item.topic}>
+                      {item.topic}（{item.questionCount} 题）
+                    </option>
+                  ))
+                )}
+              </select>
+              {catalogLoading && (
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <Loader2 size={12} className="animate-spin" /> 正在加载课程主题
+                </p>
+              )}
+              {!catalogLoading && catalogError && (
+                <div className="mt-1 flex items-center justify-between gap-2 text-xs text-red-400">
+                  <span>{catalogError}</span>
+                  <button
+                    type="button"
+                    onClick={retryCatalog}
+                    className="shrink-0 rounded border border-red-500/30 px-2 py-1 transition hover:bg-red-500/10"
+                  >
+                    重试
+                  </button>
+                </div>
+              )}
+              {!catalogLoading && !catalogError && catalog.length === 0 && (
+                <p className="mt-1 text-xs text-slate-500">当前课程没有可用于生成测验的主题</p>
+              )}
             </div>
           </div>
           <div>
@@ -163,7 +313,7 @@ export default function QuizPage() {
             />
             <p className="mt-1 text-xs text-slate-500">用于让 AI 围绕指定能力标签生成题目，题目标签也会记录到画像。</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="text-sm text-slate-400">题目数量</label>
               <input
@@ -190,7 +340,7 @@ export default function QuizPage() {
           </div>
           <button
             onClick={generate}
-            disabled={loading}
+            disabled={loading || catalogLoading || catalogError.length > 0 || topic.length === 0}
             className="flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-40"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Brain size={16} />}
@@ -204,8 +354,8 @@ export default function QuizPage() {
       {/* 答题区 */}
       {quiz && !result && (
         <div className="space-y-4">
-          <div className="card flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
               <Brain size={18} className="text-brand-100" />
               <span className="font-semibold">测验进行中</span>
               <span className="text-sm text-slate-400">· {quiz.questions.length} 题</span>
@@ -215,15 +365,15 @@ export default function QuizPage() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-slate-400">已答 {answeredCount}/{quiz.questions.length}</span>
               <button
-                onClick={submit}
-                disabled={submitting || answeredCount === 0}
+                onClick={score}
+                disabled={answeredCount !== quiz.questions.length}
                 className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-40"
               >
-                {submitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                提交评分
+                <CheckCircle2 size={16} />
+                本地评分
               </button>
             </div>
           </div>
@@ -277,7 +427,7 @@ export default function QuizPage() {
       {result && (
         <div className="space-y-4">
           {/* 分数卡片 */}
-          <div className="card flex items-center gap-6">
+          <div className="card flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
             <div className="flex flex-col items-center">
               <div className={`text-4xl font-bold ${
                 result.accuracy >= 0.8 ? "text-emerald-400" :
@@ -307,6 +457,11 @@ export default function QuizPage() {
               <RefreshCw size={16} /> 再来一组
             </button>
           </div>
+
+          <DeviceDataNotice
+            title="评分已在当前页面完成"
+            description="本次结果未提交到无状态 Web 服务；学习记录、错题与画像请在鸿学伴 HarmonyOS App 中保存和查看。"
+          />
 
           {/* 评估报告 */}
           {result.evaluation && (
@@ -403,7 +558,7 @@ export default function QuizPage() {
               {history.slice(0, 5).map((h, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-4 rounded-lg bg-slate-900/40 px-4 py-3"
+                  className="flex flex-wrap items-center gap-4 rounded-lg bg-slate-900/40 px-4 py-3"
                 >
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                     h.accuracy >= 0.8 ? "bg-emerald-500/20 text-emerald-400" :

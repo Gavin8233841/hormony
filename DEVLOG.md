@@ -6656,3 +6656,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 首轮本地 HTTP 脚本对多值响应头的 PowerShell 类型处理不正确，虽业务请求完成但未作为通过证据；改为严格停止模式和显式 header 归一化后 exit 0。
 - 当前分支未部署，线上行为未验证；无模型配置下未产生真实 Chat SSE 正文、Plan 或 Quiz 模型结果。
 - 浏览器交互、模拟器与真机未验证；本批未修改 HarmonyOS 文件。
+
+---
+
+## [WS05] 2026-07-17：Web SSE、Quiz 本地评分与禁用端点调试体验
+
+背景：Web Chat 会忽略 SSE 解析错误和流内 error；Quiz 页面仍调用无状态生产禁用的 submit；Plan、Knowledge、Stats、Profile 把 `ENDPOINT_DISABLED` 混入普通失败；Quiz 自由文本主题也会与 `c9572d2` 的精确课程-Topic 契约冲突。
+
+文件：
+- `apps/web/src/app/chat/page.tsx`、`apps/web/src/app/chat/sse-client.ts` 及测试
+- `apps/web/src/app/quiz/page.tsx`、`apps/web/src/app/quiz/local-scoring.ts` 及测试
+- `apps/web/src/app/page.tsx`、`plan/page.tsx`、`knowledge/page.tsx`、`profile/page.tsx`、`layout.tsx`
+- `apps/web/src/components/device-data-notice.tsx`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 严格解析 SSE 字段和 `error -> done` 边界，协议错误取消 reader；非 2xx 与流内错误在页面保留 HTTP 状态、精确 code/message，不采用错误流 sessionId。
+- Quiz 使用 API 独立 `grading` 在浏览器本地评分，不再调用 `/api/quiz/submit`；响应先校验题目/评分一一对应、题型、选项、答案和标签。
+- Quiz Topic 从课程题库目录加载，不允许自由文本污染；目录和生成请求都支持取消与请求身份校验，响应 course/topic 必须与请求快照逐字一致。
+- Plan、Knowledge Upload、Stats、Profile、Quiz History 对 `ENDPOINT_DISABLED` 显示端侧持久化提示，并禁用不可能成功的 Web 写操作。
+- Dashboard、导航、Chat、Quiz、Plan、Knowledge、Profile 增加窄屏单列、换行和可访问标签。
+
+验证：
+- `cd apps/web; pnpm lint`：exit 0，静态诊断通过。
+- `cd apps/web; pnpm typecheck`：exit 0，静态诊断通过。
+- `cd apps/web; pnpm test`：exit 0，17 个测试文件、299 项通过。
+- `cd apps/web; pnpm build`：exit 0，构建通过。
+- SSE、Quiz 本地评分与 client API 目标测试：exit 0，35 项通过。
+- 本地生产实例：Quiz 与 Chat 页面 HTTP 200 且包含对应 SSR 标题；API 契约严格脚本 exit 0。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 当前环境没有 Browser 插件，仓库也未新增浏览器依赖；浏览器交互、视觉截图和移动端真实渲染未验证。
+- 当前分支未部署，线上通过未验证；真实模型 Chat SSE、Plan、Quiz 未验证。
+- HarmonyOS 模拟器与真机未验证，本批未修改 HarmonyOS 文件。

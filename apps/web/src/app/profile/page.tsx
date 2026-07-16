@@ -3,12 +3,14 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { User, TrendingUp, AlertCircle, Award, Pencil, Check, X, Loader2, Plus, RotateCcw } from "lucide-react";
 import type { UserProfile } from "@/lib/types";
-import { requestJson, getErrorMessage, isNotFound } from "@/lib/client-api";
+import { requestJson, getErrorMessage, isNotFound, isEndpointDisabled } from "@/lib/client-api";
+import { DeviceDataNotice } from "@/components/device-data-notice";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [endpointDisabled, setEndpointDisabled] = useState(false);
 
   // 编辑状态
   const [editing, setEditing] = useState(false);
@@ -32,6 +34,7 @@ export default function ProfilePage() {
     loadAbortRef.current = controller;
     setLoading(true);
     setError(null);
+    setEndpointDisabled(false);
     try {
       const data = await requestJson<UserProfile>(
         "/api/profile?userId=demo",
@@ -44,7 +47,10 @@ export default function ProfilePage() {
     } catch (e) {
       // 请求已被取代，忽略旧请求的错误
       if (loadAbortRef.current !== controller) return;
-      if (isNotFound(e)) {
+      if (isEndpointDisabled(e)) {
+        setEndpointDisabled(true);
+        setProfile(null);
+      } else if (isNotFound(e)) {
         // 用户不存在 → 空态，不显示红色错误
         setProfile(null);
       } else {
@@ -106,6 +112,13 @@ export default function ProfilePage() {
       setEditing(false);
       setSaveMsg({ type: "success", text: "画像已更新" });
     } catch (e) {
+      if (isEndpointDisabled(e)) {
+        setEndpointDisabled(true);
+        setProfile(null);
+        setEditing(false);
+        setSaveMsg(null);
+        return;
+      }
       const msg = getErrorMessage(e, "保存失败");
       // AbortError → msg 为 null；错误时保留用户编辑内容，不退出编辑模式
       if (msg !== null) {
@@ -136,7 +149,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">个人画像</h1>
           <p className="mt-1 text-sm text-slate-400">你的学习数据画像，驱动个性化推荐</p>
@@ -177,8 +190,15 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {!loading && endpointDisabled && (
+        <DeviceDataNotice
+          title="学习画像仅保存在 HarmonyOS 设备"
+          description="无状态 Web 服务不会读取或修改个人画像、答题统计与薄弱知识点；请在鸿学伴 HarmonyOS App 中查看和维护。"
+        />
+      )}
+
       {/* 空态：用户不存在（NOT_FOUND） */}
-      {!loading && !error && !profile && (
+      {!loading && !error && !endpointDisabled && !profile && (
         <div className="card flex flex-col items-center gap-2 py-12 text-center">
           <User size={32} className="text-slate-600" />
           <p className="text-slate-400">暂无画像数据</p>
@@ -189,13 +209,13 @@ export default function ProfilePage() {
       {!loading && !error && profile && (
         <>
           {/* 基本信息 */}
-          <div className="card flex items-center gap-4">
+          <div className="card flex flex-col items-start gap-4 sm:flex-row sm:items-center">
             <div className="rounded-full bg-brand-500/20 p-4">
               <User className="text-brand-100" size={28} />
             </div>
             <div className="flex-1">
               {editing ? (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                   <input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
@@ -225,7 +245,7 @@ export default function ProfilePage() {
               )}
             </div>
             {editing && (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={save}
                   disabled={saving}
@@ -245,7 +265,7 @@ export default function ProfilePage() {
           </div>
 
           {/* 统计 */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="card">
               <TrendingUp className="text-emerald-400" size={20} />
               <div className="mt-2 text-2xl font-bold">{(profile.stats.accuracy * 100).toFixed(0)}%</div>
@@ -264,7 +284,7 @@ export default function ProfilePage() {
           </div>
 
           {/* 薄弱与优势知识点 */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="card">
               <div className="mb-3 flex items-center gap-2">
                 <AlertCircle className="text-red-400" size={18} />
@@ -276,7 +296,7 @@ export default function ProfilePage() {
                     {editWeak.map((t) => (
                       <span key={t} className="flex items-center gap-1 rounded-lg bg-red-500/15 px-3 py-1.5 text-sm text-red-300">
                         {t}
-                        <button onClick={() => removeWeak(t)} className="hover:text-red-200">
+                        <button onClick={() => removeWeak(t)} className="hover:text-red-200" aria-label={`移除薄弱知识点 ${t}`}>
                           <X size={14} />
                         </button>
                       </span>
@@ -290,7 +310,7 @@ export default function ProfilePage() {
                       placeholder="添加薄弱知识点..."
                       className="flex-1 rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-1.5 text-sm outline-none focus:border-brand-500/50"
                     />
-                    <button onClick={addWeak} className="rounded-lg bg-slate-700/50 px-3 py-1.5 text-slate-300 hover:bg-slate-600/50">
+                    <button onClick={addWeak} className="rounded-lg bg-slate-700/50 px-3 py-1.5 text-slate-300 hover:bg-slate-600/50" aria-label="添加薄弱知识点">
                       <Plus size={16} />
                     </button>
                   </div>
@@ -323,7 +343,7 @@ export default function ProfilePage() {
                     {editStrong.map((t) => (
                       <span key={t} className="flex items-center gap-1 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-sm text-emerald-300">
                         {t}
-                        <button onClick={() => removeStrong(t)} className="hover:text-emerald-200">
+                        <button onClick={() => removeStrong(t)} className="hover:text-emerald-200" aria-label={`移除已掌握知识点 ${t}`}>
                           <X size={14} />
                         </button>
                       </span>
@@ -337,7 +357,7 @@ export default function ProfilePage() {
                       placeholder="添加已掌握知识点..."
                       className="flex-1 rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-1.5 text-sm outline-none focus:border-brand-500/50"
                     />
-                    <button onClick={addStrong} className="rounded-lg bg-slate-700/50 px-3 py-1.5 text-slate-300 hover:bg-slate-600/50">
+                    <button onClick={addStrong} className="rounded-lg bg-slate-700/50 px-3 py-1.5 text-slate-300 hover:bg-slate-600/50" aria-label="添加已掌握知识点">
                       <Plus size={16} />
                     </button>
                   </div>
