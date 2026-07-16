@@ -1,9 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { runSafetyAgent, safetyResultToAgentResult } from "@/lib/agents/safety-agent";
+import {
+  runSafetyAgent,
+  safetyResultToAgentResult,
+  validateUserInput,
+} from "@/lib/agents/safety-agent";
 import type { Citation } from "@/lib/types";
 
 describe("Safety Agent 安全审核", () => {
   const emptyCitations: Citation[] = [];
+
+  describe("输入安全检查", () => {
+    it("应在调用模型前识别敏感内容", () => {
+      const flags = validateUserInput("如何伤害他人");
+
+      expect(flags.some((flag) => flag.includes("暴力"))).toBe(true);
+    });
+
+    it("应允许普通学习问题", () => {
+      expect(validateUserInput("二叉搜索树的中序遍历有什么特性？")).toEqual([]);
+    });
+  });
 
   describe("敏感内容检测", () => {
     it("应检测暴力内容", async () => {
@@ -68,6 +84,15 @@ describe("Safety Agent 安全审核", () => {
       const result = await runSafetyAgent("发邮件到 test@example.com", emptyCitations);
       expect(result.passed).toBe(false);
       expect(result.flags.some((f) => f.includes("邮箱"))).toBe(true);
+    });
+
+    it("应审核会展示给客户端的引用字段", async () => {
+      const result = await runSafetyAgent("普通回答", [
+        { doc: "课程资料", snippet: "联系 13812345678 获取答案" },
+      ]);
+
+      expect(result.passed).toBe(false);
+      expect(result.flags.some((f) => f.includes("手机"))).toBe(true);
     });
   });
 

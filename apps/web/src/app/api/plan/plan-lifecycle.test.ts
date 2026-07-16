@@ -56,6 +56,42 @@ describe("学习计划生命周期", () => {
     expect(generated.agentTrace?.some((item) => item.includes("Planner Agent"))).toBe(true);
   });
 
+  it("每项任务时长不得超过用户的每日分钟预算", async () => {
+    const response = await generatePlan(new Request("http://localhost/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goal: "复习数据结构",
+        durationDays: 7,
+        dailyMinutes: 30,
+      }),
+    }));
+    const plan = (await response.json()) as StudyPlan;
+
+    expect(response.status).toBe(200);
+    expect(plan.tasks.length).toBeGreaterThan(0);
+    expect(plan.tasks.every((task) => task.estimatedMin <= 30)).toBe(true);
+  });
+
+  it("模型返回非数字任务时长时应拒绝整份无效计划", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([{
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      action: "review",
+      title: "复习二叉树",
+      reason: "先复盘树结构错题",
+      estimatedMin: "45",
+    }]);
+    const response = await generatePlan(new Request("http://localhost/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal: "复习数据结构" }),
+    }));
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
   it("模型未配置时应返回明确 503", async () => {
     delete process.env.TEST_MODEL_RESPONSE;
     const response = await generatePlan(new Request("http://localhost/api/plan", {

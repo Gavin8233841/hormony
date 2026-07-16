@@ -1,15 +1,16 @@
 // GET /api/profile?userId=... — 获取用户学习画像
 
 import { store } from "@/lib/store/db";
-import { sanitizeUserId } from "@/lib/utils";
+import { readUserId } from "@/lib/api-validation";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = sanitizeUserId(searchParams.get("userId"));
-    const profile = store.getProfile(userId) ?? store.getProfile("demo");
+    const userId = readUserId(searchParams.get("userId"));
+    if (!userId.ok) return userId.response;
+    const profile = store.getProfile(userId.value) ?? store.getProfile("demo");
 
     if (!profile) {
       return Response.json({ error: "用户不存在", code: "NOT_FOUND" }, { status: 404 });

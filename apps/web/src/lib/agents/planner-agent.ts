@@ -39,13 +39,6 @@ const ACTION_TYPES: Record<PlanAction, PlanTask["type"]> = {
   review: "review",
 };
 
-const ACTION_LABELS: Record<PlanAction, string> = {
-  lesson: "学习",
-  practice: "练习",
-  quiz: "测验",
-  review: "复盘",
-};
-
 export async function runPlannerAgent(
   userId: string,
   goal: string,
@@ -82,7 +75,7 @@ ${topicCatalog}`;
     signal,
   });
 
-  const tasks = parseTasks(raw, startDate, durationDays, topicOptions);
+  const tasks = parseTasks(raw, startDate, durationDays, dailyMinutes, topicOptions);
   if (tasks.length === 0) {
     throw new ModelInvalidResponseError("学习计划不是有效 JSON");
   }
@@ -97,15 +90,21 @@ ${topicCatalog}`;
   return plan;
 }
 
-function parseTasks(raw: string, startDate: string, durationDays: number, topicOptions: TopicOption[]): PlanTask[] {
+function parseTasks(
+  raw: string,
+  startDate: string,
+  durationDays: number,
+  dailyMinutes: number,
+  topicOptions: TopicOption[]
+): PlanTask[] {
   try {
-    const arr = JSON.parse(extractJsonPayload(raw));
+    const arr: unknown = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
       const selected = arr.slice(0, 10);
       const startTime = Date.parse(startDate + "T00:00:00.000Z");
       const parsedItems: ParsedPlanItem[] = [];
       for (const item of selected) {
-        if (!item || typeof item !== "object") continue;
+        if (!item || typeof item !== "object" || Array.isArray(item)) continue;
         const t = item as Record<string, unknown>;
         const courseId = typeof t.courseId === "string" ? t.courseId.trim() : "";
         const topic = typeof t.topic === "string" ? t.topic.trim() : "";
@@ -113,14 +112,28 @@ function parseTasks(raw: string, startDate: string, durationDays: number, topicO
         const rawAction = typeof t.action === "string" ? t.action.trim() : "";
         if (option === undefined || !isPlanAction(rawAction)) continue;
         const title = typeof t.title === "string" ? t.title.trim() : "";
+        const reason = typeof t.reason === "string" ? t.reason.trim() : "";
+        const estimatedMin = t.estimatedMin;
+        if (
+          title.length < 1 ||
+          title.length > 120 ||
+          reason.length < 1 ||
+          reason.length > 80 ||
+          typeof estimatedMin !== "number" ||
+          !Number.isInteger(estimatedMin) ||
+          estimatedMin < 15 ||
+          estimatedMin > 180
+        ) {
+          continue;
+        }
         parsedItems.push({
           courseId: option.courseId,
           courseTitle: option.courseTitle,
           topic: option.topic,
           action: rawAction,
-          title: title.length > 0 ? title : `${ACTION_LABELS[rawAction]}：${option.topic}`,
-          reason: sanitizeReason(t.reason, rawAction, option.topic),
-          estimatedMin: Math.min(Math.max(Number(t.estimatedMin) || 45, 15), 180),
+          title,
+          reason,
+          estimatedMin: Math.min(estimatedMin, dailyMinutes),
         });
       }
       return parsedItems.map((item: ParsedPlanItem, i: number) => {
@@ -179,12 +192,6 @@ function findTopicOption(courseId: string, topic: string, options: TopicOption[]
 
 function isPlanAction(value: string): value is PlanAction {
   return ACTIONS.some((action) => action === value);
-}
-
-function sanitizeReason(raw: unknown, action: PlanAction, topic: string): string {
-  const value = typeof raw === "string" ? raw.trim() : "";
-  if (value.length > 0) return value.slice(0, 80);
-  return `${ACTION_LABELS[action]} ${topic}，用于把目标拆成可完成的下一步`;
 }
 
 function buildAgentTrace(

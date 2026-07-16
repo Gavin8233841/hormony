@@ -2,10 +2,11 @@
 // PATCH /api/plan/save — 更新计划任务状态（打卡）
 
 import { store } from "@/lib/store/db";
-import { sanitizeUserId } from "@/lib/utils";
 import type { PlanTask, StudyPlan } from "@/lib/types";
 import { isCourseId } from "@/lib/data";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
+import { readUserId } from "@/lib/api-validation";
+import { validateUserInput } from "@/lib/agents/safety-agent";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +19,12 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
 
-  const userId = sanitizeUserId(body.userId);
-  const goal = String(body.goal ?? "").trim();
+  const userId = readUserId(body.userId);
+  if (!userId.ok) return userId.response;
+  if (body.goal !== undefined && typeof body.goal !== "string") {
+    return Response.json({ error: "目标描述必须是字符串", code: "INVALID_GOAL" }, { status: 400 });
+  }
+  const goal = body.goal?.trim() ?? "";
   if (body.tasks !== undefined && !Array.isArray(body.tasks)) {
     return Response.json(
       { error: "任务列表必须是数组", code: "INVALID_TASKS" },
@@ -40,6 +45,11 @@ export async function POST(req: Request) {
   if (tasks.length > 50) {
     return Response.json({ error: "任务数量超出上限（50 个）", code: "TOO_MANY_TASKS" }, { status: 400 });
   }
+  if (body.planId !== undefined) {
+    if (typeof body.planId !== "string" || body.planId.trim().length < 1 || body.planId.length > 100) {
+      return Response.json({ error: "planId 长度必须为 1-100 字符", code: "INVALID_PLAN_ID" }, { status: 400 });
+    }
+  }
   if (!tasks.every(isJsonObject)) {
     return Response.json(
       { error: "任务列表必须只包含对象", code: "INVALID_TASKS" },
@@ -52,18 +62,38 @@ export async function POST(req: Request) {
     const taskValidation = validateTask(task);
     if (taskValidation) return taskValidation;
   }
+  const traceValidation = validateTrace(body.agentTrace);
+  if (traceValidation) return traceValidation;
+  const agentTrace = sanitizeTrace(body.agentTrace);
+  const safetyText = [
+    goal,
+    ...(agentTrace ?? []),
+    ...taskObjects.flatMap((task) => [
+      task.id,
+      task.title,
+      task.date,
+      task.topic,
+      task.reason,
+    ].filter((value): value is string => typeof value === "string")),
+  ].join("\n");
+  if (validateUserInput(safetyText).length > 0) {
+    return Response.json(
+      { error: "计划内容不符合安全要求", code: "INPUT_REJECTED" },
+      { status: 400 }
+    );
+  }
 
   const plan: StudyPlan = {
-    planId: body.planId ?? `plan_${Date.now().toString(36)}`,
-    userId,
+    planId: body.planId?.trim() ?? `plan_${Date.now().toString(36)}`,
+    userId: userId.value,
     goal,
     tasks: taskObjects.slice(0, 50).map((t) => sanitizeTask(t)),
-    agentTrace: sanitizeTrace(body.agentTrace),
+    agentTrace,
   };
 
   store.savePlan(plan);
   store.logActivity({
-    userId,
+    userId: userId.value,
     type: "plan",
     description: `保存学习计划：${goal.slice(0, 40)}`,
     timestamp: new Date().toISOString(),
@@ -73,7 +103,10 @@ export async function POST(req: Request) {
 }
 
 function validateTask(task: Record<string, unknown>): Response | null {
-  if (task.type !== undefined && !isPlanType(String(task.type))) {
+  if (task.id !== undefined && (typeof task.id !== "string" || task.id.trim().length < 1 || task.id.length > 100)) {
+    return Response.json({ error: "任务 id 长度必须为 1-100 字符", code: "INVALID_TASK_ID" }, { status: 400 });
+  }
+  if (task.type !== undefined && (typeof task.type !== "string" || !isPlanType(task.type))) {
     return Response.json({ error: "任务包含不支持的类型", code: "INVALID_TASK_TYPE" }, { status: 400 });
   }
   if (task.title !== undefined && (typeof task.title !== "string" || task.title.trim().length === 0 || task.title.length > 200)) {
@@ -90,8 +123,11 @@ function validateTask(task: Record<string, unknown>): Response | null {
   if (task.done !== undefined && typeof task.done !== "boolean") {
     return Response.json({ error: "任务完成状态必须是布尔值", code: "INVALID_DONE" }, { status: 400 });
   }
-  if (task.reason !== undefined && typeof task.reason !== "string") {
-    return Response.json({ error: "任务原因必须是字符串", code: "INVALID_REASON" }, { status: 400 });
+  if (
+    task.reason !== undefined &&
+    (typeof task.reason !== "string" || task.reason.trim().length > 120)
+  ) {
+    return Response.json({ error: "任务原因必须是 120 字符以内字符串", code: "INVALID_REASON" }, { status: 400 });
   }
   if (task.courseId !== undefined) {
     if (typeof task.courseId !== "string" || !isCourseId(task.courseId)) {
@@ -125,11 +161,18 @@ export async function PATCH(req: Request) {
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
 
-  const userId = sanitizeUserId(body.userId);
-  const taskId = String(body.taskId ?? "").trim();
+  const userId = readUserId(body.userId);
+  if (!userId.ok) return userId.response;
+  if (body.taskId !== undefined && typeof body.taskId !== "string") {
+    return Response.json({ error: "taskId 必须是字符串", code: "INVALID_TASK_ID" }, { status: 400 });
+  }
+  const taskId = body.taskId?.trim() ?? "";
 
   if (!taskId) {
     return Response.json({ error: "缺少 taskId", code: "MISSING_FIELD" }, { status: 400 });
+  }
+  if (taskId.length > 100) {
+    return Response.json({ error: "taskId 长度不能超过 100 字符", code: "INVALID_TASK_ID" }, { status: 400 });
   }
   if (body.done === undefined) {
     return Response.json({ error: "缺少 done", code: "MISSING_FIELD" }, { status: 400 });
@@ -138,7 +181,7 @@ export async function PATCH(req: Request) {
     return Response.json({ error: "done 必须是布尔值", code: "INVALID_DONE" }, { status: 400 });
   }
 
-  const plan = store.updatePlanTask(userId, taskId, body.done);
+  const plan = store.updatePlanTask(userId.value, taskId, body.done);
   if (!plan) {
     return Response.json({ error: "计划或任务不存在", code: "NOT_FOUND" }, { status: 404 });
   }
@@ -147,7 +190,7 @@ export async function PATCH(req: Request) {
     const task = plan.tasks.find((item) => item.id === taskId);
     if (task) {
       store.logActivity({
-        userId,
+        userId: userId.value,
         type: "plan",
         description: `完成任务：${task.title.slice(0, 40)}`,
         timestamp: new Date().toISOString(),
@@ -189,6 +232,27 @@ function sanitizeTrace(trace: unknown): string[] | undefined {
     .filter((item) => item.length > 0)
     .slice(0, 8);
   return items.length > 0 ? items : undefined;
+}
+
+function validateTrace(trace: unknown): Response | null {
+  if (trace === undefined) return null;
+  if (!Array.isArray(trace) || trace.length > 8) {
+    return Response.json(
+      { error: "agentTrace 必须是最多 8 项的字符串数组", code: "INVALID_AGENT_TRACE" },
+      { status: 400 }
+    );
+  }
+  if (
+    !trace.every(
+      (item) => typeof item === "string" && item.trim().length <= 160
+    )
+  ) {
+    return Response.json(
+      { error: "agentTrace 每项必须是 160 字符以内字符串", code: "INVALID_AGENT_TRACE" },
+      { status: 400 }
+    );
+  }
+  return null;
 }
 
 function isPlanType(value: string): boolean {

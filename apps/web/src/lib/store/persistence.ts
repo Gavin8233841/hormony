@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { isStatelessDeployment } from "@/lib/deployment";
 import type {
   ConversationRecord,
   Course,
@@ -30,11 +31,10 @@ export interface PersistedAppState {
   activityLog: RecentActivity[];
 }
 
-function persistenceEnabled(): boolean {
+export function isAppStatePersistenceEnabled(): boolean {
+  if (isStatelessDeployment()) return false;
   const mode = process.env.APP_STATE_PERSISTENCE?.trim().toLowerCase();
-  if (mode === "off") return false;
-  if (mode === "on") return true;
-  return process.env.NODE_ENV !== "test";
+  return mode === "on";
 }
 
 function stateFilePath(): string {
@@ -55,7 +55,7 @@ function isPersistedState(value: PersistedAppState): boolean {
 }
 
 export function loadPersistedState(): PersistedAppState | undefined {
-  if (!persistenceEnabled()) return undefined;
+  if (!isAppStatePersistenceEnabled()) return undefined;
 
   try {
     const raw = readFileSync(stateFilePath(), "utf8");
@@ -67,7 +67,7 @@ export function loadPersistedState(): PersistedAppState | undefined {
 }
 
 export function savePersistedState(state: Omit<PersistedAppState, "version">): void {
-  if (!persistenceEnabled()) return;
+  if (!isAppStatePersistenceEnabled()) return;
 
   try {
     const filePath = stateFilePath();

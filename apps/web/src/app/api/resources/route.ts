@@ -3,7 +3,7 @@
 // GET /api/resources?type=textbook — 按类型筛选
 
 import { store } from "@/lib/store/db";
-import { isExternalResourceType } from "@/lib/data";
+import { isCourseId, isExternalResourceType } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const courseId = searchParams.get("courseId");
     const type = searchParams.get("type");
+
+    if (courseId && !isCourseId(courseId)) {
+      return Response.json(
+        { error: "不支持的课程", code: "INVALID_COURSE" },
+        { status: 400 }
+      );
+    }
 
     if (type && !isExternalResourceType(type)) {
       return Response.json(

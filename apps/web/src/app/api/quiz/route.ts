@@ -4,15 +4,19 @@
 
 import { runQuizAgent } from "@/lib/agents/quiz-agent";
 import { store } from "@/lib/store/db";
-import { sanitizeUserId } from "@/lib/utils";
 import type { Quiz, QuizCatalogItem } from "@/lib/types";
-import { getQuizzesByCourse as getSeedQuizzesByCourse, isCourseId } from "@/lib/data";
+import {
+  getQuizzesByCourse as getSeedQuizzesByCourse,
+  isCourseId,
+  isCourseTopic,
+} from "@/lib/data";
 import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
 import { modelErrorResponse, SafetyBlockedError } from "@/lib/api-errors";
 import type { QuizPackage } from "@/lib/types";
 import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
 import { readJsonObject } from "@/lib/request-json";
-import { readBoundedInteger } from "@/lib/api-validation";
+import { readBoundedInteger, readUserId } from "@/lib/api-validation";
+import { isStatelessDeployment } from "@/lib/deployment";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -40,7 +44,7 @@ export async function GET(req: Request) {
       return Response.json({ quizzes: catalog });
     }
 
-    if (process.env.DEPLOYMENT_MODE === "stateless") {
+    if (isStatelessDeployment()) {
       return Response.json(
         { error: "答题结果仅保存在 HarmonyOS 设备", code: "ENDPOINT_DISABLED" },
         { status: 404 }
@@ -48,8 +52,9 @@ export async function GET(req: Request) {
     }
 
     // 本地开发模式可返回进程内测验结果
-    const userId = sanitizeUserId(searchParams.get("userId"));
-    const results = store.getQuizResults(userId);
+    const userId = readUserId(searchParams.get("userId"));
+    if (!userId.ok) return userId.response;
+    const results = store.getQuizResults(userId.value);
     return Response.json({ results });
   } catch (err) {
     console.error("[quiz/GET] error:", err instanceof Error ? err.message : String(err));
@@ -62,15 +67,16 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
 
-  const userId = sanitizeUserId(body.userId);
+  const userId = readUserId(body.userId);
+  if (!userId.ok) return userId.response;
   const courseId = body.courseId ?? "cs101";
   if (typeof courseId !== "string" || !isCourseId(courseId)) {
     return Response.json({ error: "不支持的课程", code: "INVALID_COURSE" }, { status: 400 });
   }
-  if (body.topic !== undefined && typeof body.topic !== "string") {
+  if (typeof body.topic !== "string") {
     return Response.json({ error: "主题必须是字符串", code: "INVALID_TOPIC" }, { status: 400 });
   }
-  const topic = (body.topic ?? "综合").trim();
+  const topic = body.topic.trim();
   const count = readBoundedInteger(body.count, 5, 1, 20, "INVALID_COUNT", "count");
   if (!count.ok) return count.response;
   const difficulty = body.difficulty ?? "medium";
@@ -84,6 +90,9 @@ export async function POST(req: Request) {
 
   if (topic.length === 0 || topic.length > 100) {
     return Response.json({ error: "主题长度必须为 1-100 字符", code: "INVALID_TOPIC" }, { status: 400 });
+  }
+  if (!isCourseTopic(courseId, topic)) {
+    return Response.json({ error: "主题不属于所选课程", code: "INVALID_TOPIC" }, { status: 400 });
   }
   if (focusTag.length > 12) {
     return Response.json({ error: "重点标签长度必须为 1-12 字符", code: "INVALID_FOCUS_TAG" }, { status: 400 });
@@ -110,7 +119,7 @@ export async function POST(req: Request) {
 
   try {
     const quiz = await runQuizAgent(
-      userId,
+      userId.value,
       courseId,
       topic,
       count.value,
@@ -118,7 +127,9 @@ export async function POST(req: Request) {
       focusTag.length > 0 ? focusTag : undefined
     );
     await assertSafeQuiz(quiz);
-    store.saveQuiz(quiz);
+    if (!isStatelessDeployment()) {
+      store.saveQuiz(quiz);
+    }
     return Response.json(toQuizPackage(quiz));
   } catch (err) {
     console.error("[quiz] error:", err instanceof Error ? err.message : String(err));
@@ -164,10 +175,12 @@ export async function OPTIONS() {
 
 async function assertSafeQuiz(quiz: Quiz): Promise<void> {
   const outputText = [
+    quiz.topic,
     quiz.focusTag ?? "",
     ...quiz.questions.flatMap((question) => [
       question.stem,
       ...(question.options ?? []),
+      question.answer,
       question.explanation,
       ...(question.tags ?? []),
     ]),

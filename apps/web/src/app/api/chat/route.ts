@@ -8,13 +8,17 @@
 
 import { NextRequest } from "next/server";
 import { orchestrateStream } from "@/lib/agents/orchestrator";
-import { sanitizeUserId } from "@/lib/utils";
 import type { ChatMessage, ChatRequest, StreamEvent } from "@/lib/types";
 import { getModelRuntimeInfo } from "@/lib/agents/model";
 import { validateUserInput } from "@/lib/agents/safety-agent";
 import { modelErrorResponse } from "@/lib/api-errors";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
-import { readDateKey, sanitizeLearningProfile, validationError } from "@/lib/api-validation";
+import {
+  readDateKey,
+  readUserId,
+  sanitizeLearningProfile,
+  validationError,
+} from "@/lib/api-validation";
 import { isCourseId } from "@/lib/data";
 
 export const runtime = "nodejs";
@@ -49,7 +53,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const userId = sanitizeUserId(body.userId);
+  const userId = readUserId(body.userId);
+  if (!userId.ok) return userId.response;
   const startDate = readDateKey(
     body.startDate,
     new Date().toISOString().slice(0, 10),
@@ -90,7 +95,7 @@ export async function POST(req: NextRequest) {
   }
 
   const chatRequest: ChatRequest = {
-    userId,
+    userId: userId.value,
     message,
     startDate: startDate.value,
     profile: profile.value,
@@ -260,7 +265,13 @@ function sanitizeContext(value: unknown): ReturnType<typeof validationError> | {
     if (typeof value.sessionId !== "string") {
       return validationError("context.sessionId 必须是字符串", "INVALID_CONTEXT");
     }
-    const trimmed = value.sessionId.trim().slice(0, 100);
+    const trimmed = value.sessionId.trim();
+    if (trimmed.length > 100) {
+      return validationError(
+        "context.sessionId 长度不能超过 100 字符",
+        "INVALID_CONTEXT"
+      );
+    }
     sessionId = trimmed.length > 0 ? trimmed : undefined;
   }
 
@@ -275,6 +286,9 @@ function sanitizeHistory(value: unknown): ReturnType<typeof validationError> | {
   if (!Array.isArray(value) || !value.every(isJsonObject)) {
     return validationError("history 必须是消息对象数组", "INVALID_HISTORY");
   }
+  if (value.length > 12) {
+    return validationError("history 最多包含 12 条消息", "INVALID_HISTORY");
+  }
   const messages: ChatMessage[] = [];
   for (const item of value) {
     if (item.role !== "user" && item.role !== "assistant") {
@@ -283,14 +297,20 @@ function sanitizeHistory(value: unknown): ReturnType<typeof validationError> | {
     if (typeof item.content !== "string") {
       return validationError("history.content 必须是字符串", "INVALID_HISTORY");
     }
+    if (item.content.length > 1000) {
+      return validationError(
+        "history.content 长度不能超过 1000 字符",
+        "INVALID_HISTORY"
+      );
+    }
     if (item.content.trim().length > 0) {
       messages.push({
         role: item.role,
-        content: item.content.slice(0, 1000),
+        content: item.content,
       });
     }
   }
-  return { ok: true, value: messages.slice(-12) };
+  return { ok: true, value: messages };
 }
 
 function streamErrorCode(error: unknown): string {
