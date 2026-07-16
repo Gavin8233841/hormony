@@ -101,11 +101,16 @@
 - `route_contract_audit`：补齐 256 KiB UTF-8、Content-Length 绕过和 413 精确契约测试；主线程复核后采用。
 - `agent_core_audit`：补齐 97 项路由输入/Safety 契约，并定位 Chat 静默裁剪；主线程修改源码并复跑。
 - `client_contract_audit`：实现 SSE parser、Quiz 本地评分、禁用端点状态、精确 Topic 目录和请求竞态取消；主线程逐文件复核并纳入全量验证。
+- `plan_save_contract`：实现任务核心字段、真实日历日期与去空白后唯一 ID 校验；主线程逐行复核并补强重复 ID 回归后采用。
+- `production_middleware_regression`：两轮独立 production 黑盒验证；首轮发现 Health 缺少 `persistence.mode`，主线程修复后由同一脚本复测全部通过。子 agent 未修改、暂存或提交文件。
 
 ## 5. 提交
 
 - API/无状态/Safety 原子批次：`b372f86 fix(web): 强化无状态 Agent API 契约`。
-- Web 调试体验与本文：同一原子提交。
+- Web 调试体验与本文：`bc046b1 fix(web): 对齐无状态调试客户端契约`。
+- 生产无状态网关、可信限流与 Health：`04fbd6a fix(web): 加固生产无状态网关`。
+- Agent 输出、Chat SSE 预算、Plan/Quiz/日期契约：`93907c8 fix(web): 加固 Agent 生成与流式契约`。
+- Web Chat 停止后重发与历史请求边界：`bfdad5d fix(web): 隔离 Chat 停止后重发状态`。
 
 ## 6. 失败与未验证
 
@@ -114,3 +119,29 @@
 - 第一轮本地 HTTP 脚本对多值 header 的 PowerShell 类型处理错误，没有作为通过证据；严格停止模式重跑 exit 0。
 - **未验证**：当前分支线上部署、带真实模型的 Chat SSE 正文/Plan/Quiz、浏览器交互渲染、HarmonyOS 模拟器、真机。
 - 本批未执行线上写操作，未使用测试替身伪造产品能力，未提交秘密、日志、截图、缓存、资产、HAP 或压缩包。
+
+## 7. 第三批生产可靠性补强
+
+### 7.1 行为与边界
+
+- 生产环境无论部署变量缺失或误写都强制 `stateless`；文件持久化保持关闭。Health 新增 `persistence.mode`，生产无状态返回精确值 `stateless`。
+- middleware 不再信任客户端 `X-Forwarded-For`，只使用运行时 `req.ip`；缺失可信 IP 时进入共享桶。限流键上限 1000，容量满返回 `429/RATE_LIMITED`，窗口到期后清理并恢复。
+- Chat SSE 将请求与 reader 取消传到 orchestrator/model；单事件 64 KiB、总流 512 KiB、最多 128 事件，超限以 `OUTPUT_LIMIT_EXCEEDED -> done` 收束。
+- Planner 拒绝超出周期/10 项上限、任一坏任务和超每日总预算；Quiz 校验 choice、题干、选项、答案、解析和标签边界。
+- `startDate` 从 Web 本地日历经 `readDateKey` 传入 Chat/Plan/Planner，保留主线本地日期契约。
+- `/api/plan/save` 要求 `id/title/date/estimatedMin/type`，拒绝空任务、虚假日期和去空白后重复 ID，不再生成核心字段默认值。
+- Web Chat history 只发送最后 12 条且逐条截到 1000 字符；控制器身份保护事件、catch、session 与 finally，stop 后旧请求不能覆盖新 assistant 或清除新控制器。
+
+### 7.2 验证
+
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，21 个测试文件、343 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面，API dynamic routes 与 26.8 kB middleware 进入生产产物。
+- 定向回归：无状态/中间件 4 文件 58 项、Agent/API/日期 7 文件 139 项、Chat client 1 文件 8 项，均 exit 0。
+- 本地 production 黑盒通过：`127.0.0.1:3118` 严格断言脚本 exit 0；Profile `404/ENDPOINT_DISABLED`，Health `503/degraded`、`model.configured=false`、`deploymentMode=stateless`、`persistence.mode=stateless`，轮换 XFF 的第 31 次同路径请求 `429/RATE_LIMITED`。独立实例已停止，既有 3105 实例未受影响。
+- 提交前每批 `git diff --check`、`git status --short`、`git diff --cached --name-only` 与不打印值的敏感信息扫描均 exit 0；无敏感值或禁止文件命中。
+
+### 7.3 未验证
+
+- 当前分支尚未部署，线上通过未验证；带真实模型的 Chat SSE 正文、Plan、Quiz 未验证。
+- Browser 插件未提供，仓库没有 Playwright 可执行文件且未安装新依赖；Chat stop 后立即重发的真实浏览器交互未验证。
+- HarmonyOS 模拟器与真机未验证；第三批未修改 HarmonyOS 文件、生产模型 ID、题库内容或竞赛文档。
