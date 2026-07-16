@@ -3,7 +3,7 @@
  * 浅色主题 · 用户友好文案 · 任务列表
  */
 
-import { HttpClient } from '../common/HttpClient';
+import { HttpClient, HttpRequestCancellation, HttpStatusError } from '../common/HttpClient';
 import { GradientHeader, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
@@ -37,25 +37,43 @@ struct PlanPage {
   @State loading: boolean = false;
   @State message: string = '';
   @State hasError: boolean = false;
+  @State planLoading: boolean = true;
   @State agentTrace: string[] = [];
   @State progressStep: number = 0;
   @State progressTick: number = 0;
+  @State savedPlanGoal: string = '';
+  @State evidenceExpanded: boolean = false;
+  @State errorHttpStatus: number = 0;
+  @State errorCode: string = '';
+  @State errorExpanded: boolean = false;
+  @State retryAction: string = 'none';
+  private activeRequest: HttpRequestCancellation | null = null;
+  private generationRunId: number = 0;
+  private planReadRunId: number = 0;
+  private pendingPlan: AgentStudyPlan | null = null;
   private durationOptions: number[] = [7, 14, 21];
   private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
   private planSteps: WorkStep[] = [
-    { title: '画像', description: '读取本地学习状态' },
-    { title: '目录', description: '锁定真实 Topic' },
-    { title: '编排', description: '生成可执行动作' },
-    { title: '校验', description: '检查计划结构' },
-    { title: '同步', description: '写入端侧计划' }
+    { title: '准备', description: '读取本机学习状态' },
+    { title: '规划', description: '等待在线学伴安排节奏' },
+    { title: '检查', description: '核对任务能否直接开始' },
+    { title: '保存', description: '写入本机学习计划' },
+    { title: '更新', description: '通知首页与服务卡片' }
   ];
 
   aboutToAppear(): void {
     this.loadPlan();
   }
 
+  aboutToDisappear(): void {
+    this.planReadRunId += 1;
+    this.planLoading = false;
+    if (this.loading && this.progressStep >= 3) return;
+    this.cancelPlanGeneration(false);
+  }
+
   get canGenerate(): boolean {
-    return !this.loading && this.goal.trim().length > 0;
+    return !this.loading && !this.planLoading && this.goal.trim().length > 0;
   }
 
   private taskTypeLabel(type: string): string {
@@ -89,6 +107,8 @@ struct PlanPage {
     if (!this.hasTaskTarget(task)) {
       this.message = '旧计划缺少课程主题，请重新生成可执行计划';
       this.hasError = true;
+      this.retryAction = 'none';
+      this.clearErrorEvidence();
       return;
     }
     const courseId = task.courseId ?? 'cs101';
@@ -113,19 +133,43 @@ struct PlanPage {
     this.getUIContext().getRouter().pushUrl({ url: url }).catch((): void => {
       this.message = '无法打开学习环节，请稍后重试';
       this.hasError = true;
+      this.retryAction = 'none';
+      this.clearErrorEvidence();
     });
   }
 
   private async loadPlan(): Promise<void> {
+    if (this.loading) {
+      this.planLoading = false;
+      return;
+    }
+    const readRunId = this.planReadRunId + 1;
+    this.planReadRunId = readRunId;
+    this.planLoading = true;
+    this.message = '';
+    this.hasError = false;
+    this.retryAction = 'none';
+    this.clearErrorEvidence();
     try {
       const plan = await LocalLearningRepository.getPlan();
+      if (this.planReadRunId !== readRunId || this.loading) return;
       if (plan !== null) {
         this.goal = plan.goal;
+        this.savedPlanGoal = plan.goal;
         this.tasks = plan.tasks;
         this.agentTrace = (plan as AgentStudyPlan).agentTrace ?? [];
       }
+      this.message = '';
+      this.hasError = false;
     } catch (e) {
-      // 没有已保存计划时保留创建状态。
+      if (this.planReadRunId !== readRunId || this.loading) return;
+      this.message = '本机计划读取失败，请重新读取';
+      this.hasError = true;
+      this.retryAction = 'load';
+    } finally {
+      if (this.planReadRunId === readRunId && !this.loading) {
+        this.planLoading = false;
+      }
     }
   }
 
@@ -156,7 +200,12 @@ struct PlanPage {
       if (current === null) throw new Error('本地计划不存在');
       current.tasks = nextTasks;
       await LocalLearningRepository.savePlan(current);
-      await LearningFormUpdater.refreshAll();
+      this.tasks = nextTasks;
+      try {
+        await LearningFormUpdater.refreshAll();
+      } catch (_) {
+      }
+      let studyEventSaved: boolean = true;
       if (nextDone) {
         const event: StudyEvent = {
           id: 'event_' + Date.now().toString(),
@@ -164,14 +213,23 @@ struct PlanPage {
           timestamp: new Date().toISOString(),
           taskId: task.id
         };
-        await LocalLearningRepository.appendStudyEvent(event);
+        try {
+          await LocalLearningRepository.appendStudyEvent(event);
+        } catch (_) {
+          studyEventSaved = false;
+        }
       }
-      this.tasks = nextTasks;
-      this.message = nextDone ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成';
-      this.hasError = false;
+      this.message = studyEventSaved ?
+        (nextDone ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成') :
+        '任务已完成并保存，学习记录暂未更新';
+      this.hasError = !studyEventSaved;
+      this.retryAction = 'none';
+      this.clearErrorEvidence();
     } catch (e) {
       this.message = '任务状态保存失败，请稍后重试';
       this.hasError = true;
+      this.retryAction = 'none';
+      this.clearErrorEvidence();
     }
   }
 
@@ -195,7 +253,24 @@ struct PlanPage {
       })
     }
     .width('100%')
-    .padding({ left: 16, right: 16 })
+  }
+
+  @Builder
+  GoalSuggestions() {
+    Flex({ wrap: FlexWrap.Wrap }) {
+      ForEach(this.goalSuggestions, (suggestion: string): void => {
+        Button(suggestion)
+          .height(34)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(17)
+          .margin({ right: 6, bottom: 6 })
+          .enabled(!this.loading && !this.planLoading)
+          .onClick((): void => { this.goal = suggestion; })
+      })
+    }
+    .width('100%')
   }
 
   private taskReason(task: PlanTask): string {
@@ -203,11 +278,117 @@ struct PlanPage {
     return reason.trim().length > 0 ? reason.trim() : '学伴根据目标拆出的可执行下一步';
   }
 
+  private savedPlanLabel(): string {
+    if (this.savedPlanGoal.trim().length === 0) return '上一版计划';
+    const label = this.savedPlanGoal.trim();
+    return '上一版“' + (label.length > 24 ? label.slice(0, 24) + '…' : label) + '”计划';
+  }
+
+  private clearErrorEvidence(): void {
+    this.errorHttpStatus = 0;
+    this.errorCode = '';
+    this.errorExpanded = false;
+  }
+
+  private readablePlanTrace(trace: string): string {
+    if (trace.startsWith('Profile Agent')) return '已结合你的学习阶段、习惯和薄弱项';
+    if (trace.startsWith('Planner Agent')) return '已从现有课程主题中安排可完成的任务';
+    if (trace.startsWith('Action Router')) return '每项任务都能直接进入学习、练习、测验或复盘';
+    if (trace.startsWith('Local-first Guard')) return '计划与完成状态只保存在本机';
+    return trace;
+  }
+
   private dismissGoalInput(): void {
     try {
       this.goalInputController.stopEditing();
     } catch (e) {
       // 输入框可能尚未完成挂载；不影响后续生成。
+    }
+  }
+
+  private goBack(): void {
+    this.dismissGoalInput();
+    if (this.loading && this.progressStep >= 3) {
+      this.message = '计划正在保存到本机，请稍候';
+      this.hasError = false;
+      return;
+    }
+    this.cancelPlanGeneration(false);
+    this.getUIContext().getRouter().back();
+  }
+
+  private isActiveGeneration(runId: number, request: HttpRequestCancellation): boolean {
+    return this.loading && this.generationRunId === runId && this.activeRequest === request &&
+      !request.isCancelled();
+  }
+
+  private cancelPlanGeneration(showMessage: boolean = true): void {
+    if (!this.loading || this.progressStep >= 3) return;
+    const hadSavedPlan = this.tasks.length > 0;
+    this.generationRunId += 1;
+    const request = this.activeRequest;
+    this.activeRequest = null;
+    if (request !== null) request.cancel();
+    this.loading = false;
+    this.progressStep = 0;
+    this.progressTick = 0;
+    this.hasError = false;
+    this.retryAction = 'none';
+    this.clearErrorEvidence();
+    if (showMessage) {
+      this.message = hadSavedPlan ? '已取消生成，' + this.savedPlanLabel() + '仍可继续执行' :
+        '已取消生成，学习目标和周期仍然保留';
+    }
+  }
+
+  private planSavedMessage(): string {
+    return '计划已保存到本机，首页已更新；已发起服务卡片更新';
+  }
+
+  private async persistGeneratedPlan(plan: AgentStudyPlan): Promise<boolean> {
+    try {
+      await LocalLearningRepository.savePlan(plan);
+    } catch (_) {
+      const retained = this.tasks.length > 0 ? '；' + this.savedPlanLabel() + '仍可继续执行' : '';
+      this.message = '计划已生成，但未能保存到本机' + retained;
+      this.hasError = true;
+      this.retryAction = 'save';
+      this.clearErrorEvidence();
+      return false;
+    }
+
+    this.tasks = plan.tasks;
+    this.savedPlanGoal = plan.goal;
+    this.agentTrace = plan.agentTrace ?? [];
+    this.evidenceExpanded = false;
+    this.pendingPlan = null;
+    this.progressStep = 4;
+    try {
+      await LearningFormUpdater.refreshAll();
+    } catch (_) {
+    }
+    this.message = this.planSavedMessage();
+    this.hasError = false;
+    this.retryAction = 'none';
+    this.clearErrorEvidence();
+    return true;
+  }
+
+  private async retryPendingPlanSave(): Promise<void> {
+    if (this.loading || this.pendingPlan === null) return;
+    this.generationRunId += 1;
+    this.activeRequest = null;
+    this.loading = true;
+    this.progressStep = 3;
+    this.progressTick = 0;
+    this.message = '';
+    this.hasError = false;
+    this.retryAction = 'none';
+    this.clearErrorEvidence();
+    try {
+      await this.persistGeneratedPlan(this.pendingPlan);
+    } finally {
+      this.loading = false;
     }
   }
 
@@ -260,7 +441,7 @@ struct PlanPage {
   private validatePlanResponse(response: AgentStudyPlan | null): PlanValidationResult {
     const invalid: PlanValidationResult = {
       valid: false,
-      message: '云端返回的计划未通过端侧可执行校验，请重新生成',
+      message: '返回的计划无法直接执行，请重新生成',
       plan: null
     };
     if (response === null) return invalid;
@@ -320,40 +501,28 @@ struct PlanPage {
     };
   }
 
-  private runLocalProgress(): void {
+  private runWaitClock(runId: number): void {
     this.progressStep = 0;
     this.progressTick = 0;
     setTimeout((): void => {
-      if (this.loading) {
-        this.progressStep = 1;
+      if (this.loading && this.generationRunId === runId) {
         this.progressTick = 1;
       }
-    }, 700);
+    }, 10000);
     setTimeout((): void => {
-      if (this.loading) {
-        this.progressStep = 2;
+      if (this.loading && this.generationRunId === runId) {
         this.progressTick = 2;
       }
-    }, 2200);
+    }, 30000);
     setTimeout((): void => {
-      if (this.loading) {
-        this.progressStep = 3;
+      if (this.loading && this.generationRunId === runId) {
         this.progressTick = 3;
       }
-    }, 5200);
-    setTimeout((): void => {
-      if (this.loading) {
-        this.progressTick = 4;
-      }
-    }, 10000);
+    }, 60000);
   }
 
   private currentPlanStepIndex(): number {
     return Math.min(Math.max(this.progressStep, 0), this.planSteps.length - 1);
-  }
-
-  private currentPlanStepDescription(): string {
-    return this.planSteps[this.currentPlanStepIndex()].description;
   }
 
   @Builder
@@ -367,24 +536,29 @@ struct PlanPage {
   }
 
   private planProgressTitle(): string {
-    if (this.progressStep >= 4) return '正在同步到本机';
-    if (this.progressStep === 3) return '正在校验可执行计划';
-    if (this.progressStep === 2) return '正在编排学习节奏';
-    if (this.progressStep === 1) return '正在匹配课程 Topic';
-    return 'AI 正在读取学习画像';
+    if (this.progressStep >= 4) return '正在更新学习入口';
+    if (this.progressStep === 3) return '正在保存到本机';
+    if (this.progressStep === 2) return '正在检查每项任务';
+    if (this.progressStep === 1) return '正在在线安排学习节奏';
+    return '正在读取本机学习状态';
   }
 
   private planProgressSubtitle(): string {
-    if (this.progressStep >= 4) return '保存计划、刷新首页和服务卡片的今日任务';
-    if (this.progressStep === 3) return '检查日期、课程、主题、动作和预计时长是否可直达';
-    if (this.progressStep === 2) return '把目标拆成学习、练习、测验、复盘四类动作';
-    if (this.progressStep === 1) return '只在当前 33 个真实 Topic 内选择，不让计划凭空造主题';
-    return '读取本地画像、薄弱标签和学习风格，云端只生成计划不保存私有状态';
+    if (this.progressStep >= 4) return '本机计划已写入，正在通知首页与服务卡片刷新';
+    if (this.progressStep === 3) return '任务已通过检查，正在写入本机学习计划';
+    if (this.progressStep === 2) return '核对日期、课程主题、入口和预计时长';
+    if (this.progressStep === 1) return '等待学伴从已有课程主题中安排每天的任务';
+    return '读取本机薄弱项与学习习惯，私人学习状态不会在云端保存';
   }
 
   private planWaitHint(): string {
-    if (this.progressTick >= 4) return '规划仍在云端生成中：页面没有卡住，完成后会自动写入本机计划。';
-    if (this.days >= 21) return '周期越长，Planner Agent 会检查更多主题和日期，等待时间会更久。';
+    if (this.progressStep >= 4) return '计划已保存，正在更新学习入口，请不要关闭页面。';
+    if (this.progressStep === 3) return '计划正在写入本机，此时不会再中断保存。';
+    if (this.progressStep === 2) return '计划已返回，正在确认每项任务都能直接开始。';
+    if (this.progressTick >= 3) return '规划需要更多时间。你可以继续等待，也可以取消后调整目标。';
+    if (this.progressTick >= 2) return '学伴仍在安排日期和任务入口，完成后会自动保存。';
+    if (this.progressTick >= 1) return '计划仍在生成中，页面没有卡住。';
+    if (this.days >= 21) return '周期较长，需要检查更多主题和日期，通常会多等一会儿。';
     return '保持在当前页，计划生成后会直接展示可点击任务。';
   }
 
@@ -393,37 +567,44 @@ struct PlanPage {
   }
 
   private planErrorMessage(error: Error): string {
-    const text = error.message;
-    if (text.includes('MODEL_UNAVAILABLE')) return '云端模型未配置，计划不会用本地模板伪造。请稍后再试。';
-    if (text.includes('MODEL_TIMEOUT')) return 'AI 规划超时了，目标和周期已保留，请稍后重试。';
-    if (text.includes('MODEL_INVALID_RESPONSE')) return 'AI 返回的计划格式未通过校验，请重新生成一版。';
-    if (text.includes('SAFETY_BLOCKED')) return '计划内容未通过安全审核，请换一种目标描述再试。';
-    if (text.includes('INPUT_REJECTED')) return '目标或画像内容未通过安全检查，请调整后重新生成。';
-    if (text.includes('GOAL_TOO_LONG')) return '学习目标太长，请压缩到 500 字以内。';
-    if (text.includes('INVALID_DURATION') || text.includes('INVALID_DAILY_MINUTES')) {
-      return '计划参数不符合云端边界，请重新选择周期后再试。';
+    const code = error instanceof HttpStatusError ? error.errorCode : '';
+    const retained = this.tasks.length > 0 ? '，上一版计划仍可继续执行' : '';
+    if (code === 'MODEL_UNAVAILABLE') return '在线规划暂不可用，不会用本地模板代替' + retained;
+    if (code === 'MODEL_TIMEOUT') return '规划等待超时，目标和周期已保留' + retained;
+    if (code === 'MODEL_INVALID_RESPONSE') return '返回的计划无法正常显示，请重新生成' + retained;
+    if (code === 'SAFETY_BLOCKED') return '计划内容未通过安全检查，请换一种目标描述再试' + retained;
+    if (code === 'INPUT_REJECTED') return '目标或学习状态未通过安全检查，请调整后重新生成' + retained;
+    if (code === 'GOAL_TOO_LONG') return '学习目标太长，请压缩到 500 字以内' + retained;
+    if (code === 'INVALID_DURATION' || code === 'INVALID_DAILY_MINUTES') {
+      return '选择的周期不符合要求，请重新选择后再试' + retained;
     }
-    if (text.startsWith('HTTP ')) return '云端规划暂时失败，未保存任何计划。请检查网络后重试。';
-    return '云端学伴暂不可用，未生成任何计划';
+    if (error instanceof HttpStatusError && error.statusCode === 429) return '请求较多，请稍后重试' + retained;
+    if (error instanceof HttpStatusError && error.statusCode >= 400 && error.statusCode < 500) {
+      return '目标或学习状态不符合要求，请调整后重试' + retained;
+    }
+    if (error instanceof HttpStatusError) return '在线规划暂时失败，请稍后重试' + retained;
+    return '在线规划暂不可用，请稍后重试' + retained;
   }
 
   @Builder
-  PlanCheckpoint(title: string, detail: string, active: boolean) {
+  PlanCheckpoint(title: string, detail: string, index: number) {
     Row({ space: 9 }) {
-      Text(active ? '✓' : '·')
+      Text(this.progressStep > index ? '✓' : (this.progressStep === index ? '…' : '·'))
         .width(22)
         .height(22)
         .fontSize(12)
         .fontWeight(FontWeight.Bold)
-        .fontColor(active ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PLACEHOLDER)
+        .fontColor(this.progressStep > index ? Constants.COLOR_TEXT_ON_GRADIENT :
+          (this.progressStep === index ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER))
         .textAlign(TextAlign.Center)
-        .backgroundColor(active ? Constants.COLOR_BRAND : Constants.COLOR_BG_PROGRESS_TRACK)
+        .backgroundColor(this.progressStep > index ? Constants.COLOR_BRAND :
+          (this.progressStep === index ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_PROGRESS_TRACK))
         .borderRadius(11)
       Column({ space: 2 }) {
         Text(title)
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
-          .fontColor(active ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_PLACEHOLDER)
+          .fontColor(this.progressStep >= index ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_PLACEHOLDER)
         Text(detail)
           .fontSize(10)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -446,7 +627,7 @@ struct PlanPage {
           .backgroundColor(Constants.COLOR_BRAND)
           .borderRadius(21)
         Column({ space: 4 }) {
-          Text('AI 正在生成学习计划')
+          Text('正在生成学习计划')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -459,18 +640,43 @@ struct PlanPage {
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
+        Button('取消')
+          .height(34)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_ERROR)
+          .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .enabled(this.progressStep < 3)
+          .onClick((): void => { this.cancelPlanGeneration(); })
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
       this.PlanProgress()
 
+      if (this.tasks.length > 0) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+            .fontSize(17)
+            .fontColor([Constants.COLOR_SUCCESS])
+          Text(this.savedPlanLabel() + '已保留，取消或失败后仍可继续执行')
+            .layoutWeight(1)
+            .fontSize(12)
+            .lineHeight(18)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+        .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+      }
+
       Column({ space: 9 }) {
-        this.PlanCheckpoint('本地画像', '读取薄弱标签、连续学习和练习表现', this.progressStep >= 0)
-        this.PlanCheckpoint('真实目录', '只从课程已有 Topic 中选择任务目标', this.progressStep >= 1)
-        this.PlanCheckpoint('行动编排', '生成学习、练习、测验和复盘动作', this.progressStep >= 2)
-        this.PlanCheckpoint('结构校验', '检查日期、课程、主题和时长边界', this.progressStep >= 3)
-        this.PlanCheckpoint('端侧同步', '保存到本机并刷新首页今日任务', this.progressStep >= 4)
+        this.PlanCheckpoint('本机状态', '读取薄弱项、连续学习和练习表现', 0)
+        this.PlanCheckpoint('在线规划', '从已有课程主题中安排每天的任务', 1)
+        this.PlanCheckpoint('任务检查', '检查日期、课程入口和预计时长', 2)
+        this.PlanCheckpoint('本机保存', '写入计划并保留已有学习数据', 3)
+        this.PlanCheckpoint('入口更新', '通知首页与服务卡片刷新', 4)
       }
       .width('100%')
       .padding(12)
@@ -496,46 +702,57 @@ struct PlanPage {
       this.PlanSkeleton()
     }
     .width('100%')
-    .padding(18)
-    .backgroundColor(Constants.COLOR_BG_CARD)
-    .borderRadius(Constants.RADIUS_LG)
+    .padding({ top: 4, bottom: 4 })
   }
 
   @Builder
   AgentTraceCard() {
     Column({ space: 12 }) {
-      Row() {
-        Text('Agent 工作链')
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('可解释规划')
+      Row({ space: 8 }) {
+        SymbolGlyph($r('sys.symbol.calendar_fill'))
+          .fontSize(19)
+          .fontColor([Constants.COLOR_BRAND])
+        Column({ space: 3 }) {
+          Text('规划依据')
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('已检查学习状态、课程主题和任务入口')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Text(this.evidenceExpanded ? '收起' : this.agentTrace.length.toString() + ' 条')
           .fontSize(11)
           .fontColor(Constants.COLOR_BRAND)
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-          .borderRadius(Constants.RADIUS_SM)
+        SymbolGlyph($r(this.evidenceExpanded ? 'sys.symbol.chevron_up' : 'sys.symbol.chevron_down'))
+          .fontSize(14)
+          .fontColor([Constants.COLOR_BRAND])
       }
       .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-      ForEach(this.agentTrace, (trace: string, index: number): void => {
-        Row({ space: 9 }) {
-          Stack({ alignContent: Alignment.Center }) {
-            Column().width(22).height(22).backgroundColor(Constants.COLOR_SUCCESS_LIGHT).borderRadius(11)
-            Text((index + 1).toString())
-              .fontSize(10)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_SUCCESS)
+      .alignItems(VerticalAlign.Center)
+      .onClick((): void => { this.evidenceExpanded = !this.evidenceExpanded; })
+      if (this.evidenceExpanded) {
+        ForEach(this.agentTrace, (trace: string, index: number): void => {
+          Row({ space: 9 }) {
+            Stack({ alignContent: Alignment.Center }) {
+              Column().width(22).height(22).backgroundColor(Constants.COLOR_SUCCESS_LIGHT).borderRadius(11)
+              Text((index + 1).toString())
+                .fontSize(10)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Constants.COLOR_SUCCESS)
+            }
+            Text(this.readablePlanTrace(trace))
+              .layoutWeight(1)
+              .fontSize(12)
+              .lineHeight(19)
+              .fontColor(Constants.COLOR_TEXT_TERTIARY)
           }
-          Text(trace)
-            .layoutWeight(1)
-            .fontSize(12)
-            .lineHeight(19)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Top)
-      })
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+        })
+      }
     }
     .width('100%')
     .padding(16)
@@ -547,7 +764,7 @@ struct PlanPage {
 
   build() {
     Column() {
-      GradientHeader('学习计划', '输入目标，自动拆解为每日任务', () => this.getUIContext().getRouter().back())
+      GradientHeader('学习计划', '输入目标，自动拆解为每日任务', () => this.goBack())
 
       Column({ space: 14 }) {
         Column({ space: 8 }) {
@@ -556,14 +773,25 @@ struct PlanPage {
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .width('100%')
-          TextInput({ text: this.goal, placeholder: '例如：两周复习数据结构', controller: this.goalInputController })
+          TextInput({
+            text: $$this.goal,
+            controller: this.goalInputController,
+            placeholder: '例如：两周复习数据结构'
+          })
             .width('100%')
             .height(44)
             .fontSize(14)
             .backgroundColor(Constants.COLOR_SURFACE_TINT)
             .borderRadius(Constants.RADIUS_MD)
+            .enabled(!this.loading && !this.planLoading)
+            .maxLength(500)
+            .enterKeyType(EnterKeyType.Done)
             .onChange((v: string) => { this.goal = v; })
-            .onSubmit(() => { this.generate(); })
+            .onSubmit((_enterKey: EnterKeyType, event: SubmitEvent): void => {
+              this.goal = event.text;
+              this.generate();
+            })
+          this.GoalSuggestions()
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -583,6 +811,7 @@ struct PlanPage {
                 .fontColor(this.days === option ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
                 .backgroundColor(this.days === option ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
                 .borderRadius(Constants.RADIUS_MD)
+                .enabled(!this.loading && !this.planLoading)
                 .onClick(() => {
                   this.days = option;
                 })
@@ -596,23 +825,23 @@ struct PlanPage {
         Button() {
           Row({ space: 8 }) {
             if (this.loading) {
-              LoadingProgress().width(18).height(18).color(Constants.COLOR_TEXT_ON_GRADIENT)
+              LoadingProgress().width(18).height(18).color(Constants.COLOR_TEXT_SECONDARY)
             } else {
               SymbolGlyph($r('sys.symbol.rays'))
                 .fontSize(18)
                 .fontColor([this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT])
             }
-            Text(this.loading ? '正在' + this.currentPlanStepDescription() : '生成学习计划')
+            Text(this.loading ? '正在生成计划' : '生成学习计划')
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
-              .fontColor(this.canGenerate || this.loading ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .fontColor(this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
         }
         .width('100%')
         .height(44)
-        .backgroundColor(this.canGenerate || this.loading ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+        .backgroundColor(this.canGenerate ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
         .borderRadius(22)
         .enabled(this.canGenerate)
         .onClick(() => { this.generate(); })
@@ -625,32 +854,86 @@ struct PlanPage {
       .margin({ left: 16, right: 16, bottom: 16 })
 
       if (this.message.length > 0) {
-        Row({ space: 8 }) {
-          if (this.hasError) {
-            SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
+        Column({ space: 6 }) {
+          Row({ space: 8 }) {
+            SymbolGlyph($r(this.hasError ? 'sys.symbol.xmark_circle_fill' : 'sys.symbol.checkmark_circle_fill'))
               .fontSize(16)
-              .fontColor([Constants.COLOR_ERROR])
-          } else {
-            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-              .fontSize(16)
-              .fontColor([Constants.COLOR_SUCCESS])
-          }
-          Text(this.message)
-            .layoutWeight(1)
-            .fontSize(12)
-            .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
-          if (this.hasError) {
-            Button('重试')
-              .height(32)
+              .fontColor([this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_SUCCESS])
+            Text(this.message)
+              .layoutWeight(1)
               .fontSize(12)
-              .fontColor(Constants.COLOR_BRAND)
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+            if (this.retryAction !== 'none') {
+              Button(this.retryAction === 'load' ? '重新读取' :
+                (this.retryAction === 'save' ? '重试保存' : '重试'))
+                .height(32)
+                .fontSize(12)
+                .fontColor(Constants.COLOR_BRAND)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(Constants.RADIUS_SM)
+                .enabled(!this.loading && !this.planLoading)
+                .onClick(() => {
+                  if (this.retryAction === 'load') this.loadPlan();
+                  else if (this.retryAction === 'save') this.retryPendingPlanSave();
+                  else this.generate();
+                })
+            }
+          }
+          .width('100%')
+
+          if (this.hasError && (this.errorHttpStatus > 0 || this.errorCode.length > 0)) {
+            Row({ space: 4 }) {
+              Text(this.errorExpanded ? '收起错误详情' : '查看错误详情')
+                .fontSize(11)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              SymbolGlyph($r(this.errorExpanded ? 'sys.symbol.chevron_up' : 'sys.symbol.chevron_down'))
+                .fontSize(11)
+                .fontColor([Constants.COLOR_TEXT_SECONDARY])
+            }
+            .height(28)
+            .onClick((): void => { this.errorExpanded = !this.errorExpanded; })
+
+            if (this.errorExpanded) {
+              Column({ space: 3 }) {
+                if (this.errorHttpStatus > 0) {
+                  Text('HTTP 状态：' + this.errorHttpStatus.toString())
+                    .width('100%')
+                    .fontSize(10)
+                    .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                }
+                if (this.errorCode.length > 0) {
+                  Text('错误代码：' + this.errorCode)
+                    .width('100%')
+                    .fontSize(10)
+                    .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                }
+              }
+              .width('100%')
+              .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+              .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_SM)
-              .onClick(() => { this.generate(); })
+            }
           }
         }
         .width('100%')
         .padding({ left: 18, right: 18, bottom: 10 })
+      }
+
+      if (this.hasError && (this.retryAction === 'generate' || this.retryAction === 'save') &&
+        this.tasks.length > 0) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+            .fontSize(16)
+            .fontColor([Constants.COLOR_SUCCESS])
+          Text(this.retryAction === 'save' ? this.savedPlanLabel() + '未被替换，可以继续执行或重试保存' :
+            this.savedPlanLabel() + '未被替换，可以继续执行或重新生成')
+            .layoutWeight(1)
+            .fontSize(12)
+            .lineHeight(18)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        .width('100%')
+        .padding({ left: 18, right: 18, bottom: 12 })
       }
 
       if (this.loading) {
@@ -658,7 +941,23 @@ struct PlanPage {
           this.PlanLoadingState()
         }
         .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
+        .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
+      } else if (this.planLoading) {
+        Column({ space: 12 }) {
+          Row({ space: 8 }) {
+            LoadingProgress()
+              .width(18)
+              .height(18)
+              .color(Constants.COLOR_BRAND)
+            Text('正在恢复本机计划')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .width('100%')
+          this.PlanSkeleton()
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
       } else if (this.tasks.length > 0) {
         if (this.agentTrace.length > 0) {
           this.AgentTraceCard()
@@ -776,7 +1075,7 @@ struct PlanPage {
         .layoutWeight(1)
         .cachedCount(5)
         .scrollBar(BarState.Off)
-        .padding({ left: 16, right: 16 })
+        .padding({ left: 16, right: 16, bottom: 16 + SafeAreaInsets.bottomVp() })
       } else {
         Column({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.calendar'))
@@ -790,22 +1089,6 @@ struct PlanPage {
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .textAlign(TextAlign.Center)
-          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
-            ForEach(this.goalSuggestions, (suggestion: string) => {
-              Button(suggestion)
-                .height(40)
-                .fontSize(12)
-                .fontColor(Constants.COLOR_BRAND)
-                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                .borderRadius(20)
-                .margin({ right: 6, bottom: 6 })
-                .onClick(() => {
-                  this.goal = suggestion;
-                })
-            })
-          }
-          .width('100%')
-          .margin({ top: 8 })
         }
         .width('100%')
         .layoutWeight(1)
@@ -819,44 +1102,68 @@ struct PlanPage {
   }
 
   async generate(): Promise<void> {
-    if (this.goal.trim().length === 0) return;
+    const requestedGoal = this.goal.trim();
+    const requestedDays = this.days;
+    if (requestedGoal.length === 0 || this.loading || this.planLoading) return;
+    const runId = this.generationRunId + 1;
+    this.generationRunId = runId;
+    const request = new HttpRequestCancellation();
+    this.activeRequest = request;
+    this.pendingPlan = null;
     this.dismissGoalInput();
     this.loading = true;
     this.message = '';
     this.hasError = false;
-    this.tasks = [];
-    this.agentTrace = [];
-    this.runLocalProgress();
+    this.retryAction = 'none';
+    this.clearErrorEvidence();
+    this.runWaitClock(runId);
     try {
+      const profile = await LocalLearningRepository.getProfile();
+      if (!this.isActiveGeneration(runId, request)) return;
+      this.progressStep = 1;
       const req: PlanRequest = {
         userId: Constants.DEMO_USER_ID,
-        goal: this.goal.trim(),
-        durationDays: this.days,
+        goal: requestedGoal,
+        durationDays: requestedDays,
         dailyMinutes: 90,
         startDate: this.localDateKey(),
-        profile: (await LocalLearningRepository.getProfile()) ?? undefined
+        profile: profile ?? undefined
       };
-      const response = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req));
-      this.progressStep = 3;
+      const response = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req), request);
+      if (!this.isActiveGeneration(runId, request)) return;
+      this.progressStep = 2;
       const validation = this.validatePlanResponse(response);
       if (!validation.valid || validation.plan === null) {
         this.message = validation.message;
         this.hasError = true;
+        this.retryAction = 'generate';
+        this.clearErrorEvidence();
         return;
       }
       const plan = validation.plan;
-      this.progressStep = 4;
-      await LocalLearningRepository.savePlan(plan);
-      await LearningFormUpdater.refreshAll();
-      this.tasks = plan.tasks;
-      this.agentTrace = plan.agentTrace ?? [];
-      this.message = '计划已生成并同步到首页';
+      this.pendingPlan = plan;
+      this.progressStep = 3;
+      await this.persistGeneratedPlan(plan);
     } catch (e) {
+      if (this.generationRunId !== runId || request.isCancelled()) return;
       const error = e instanceof Error ? e : new Error('Network request failed');
-      this.message = this.planErrorMessage(error);
+      const retained = this.tasks.length > 0 ? '，上一版计划仍可继续执行' : '';
+      this.message = this.progressStep === 0 ? '本机学习状态读取失败，请稍后重试' + retained :
+        this.planErrorMessage(error);
       this.hasError = true;
+      this.retryAction = 'generate';
+      if (error instanceof HttpStatusError) {
+        this.errorHttpStatus = error.statusCode;
+        this.errorCode = error.errorCode;
+        this.errorExpanded = false;
+      } else {
+        this.clearErrorEvidence();
+      }
     } finally {
-      this.loading = false;
+      if (this.generationRunId === runId) {
+        this.loading = false;
+        this.activeRequest = null;
+      }
     }
   }
 

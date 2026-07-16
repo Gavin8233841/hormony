@@ -4,7 +4,7 @@
  */
 
 import http from '@ohos.net.http';
-import { HttpClient } from '../common/HttpClient';
+import { HttpClient, HttpRequestCancellation, HttpStreamError } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { Citation, StreamEvent, ChatRequest, ChatMessage, HealthResponse } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -18,7 +18,13 @@ interface DisplayMessage {
   thinking: string[];
   agentExpanded: boolean;
   citationExpanded: boolean;
+  streaming: boolean;
   failed: boolean;
+  cancelled: boolean;
+  statusMessage: string;
+  httpStatus: number;
+  errorCode: string;
+  statusExpanded: boolean;
   retryQuestion: string;
 }
 
@@ -35,12 +41,23 @@ export struct ChatContent {
   @State inputText: string = '';
   @State loading: boolean = false;
   @State probing: boolean = false;
+  @State historyLoading: boolean = true;
+  @State historySaving: boolean = false;
+  @State historyMessage: string = '';
+  @State historyLoadFailed: boolean = false;
+  @State historySaveFailed: boolean = false;
   @StorageLink('cloudAgentReady') cloudAgentReady: boolean = false;
   @State serviceMessage: string = '正在连接云端学伴';
   private scroller: Scroller = new Scroller();
+  private inputController: TextInputController = new TextInputController();
   private currentRequest: http.HttpRequest | null = null;
+  private currentCancellation: HttpRequestCancellation | null = null;
   private isCancelled: boolean = false;
+  private receivedDone: boolean = false;
+  private requestSequence: number = 0;
+  private activeRequestId: number = 0;
   private scrollScheduled: boolean = false;
+  private historySaveQueued: boolean = false;
 
   // 推荐问题
   private suggestions: string[] = [
@@ -58,6 +75,12 @@ export struct ChatContent {
 
   aboutToAppear(): void {
     this.isCancelled = false;
+    this.loading = false;
+    this.currentRequest = null;
+    this.currentCancellation = null;
+    this.receivedDone = false;
+    this.activeRequestId = 0;
+    this.historyLoading = true;
     this.loadLocalHistory();
     this.probeCloudAgent();
     const pendingQuestion = AppStorage.get<string>('pendingChatQuestion') ?? '';
@@ -65,21 +88,13 @@ export struct ChatContent {
     AppStorage.setOrCreate<string>('pendingChatQuestion', '');
   }
 
-  aboutToDisappear() {
-    this.isCancelled = true;
-    if (this.currentRequest) {
-      try {
-        this.currentRequest.off('dataReceive');
-        this.currentRequest.destroy();
-      } catch (e) {
-        // 忽略销毁异常
-      }
-      this.currentRequest = null;
-    }
+  aboutToDisappear(): void {
+    this.cancelCurrentRequest(false);
   }
 
   get canSend(): boolean {
-    return this.cloudAgentReady && !this.loading && this.inputText.trim().length > 0;
+    return this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
+      !this.historyLoadFailed && this.inputText.trim().length > 0;
   }
 
   private canRetryCloudAgent(): boolean {
@@ -87,22 +102,33 @@ export struct ChatContent {
   }
 
   private sendButtonBackground(): string {
+    if (this.loading) return Constants.COLOR_ERROR_LIGHT;
     if (this.canSend) return Constants.COLOR_BRAND;
     if (this.canRetryCloudAgent()) return Constants.COLOR_WARNING;
     return Constants.COLOR_BRAND_LIGHT;
   }
 
   private sendButtonIconColor(): string {
+    if (this.loading) return Constants.COLOR_ERROR;
     if (this.canSend || this.canRetryCloudAgent()) return Constants.COLOR_TEXT_ON_GRADIENT;
     return Constants.COLOR_BRAND;
   }
 
   private sendButtonHint(): string {
-    if (this.loading) return '学伴正在回答，完成后可继续追问';
+    if (this.loading) return '学伴正在回答，点击右侧按钮可停止';
+    if (this.historyLoading) return '正在恢复本机会话';
+    if (this.historySaving) return '正在把回答保存到本机';
+    if (this.historyMessage.length > 0) return this.historyMessage;
     if (this.probing) return '正在连接云端学伴';
     if (!this.cloudAgentReady) return '云端未连接，点击右侧按钮重试';
     if (this.inputText.trim().length === 0) return '输入问题后发送按钮会亮起';
     return '';
+  }
+
+  private sendButtonHintColor(): string {
+    if (this.historyLoadFailed || this.historySaveFailed) return Constants.COLOR_ERROR;
+    if (this.canRetryCloudAgent()) return Constants.COLOR_WARNING;
+    return Constants.COLOR_TEXT_SECONDARY;
   }
 
   private markdownBlocks(content: string): MarkdownBlock[] {
@@ -476,15 +502,96 @@ export struct ChatContent {
           thinking: item.thinking ?? [],
           agentExpanded: false,
           citationExpanded: false,
+          streaming: false,
           failed: false,
+          cancelled: false,
+          statusMessage: '',
+          httpStatus: 0,
+          errorCode: '',
+          statusExpanded: false,
           retryQuestion: ''
         };
         restored.push(message);
       }
       this.messages = restored;
+      this.historyLoadFailed = false;
+      this.historySaveFailed = false;
+      this.historyMessage = restored.length > 0 ?
+        '已恢复最近 ' + restored.length.toString() + ' 条本机会话' : '';
     } catch (error) {
-      this.serviceMessage = '本地会话记录加载失败';
+      this.historyLoadFailed = true;
+      this.historyMessage = '本机会话暂时无法读取';
+    } finally {
+      this.historyLoading = false;
     }
+  }
+
+  private retryLocalHistoryLoad(): void {
+    if (this.historyLoading || this.historySaving || this.loading) return;
+    this.historyLoading = true;
+    this.historyLoadFailed = false;
+    this.historyMessage = '正在恢复本机会话';
+    this.loadLocalHistory();
+  }
+
+  private cancelCurrentRequest(showStatus: boolean): void {
+    this.isCancelled = true;
+    this.activeRequestId = 0;
+    const request = this.currentRequest;
+    const cancellation = this.currentCancellation;
+    this.currentRequest = null;
+    this.currentCancellation = null;
+    if (request !== null) {
+      try {
+        request.off('dataReceive');
+        request.off('dataEnd');
+      } catch (_) {
+      }
+    }
+    if (cancellation !== null) {
+      cancellation.cancel();
+    } else if (request !== null) {
+      try {
+        request.destroy();
+      } catch (_) {
+      }
+    }
+    this.loading = false;
+    this.receivedDone = false;
+    if (!showStatus || this.messages.length === 0) return;
+    const last = this.messages[this.messages.length - 1];
+    if (last.role !== 'assistant' || !last.streaming) return;
+    last.streaming = false;
+    last.failed = false;
+    last.cancelled = true;
+    last.httpStatus = 0;
+    last.errorCode = '';
+    last.statusExpanded = false;
+    last.statusMessage = last.content.length > 0 ?
+      '已停止继续生成，上方内容不会保存到本机' : '已停止回答，可以重新提问';
+    this.inputText = last.retryQuestion;
+    this.messages = this.messages.slice();
+  }
+
+  private retryMessage(msg: DisplayMessage): void {
+    const question = msg.retryQuestion.trim();
+    if (question.length === 0 || this.loading || this.historyLoading || this.historySaving ||
+      this.historyLoadFailed) return;
+    if (!this.cloudAgentReady) {
+      this.inputText = question;
+      if (!this.probing) this.probeCloudAgent();
+      return;
+    }
+    const targetIndex = this.messages.indexOf(msg);
+    if (targetIndex < 0) return;
+    const next: DisplayMessage[] = [];
+    for (let index = 0; index < this.messages.length; index++) {
+      const item = this.messages[index];
+      const pairedUser = index === targetIndex - 1 && item.role === 'user' && item.content === question;
+      if (index !== targetIndex && !pairedUser) next.push(item);
+    }
+    this.messages = next;
+    this.sendMessage(question);
   }
 
   private async probeCloudAgent(): Promise<void> {
@@ -572,7 +679,8 @@ export struct ChatContent {
                 .borderRadius(Constants.RADIUS_LG)
                 .height(44)
                 .padding({ left: 16, right: 16 })
-                .enabled(this.cloudAgentReady && !this.loading)
+                .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
+                  !this.historyLoadFailed)
                 .onClick(() => {
                   this.inputText = s;
                   this.sendMessage();
@@ -626,7 +734,8 @@ export struct ChatContent {
       Column({ space: 6 }) {
         Row({ space: 12 }) {
           TextInput({
-            text: this.inputText,
+            text: $$this.inputText,
+            controller: this.inputController,
             placeholder: this.cloudAgentReady ? '输入你的问题...' : '云端学伴连接后可提问'
           })
             .layoutWeight(1)
@@ -634,16 +743,24 @@ export struct ChatContent {
             .fontSize(14)
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_MD)
-            .enabled(this.cloudAgentReady && !this.loading)
+            .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historyLoadFailed)
+            .maxLength(2000)
+            .enterKeyType(EnterKeyType.Send)
             .onChange((value: string) => {
               this.inputText = value;
+              if (!this.historyLoadFailed && !this.historySaveFailed) this.historyMessage = '';
             })
-            .onSubmit(() => {
-              this.sendMessage();
+            .onSubmit((_enterKey: EnterKeyType, event: SubmitEvent): void => {
+              this.inputText = event.text;
+              this.sendMessage(event.text);
             })
 
           Button() {
-            if (this.loading || this.probing) {
+            if (this.loading) {
+              SymbolGlyph($r('sys.symbol.stop_circle_fill'))
+                .fontSize(20)
+                .fontColor([this.sendButtonIconColor()])
+            } else if (this.probing) {
               LoadingProgress()
                 .width(20)
                 .height(20)
@@ -657,10 +774,16 @@ export struct ChatContent {
             .width(44)
             .height(44)
             .backgroundColor(this.sendButtonBackground())
-            .border({ width: 1, color: this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT })
+            .border({
+              width: 1,
+              color: this.loading ? Constants.COLOR_ERROR :
+                (this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
+            })
             .borderRadius(22)
             .onClick(() => {
-              if (this.canSend) {
+              if (this.loading) {
+                this.cancelCurrentRequest(true);
+              } else if (this.canSend) {
                 this.sendMessage();
               } else if (this.canRetryCloudAgent()) {
                 this.probeCloudAgent();
@@ -669,12 +792,29 @@ export struct ChatContent {
         }
         .width('100%')
 
-        if (this.sendButtonHint().length > 0) {
-          Text(this.sendButtonHint())
-            .width('100%')
+        Row({ space: 8 }) {
+          Text(this.sendButtonHint().length > 0 ? this.sendButtonHint() : ' ')
+            .layoutWeight(1)
             .fontSize(11)
-            .fontColor(this.canRetryCloudAgent() ? Constants.COLOR_WARNING : Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(this.sendButtonHintColor())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          if (this.historyLoadFailed || this.historySaveFailed) {
+            Button(this.historyLoadFailed ? '重新读取' : (this.historySaving ? '保存中' : '重试保存'))
+              .height(28)
+              .fontSize(11)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(14)
+              .enabled(!this.loading && !this.historySaving && !this.historyLoading)
+              .onClick((): void => {
+                if (this.historyLoadFailed) this.retryLocalHistoryLoad();
+                else this.retryLocalHistorySave();
+              })
+          }
         }
+        .width('100%')
+        .height(28)
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 20, top: 12 })
@@ -692,9 +832,12 @@ export struct ChatContent {
 
   sendMessage(question?: string): void {
     const content = question !== undefined ? question.trim() : this.inputText.trim();
-    if (content.length === 0 || this.loading || !this.cloudAgentReady) {
+    if (content.length === 0 || this.loading || this.historyLoading || this.historySaving ||
+      this.historyLoadFailed || !this.cloudAgentReady) {
       return;
     }
+    this.inputController.stopEditing();
+    this.historyMessage = '';
 
     const userMsg: DisplayMessage = {
       role: 'user',
@@ -704,7 +847,13 @@ export struct ChatContent {
       thinking: [],
       agentExpanded: false,
       citationExpanded: false,
+      streaming: false,
       failed: false,
+      cancelled: false,
+      statusMessage: '',
+      httpStatus: 0,
+      errorCode: '',
+      statusExpanded: false,
       retryQuestion: '',
     };
     this.messages.push(userMsg);
@@ -717,7 +866,13 @@ export struct ChatContent {
       thinking: [],
       agentExpanded: true,
       citationExpanded: false,
+      streaming: true,
       failed: false,
+      cancelled: false,
+      statusMessage: '',
+      httpStatus: 0,
+      errorCode: '',
+      statusExpanded: false,
       retryQuestion: content,
     };
     this.messages.push(assistantMsg);
@@ -726,18 +881,23 @@ export struct ChatContent {
     this.inputText = '';
     this.loading = true;
     this.isCancelled = false;
+    this.receivedDone = false;
+    this.requestSequence += 1;
+    const requestId = this.requestSequence;
+    const cancellation = new HttpRequestCancellation();
+    this.activeRequestId = requestId;
+    this.currentCancellation = cancellation;
     this.scrollToBottom();
 
-    const requestHistory: ChatMessage[] = [];
-    for (const item of this.messages.slice(0, this.messages.length - 2).slice(-24)) {
-      if (item.content.length === 0) continue;
-      const historyItem: ChatMessage = {
-        role: item.role,
-        content: item.content,
-        citations: item.citations
-      };
-      requestHistory.push(historyItem);
-    }
+    const requestHistory = this.completeChatHistory(this.messages.slice(0, this.messages.length - 2), false)
+      .slice(-12)
+      .map((item: ChatMessage): ChatMessage => {
+        return {
+          role: item.role,
+          content: item.content.slice(0, 1000),
+          citations: item.citations
+        };
+      });
     const req: ChatRequest = {
       userId: Constants.DEMO_USER_ID,
       message: message,
@@ -749,16 +909,21 @@ export struct ChatContent {
     };
     LocalLearningRepository.getProfile().then((profile): void => {
       if (profile !== null) req.profile = profile;
-      this.startSseRequest(req);
+      this.startSseRequest(req, requestId, cancellation);
     }).catch((): void => {
-      this.startSseRequest(req);
+      this.startSseRequest(req, requestId, cancellation);
     });
   }
 
-  private startSseRequest(req: ChatRequest): void {
+  private isActiveRequest(requestId: number): boolean {
+    return requestId === this.activeRequestId && !this.isCancelled;
+  }
+
+  private startSseRequest(req: ChatRequest, requestId: number, cancellation: HttpRequestCancellation): void {
+    if (!this.isActiveRequest(requestId) || !this.loading) return;
     HttpClient.postSSE(Constants.API_CHAT, JSON.stringify(req),
       (evt: StreamEvent) => {
-        if (this.isCancelled) {
+        if (!this.isActiveRequest(requestId)) {
           return;
         }
         const last = this.messages[this.messages.length - 1];
@@ -777,58 +942,168 @@ export struct ChatContent {
         } else if (evt.type === 'citation' && evt.source) {
           last.citations.push(evt.source);
         } else if (evt.type === 'error') {
+          last.streaming = false;
           last.failed = true;
-          this.cloudAgentReady = false;
-          this.serviceMessage = evt.message ?? '云端学伴暂不可用';
+          last.cancelled = false;
+          last.statusMessage = this.streamFailureMessage(evt.code ?? '', evt.message ?? '');
+          last.httpStatus = 0;
+          last.errorCode = evt.code ?? '';
+          last.statusExpanded = false;
+          if (evt.code === 'MODEL_UNAVAILABLE') {
+            this.cloudAgentReady = false;
+          }
+          this.serviceMessage = last.statusMessage;
+        } else if (evt.type === 'done') {
+          this.receivedDone = true;
+          if (!last.failed && !last.cancelled) {
+            last.streaming = false;
+          }
         }
 
         this.messages = this.messages.slice();
         this.scrollToBottom();
       },
       () => {
-        if (this.isCancelled) {
+        if (!this.isActiveRequest(requestId)) {
           return;
         }
         this.loading = false;
         this.currentRequest = null;
+        this.currentCancellation = null;
+        this.activeRequestId = 0;
         const last = this.messages[this.messages.length - 1];
-        if (last.failed || last.content.length === 0) {
-          this.messages = this.messages.slice(0, this.messages.length - 1);
-        } else {
-          this.saveLocalHistory();
-        }
-      },
-      (_err: Error) => {
-        if (this.isCancelled) {
+        last.streaming = false;
+        if (last.failed || last.cancelled) {
+          this.messages = this.messages.slice();
           return;
         }
-        this.messages = this.messages.slice(0, this.messages.length - 1);
-        this.serviceMessage = '云端学伴暂不可用，请稍后重试';
-        this.cloudAgentReady = false;
+        if (!this.receivedDone) {
+          last.failed = true;
+          last.statusMessage = '连接提前结束，这次回答不会保存，请重试';
+          this.messages = this.messages.slice();
+          return;
+        }
+        if (last.content.length === 0) {
+          last.failed = true;
+          last.statusMessage = '这次没有收到可显示的回答，请重试';
+          this.messages = this.messages.slice();
+          return;
+        }
+        this.messages = this.messages.slice();
+        this.saveLocalHistory();
+      },
+      (err: HttpStreamError) => {
+        if (!this.isActiveRequest(requestId)) {
+          return;
+        }
+        const last = this.messages[this.messages.length - 1];
+        last.streaming = false;
+        last.failed = true;
+        last.cancelled = false;
+        last.statusMessage = this.requestFailureMessage(err);
+        last.httpStatus = err.statusCode;
+        last.errorCode = err.errorCode;
+        last.statusExpanded = false;
+        this.serviceMessage = last.statusMessage;
+        const requestRejected = err.statusCode >= 400 && err.statusCode < 500;
+        if (!requestRejected) {
+          this.cloudAgentReady = false;
+        }
         this.loading = false;
         this.currentRequest = null;
+        this.currentCancellation = null;
+        this.activeRequestId = 0;
         this.messages = this.messages.slice();
       },
       (reqInstance: http.HttpRequest) => {
+        if (!this.isActiveRequest(requestId)) {
+          try {
+            reqInstance.destroy();
+          } catch (_) {
+          }
+          return;
+        }
         this.currentRequest = reqInstance;
-      }
+      },
+      cancellation
     );
   }
 
-  private async saveLocalHistory(): Promise<void> {
+  private streamFailureMessage(code: string, fallback: string): string {
+    if (code === 'MODEL_UNAVAILABLE') return '在线学伴暂时无法回答，请稍后重试';
+    if (code === 'MODEL_TIMEOUT') return '等待回答超时，请稍后重试';
+    if (code === 'MODEL_INVALID_RESPONSE') return '这次回答无法正常显示，请重新提问';
+    if (code === 'KNOWLEDGE_UNAVAILABLE') return '当前主题还没有足够课程资料，请换个问题重试';
+    if (code === 'SAFETY_BLOCKED') return '这次回答未通过安全检查，请调整问题后重试';
+    const message = fallback.trim();
+    return message.length > 0 ? message : '云端未能完成这次回答，请稍后重试';
+  }
+
+  private requestFailureMessage(error: HttpStreamError): string {
+    if (error.statusCode === 0) return '网络连接中断，请检查网络后重试';
+    if (error.errorCode === 'INPUT_REJECTED') return '问题内容未通过安全检查，请调整后重试';
+    if (error.errorCode === 'MESSAGE_TOO_LONG') return '问题太长，请精简后重新发送';
+    const streamMessage = this.streamFailureMessage(error.errorCode, '');
+    if (streamMessage !== '云端未能完成这次回答，请稍后重试') return streamMessage;
+    if (error.statusCode === 429) return '提问太频繁，请稍后再试';
+    if (error.statusCode >= 400 && error.statusCode < 500) return '问题或学习上下文不符合要求，请调整后重试';
+    return '在线学伴暂时无法回答，请稍后重试';
+  }
+
+  private completeChatHistory(source: DisplayMessage[], includeLocalEvidence: boolean): ChatMessage[] {
     const history: ChatMessage[] = [];
-    for (const item of this.messages.slice(-24)) {
-      if (item.content.length === 0 || item.failed) continue;
-      const message: ChatMessage = {
-        role: item.role,
-        content: item.content,
-        citations: item.citations,
-        agentTrace: item.agentTrace,
-        thinking: item.thinking
-      };
-      history.push(message);
+    for (let index: number = 0; index + 1 < source.length; index += 1) {
+      const userMessage = source[index];
+      const assistantMessage = source[index + 1];
+      const completeTurn = userMessage.role === 'user' && userMessage.content.length > 0 &&
+        assistantMessage.role === 'assistant' && assistantMessage.content.length > 0 &&
+        !assistantMessage.failed && !assistantMessage.cancelled && !assistantMessage.streaming;
+      if (!completeTurn) continue;
+      history.push({
+        role: userMessage.role,
+        content: userMessage.content,
+        citations: userMessage.citations,
+        agentTrace: includeLocalEvidence ? userMessage.agentTrace : undefined,
+        thinking: includeLocalEvidence ? userMessage.thinking : undefined
+      });
+      history.push({
+        role: assistantMessage.role,
+        content: assistantMessage.content,
+        citations: assistantMessage.citations,
+        agentTrace: includeLocalEvidence ? assistantMessage.agentTrace : undefined,
+        thinking: includeLocalEvidence ? assistantMessage.thinking : undefined
+      });
+      index += 1;
     }
-    await LocalLearningRepository.saveChatHistory(history);
+    return history.slice(-24);
+  }
+
+  private async saveLocalHistory(): Promise<void> {
+    if (this.historySaving) {
+      this.historySaveQueued = true;
+      return;
+    }
+    const history = this.completeChatHistory(this.messages, true);
+    this.historySaving = true;
+    try {
+      await LocalLearningRepository.saveChatHistory(history);
+      this.historySaveFailed = false;
+      this.historyMessage = '回答已保存到本机';
+    } catch (_) {
+      this.historySaveFailed = true;
+      this.historyMessage = '回答已完成，但未能保存到本机';
+    } finally {
+      this.historySaving = false;
+      if (this.historySaveQueued) {
+        this.historySaveQueued = false;
+        this.saveLocalHistory();
+      }
+    }
+  }
+
+  private retryLocalHistorySave(): void {
+    if (this.loading || this.historyLoading || this.historySaving || this.historyLoadFailed) return;
+    this.saveLocalHistory();
   }
 
   private agentLabel(agent: string): string {
@@ -891,7 +1166,9 @@ export struct ChatContent {
 
   private agentSummary(msg: DisplayMessage): string {
     const count = this.agentFlow(msg).length;
-    if (msg.content.length === 0) return '正在生成 · ' + count.toString() + ' 个步骤';
+    if (msg.streaming) return '正在生成 · ' + count.toString() + ' 个步骤';
+    if (msg.cancelled) return '已停止 · 已完成 ' + count.toString() + ' 个步骤';
+    if (msg.failed) return '未完成 · 已执行 ' + count.toString() + ' 个步骤';
     return '已完成 · ' + count.toString() + ' 个步骤 · ' + msg.citations.length.toString() + ' 条依据';
   }
 
@@ -936,7 +1213,7 @@ export struct ChatContent {
             .borderRadius(16)
 
           Column() {
-            if (msg.thinking.length > 0 || msg.agentTrace.length > 0) {
+            if (msg.thinking.length > 0 || msg.agentTrace.length > 0 || msg.streaming) {
               this.AnswerProcessCard(msg)
             }
 
@@ -949,25 +1226,10 @@ export struct ChatContent {
                 .borderRadius(Constants.RADIUS_MD)
                 .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
                 .width('100%')
-            } else {
-              if (msg.thinking.length === 0 && msg.agentTrace.length === 0) {
-                this.AnswerProcessCard(msg)
-              }
             }
 
-            if (msg.failed) {
-              Button('重试')
-                .fontSize(12)
-                .fontColor(Constants.COLOR_BRAND)
-                .height(36)
-                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                .borderRadius(18)
-                .margin({ top: 6 })
-                .onClick(() => {
-                  msg.failed = false;
-                  this.messages = this.messages.slice(0, this.messages.length - 1);
-                  this.sendMessage(msg.retryQuestion);
-                })
+            if (msg.failed || msg.cancelled) {
+              this.MessageStatus(msg)
             }
 
             // 引用（折叠式）
@@ -1027,18 +1289,112 @@ export struct ChatContent {
   }
 
   @Builder
+  MessageStatus(msg: DisplayMessage) {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        SymbolGlyph($r(msg.cancelled ? 'sys.symbol.stop_circle_fill' : 'sys.symbol.exclamationmark_triangle_fill'))
+          .width(18)
+          .height(18)
+          .fontSize(18)
+          .fontColor([msg.cancelled ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_ERROR])
+        Column({ space: 2 }) {
+          Text(msg.cancelled ? '回答已停止' : '这次回答未完成')
+            .width('100%')
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(msg.statusMessage)
+            .width('100%')
+            .fontSize(11)
+            .lineHeight(17)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+
+      if (msg.httpStatus > 0 || msg.errorCode.length > 0) {
+        Row({ space: 4 }) {
+          Text(msg.statusExpanded ? '收起错误详情' : '查看错误详情')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          SymbolGlyph($r(msg.statusExpanded ? 'sys.symbol.chevron_up' : 'sys.symbol.chevron_down'))
+            .fontSize(11)
+            .fontColor([Constants.COLOR_TEXT_SECONDARY])
+        }
+        .height(28)
+        .onClick((): void => {
+          msg.statusExpanded = !msg.statusExpanded;
+          this.messages = this.messages.slice();
+        })
+
+        if (msg.statusExpanded) {
+          Column({ space: 3 }) {
+            if (msg.httpStatus > 0) {
+              Text('HTTP 状态：' + msg.httpStatus.toString())
+                .width('100%')
+                .fontSize(10)
+                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            }
+            if (msg.errorCode.length > 0) {
+              Text('错误代码：' + msg.errorCode)
+                .width('100%')
+                .fontSize(10)
+                .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            }
+          }
+          .width('100%')
+          .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .borderRadius(Constants.RADIUS_SM)
+        }
+      }
+
+      Button(msg.cancelled ? '重新提问' : '重试')
+        .fontSize(12)
+        .fontColor(Constants.COLOR_BRAND)
+        .height(36)
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(18)
+        .onClick((): void => {
+          this.retryMessage(msg);
+        })
+    }
+    .width('100%')
+    .padding(10)
+    .backgroundColor(msg.cancelled ? Constants.COLOR_SURFACE_TINT : Constants.COLOR_ERROR_LIGHT)
+    .borderRadius(Constants.RADIUS_MD)
+    .margin({ top: 6 })
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
   AnswerProcessCard(msg: DisplayMessage) {
     Column({ space: 10 }) {
-      if (msg.content.length === 0) {
+      if (msg.streaming && msg.content.length === 0) {
         StagedProgress(this.answerProgressTitle(msg), this.answerProgressSubtitle(msg),
           this.answerProgressIndex(msg), this.answerSteps)
       }
       Row({ space: 8 }) {
-        if (msg.content.length === 0) {
+        if (msg.streaming) {
           LoadingProgress()
             .width(16)
             .height(16)
             .color(Constants.COLOR_BRAND)
+        } else if (msg.failed) {
+          SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+            .width(16)
+            .height(16)
+            .fontSize(16)
+            .fontColor([Constants.COLOR_ERROR])
+        } else if (msg.cancelled) {
+          SymbolGlyph($r('sys.symbol.stop_circle_fill'))
+            .width(16)
+            .height(16)
+            .fontSize(16)
+            .fontColor([Constants.COLOR_TEXT_SECONDARY])
         } else {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .width(16)

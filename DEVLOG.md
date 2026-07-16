@@ -6490,3 +6490,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真实 ArkData 写失败、进程中断和并发恢复尚未做设备故障注入；当前证据为源码契约、可执行脚本与构建通过。
 - HAP 未配置正式签名，安装和竞赛提交包可用性未验证。
 - WS02 的统一 Quiz reducer 与 schema 迁移仍在独立修复，主线尚未集成；本批只保证现有 Repository 的学习事件写入和自评统计边界。
+
+---
+
+## 2026-07-17 [MAIN+WS01] 学伴输入、SSE 与计划恢复闭环
+
+背景：WS01 两个提交补齐了 Chat 原生输入、SSE 终态、可读回答、ArkData 历史以及 Plan 取消/重试/旧计划保留。主线审查确认当前分叉点之后只新增了 Chat/Plan 各 7 行本地日期契约；同时 WS05 严格 history 审查确认服务端上限为 12 条、单条 1000 字符，而端侧仍会发送 24 条完整正文。Plan 目标输入还保留单向 `text` 和不读取 `SubmitEvent.text` 的路径。本批在采用 WS01 最终实现时同步关闭这两个端云和输入阻断。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `docs/workstreams/01-chat-plan-result.md`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 通过 `$$this.inputText` 和 `SubmitEvent.text` 将原生输入送入真实 SSE；done、error、cancel 终态互斥，非 2xx 保留 HTTP 状态与业务错误码，取消后不再尝试备用地址。
+- 引用、代码块、表格与回答思路保留可读渲染；只有完整 done 回答进入 ArkData，加载/保存失败、取消和流式残片均可观察且不伪装成功。
+- 本机继续保存最近 24 条完整会话用于恢复；云端请求只发送最近 12 条，每条正文截到 1000 字符，与已核实的严格 Chat API 契约一致。
+- Plan 在长请求中显示阶段、支持保存前取消、失败重试且保留上一版计划；新计划通过端侧结构校验并成功写入 ArkData 后才替换界面，再刷新首页和服务卡片。
+- Plan 输入改为 `$$this.goal`，回车读取 `SubmitEvent.text`，上限 500 字符；Chat/Plan 均继续发送设备本地 `startDate`，没有回退本地日期修复。
+
+验证：
+- `node --check scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，8/8 通过；覆盖输入、取消、SSE 终态、完整历史、12×1000 请求边界、内容渲染、计划恢复和本地日期。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 20 s 845 ms`；CompileArkTS 与 HAP 打包完成，仍提示未配置 `signingConfigs`。
+- `git diff --check`：exit 0，仅有既有 LF/CRLF 工作区提示。
+
+失败或未验证：
+- `hdc list targets` 返回 `[Empty]`；真实 TextInput 输入、SSE 停止/错误、Plan 慢请求取消、ArkData 写失败和重启恢复均未取得模拟器或真机证据。
+- 本轮未重复线上模型调用；WS01 结果文档保留其原分支 Health/Chat/Plan 业务字段证据，但不作为本批新验证。
+- HAP 未配置正式签名，安装与竞赛提交包可用性未验证。
+- Web 严格 API 两批提交仍有 Web 停止竞态和 Plan Save 输入缺口，主线尚未集成，因此本批未运行 Web 四项。
