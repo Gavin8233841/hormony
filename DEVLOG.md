@@ -6674,3 +6674,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：内容契约 8 项通过；topic/内容关系校验通过；WS03 完整回归 45 项运行、44 项通过、1 项既有预期失败；增量 HAP `BUILD SUCCESSFUL in 4 s 462 ms`，命令退出码均为 0。
 
 失败或未验证：无模拟器或真机，答案、反馈和来源长文本显示未验证。
+
+---
+
+## 2026-07-17 [WS03] 匿名管道 read 与 EOF 三阶段语义修正
+
+背景：`cs102-进程间通信-1` 旧反馈把“仍有写端所以无法得到 EOF”错误扩大为“当前 read 一直阻塞”，忽略管道内已有数据会先被读取；末句又无条件称读空会阻塞，与所有写端关闭后返回 EOF 的规则冲突。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS102.md`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_facts.py`。
+
+行为变化：反馈明确已有数据立即可读、空管道仍有写端时等待、全部写端关闭后返回 `0`（EOF）；示例补齐 `<stdio.h>`；真实 `os.pipe` 契约固定三阶段预期，并用错误状态 fixture 证明门禁能检出旧误解。子 agent 提供测试初稿，主代理复核并收紧预期状态边界后采用。
+
+验证：生成器退出码 0，33 Topic/59 活动；内容事实 10 项与 CS102 一致性 5 项均通过；topic/内容关系校验通过；WS03 完整回归 47 项运行、46 项通过、1 项既有预期失败；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 16 s 348 ms`。
+
+失败或未验证：无模拟器或真机；代码块与反馈长文本在手机/平板的实际换行、滚动未验证。HAP 未配置 `signingConfigs`。

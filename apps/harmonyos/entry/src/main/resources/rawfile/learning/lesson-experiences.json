@@ -1332,13 +1332,13 @@
         "title": "代码填空",
         "focusTag": "IPC机制",
         "prompt": "以下代码实现父子进程通过匿名管道通信：子进程写入消息，父进程读取消息。请填写空缺部分",
-        "content": "代码：\n#include <unistd.h>\nint fd[2];\npipe(fd);  // fd[0] = 读端, fd[1] = 写端\n\nif (fork() == 0) {\n    // 子进程：写入数据\n    close(fd[0]);  // 关闭不使用的读端\n    char msg[] = \"hello parent\";\n    ________;  // 填空：通过管道写端写入消息\n    close(fd[1]);\n} else {\n    // 父进程：读取数据\n    close(fd[1]);  // 关闭不使用的写端\n    char buf[64];\n    read(fd[0], buf, sizeof(buf));\n    printf(\"received: %s\\n\", buf);\n    close(fd[0]);\n}",
+        "content": "代码：\n#include <unistd.h>\n#include <stdio.h>\nint fd[2];\npipe(fd);  // fd[0] = 读端, fd[1] = 写端\n\nif (fork() == 0) {\n    // 子进程：写入数据\n    close(fd[0]);  // 关闭不使用的读端\n    char msg[] = \"hello parent\";\n    ________;  // 填空：通过管道写端写入消息\n    close(fd[1]);\n} else {\n    // 父进程：读取数据\n    close(fd[1]);  // 关闭不使用的写端\n    char buf[64];\n    read(fd[0], buf, sizeof(buf));\n    printf(\"received: %s\\n\", buf);\n    close(fd[0]);\n}",
         "language": "代码阅读",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
         "answer": "write(fd[1], msg, sizeof(msg))",
-        "feedback": "管道是半双工通信机制（知识切片 cs102_k44），fd[0] 为读端、fd[1] 为写端。子进程写入数据使用 write(fd[1], msg, sizeof(msg)) 通过写端发送。父进程通过 read(fd[0], buf, sizeof(buf)) 从读端接收。注意每个进程应关闭不使用的端：子进程关闭读端 fd[0]，父进程关闭写端 fd[1]。如果父进程不关闭写端，当子进程写完关闭后，父进程的 read 会一直阻塞（因为写端未全部关闭，read 不会返回 EOF）。管道缓冲区有限（通常 64KB），写满时写入端阻塞，读空时读取端阻塞",
+        "feedback": "管道是半双工通信机制（知识切片 cs102_k44），fd[0] 为读端、fd[1] 为写端。子进程写入数据使用 write(fd[1], msg, sizeof(msg)) 通过写端发送。父进程通过 read(fd[0], buf, sizeof(buf)) 从读端接收。每个进程都应关闭不使用的端：子进程关闭读端 fd[0]，父进程关闭写端 fd[1]。如果父进程不关闭自己的写端，当前这次 read 仍会读取管道中已有的消息；但数据耗尽后继续 read 会等待，因为仍有写端打开，所有写端关闭后 read 才返回 0（EOF）。管道缓冲区容量有限；缓冲区写满时 write 等待，缓冲区读空且仍有写端时 read 等待",
         "source": "操作系统概念（Silberschatz）；知识切片 cs102_k44"
       },
       {

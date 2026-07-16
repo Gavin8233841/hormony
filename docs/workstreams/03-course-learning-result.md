@@ -522,3 +522,32 @@
 ### 未验证
 
 - **未验证**：当前无模拟器或真机；修订后的答案、反馈和来源长文本显示未验证。
+
+## 批次二十：匿名管道 read 与 EOF 三阶段语义修正
+
+### 行为
+
+- 修正 `cs102-进程间通信-1` 把“父进程未关闭写端”误述为当前 `read` 一直阻塞的问题：管道中已有数据时本次读取立即返回；数据耗尽且仍有写端时后续读取等待；所有写端关闭后读取返回 `0`（EOF）。
+- 补齐示例调用 `printf` 所需的 `#include <stdio.h>`，并把末句的阻塞条件限定为“缓冲区读空且仍有写端”，避免与 EOF 条件互相矛盾。
+- 子 agent 交付管道契约初稿；主代理复核后将预期三阶段收口为固定常量，避免调用方通过传入错误预期绕过门禁。
+- 契约从生成活动 `$[23].activities[0]` 唯一提取 `char msg[]`，用真实 `os.pipe`/非阻塞 `os.read` 依次观测 `data`、`would_block`、`eof`；错误状态 fixture 三项均红灯，当前活动与真实观测绿灯。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：POSIX.1-2024 `read()` 明确规定空管道仍有写端且未启用 `O_NONBLOCK` 时阻塞、启用时返回 `EAGAIN`，无任何写端时返回 `0`；已有数据的读取不由写端是否仍打开决定。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；33/33 Topic、59 个活动，类型分布不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts -v`，退出码 0；10 项通过。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_consistency_cs102 -v`，退出码 0；CS102 的 16 个活动共 5 项一致性门禁通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；47 项运行，46 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 16 s 348 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器、手机、平板或真机；修订后的代码块、反馈长文本换行和滚动未验证。

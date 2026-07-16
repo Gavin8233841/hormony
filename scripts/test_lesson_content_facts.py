@@ -1,5 +1,6 @@
 import heapq
 import json
+import os
 import re
 import unittest
 from pathlib import Path
@@ -152,6 +153,86 @@ def dijkstra_contract_errors(activity):
     return errors
 
 
+PIPE_MESSAGE_PATTERN = re.compile(r'char\s+msg\[\]\s*=\s*"([^"]+)";')
+PIPE_EXPECTED_STATES = {
+    "written_data": ("data", b"hello parent\0"),
+    "empty_with_writer": ("would_block", b""),
+    "all_writers_closed": ("eof", b""),
+}
+
+
+def read_pipe_state(read_fd):
+    try:
+        data = os.read(read_fd, 64)
+    except BlockingIOError:
+        return "would_block", b""
+    if data == b"":
+        return "eof", data
+    return "data", data
+
+
+def observe_pipe_eof_states(message):
+    read_fd = None
+    write_fd = None
+    try:
+        read_fd, write_fd = os.pipe()
+        os.set_blocking(read_fd, False)
+        os.write(write_fd, message)
+
+        written_data = read_pipe_state(read_fd)
+        empty_with_writer = read_pipe_state(read_fd)
+
+        os.close(write_fd)
+        write_fd = None
+        all_writers_closed = read_pipe_state(read_fd)
+        return {
+            "written_data": written_data,
+            "empty_with_writer": empty_with_writer,
+            "all_writers_closed": all_writers_closed,
+        }
+    finally:
+        if read_fd is not None:
+            os.close(read_fd)
+        if write_fd is not None:
+            os.close(write_fd)
+
+
+def pipe_state_contract_errors(observed_states):
+    errors = []
+    for phase, expected in PIPE_EXPECTED_STATES.items():
+        observed = observed_states.get(phase)
+        if observed != expected:
+            errors.append(f"{phase}: expected {expected!r}, observed {observed!r}")
+    return errors
+
+
+def pipe_eof_contract_errors(activity):
+    errors = []
+    message_matches = PIPE_MESSAGE_PATTERN.findall(activity.get("content", ""))
+    if len(message_matches) != 1:
+        return [f"expected exactly one pipe message, got {len(message_matches)}"]
+
+    prompt = activity.get("prompt", "")
+    feedback = activity.get("feedback", "")
+    if "子进程写入消息，父进程读取消息" not in prompt:
+        errors.append("prompt must establish child-write/parent-read direction")
+    if activity.get("answer") != "write(fd[1], msg, sizeof(msg))":
+        errors.append("answer must write the complete message through fd[1]")
+    if "当前这次 read 仍会读取管道中已有的消息" not in feedback:
+        errors.append("feedback must say queued data is readable while a writer is open")
+    if "数据耗尽后继续 read 会等待，因为仍有写端打开" not in feedback:
+        errors.append("feedback must say an empty pipe with a writer would block")
+    if "所有写端关闭后 read 才返回 0（EOF）" not in feedback:
+        errors.append("feedback must say closing every writer produces EOF")
+    if "缓冲区读空且仍有写端时 read 等待" not in feedback:
+        errors.append("feedback must qualify empty-pipe blocking with an open writer")
+
+    message = message_matches[0].encode("utf-8") + b"\0"
+    observed_states = observe_pipe_eof_states(message)
+    errors.extend(pipe_state_contract_errors(observed_states))
+    return errors
+
+
 class LessonContentFactsTest(unittest.TestCase):
     def setUp(self):
         self.experiences = load_json(EXPERIENCES_PATH)
@@ -250,6 +331,41 @@ class LessonContentFactsTest(unittest.TestCase):
 
         spec = CS102_SPEC_PATH.read_text(encoding="utf-8")
         self.assertIn("消费者可先通过 P(full)", spec)
+
+    def test_pipe_eof_contract_rejects_static_blocking_myth_fixture(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "进程间通信",
+            "cs102-进程间通信-1",
+        )
+        wrong_states = {
+            "written_data": ("would_block", b""),
+            "empty_with_writer": ("eof", b""),
+            "all_writers_closed": ("would_block", b""),
+        }
+
+        errors = pipe_state_contract_errors(wrong_states)
+
+        self.assertTrue(any(error.startswith("written_data:") for error in errors))
+        self.assertTrue(
+            any(error.startswith("empty_with_writer:") for error in errors)
+        )
+        self.assertTrue(
+            any(error.startswith("all_writers_closed:") for error in errors)
+        )
+
+    def test_pipe_eof_contract_accepts_generated_activity_and_os_semantics(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "进程间通信",
+            "cs102-进程间通信-1",
+        )
+        self.assertEqual(
+            [],
+            pipe_eof_contract_errors(activity),
+        )
 
     def test_red_black_root_step_is_kept_in_the_source_spec(self):
         spec = CS101_SPEC_PATH.read_text(encoding="utf-8")
