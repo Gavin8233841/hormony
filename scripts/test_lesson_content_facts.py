@@ -14,6 +14,7 @@ KNOWLEDGE_PATH = (
 )
 CS101_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS101.md"
 CS102_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS102.md"
+CS103_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS103.md"
 
 
 def load_json(path):
@@ -105,6 +106,35 @@ class LessonContentFactsTest(unittest.TestCase):
 
         spec = CS102_SPEC_PATH.read_text(encoding="utf-8")
         self.assertIn("- **正确顺序**：B → D → E → C → A → F", spec)
+
+    def test_udp_encapsulation_uses_protocol_specific_datagram_names(self):
+        activity = find_activity(
+            self.experiences,
+            "cs103",
+            "OSI与TCP/IP模型",
+            "cs103-OSI与TCP/IP模型-2",
+        )
+        knowledge = find_unique(
+            self.knowledge_items,
+            "cs103_k03 knowledge chunk",
+            lambda item: item.get("id") == "cs103_k03",
+        )
+
+        self.assertIn("添加TCP/UDP首部", knowledge["text"])
+        self.assertIn("添加UDP首部", activity["content"])
+        self.assertEqual(
+            "Message → UDP Datagram → IP Datagram → Frame → Bits；最终为 Bits（比特流）",
+            activity["answer"],
+        )
+        self.assertNotIn("DNS使用UDP而非TCP", activity["feedback"])
+        self.assertIn("同时支持UDP与TCP", activity["feedback"])
+        self.assertIn("RFC 7766", activity["source"])
+
+        spec = CS103_SPEC_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            "- **答案**：Message → UDP Datagram → IP Datagram → Frame → Bits；最终为 Bits（比特流）",
+            spec,
+        )
 
 
 if __name__ == "__main__":

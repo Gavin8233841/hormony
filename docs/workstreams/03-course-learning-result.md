@@ -416,3 +416,30 @@
 ### 未验证
 
 - **未验证**：当前设备列表仍为空；六步排序的拖动、提交反馈和长文本滚动没有模拟器、手机、平板或真机证据。
+
+## 批次十六：UDP 与 IP 封装术语修正
+
+### 行为
+
+- 修正 `cs103-OSI与TCP/IP模型-2` 把添加 UDP 首部后的 PDU 统称为 Segment 的问题；现明确推演 `Message → UDP Datagram → IP Datagram → Frame → Bits`。
+- 删除“DNS 使用 UDP 而非 TCP”的错误绝对化表述；题面只证明本次查询使用 UDP，反馈补充 RFC 7766 对通用 DNS 实现同时支持 UDP 与 TCP 的要求。
+- 来源增加 RFC 7766，生成产物与唯一源规格同步；契约同时固定 UDP/IP 两层术语、禁止旧错误句回归并校验 RFC 引用。
+- 修订来自并行 CS103 全活动事实审计，主代理复核 RFC 768、RFC 7766 原文后独立采用本活动；同文件 TCP Reno 差异未并入本提交。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：RFC 768 使用 User Datagram 术语；RFC 7766 明确写明通用 DNS 实现 `MUST support both UDP and TCP transport`；本题操作序列明确添加 UDP 首部后再添加 IP 首部。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts -v`，退出码 0；4 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：`python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations scripts.test_lesson_content_facts -v`，退出码 0；43 项运行，42 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 4 s 47 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前没有模拟器或真机；修订后的英文协议术语换行、长答案滚动及手机/平板显示未验证。

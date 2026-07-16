@@ -6569,3 +6569,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 失败或未验证：
 - 当前无模拟器、手机、平板或真机；六步排序的拖动、提交反馈和长文本滚动未验证。
+
+---
+
+## 2026-07-17 [WS03] UDP 与 IP 封装术语修正
+
+背景：`cs103-OSI与TCP/IP模型-2` 的题面明确添加 UDP 首部，旧答案却把传输层 PDU 写成通用 Segment，并称“DNS 使用 UDP 而非 TCP”。这混淆 UDP Datagram 与 TCP Segment，也忽略通用 DNS 实现的 TCP 支持要求。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+行为变化：
+- 推演修正为 `Message → UDP Datagram → IP Datagram → Frame → Bits`，逐层名称与题面 UDP/IP 首部一致。
+- 反馈只断言本次查询选择 UDP，并增加 RFC 7766 对通用 DNS 实现同时支持 UDP 与 TCP 的要求；来源同步增加 RFC 7766。
+- 新增真实产物契约，固定答案、禁止旧错误句并要求反馈与来源保留 RFC 依据。
+- 并行子 agent 完成 CS103 18 个规格活动审计；主代理读取 RFC 768、RFC 7766 原文后只采用本活动，TCP Reno 差异继续未暂存。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_lesson_content_facts -v`：退出码 0，4 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_course_resume_contract scripts.test_knowledge_navigation_contract scripts.test_lesson_activity_resume_contract scripts.test_course_learning_path_contract scripts.test_lesson_self_assessment_boundary scripts.test_validate_topic_relations scripts.test_lesson_content_facts -v`：退出码 0，43 项运行，42 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 4 s 47 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 当前无模拟器、手机、平板或真机；英文协议术语换行、长答案滚动及布局未验证。

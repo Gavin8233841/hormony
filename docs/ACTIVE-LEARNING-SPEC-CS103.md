@@ -51,14 +51,14 @@
   3. 数据链路层处理：添加以太网帧首部和FCS帧尾
   4. 物理层处理：转换为比特流在线路上传输
 - **推演过程**：
-  - 操作1后：PDU从 Message 变为 Segment（报文段）
-  - 操作2后：PDU从 Segment 变为 Datagram（数据报）
-  - 操作3后：PDU从 Datagram 变为 Frame（数据帧）
-  - 操作4后：PDU从 Frame 变为 Bit（比特流）
-- **最终状态**：到达物理层时PDU为Bit（比特流），接收端将逆向从Bit逐层还原为Message
-- **答案**：Message → Segment → Datagram → Frame → Bit；最终为 Bit（比特流）
-- **反馈**：OSI各层PDU依次为：物理层-Bit、数据链路层-Frame、网络层-Packet(Datagram)、传输层-Segment、应用层-Message。DNS使用UDP而非TCP，因此传输层PDU虽为报文段但承载的是UDP报文。注意TCP/IP模型将OSI上三层合并为应用层，但PDU名称仍沿用OSI定义。这与知识切片 cs103_k03 和 cs103_k04 中PDU通过封装保持独立性的描述一致
-- **来源**：计算机网络：自顶向下方法（Kurose & Ross）；知识切片 cs103_k03、cs103_k04
+  - 操作1后：PDU从 Message 变为 UDP Datagram（UDP用户数据报）
+  - 操作2后：PDU从 UDP Datagram 变为 IP Datagram（IP数据报）
+  - 操作3后：PDU从 IP Datagram 变为 Frame（数据帧）
+  - 操作4后：PDU从 Frame 变为 Bits（比特流）
+- **最终状态**：到达物理层时PDU为Bits（比特流），接收端将逆向从Bits逐层还原为Message
+- **答案**：Message → UDP Datagram → IP Datagram → Frame → Bits；最终为 Bits（比特流）
+- **反馈**：传输层PDU应按所用协议区分：TCP形成TCP Segment，UDP形成UDP Datagram；网络层再封装为IP Datagram。题面已明确本次查询添加UDP首部，因此本题选择UDP，但不能把DNS概括为“只使用UDP”：RFC 7766要求通用DNS实现同时支持UDP与TCP。知识切片 cs103_k03、cs103_k04提供了逐层封装和PDU独立性的基础
+- **来源**：计算机网络：自顶向下方法（Kurose & Ross）；RFC 7766（DNS over TCP Requirements）；知识切片 cs103_k03、cs103_k04
 
 ---
 
