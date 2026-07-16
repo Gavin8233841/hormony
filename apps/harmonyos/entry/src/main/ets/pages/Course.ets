@@ -37,16 +37,6 @@ export struct CourseContent {
     });
   }
 
-  private openQuiz(course: Course): void {
-    AppStorage.setOrCreate<string>('selectedCourseId', course.id);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', '综合');
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((err: Error): void => {
-      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'CourseContent quiz router.pushUrl failed: %{public}s', err.message);
-    });
-  }
-
   @Builder
   CourseSkeleton() {
     Column({ space: 12 }) {
@@ -149,9 +139,9 @@ export struct CourseContent {
                   .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
                   .borderRadius(4)
 
-                // 知识点标签
+                // 课程主题预览
                 Flex({ wrap: FlexWrap.Wrap }) {
-                  ForEach(c.topics, (t: string) => {
+                  ForEach(c.topics.slice(0, 3), (t: string) => {
                     Text(t)
                       .fontSize(11)
                       .fontColor(Constants.COLOR_TEXT_TERTIARY)
@@ -160,34 +150,44 @@ export struct CourseContent {
                       .borderRadius(8)
                       .margin({ right: 6, bottom: 6 })
                   })
+                  if (c.topics.length > 3) {
+                    Text('+' + (c.topics.length - 3).toString())
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                      .backgroundColor(Constants.COLOR_BG_TAG)
+                      .borderRadius(8)
+                      .margin({ right: 6, bottom: 6 })
+                  }
                 }
                 .width('100%')
                 .margin({ top: 12 })
 
-                Row({ space: 10 }) {
-                  Button('进入课程')
-                    .layoutWeight(1)
-                    .height(42)
-                    .fontSize(13)
-                    .fontColor(Constants.COLOR_BRAND)
-                    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                    .borderRadius(Constants.RADIUS_MD)
-                    .onClick(() => {
-                      this.openCourse(c);
-                    })
-                  Button('AI 出题')
-                    .layoutWeight(1)
-                    .height(42)
-                    .fontSize(13)
-                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                    .backgroundColor(Constants.COLOR_BRAND)
-                    .borderRadius(Constants.RADIUS_MD)
-                    .onClick(() => {
-                      this.openQuiz(c);
-                    })
+                Button({ type: ButtonType.Normal }) {
+                  Row({ space: 8 }) {
+                    SymbolGlyph($r('sys.symbol.book_open_fill'))
+                      .fontSize(16)
+                      .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                    Text(c.progress > 0 ? '继续课程' : '进入课程')
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                    Blank()
+                    SymbolGlyph($r('sys.symbol.chevron_right'))
+                      .fontSize(14)
+                      .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                  }
+                  .width('100%')
                 }
                 .width('100%')
+                .height(44)
                 .margin({ top: 6 })
+                .padding({ left: 14, right: 14 })
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick(() => {
+                  this.openCourse(c);
+                })
               }
               .width('100%')
               .padding(16)

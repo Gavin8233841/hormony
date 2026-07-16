@@ -6176,3 +6176,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 本批尚未安装到模拟器，课程点击路径、手机与平板布局均未验证。
 - 真机与线上聚焦测验请求未验证。
+
+---
+
+## 2026-07-17 [WS03] 课程入口与主题路径收敛
+
+背景：课程列表存在脱离具体 Topic 的课程级出题入口；课程详情重复展示三步说明，并在每个 Topic 内并列学习、精选练习、AI 测验三个动作，主路径不清晰。本批将课程入口收敛到 Topic 对应 Lesson，让后续互动与同标签练习在 Lesson 内发生。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
+
+行为变化：
+- 课程列表每门课程只保留一个“进入课程 / 继续课程”主动作，移除课程级出题；主题预览最多显示 3 个标签和剩余数量。
+- 课程详情移除重复的三步说明和每个 Topic 下的三个并列按钮；Topic 整行可点击并直达对应 Lesson。
+- 从本地学习事件计算已完成 Topic 数，标出首个未完成 Topic，并显示“开始 / 继续 / 复习 / 预览”状态。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过，`ALL CHECKS PASSED`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 27 s 777 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 从仓库根目录调用 wrapper 时，Hvigor 在错误目录查找配置并以退出码 124、`00304004` 结束；切换到 `apps/harmonyos` 后验证通过。
+- 切换目录后的第一次工具调用因 5 秒调用超时以退出码 124 结束；随后完整重跑并构建通过。
+- 本批尚无模拟器 UI 树或点击证据；手机与平板布局、真机均未验证。
