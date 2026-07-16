@@ -614,3 +614,30 @@
 ### 未验证
 
 - **未验证**：当前无模拟器、手机、平板或真机；七步排序的拖动、提交反馈和长文本滚动未验证。
+
+## 批次二十三：Socket 监听队列因果补正
+
+### 行为
+
+- 修正 `cs102-进程间通信-2` 的并发事件排序缺口：旧 G 是“客户端调用 `connect()`”，但该调用可以在服务器 `listen()` 前开始，不能与连接成功到达监听套接字混为同一事件。
+- 题面现限定“服务器端可观察事件”；G 是连接到达已监听套接字并进入待 `accept` 队列，A 是 `accept()` 从该队列取出连接并返回新套接字。因此 `E → G → A` 分别对应建立监听队列、连接进入待处理队列、从队列取出连接，均为可证明依赖。
+- 答案继续使用 `B → C → E → G → A → F → D`；反馈明确说明 `connect()` 调用起始时刻不参与排序，避免把并发调用时间包装成唯一教学答案。
+- 可执行契约精确锁定题面范围、A/G 事件、POSIX 来源、完整排列与逐边依赖；固定输入把 G 恢复为旧 `connect()` 调用描述时仅触发对应错误，把 G/A 颠倒时仅触发 pending queue 依赖错误。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：POSIX.1-2024 `listen()` 规定将连接型 socket 标记为接受连接并限制 listen queue；`connect()` 规定尝试建立连接，阻塞、非阻塞或信号中断路径允许连接异步完成；`accept()` 规定从 pending connection queue 取出首个连接并创建新 socket。三份官方页面本轮读取均返回 HTTP 200，且已核对上述业务正文。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts scripts.test_lesson_content_consistency_cs102 -v`，退出码 0；22 项通过。首次执行因未跟踪总审计脚本仍锁定旧 Socket 文案失败 2 项，更新该审计契约后同一命令转绿；该未跟踪脚本不纳入本提交。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；54 项运行，53 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 16 s 122 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器、手机、平板或真机；七步排序的拖动、提交反馈、长文本滚动和手机/平板布局未验证。

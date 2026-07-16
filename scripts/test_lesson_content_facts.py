@@ -365,9 +365,12 @@ def segment_worked_example_contract_errors(experience):
 
 SOCKET_STEP_KEYS = ["A", "B", "C", "D", "E", "F", "G"]
 SOCKET_REQUIRED_OPTIONS = {
-    "A": "客户端连接到达后，服务器的 accept() 返回用于本次连接的新套接字",
-    "G": "客户端调用 connect() 向服务器发起连接请求",
+    "A": "服务器的 accept() 从待处理连接队列取出该连接，并返回新套接字",
+    "G": "客户端发起的连接到达已监听套接字，并进入待 accept 的连接队列",
 }
+SOCKET_PROMPT_EVENT_SCOPE = "服务器端可观察事件"
+SOCKET_FEEDBACK_CALL_SCOPE = "connect() 调用的起始时刻不参与排序"
+SOCKET_POSIX_SOURCE = "POSIX.1-2024 listen()/connect()/accept()"
 SOCKET_DEPENDENCIES = [
     ("B", "C"),
     ("C", "E"),
@@ -380,16 +383,15 @@ SOCKET_DEPENDENCIES = [
 
 def socket_step_contract_errors(activity):
     errors = []
+    if SOCKET_PROMPT_EVENT_SCOPE not in activity.get("prompt", ""):
+        errors.append("Socket prompt must scope the order to server-observable events")
+    if SOCKET_FEEDBACK_CALL_SCOPE not in activity.get("feedback", ""):
+        errors.append("Socket feedback must exclude connect() call start time")
+    if SOCKET_POSIX_SOURCE not in activity.get("source", ""):
+        errors.append("Socket source must cite the POSIX listen/connect/accept contract")
+
     options = activity.get("options", [])
     answer_indexes = activity.get("answerIndexes", [])
-    prompt = activity.get("prompt", "")
-    feedback = activity.get("feedback", "")
-    if "按必然的先后依赖" not in prompt:
-        errors.append("prompt must ask for necessary event dependencies")
-    if "服务器可以在客户端 connect 前调用 accept 并阻塞" not in feedback:
-        errors.append("feedback must distinguish the accept call from its return")
-    if "accept 返回”必然发生在连接到达之后" not in feedback:
-        errors.append("feedback must place the accept return after connection arrival")
     if "知识切片 cs102_k48" not in activity.get("source", ""):
         errors.append("Socket activity source must cite cs102_k48")
     if len(options) != len(SOCKET_STEP_KEYS):
@@ -669,7 +671,7 @@ class LessonContentFactsTest(unittest.TestCase):
         )
         self.assertEqual("B → C → E → G → A → F → D", activity["answer"])
 
-    def test_socket_step_contract_rejects_accept_before_connect_fixture(self):
+    def test_socket_step_contract_rejects_dequeue_before_pending_connection(self):
         activity = find_activity(
             self.experiences,
             "cs102",
@@ -687,6 +689,29 @@ class LessonContentFactsTest(unittest.TestCase):
         self.assertEqual(
             ["Socket dependency requires G before A"],
             errors,
+        )
+
+    def test_socket_step_contract_rejects_connect_call_start_option_fixture(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "进程间通信",
+            "cs102-进程间通信-2",
+        )
+        old_option = "客户端调用 connect() 向服务器发起连接请求"
+        wrong_options = list(activity["options"])
+        wrong_options[6] = old_option
+        wrong_activity = {
+            **activity,
+            "options": wrong_options,
+        }
+
+        self.assertEqual(
+            [
+                f"Socket option G is {old_option!r}, "
+                f"expected {SOCKET_REQUIRED_OPTIONS['G']!r}"
+            ],
+            socket_step_contract_errors(wrong_activity),
         )
 
     def test_red_black_root_step_is_kept_in_the_source_spec(self):

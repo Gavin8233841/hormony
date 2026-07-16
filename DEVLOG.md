@@ -6716,3 +6716,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：生成器退出码 0，33 Topic/59 活动；目标 19 项、关系校验、WS03 51 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 18 s 607 ms`。
 
 失败或未验证：无模拟器或真机，七步排序拖动、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。
+
+---
+
+## 2026-07-17 [WS03] Socket 监听队列因果补正
+
+背景：上一批仍把 G 定义为客户端调用 `connect()`，却要求 `listen()` 必然先于 G。POSIX 规定 `connect()` 只尝试建连且可能异步完成，调用起始时刻不能代表连接已进入服务器监听队列，因此旧依赖不可证明。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS102.md`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_facts.py`。
+
+行为变化：题目限定服务器端可观察事件；G 改为连接到达已监听套接字并进入待 `accept` 队列，A 改为 `accept()` 从该队列取出连接并返回新套接字。答案仍为 `B→C→E→G→A→F→D`，反馈明确排除 `connect()` 调用起始时刻。契约测试固定拒绝旧 G，并逐边校验监听队列因果关系。
+
+验证：POSIX.1-2024 `listen()`、`connect()`、`accept()` 页面均返回 HTTP 200，且正文分别确认监听队列、尝试/异步建连和从 pending queue 取连接语义；生成器、目标 22 项、关系校验、WS03 54 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 16 s 122 ms`。首次目标回归因未跟踪总审计脚本仍固定旧 Socket 文案失败 2 项，修正其契约后同一命令转绿，该脚本不纳入本提交。
+
+失败或未验证：无模拟器或真机，七步排序交互、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。
