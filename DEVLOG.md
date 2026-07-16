@@ -6176,3 +6176,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 本批尚未安装到模拟器，课程点击路径、手机与平板布局均未验证。
 - 真机与线上聚焦测验请求未验证。
+
+---
+
+## 2026-07-17 [WS06]：基于实时 UI 树 bounds 的 HarmonyOS 冒烟门禁
+
+背景：原冒烟脚本会复用 UI 树、宽松匹配文本，并在多设备或多个 HAP 并存时隐式选择目标，无法稳定证明点击来自当次页面的真实节点。
+
+文件：
+- `scripts/harmonyos-app-smoke.ps1`
+- `docs/workstreams/06-competition-release-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 每次点击和断言前重新执行 `uitest dumpLayout`，只匹配当前可见节点的精确文本，并从节点 `bounds` 计算点击中心。
+- 显式解析三种已核实的 bounds 编码，拒绝反向、空尺寸或带尾随内容的边界数据。
+- 多设备时要求 `-DeviceTarget` 精确选择；所有 HDC 命令固定到同一目标，HAP 固定为当前构建配置的 `entry-default-unsigned.hap`。
+- UI 树 JSON、dump 路径、命令退出码、安装与启动结果设置明确失败边界；截图目录只新建、不覆盖。
+- 新增 `-SelfTest`，离线验证 bounds、UI 树、dump 路径和设备参数，不连接设备、不构建、不创建截图目录。
+
+验证：
+- PowerShell AST 解析：exit 0，`AST_PARSE=PASS`。
+- PowerShell 7.6.3 `./scripts/harmonyos-app-smoke.ps1 -SelfTest`：exit 0，9/9 通过。
+- Windows PowerShell 5.1 同一 `-SelfTest`：exit 0，9/9 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 8 s 559 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- `hdc list targets` 返回 `[Empty]`，未运行安装、启动、页面点击和截图流程；模拟器与真机均未验证。
+- 当前 HAP 未配置正式签名；构建通过不等于可发布安装包通过。
