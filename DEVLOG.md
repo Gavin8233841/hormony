@@ -6257,3 +6257,29 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 尚无模拟器证据证明“完成一个知识切片后退出 → 课程显示继续 → 返回最近 Topic”的运行路径。
 - 手机与平板布局、真机均未验证。
+
+---
+
+## 2026-07-17 [WS03] 知识星图方向与局部行动
+
+背景：知识星图的边只有连通线、没有先修方向；选择节点后无关旁支仍同权显示；背景含无教学含义的星点和大圆；详情并列“学习主题 / 主题练习”两个动作，锁定节点没有可执行下一步。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+
+行为变化：
+- 关系边新增源/目标 ID 和向量箭头，从前置指向后继；选中后只强调当前节点的一跳入边、出边与相关节点。
+- 一跳节点显示“前置 / 后继”，无关节点和边淡化；删除装饰星点与大面积圆形光斑。
+- 详情收敛为一个下一步动作，依据真实解锁、Lesson 完成和客观练习状态进入 Lesson 或 Practice。
+- 锁定节点沿已校验 DAG 回溯到最早可进入前置；已掌握节点优先进入可解锁后继，没有后继时复习当前 Topic。
+- 复核 `dad2d67`、`7693a6d`、`2857f6c`，只吸收适配当前动态画布的边 ID、箭头与一跳聚焦实现；未增加依赖或资源。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic 的唯一性、引用、DAG、连通性、层级、内容与 Lesson 闭环契约全部通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 31 s 818 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：退出码 0，输出 `[Empty]`，当前无可用模拟器或设备。
+- 箭头实际渲染、横向滚动、节点局部聚焦、手机与平板布局、真机均未验证。

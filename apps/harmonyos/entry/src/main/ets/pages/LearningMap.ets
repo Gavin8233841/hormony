@@ -21,39 +21,24 @@ interface MapNode {
 }
 
 interface MapEdge {
+  fromId: string;
+  toId: string;
   fromX: number;
   fromY: number;
   toX: number;
   toY: number;
+  arrowX: number;
+  arrowY: number;
+  arrowLeftX: number;
+  arrowLeftY: number;
+  arrowRightX: number;
+  arrowRightY: number;
   active: boolean;
-}
-
-interface NebulaStar {
-  x: number;
-  y: number;
-  size: number;
-  opacity: number;
 }
 
 const MAP_WIDTH: number = 328;
 const NODE_WIDTH: number = 72;
 const LEVEL_GAP: number = 82;
-const NEBULA_STARS: NebulaStar[] = [
-  { x: 26, y: 36, size: 2, opacity: 0.52 },
-  { x: 72, y: 92, size: 3, opacity: 0.36 },
-  { x: 128, y: 48, size: 2, opacity: 0.42 },
-  { x: 196, y: 118, size: 2, opacity: 0.34 },
-  { x: 286, y: 64, size: 3, opacity: 0.44 },
-  { x: 42, y: 188, size: 2, opacity: 0.30 },
-  { x: 112, y: 246, size: 3, opacity: 0.38 },
-  { x: 238, y: 214, size: 2, opacity: 0.32 },
-  { x: 298, y: 286, size: 2, opacity: 0.40 },
-  { x: 74, y: 356, size: 2, opacity: 0.34 },
-  { x: 164, y: 404, size: 3, opacity: 0.36 },
-  { x: 266, y: 468, size: 2, opacity: 0.30 },
-  { x: 36, y: 532, size: 3, opacity: 0.32 },
-  { x: 206, y: 574, size: 2, opacity: 0.35 }
-];
 
 @Entry
 @Component
@@ -144,11 +129,33 @@ struct LearningMapPage {
       for (const prerequisiteId of node.prerequisiteIds) {
         const source = nextNodes.find((item: MapNode): boolean => item.id === prerequisiteId);
         if (source === undefined) continue;
+        const fromX = source.x + NODE_WIDTH / 2;
+        const fromY = source.y + 22;
+        const toX = node.x + NODE_WIDTH / 2;
+        const toY = node.y + 22;
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const distance = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+        const unitX = dx / distance;
+        const unitY = dy / distance;
+        const arrowX = fromX + dx * 0.72;
+        const arrowY = fromY + dy * 0.72;
+        const perpendicularX = -unitY;
+        const perpendicularY = unitX;
+        const arrowSize = 8;
         nextEdges.push({
-          fromX: source.x + NODE_WIDTH / 2,
-          fromY: source.y + 22,
-          toX: node.x + NODE_WIDTH / 2,
-          toY: node.y + 22,
+          fromId: source.id,
+          toId: node.id,
+          fromX: fromX,
+          fromY: fromY,
+          toX: toX,
+          toY: toY,
+          arrowX: arrowX,
+          arrowY: arrowY,
+          arrowLeftX: arrowX - unitX * arrowSize + perpendicularX * 4,
+          arrowLeftY: arrowY - unitY * arrowSize + perpendicularY * 4,
+          arrowRightX: arrowX - unitX * arrowSize - perpendicularX * 4,
+          arrowRightY: arrowY - unitY * arrowSize - perpendicularY * 4,
           active: source.mastery?.mastered === true
         });
       }
@@ -242,6 +249,135 @@ struct LearningMapPage {
     return '可学习：按当前节奏安排到后续练习';
   }
 
+  private selectedNode(): MapNode | null {
+    return this.nodes.find((node: MapNode): boolean => node.topic === this.selectedTopic) ?? null;
+  }
+
+  private isPrerequisiteOfSelected(node: MapNode): boolean {
+    const selected = this.selectedNode();
+    return selected !== null && selected.prerequisiteIds.includes(node.id);
+  }
+
+  private isSuccessorOfSelected(node: MapNode): boolean {
+    const selected = this.selectedNode();
+    return selected !== null && node.prerequisiteIds.includes(selected.id);
+  }
+
+  private isFocusedNode(node: MapNode): boolean {
+    if (this.selectedTopic.length === 0) return true;
+    return node.topic === this.selectedTopic || this.isPrerequisiteOfSelected(node) || this.isSuccessorOfSelected(node);
+  }
+
+  private isFocusedEdge(edge: MapEdge): boolean {
+    const selected = this.selectedNode();
+    return selected === null || edge.fromId === selected.id || edge.toId === selected.id;
+  }
+
+  private nodeOpacity(node: MapNode): number {
+    if (!this.isFocusedNode(node)) return 0.24;
+    return node.unlocked ? 1 : 0.58;
+  }
+
+  private nodeOuterOpacity(node: MapNode): number {
+    if (node.topic === this.selectedTopic) return 0.34;
+    if (!this.isFocusedNode(node)) return 0.05;
+    return node.mastery === null ? 0.14 : 0.22;
+  }
+
+  private nodeRelationLabel(node: MapNode): string {
+    if (this.isPrerequisiteOfSelected(node)) return '前置';
+    if (this.isSuccessorOfSelected(node)) return '后继';
+    return '';
+  }
+
+  private edgeColor(edge: MapEdge): ResourceColor {
+    const selected = this.selectedNode();
+    if (selected !== null && edge.toId === selected.id) return Constants.COLOR_WARNING;
+    if (selected !== null && edge.fromId === selected.id) return Constants.COLOR_MAP_LINE_ACTIVE;
+    return edge.active ? Constants.COLOR_MAP_LINE_ACTIVE : Constants.COLOR_MAP_LINE;
+  }
+
+  private edgeWidth(edge: MapEdge): number {
+    if (this.isFocusedEdge(edge)) return edge.active ? 2.6 : 1.8;
+    return edge.active ? 1.2 : 0.8;
+  }
+
+  private edgeOpacity(edge: MapEdge): number {
+    if (this.isFocusedEdge(edge)) return edge.active ? 0.92 : 0.72;
+    return 0.14;
+  }
+
+  private firstIncompletePrerequisite(node: MapNode): MapNode | null {
+    for (const id of node.prerequisiteIds) {
+      const prerequisite = this.nodes.find((item: MapNode): boolean => item.id === id);
+      if (prerequisite !== undefined && prerequisite.mastery?.mastered !== true) return prerequisite;
+    }
+    return null;
+  }
+
+  private firstActionablePrerequisite(node: MapNode): MapNode | null {
+    let target = this.firstIncompletePrerequisite(node);
+    const visitedIds: string[] = [];
+    while (target !== null && !target.unlocked && !visitedIds.includes(target.id)) {
+      visitedIds.push(target.id);
+      const earlier = this.firstIncompletePrerequisite(target);
+      if (earlier === null) break;
+      target = earlier;
+    }
+    return target;
+  }
+
+  private firstIncompleteSuccessor(node: MapNode): MapNode | null {
+    return this.nodes.find((item: MapNode): boolean =>
+      item.prerequisiteIds.includes(node.id) && item.mastery?.mastered !== true) ?? null;
+  }
+
+  private nextActionTarget(node: MapNode): MapNode {
+    if (!node.unlocked) return this.firstActionablePrerequisite(node) ?? node;
+    if (node.mastery?.mastered === true) {
+      const successor = this.firstIncompleteSuccessor(node);
+      if (successor === null) return node;
+      if (successor.unlocked) return successor;
+      return this.firstActionablePrerequisite(successor) ?? node;
+    }
+    return node;
+  }
+
+  private nextActionUsesPractice(node: MapNode): boolean {
+    const target = this.nextActionTarget(node);
+    if (target.id !== node.id) return false;
+    return node.lessonCompleted || node.mastery !== null;
+  }
+
+  private nextActionLabel(node: MapNode): string {
+    const target = this.nextActionTarget(node);
+    if (target.id !== node.id) {
+      return target.prerequisiteIds.includes(node.id) ? '学习后继主题' : '学习前置主题';
+    }
+    if (node.mastery?.mastered === true) return '复习主题练习';
+    if (node.mastery !== null) return '继续主题练习';
+    if (node.lessonCompleted) return '开始主题练习';
+    return '学习主题';
+  }
+
+  private nextActionDescription(node: MapNode): string {
+    const target = this.nextActionTarget(node);
+    if (target.id !== node.id) {
+      if (target.prerequisiteIds.includes(node.id)) return '下一步：进入直接后继「' + target.topic + '」';
+      return '下一步：先完成路径前置「' + target.topic + '」';
+    }
+    if (node.mastery?.mastered === true) return '下一步：课程末端复习，保持客观练习记录';
+    if (node.mastery !== null) return '下一步：继续练习并复盘当前错题';
+    if (node.lessonCompleted) return '下一步：完成一组精选练习，获得客观反馈';
+    return '下一步：进入 Lesson 学习概念与固定示例';
+  }
+
+  private runNextAction(node: MapNode): void {
+    const target = this.nextActionTarget(node);
+    if (this.nextActionUsesPractice(node)) this.openPractice(target.topic);
+    else this.openLesson(target.topic);
+  }
+
   private openPractice(topic: string): void {
     AppStorage.setOrCreate<string>('selectedCourseId', this.selectedCourseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.selectedCourseTitle);
@@ -286,38 +422,6 @@ struct LearningMapPage {
         .width(this.canvasWidth)
         .height(this.canvasHeight)
         .backgroundColor(Constants.COLOR_MAP_SURFACE)
-        .borderRadius(Constants.RADIUS_LG)
-      Column()
-        .width(210)
-        .height(170)
-        .backgroundColor(Constants.COLOR_BRAND)
-        .borderRadius(105)
-        .opacity(0.10)
-        .position({ x: 28, y: 28 })
-      Column()
-        .width(190)
-        .height(220)
-        .backgroundColor(Constants.COLOR_MAP_LINE_ACTIVE)
-        .borderRadius(95)
-        .opacity(0.08)
-        .position({ x: 116, y: Math.max(160, Math.floor(this.canvasHeight * 0.36)) })
-      Column()
-        .width(120)
-        .height(120)
-        .backgroundColor(Constants.COLOR_SUCCESS)
-        .borderRadius(60)
-        .opacity(0.06)
-        .position({ x: 22, y: Math.max(280, this.canvasHeight - 156) })
-
-      ForEach(NEBULA_STARS, (star: NebulaStar): void => {
-        Column()
-          .width(star.size)
-          .height(star.size)
-          .backgroundColor(Constants.COLOR_MAP_STAR)
-          .borderRadius(star.size / 2)
-          .opacity(star.opacity)
-          .position({ x: star.x, y: Math.min(star.y, this.canvasHeight - 18) })
-      })
 
       ForEach(this.levelRows, (level: number): void => {
         Text('Level ' + level.toString())
@@ -341,9 +445,25 @@ struct LearningMapPage {
           .height(this.canvasHeight)
           .startPoint([edge.fromX, edge.fromY])
           .endPoint([edge.toX, edge.toY])
-          .stroke(edge.active ? Constants.COLOR_MAP_LINE_ACTIVE : Constants.COLOR_MAP_LINE)
-          .strokeWidth(edge.active ? 2.2 : 1)
-          .opacity(edge.active ? 0.86 : 0.52)
+          .stroke(this.edgeColor(edge))
+          .strokeWidth(this.edgeWidth(edge))
+          .opacity(this.edgeOpacity(edge))
+        Line()
+          .width(this.canvasWidth)
+          .height(this.canvasHeight)
+          .startPoint([edge.arrowLeftX, edge.arrowLeftY])
+          .endPoint([edge.arrowX, edge.arrowY])
+          .stroke(this.edgeColor(edge))
+          .strokeWidth(this.edgeWidth(edge))
+          .opacity(this.edgeOpacity(edge))
+        Line()
+          .width(this.canvasWidth)
+          .height(this.canvasHeight)
+          .startPoint([edge.arrowRightX, edge.arrowRightY])
+          .endPoint([edge.arrowX, edge.arrowY])
+          .stroke(this.edgeColor(edge))
+          .strokeWidth(this.edgeWidth(edge))
+          .opacity(this.edgeOpacity(edge))
       })
 
       ForEach(this.nodes, (node: MapNode): void => {
@@ -353,7 +473,7 @@ struct LearningMapPage {
             .height(this.nodeSize(node) + 18)
             .backgroundColor(this.nodeColor(node))
             .borderRadius((this.nodeSize(node) + 18) / 2)
-            .opacity(this.selectedTopic === node.topic ? 0.28 : node.mastery === null ? 0.12 : 0.20)
+            .opacity(this.nodeOuterOpacity(node))
           Column()
             .width(this.nodeSize(node) + 8)
             .height(this.nodeSize(node) + 8)
@@ -379,7 +499,17 @@ struct LearningMapPage {
             .fontSize(9)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          if (this.selectedTopic === node.topic || node.recommended) {
+          if (this.nodeRelationLabel(node).length > 0) {
+            Text(this.nodeRelationLabel(node))
+              .fontSize(8)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_MAP_CORE)
+              .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+              .backgroundColor(Constants.COLOR_MAP_LINE)
+              .borderRadius(6)
+              .position({ x: 18, y: -2 })
+          }
+          if (this.isFocusedNode(node)) {
             Text(node.topic)
               .width(NODE_WIDTH)
               .fontSize(node.topic.length > 7 ? 9 : 10)
@@ -398,9 +528,9 @@ struct LearningMapPage {
         .width(NODE_WIDTH)
         .height(72)
         .position({ x: node.x, y: node.y })
-        .opacity(node.unlocked ? 1 : 0.58)
-        .scale({ x: this.selectedTopic === node.topic ? 1.08 : (node.recommended ? 1.04 : 1),
-          y: this.selectedTopic === node.topic ? 1.08 : (node.recommended ? 1.04 : 1) })
+        .opacity(this.nodeOpacity(node))
+        .scale({ x: this.selectedTopic === node.topic ? 1.10 : (this.isFocusedNode(node) ? 1 : 0.94),
+          y: this.selectedTopic === node.topic ? 1.10 : (this.isFocusedNode(node) ? 1 : 0.94) })
         .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
         .onClick((): void => { this.selectedTopic = node.topic; })
       })
@@ -438,9 +568,7 @@ struct LearningMapPage {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .padding(16)
-    .backgroundColor(Constants.COLOR_BG_CARD)
-    .borderRadius(Constants.RADIUS_LG)
+    .padding({ left: 4, right: 4, top: 4, bottom: 4 })
   }
 
   build() {
@@ -496,6 +624,18 @@ struct LearningMapPage {
           .width('100%')
           .justifyContent(FlexAlign.Center)
 
+          Row({ space: 6 }) {
+            Text('↓')
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_MAP_LINE_ACTIVE)
+            Text('箭头由前置主题指向后继主题')
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.Center)
+
           if (this.selectedTopic.length > 0) {
             Column({ space: 12 }) {
               Text(this.selectedTopic)
@@ -525,36 +665,34 @@ struct LearningMapPage {
                     .lineHeight(19)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(node.recommended ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_TERTIARY)
-                  if (!node.unlocked) {
-                    Text('完成前置主题并达到 80% 正确率后，该节点会进入推荐路径')
-                      .width('100%')
-                      .fontSize(11)
-                      .lineHeight(18)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                  }
-                  Row({ space: 10 }) {
-                    Button({ type: ButtonType.Normal }) {
-                      Text('学习主题').fontSize(14).fontColor(node.unlocked ? Constants.COLOR_TEXT_ON_GRADIENT :
-                        Constants.COLOR_BUTTON_DISABLED_TEXT)
+                  Text(this.nextActionDescription(node))
+                    .width('100%')
+                    .fontSize(13)
+                    .lineHeight(21)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  Button({ type: ButtonType.Normal }) {
+                    Row({ space: 8 }) {
+                      SymbolGlyph($r('sys.symbol.arrow_right'))
+                        .fontSize(16)
+                        .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                      Text(this.nextActionLabel(node))
+                        .fontSize(14)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                      Blank()
+                      SymbolGlyph($r('sys.symbol.chevron_right'))
+                        .fontSize(14)
+                        .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
                     }
-                      .layoutWeight(1)
-                      .height(48)
-                      .enabled(node.unlocked)
-                      .backgroundColor(node.unlocked ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
-                      .borderRadius(Constants.RADIUS_MD)
-                      .onClick((): void => { this.openLesson(this.selectedTopic); })
-                    Button({ type: ButtonType.Normal }) {
-                      Text('主题练习').fontSize(14).fontColor(node.unlocked ? Constants.COLOR_BRAND :
-                        Constants.COLOR_BUTTON_DISABLED_TEXT)
-                    }
-                      .layoutWeight(1)
-                      .height(48)
-                      .enabled(node.unlocked)
-                      .backgroundColor(node.unlocked ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BUTTON_DISABLED_BG)
-                      .borderRadius(Constants.RADIUS_MD)
-                      .onClick((): void => { this.openPractice(this.selectedTopic); })
+                    .width('100%')
                   }
                   .width('100%')
+                  .height(48)
+                  .padding({ left: 14, right: 14 })
+                  .backgroundColor(Constants.COLOR_BRAND)
+                  .borderRadius(Constants.RADIUS_MD)
+                  .onClick((): void => { this.runNextAction(node); })
                 })
             }
             .width('100%')
