@@ -23,7 +23,9 @@
 - `HomeContent.ets` 只消费统一行动，不再维护第二套排序；首屏说明推荐依据和当前进度。
 - 首页通知入口区分创建中、创建成功和权限/发布失败，失败状态使用错误语义。
 - `LearningReminder.ets` 使用 API 12 `WantAgent`，通知正文和点击参数来自同一行动。
+- 通知授权请求完成后再次读取系统开关；仍未授权时不发布通知，并在首页保留明确错误和重试操作。API 12 不调用 API 13 才提供的应用内通知设置接口。
 - `EntryAbility.ets` 在 `onCreate` 与 `onNewWant` 消费卡片/通知参数；合法外壳通过目录校验后重新解析当前 ArkData 行动，单调序号保证连续 Want 只执行最后一次，无关 Want 不清除已排队入口。
+- `EntryAbility.ets` 对重算后的当前行动生成前台周期稳定键；相同来源和行动的重复 Want 只发布一次，进入后台后释放去重状态，后续真实触达仍可再次执行。
 - `Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动；嵌套页上的课程入口使用 API 12 `Router.back({ url: 'pages/Index' })` 返回根页，其他目标按当前路由栈执行 `pushUrl/replaceUrl`，只在导航确认成功后消费目标。
 - `EntryAbility.ets` 先完成内容仓库与 ArkData 课程目录同步，再校验来源、128 字符长度上限、动作/页面映射、课程和精确 Topic；外部 `courseTitle` 被忽略，标题从本地目录推导，非法 Want 不写 `AppStorage`。
 - `LearningFormUpdater.ets` 与 `LearningPlanCard.ets` 展示同一行动、依据、进度和 CTA，`FormLink` 传递精确目标页面及学习上下文。
@@ -61,6 +63,7 @@
 - `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
 - `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
 - `apps/harmonyos/entry/src/main/resources/base/element/string.json`
+- `scripts/test-proactive-delivery-contracts.mjs`
 - `scripts/test-proactive-learning-service.mjs`
 
 ## 验证证据
@@ -68,9 +71,12 @@
 | 等级 | 命令或依据 | 结果 |
 |---|---|---|
 | **源码确认** | DevEco Studio API 12 SDK 类型声明 | 已确认 `NotificationRequest.wantAgent`、`wantAgent.getWantAgent()`、`UIAbility.onNewWant()`、`@Watch`、`FormLink` 的 `router/params` |
+| **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
 | **源码确认** | WS02 未提交 reducer 与测试 | 三元组分组与跨 Topic 隔离用例存在；本批未修改、未提交或运行 WS02 测试 |
 | **源码确认** | `node --test scripts/test-proactive-learning-service.mjs` | exit 0，21/21 通过；直接执行当前 `.ets` 服务并约束无关 Want、latest-wins、点击时重解析、根页回流、子页替换及失败保留重试 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 33 s 500 ms` |
+| **源码确认** | `node --test scripts/test-proactive-delivery-contracts.mjs` | exit 0，12/12 通过；直接执行当前服务、提醒、卡片更新器、Form Ability 与 EntryAbility，另对 ArkUI 绑定做精确静态契约检查 |
+| **源码确认** | 两个主动学习脚本合并执行 | exit 0，33/33 通过；覆盖六项触达参数一致、授权后二次确认、点击时重算、latest-wins、前台周期幂等、根页回流及失败保留重试 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 24 s 131 ms` |
 | **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
 | **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
@@ -82,8 +88,10 @@
 - 首页、记录、成就、提醒和卡片已在源码中共享同一真实状态，但缺少设备上的“计划保存/答题事件 -> 首页和卡片刷新 -> 通知或卡片点击回流”证据。
 - 按课程/Topic/标签隔离的主动标签推荐依赖 WS02 reducer 先完成提交和集成，当前明确未启用。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
-- 通知权限首次请求、用户拒绝后的错误态、通知点击热启动 `onNewWant` 均未取得设备证据。
+- 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
 - HAP 签名、安装、横屏、平板和真机均未验证。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。
 
 第一批提交：`a3d2ad4 feat: 统一主动学习触达`。
+第二批提交：`c6697ef fix: 修正主动学习状态与入口边界`。
+第三批提交：`17057cc fix: 强化主动触达幂等与失败恢复`，主线集成时保留最新行动重算与成功后消费状态机。

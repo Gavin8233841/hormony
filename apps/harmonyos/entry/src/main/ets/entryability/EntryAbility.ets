@@ -11,7 +11,7 @@ import { HttpClient } from '../common/HttpClient';
 import { Course, HealthResponse } from '../model/DataModels';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { SafeAreaInsets } from '../common/SafeArea';
-import { ProactiveLearningService } from '../common/ProactiveLearningService';
+import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
 
 export default class EntryAbility extends UIAbility {
   private mainWindow: window.Window | null = null;
@@ -20,6 +20,7 @@ export default class EntryAbility extends UIAbility {
   private pendingProactiveWantSequence: number = 0;
   private proactiveWantSequence: number = 0;
   private repositoriesReady: boolean = false;
+  private consumedProactiveLaunchKey: string = '';
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.queueProactiveWant(want);
@@ -157,6 +158,12 @@ export default class EntryAbility extends UIAbility {
     }
     const currentAction = await ProactiveLearningService.resolve();
     if (sequence !== this.pendingProactiveWantSequence) return;
+    const launchKey = this.proactiveLaunchKey(source, currentAction);
+    if (launchKey === this.consumedProactiveLaunchKey) {
+      this.clearPendingProactiveWant(sequence);
+      return;
+    }
+    this.consumedProactiveLaunchKey = launchKey;
     this.clearPendingProactiveWant(sequence);
     ProactiveLearningService.requestAction(currentAction);
   }
@@ -164,6 +171,18 @@ export default class EntryAbility extends UIAbility {
   private clearPendingProactiveWant(sequence: number): void {
     if (sequence !== this.pendingProactiveWantSequence) return;
     this.pendingProactiveWant = null;
+  }
+
+  private proactiveLaunchKey(source: string, launch: ProactiveLearningAction): string {
+    return JSON.stringify({
+      source: source,
+      targetPage: launch.targetPage,
+      courseId: launch.courseId,
+      courseTitle: launch.courseTitle,
+      topic: launch.topic,
+      focusTag: launch.focusTag,
+      taskAction: launch.taskAction
+    });
   }
 
   private wantString(want: Want, key: string): string | undefined {
@@ -221,6 +240,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onBackground(): void {
+    this.consumedProactiveLaunchKey = '';
     console.info('EntryAbility onBackground');
   }
 }

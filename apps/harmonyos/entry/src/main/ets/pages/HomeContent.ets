@@ -137,6 +137,7 @@ export struct HomeContent {
   }
 
   private async publishReminder(): Promise<void> {
+    if (this.notificationState === 'loading') return;
     this.notificationOpen = true;
     this.notificationState = 'loading';
     this.notificationMessage = '正在创建系统学习提醒';
@@ -147,7 +148,7 @@ export struct HomeContent {
       this.notificationMessage = '系统提醒已创建：' + taskTitle;
     } catch (e) {
       this.notificationState = 'error';
-      this.notificationMessage = '未能创建系统提醒，请检查通知权限';
+      this.notificationMessage = e instanceof Error ? e.message : '未能创建系统提醒，请稍后重试';
     }
   }
 
@@ -268,6 +269,8 @@ export struct HomeContent {
           .height(44)
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(22)
+          .enabled(this.notificationState !== 'loading')
+          .opacity(this.notificationState === 'loading' ? 0.56 : 1)
           .onClick(() => {
             this.publishReminder();
           })
@@ -299,6 +302,21 @@ export struct HomeContent {
           Text(this.notificationMessage)
             .fontSize(12)
             .fontColor(this.notificationState === 'error' ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+            .maxLines(2)
+            .layoutWeight(1)
+          if (this.notificationState === 'error') {
+            Button('重试')
+              .height(32)
+              .padding({ left: 12, right: 12 })
+              .fontSize(12)
+              .fontColor(Constants.COLOR_ERROR)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .border({ width: 1, color: Constants.COLOR_ERROR })
+              .borderRadius(16)
+              .onClick(() => {
+                this.publishReminder();
+              })
+          }
         }
         .width('100%')
         .padding({ left: 14, right: 14, top: 10, bottom: 10 })

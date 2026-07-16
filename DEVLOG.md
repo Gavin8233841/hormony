@@ -6409,3 +6409,41 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - HAP 仍未配置 `signingConfigs`，构建通过不证明安装或竞赛提交包通过。
 - 当前没有模拟器或真机目标；通知权限、通知点击、嵌套页热启动、服务卡片点击、路由失败重试与 ArkData 跨日恢复均未取得运行证据。
 - 未携带 `startDate` 的旧客户端仍使用服务端 UTC 日期作为兼容回退；本次提交中的 Web 与 HarmonyOS 客户端均已发送设备本地日期。
+
+---
+
+## 2026-07-17 [MAIN+WS04] 主动触达幂等与通知失败恢复
+
+背景：主线集成前复核发现，系统授权请求返回不代表通知开关已经开启；热启动连续收到同一合法 Want 时，两个异步校验会各自递增 `proactiveLaunchVersion`。本批收紧通知、服务卡片与 Ability 的同源行动契约，并保证失败后可再次执行。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `apps/harmonyos/entry/src/main/ets/common/LearningReminder.ets`
+- `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `scripts/test-proactive-delivery-contracts.mjs`
+
+行为变化：
+- 通知和服务卡片继续分别调用同一个 `ProactiveLearningService.resolve()`；可执行的页面、动作、课程 ID、课程标题、精确 Topic 与标签六项字段由测试约束一致。
+- 通知首次授权返回后重新读取 `isNotificationEnabled()`；开关仍关闭时不创建 WantAgent、不发布通知，首页显示系统设置提示和可再次执行的重试按钮。
+- 通知发布失败和服务卡片更新失败不写永久锁定状态，下一次调用会重新解析当前真实行动并再次发布或更新。
+- `EntryAbility` 在目录校验后重新解析当前 ArkData 行动，并用来源与当前真实行动生成稳定键；单调序号保证 latest-wins，同一前台周期的重复 Want 只消费一次，进入后台后释放去重键。
+- 首页在提醒创建期间阻止并发重复发布；失败后保持错误状态可见并允许重试。
+
+验证：
+- DevEco Studio API 12 SDK `@ohos.notificationManager.d.ts` 源码确认：`requestEnableNotification(context)` 在用户拒绝后不能再次弹授权框；`openNotificationSettings` 标注从 API 13 提供，因此本批未调用超出目标版本的接口。
+- `node --check scripts/test-proactive-learning-service.mjs`：exit 0。
+- `node --check scripts/test-proactive-delivery-contracts.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，33/33 通过；直接执行当前 `.ets` 的服务、提醒、卡片更新、Form Ability 和 EntryAbility，并约束当前行动重算、latest-wins、前台幂等和成功后导航消费。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 24 s 131 ms`；仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe version`：exit 0，版本 `3.2.0e`。
+- 同一 `hdc.exe list targets`：exit 0，返回 `[Empty]`。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 当前任务没有 DevEco MCP，单文件 ArkTS 静态诊断未验证；HAP 结果只记为构建通过。
+- 当前没有模拟器或真机目标，系统权限弹窗、拒绝后设置恢复、真实通知发布与点击、桌面服务卡片刷新与点击、设备 AppStorage 生命周期均为未验证。
+- Node 行为测试中的 HarmonyOS Kit 为受控替身，不能替代模拟器或真机证据；ArkUI 页面只做源码契约检查。
+- HAP 未配置签名，安装和提交包可用性未验证。
+- 本批未修改 Web、Repository、ArkData schema 或 `Achievements.ets`，因此未运行 Web 验证，也没有重跑 WS02 reducer 测试。

@@ -4,12 +4,8 @@ import { ProactiveLearningService } from './ProactiveLearningService';
 
 export class LearningReminder {
   static async publishNextTask(context: common.UIAbilityContext): Promise<string> {
+    await LearningReminder.ensureNotificationEnabled(context);
     try {
-      const enabled = await notificationManager.isNotificationEnabled();
-      if (!enabled) {
-        await notificationManager.requestEnableNotification(context);
-      }
-
       const action = await ProactiveLearningService.resolve();
       const targetWant: Want = {
         bundleName: 'com.c4ai.hormony',
@@ -46,8 +42,31 @@ export class LearningReminder {
       };
       await notificationManager.publish(request);
       return action.title;
-    } catch (error) {
-      throw new Error('学习提醒创建失败: ' + String(error));
+    } catch (_) {
+      throw new Error('系统学习提醒发布失败，请稍后重试');
+    }
+  }
+
+  private static async ensureNotificationEnabled(context: common.UIAbilityContext): Promise<void> {
+    let enabled: boolean = false;
+    try {
+      enabled = await notificationManager.isNotificationEnabled();
+    } catch (_) {
+      throw new Error('暂时无法检查通知权限，请稍后重试');
+    }
+    if (enabled) return;
+
+    try {
+      await notificationManager.requestEnableNotification(context);
+    } catch (_) {
+    }
+    try {
+      enabled = await notificationManager.isNotificationEnabled();
+    } catch (_) {
+      throw new Error('暂时无法检查通知权限，请稍后重试');
+    }
+    if (!enabled) {
+      throw new Error('通知权限未开启，请在系统通知设置中允许后重试');
     }
   }
 }
