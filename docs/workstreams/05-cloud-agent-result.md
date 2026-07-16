@@ -103,6 +103,7 @@
 - `client_contract_audit`：实现 SSE parser、Quiz 本地评分、禁用端点状态、精确 Topic 目录和请求竞态取消；主线程逐文件复核并纳入全量验证。
 - `plan_save_contract`：实现任务核心字段、真实日历日期与去空白后唯一 ID 校验；主线程逐行复核并补强重复 ID 回归后采用。
 - `production_middleware_regression`：两轮独立 production 黑盒验证；首轮发现 Health 缺少 `persistence.mode`，主线程修复后由同一脚本复测全部通过。子 agent 未修改、暂存或提交文件。
+- `quiz_request_cancellation`：仅修改 Quiz 路由与独立取消测试，把 `Request.signal` 贯穿至 Quiz Agent；主线程复核后与 Plan 取消链联合验证。子 agent 未暂存、提交或推送。
 
 ## 5. 提交
 
@@ -111,6 +112,8 @@
 - 生产无状态网关、可信限流与 Health：`04fbd6a fix(web): 加固生产无状态网关`。
 - Agent 输出、Chat SSE 预算、Plan/Quiz/日期契约：`93907c8 fix(web): 加固 Agent 生成与流式契约`。
 - Web Chat 停止后重发与历史请求边界：`bfdad5d fix(web): 隔离 Chat 停止后重发状态`。
+- 第三批结果证据：`6290c92 docs(ws05): 记录第三批生产可靠性证据`。
+- Plan 与 Quiz 请求取消贯穿：`2b240af fix(web): 贯穿 Plan 与 Quiz 请求取消`。
 
 ## 6. 失败与未验证
 
@@ -145,3 +148,11 @@
 - 当前分支尚未部署，线上通过未验证；带真实模型的 Chat SSE 正文、Plan、Quiz 未验证。
 - Browser 插件未提供，仓库没有 Playwright 可执行文件且未安装新依赖；Chat stop 后立即重发的真实浏览器交互未验证。
 - HarmonyOS 模拟器与真机未验证；第三批未修改 HarmonyOS 文件、生产模型 ID、题库内容或竞赛文档。
+
+## 8. Plan 与 Quiz 取消链
+
+- `/api/plan` 和 `/api/quiz` 均把派生的 `req.signal` 传给现有 Agent/model 取消链；既有输入 Safety、输出 Safety、Topic 精确校验、grading 分离和错误映射不变。
+- 路由级回归用源 AbortController 中止 Request，确认 Agent 收到的派生 signal 变为 `aborted=true`，并验证响应为 HTTP 499、`code=MODEL_CANCELLED`，没有静态成功替代。
+- 定向验证：4 个测试文件、32 项通过；全量 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0，全量测试为 23 文件、345 项。
+- 首轮 Plan 测试错误比较源/派生 signal 对象身份，1 项失败；改为验证 WHATWG Request 的取消状态传播后，Plan 15/15 项通过。失败未被记为通过证据。
+- **未验证**：真实模型上游网络请求的取消、本批本地 production 黑盒与线上部署。
