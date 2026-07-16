@@ -84,7 +84,7 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
     let batch = parseQuestions(
       raw,
       batchSize,
-      input.count,
+      batchSize,
       input.difficulty,
       input.focusTag,
       usedStems
@@ -94,7 +94,7 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
       batch = parseQuestions(
         repairedRaw,
         batchSize,
-        input.count,
+        batchSize,
         input.difficulty,
         input.focusTag,
         usedStems

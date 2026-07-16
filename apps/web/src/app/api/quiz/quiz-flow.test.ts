@@ -251,10 +251,11 @@ describe("题库与资源 API 闭环", () => {
   });
 
   it("超过单批题量时应分批调用真实模型并合并结果", async () => {
-    process.env.TEST_MODEL_RESPONSE = JSON.stringify(Array.from(
-      { length: 6 },
-      (_, index) => modelQuestion(index + 1, ["分批生成"])
-    ));
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：分批生成";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      Array.from({ length: 5 }, (_, index) => modelQuestion(index + 1, ["分批生成"])),
+      [modelQuestion(6, ["分批生成"])],
+    ]);
     const response = await generateQuiz(
       new Request("http://localhost/api/quiz", {
         method: "POST",
@@ -264,6 +265,7 @@ describe("题库与资源 API 闭环", () => {
           topic: "二叉树与BST",
           count: 6,
           difficulty: "medium",
+          focusTag: "分批生成",
         }),
       })
     );

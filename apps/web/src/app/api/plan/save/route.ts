@@ -3,7 +3,7 @@
 
 import { store } from "@/lib/store/db";
 import type { PlanTask, StudyPlan } from "@/lib/types";
-import { isCourseId } from "@/lib/data";
+import { isCourseId, isCourseTopic } from "@/lib/data";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
 import { readDateKey, readUserId } from "@/lib/api-validation";
 import { validateUserInput } from "@/lib/agents/safety-agent";
@@ -12,6 +12,15 @@ export const dynamic = "force-dynamic";
 
 const PLAN_TYPES = ["review", "practice", "reading", "quiz"] as const;
 const PLAN_ACTIONS = ["lesson", "practice", "quiz", "review"] as const;
+const PLAN_ACTION_TYPES: Record<
+  (typeof PLAN_ACTIONS)[number],
+  (typeof PLAN_TYPES)[number]
+> = {
+  lesson: "reading",
+  practice: "practice",
+  quiz: "quiz",
+  review: "review",
+};
 
 // 保存完整计划
 export async function POST(req: Request) {
@@ -160,6 +169,32 @@ function validateTaskFields(task: Record<string, unknown>): Response | null {
       return Response.json({ error: "任务包含不支持的动作", code: "INVALID_ACTION" }, { status: 400 });
     }
   }
+  const courseId = typeof task.courseId === "string" ? task.courseId : undefined;
+  const topic = typeof task.topic === "string" ? task.topic.trim() : undefined;
+  if ((courseId === undefined) !== (topic === undefined)) {
+    return Response.json(
+      { error: "任务课程与主题必须同时提供", code: "INVALID_TOPIC" },
+      { status: 400 }
+    );
+  }
+  if (courseId !== undefined && topic !== undefined && !isCourseTopic(courseId, topic)) {
+    return Response.json(
+      { error: "任务主题不属于所选课程", code: "INVALID_TOPIC" },
+      { status: 400 }
+    );
+  }
+  if (
+    typeof task.action === "string" &&
+    isPlanAction(task.action) &&
+    typeof task.type === "string" &&
+    isPlanType(task.type) &&
+    PLAN_ACTION_TYPES[task.action] !== task.type
+  ) {
+    return Response.json(
+      { error: "任务动作与类型不一致", code: "INVALID_ACTION" },
+      { status: 400 }
+    );
+  }
   return null;
 }
 
@@ -286,10 +321,10 @@ function validateRequiredTaskFields(task: Record<string, unknown>): Response | n
   return null;
 }
 
-function isPlanType(value: string): boolean {
+function isPlanType(value: string): value is (typeof PLAN_TYPES)[number] {
   return PLAN_TYPES.some((type) => type === value);
 }
 
-function isPlanAction(value: string): boolean {
+function isPlanAction(value: string): value is (typeof PLAN_ACTIONS)[number] {
   return PLAN_ACTIONS.some((action) => action === value);
 }

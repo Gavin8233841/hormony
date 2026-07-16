@@ -6805,3 +6805,43 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 首轮 Plan 测试错误地比较源 signal 与 `Request.signal` 对象身份，1 项失败；按 WHATWG Request 派生 signal 的真实行为改为验证取消状态传播后，15/15 项通过。
 - 没有使用真实模型秘密；上游真实模型请求在客户端断开后的网络级取消、本地 production 黑盒与线上通过均未验证。
 - 浏览器交互、HarmonyOS 模拟器与真机未验证；本批未修改 HarmonyOS 文件、模型 ID、题库或竞赛文档。
+
+---
+
+## 2026-07-17 [MAIN+WS05] 无状态端云闭环与请求可靠性收口
+
+背景：WS05 八笔提交从旧基线完成生产无状态网关、严格 API、Web 调试客户端、SSE 资源边界、停止后重发隔离以及 Plan/Quiz 取消传播。主线已存在本地日期与主动回流契约，不能整枝覆盖；本批逐提交融合并保留 `readDateKey`、`localDateKey`、Chat/Plan `startDate` 与 Quiz 精确课程-Topic 边界。独立复核另发现部分回答停止、计划任务交叉约束和 Quiz 分批上限三个剩余缺口，本批同步关闭。
+
+文件：
+- `apps/web/Dockerfile`
+- `apps/web/src/middleware.ts` 及测试
+- `apps/web/src/app/api/**`
+- `apps/web/src/app/chat/**`、`apps/web/src/app/quiz/**` 与其余 Web 调试页面
+- `apps/web/src/lib/agents/**`、`apps/web/src/lib/request-json.ts`、`apps/web/src/lib/deployment.ts`、`apps/web/src/lib/store/persistence.ts` 及测试
+- `apps/web/src/components/device-data-notice.tsx`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 生产 Docker 明确无状态，端侧私有画像、计划、进度、答题与历史不再由生产 Web 文件持久化；中间件统一处理禁用端点、CORS、安全头、可信平台 IP 限流和正文边界。
+- 外部 JSON、嵌套数组、枚举、长度、数量、课程-Topic、Safety 输入/输出与模型结构均返回精确 4xx/5xx，不再静默截断非法请求；Quiz 展示题与 `grading` 保持分离。
+- Web 页面区分 `ENDPOINT_DISABLED`、加载、空态、失败与取消，并在浏览器本地完成 Quiz 评分；Chat 使用严格 SSE 解析、事件/总量上限和请求身份隔离。
+- Chat 停止时即使已有部分正文也显示明确停止状态；取消或失败的 assistant 内容不会进入下一轮 history，最近 12 条和单条 1000 字符边界保持不变。
+- Plan Save 拒绝跨课程 Topic 以及 action/type 不一致的任务；合法的 `lesson/reading`、`practice/practice`、`quiz/quiz`、`review/review` 映射保持可保存。
+- Quiz Agent 对每个最多 5 题的模型批次分别执行超量拒绝；合法 `5+1` 两批可合并，单批返回 6 题不再被静默切片接受。
+- Plan 与 Quiz 将派生 `Request.signal` 贯穿到 Agent/model，取消按既有错误边界返回 `499/MODEL_CANCELLED`；没有把 mock signal 测试写成真实网络取消通过。
+
+验证：
+- `cd apps/web; pnpm lint`：exit 0，无 ESLint warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，23 个测试文件、351/351 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面，middleware 26.8 kB。
+- 主线补修定向回归：exit 0，5 个测试文件、153/153 通过；覆盖取消/失败历史排除、计划任务交叉校验、合法 `5+1` 分批和单批超量拒绝。
+- 独立只读复核再次执行受影响 4 文件 139/139、lint、typecheck、351 项全量测试与 build，均 exit 0。
+- `git diff --check`：exit 0，仅有既有 LF/CRLF 工作区提示。
+
+失败或未验证：
+- 本批主线未重新启动本地 production 黑盒；WS05 分支已有 Profile `404/ENDPOINT_DISABLED`、Health `503/degraded + persistence.mode=stateless` 和第 31 次请求 `429/RATE_LIMITED` 证据，不提升为本批新验证。
+- 竞赛生产目标 Vercel 会提供 `req.ip`；Docker 或其他自托管环境缺少可信 IP 时使用共享限流桶，属于备用部署限制，真实多用户隔离未验证。
+- 真实浏览器停止后立即重发、真实模型网络取消与 Chat/Plan/Quiz 正文、当前主线上线部署均未验证。
+- HarmonyOS 模拟器、真机和正式签名未验证；本批没有修改 HarmonyOS 文件或用户保留的课程 JSON。

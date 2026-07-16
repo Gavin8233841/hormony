@@ -36,6 +36,18 @@ describe("Quiz Agent 模型输出边界", () => {
     ]);
   });
 
+  it("拒绝单个模型批次超过当前批量上限而不是跨批静默截断", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify(
+      Array.from({ length: 6 }, (_, index) => modelQuestion({
+        stem: `二叉搜索树批次题目 ${index + 1} 的正确结论是什么？`,
+      }))
+    );
+
+    await expect(
+      runQuizAgent("quiz_batch_test", "cs101", "二叉树与BST", 6, "medium")
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
   it.each([
     ["非 choice 题型", modelQuestion({ type: "short" })],
     ["缺失标签数组", modelQuestion({ tags: undefined })],

@@ -24,6 +24,22 @@ describe("chat request contract", () => {
     expect(history[11].content.startsWith("13:")).toBe(true);
   });
 
+  it("不把已停止或失败的 assistant 正文带入下一轮历史", () => {
+    const history = buildChatHistory([
+      { role: "user", content: "解释二叉树" },
+      { role: "assistant", content: "部分正文", cancelled: true },
+      { role: "user", content: "换个例子" },
+      { role: "assistant", content: "响应未完成。", error: { code: "UPSTREAM_ERROR" } },
+      { role: "assistant", content: "完整回答" },
+    ]);
+
+    expect(history).toEqual([
+      { role: "user", content: "解释二叉树" },
+      { role: "user", content: "换个例子" },
+      { role: "assistant", content: "完整回答" },
+    ]);
+  });
+
   it("旧请求的结束回调不能清除停止后启动的新控制器", () => {
     const coordinator = new ChatRequestCoordinator();
     const first = coordinator.start();

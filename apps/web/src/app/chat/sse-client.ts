@@ -8,6 +8,8 @@ const MAX_CHAT_HISTORY_CONTENT_LENGTH = 1000;
 export interface ChatHistoryMessage {
   role: "user" | "assistant";
   content: string;
+  cancelled?: boolean;
+  error?: unknown;
 }
 
 export interface ChatStreamResult {
@@ -67,10 +69,13 @@ export class ChatRequestCoordinator {
 export function buildChatHistory(
   messages: readonly ChatHistoryMessage[]
 ): ChatHistoryMessage[] {
-  return messages.slice(-MAX_CHAT_HISTORY_MESSAGES).map((message) => ({
-    role: message.role,
-    content: message.content.slice(0, MAX_CHAT_HISTORY_CONTENT_LENGTH),
-  }));
+  return messages
+    .filter((message) => !message.cancelled && !message.error)
+    .slice(-MAX_CHAT_HISTORY_MESSAGES)
+    .map((message) => ({
+      role: message.role,
+      content: message.content.slice(0, MAX_CHAT_HISTORY_CONTENT_LENGTH),
+    }));
 }
 
 const AGENT_NAMES: readonly AgentName[] = [

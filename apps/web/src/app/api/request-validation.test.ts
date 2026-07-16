@@ -466,6 +466,46 @@ describe("API request validation", () => {
 
   it.each([
     {
+      name: "cross-course topic",
+      task: {
+        id: "task_1",
+        title: "复习进程调度",
+        date: "2026-07-17",
+        estimatedMin: 30,
+        type: "review",
+        courseId: "cs101",
+        topic: "进程与线程",
+        action: "review",
+      },
+      code: "INVALID_TOPIC",
+    },
+    {
+      name: "mismatched action and type",
+      task: {
+        id: "task_1",
+        title: "学习二叉树",
+        date: "2026-07-17",
+        estimatedMin: 30,
+        type: "review",
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        action: "lesson",
+      },
+      code: "INVALID_ACTION",
+    },
+  ])("rejects plan save task with $name", async ({ task, code }) => {
+    const response = await savePlan(new Request("http://localhost/api/plan/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal: "复习数据结构", tasks: [task] }),
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code });
+  });
+
+  it.each([
+    {
       name: "chat",
       handler: (request: Request) => postChat(request as NextRequest),
       body: { message: "解释二叉树", userId: [] },

@@ -20,6 +20,7 @@ interface ChatItem {
   trace?: { agent: AgentName; content: string }[];
   thinking?: AgentName[];
   error?: { code: string | null; message: string };
+  cancelled?: boolean;
 }
 
 interface MarkdownBlock {
@@ -154,7 +155,10 @@ export default function ChatPage() {
         setMessages((m) => {
           const last = m[m.length - 1];
           if (!last || last.role !== "assistant") return m;
-          return [...m.slice(0, -1), { ...last, content: last.content || "（已取消）" }];
+          return [
+            ...m.slice(0, -1),
+            { ...last, content: last.content || "（已取消）", cancelled: true },
+          ];
         });
       } else {
         const failure = err instanceof ChatRequestError
@@ -198,7 +202,7 @@ export default function ChatPage() {
       if (!last || last.role !== "assistant") return current;
       return [
         ...current.slice(0, -1),
-        { ...last, content: last.content || "（已取消）" },
+        { ...last, content: last.content || "（已取消）", cancelled: true },
       ];
     });
   }, []);
@@ -281,6 +285,16 @@ export default function ChatPage() {
                     )}
                     <span>{msg.error.message}</span>
                   </div>
+                </div>
+              )}
+
+              {msg.cancelled && (
+                <div
+                  className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-sm text-amber-100"
+                  role="status"
+                >
+                  <AlertCircle className="mt-0.5 shrink-0" size={16} />
+                  <span>回答已停止，以上内容未完成且不会进入后续对话。</span>
                 </div>
               )}
 
