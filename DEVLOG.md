@@ -6308,3 +6308,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 尚无模拟器证据证明“完成部分互动后退出 → 重进 Lesson 自动定位下一互动”。
 - 真机未验证。
+
+---
+
+## 2026-07-17 [WS03] 课程资料检索精确导航
+
+背景：课程资料页把任意搜索词直接写入 `selectedQuizTopic`，会让非 Topic 文本污染 Quiz/Lesson 路径；结果卡同时并列不受 Topic 约束的测验入口，云端条目也未校验课程、正文和来源。本批把检索结果收敛为“精确 Topic 进入 Lesson，否则携带原资料问学伴”的真实学习动作。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets`
+- `scripts/test_knowledge_navigation_contract.py`
+
+行为变化：
+- 删除检索词到 `selectedQuizTopic` 的写入；仅当结果 Topic 与当前课程 Topic 清单逐字一致时，写入 `selectedContentTopic` 并进入 Lesson。
+- 云端结果过滤空正文、空来源、缺失或不匹配 `courseId` 的条目，最多保留 5 条；无有效结果时继续检索真实本地课程切片。
+- 无精确 Topic 的结果不显示 Lesson/Quiz 动作，仍可把来源和资料关键句带入 Chat 追问；有 Topic 时只保留 Lesson 主动作与学伴次动作。
+- 结果卡展示来源、相关度、Topic、关键句和可展开全文；空结果不显示成功勾选；建议词支持换行，结果列表、骨架和空态在实际底部预留安全区。
+- 并行子 agent 新增 4 项 Knowledge 页面契约测试，主代理逐项复核并独立重跑后采用。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts/test_knowledge_navigation_contract.py scripts/test_validate_topic_relations.py`：退出码 0，15 项通过。
+- `python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过，`ALL CHECKS PASSED`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 22 s 525 ms`；仍提示未配置 `signingConfigs`。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：退出码 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前无可用模拟器或设备，未安装本批 HAP；检索结果展开、Lesson/Chat 跳转、手机和平板布局、真机均未验证。
+- 线上检索响应及业务字段未验证。
