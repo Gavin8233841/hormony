@@ -3,7 +3,13 @@ import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { Course } from '../model/DataModels';
+import { Course, LessonProgress } from '../model/DataModels';
+import {
+  CourseResumeState,
+  resolveCourseResumeState,
+  resolveNextTopic,
+  resolveTopicAction
+} from './CourseResumeState';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Entry
@@ -13,6 +19,7 @@ struct CourseDetailPage {
   @State courseTitle: string = '数据结构';
   @State topics: string[] = [];
   @State completedTopics: string[] = [];
+  @State lessonProgress: LessonProgress[] = [];
   @State progress: number = 0;
   @State message: string = '';
 
@@ -28,6 +35,7 @@ struct CourseDetailPage {
       const courses = await LocalLearningRepository.getCourses() ?? [];
       const course = courses.find((item: Course): boolean => item.id === this.courseId);
       this.progress = course?.progress ?? 0;
+      this.lessonProgress = await LocalLearningRepository.getLessonProgress(this.courseId);
       const events = await LocalLearningRepository.getStudyEvents();
       const completed: string[] = [];
       for (const event of events) {
@@ -36,6 +44,9 @@ struct CourseDetailPage {
           !completed.includes(event.topic)) {
           completed.push(event.topic);
         }
+      }
+      for (const topic of this.resumeState().completedTopics) {
+        if (!completed.includes(topic)) completed.push(topic);
       }
       this.completedTopics = completed;
     } catch (error) {
@@ -54,13 +65,21 @@ struct CourseDetailPage {
   }
 
   private topicStatusLabel(topic: string): string {
-    if (this.completedTopics.includes(topic)) return '复习';
-    if (topic === this.nextTopic()) return this.progress > 0 ? '继续' : '开始';
-    return '预览';
+    return resolveTopicAction(topic, this.completedTopics, this.nextTopic(), this.resumeState());
+  }
+
+  private resumeState(): CourseResumeState {
+    return resolveCourseResumeState(this.courseId, this.topics, this.lessonProgress);
   }
 
   private nextTopic(): string {
-    return this.topics.find((topic: string): boolean => !this.completedTopics.includes(topic)) ?? '';
+    return resolveNextTopic(this.topics, this.completedTopics, this.resumeState());
+  }
+
+  private nextTopicHint(): string {
+    const topic = this.nextTopic();
+    if (topic.length === 0) return '';
+    return topic === this.resumeState().recentTopic ? '继续 · ' + topic : '下一步 · ' + topic;
   }
 
   private completedTopicCount(): number {
@@ -110,7 +129,7 @@ struct CourseDetailPage {
               .fontWeight(FontWeight.Bold)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
             if (this.nextTopic().length > 0) {
-              Text('下一步 · ' + this.nextTopic())
+              Text(this.nextTopicHint())
                 .fontSize(11)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(Constants.COLOR_BRAND)

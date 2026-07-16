@@ -90,3 +90,29 @@
 - **未验证**：概念步骤切换、自由回答自评、客观互动反馈及同标签测验尚无模拟器 UI 树和点击证据。
 - **未验证**：WS02 尚未集成 `lesson_self_assessment` 的 reducer 排除规则，当前不能把标签洞察隔离标记为通过。
 - **未验证**：手机与平板视觉布局、真机均未验证。
+
+## 批次四：真实 Lesson 断点续学
+
+### 行为
+
+- 新增无 I/O 的 `CourseResumeState` 纯函数，只从 `LessonProgress.completedChunkIds`、`completedAt` 和 `updatedAt` 推导已开始、已完成及最近未完成 Topic；外课程、未知 Topic 与空断点被忽略。
+- 课程列表在聚合进度仍为 0、但已有真实 Lesson 断点时显示“继续课程”，并显示“上次学到 · Topic”。
+- 课程详情把 `completedAt` 与既有完成事件合并，优先把最近更新的未完成 Topic 作为下一步；所有已开始但未完成的 Topic 显示“继续”。
+- 未读取或写入种子进度，未修改 WS02 独占的仓储实现。
+
+### 文件
+
+- `apps/harmonyos/entry/src/main/ets/pages/CourseResumeState.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
+
+### 证据
+
+- **源码确认**：续学推导为纯函数，输入仅为当前课程 ID、真实 Topic 列表与 `LessonProgress[]`。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic 与完整 Lesson 路径契约通过。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 26 s 651 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：尚无模拟器证据证明“完成一个知识切片后退出 → 课程显示继续 → 返回最近 Topic”的运行路径。
+- **未验证**：手机与平板布局、真机均未验证。

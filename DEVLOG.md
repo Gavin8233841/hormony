@@ -6230,3 +6230,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 概念步骤切换、自由回答自评、客观互动反馈及同标签测验尚无模拟器 UI 树和点击证据。
 - WS02 尚未集成 `lesson_self_assessment` 的 reducer 排除规则，当前不能把标签洞察隔离标记为通过。
 - 手机与平板视觉布局、真机均未验证。
+
+---
+
+## 2026-07-17 [WS03] 真实 Lesson 断点续学
+
+背景：课程列表和详情只用聚合 `course.progress` 判断“进入/继续”。用户完成中间知识切片后，仓储已有 `LessonProgress.completedChunkIds/updatedAt`，但 Topic 尚未完成、聚合进度仍为 0，退出后会被错误显示为未开始。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseResumeState.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
+
+行为变化：
+- 新增无 I/O 纯函数，从真实 `LessonProgress` 推导已开始、已完成与最近未完成 Topic，忽略外课程、未知 Topic 和空断点。
+- 课程列表在聚合进度为 0 但已有知识切片断点时显示“继续课程”和“上次学到 · Topic”。
+- 课程详情合并 `completedAt` 与完成事件，最近更新的未完成 Topic 优先成为下一步，所有已开始未完成 Topic 显示“继续”。
+- 未使用种子状态，未修改 WS02 独占的仓储文件。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 26 s 651 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 尚无模拟器证据证明“完成一个知识切片后退出 → 课程显示继续 → 返回最近 Topic”的运行路径。
+- 手机与平板布局、真机均未验证。

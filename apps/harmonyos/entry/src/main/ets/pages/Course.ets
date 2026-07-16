@@ -3,13 +3,15 @@
  */
 
 import { Constants } from '../common/Constants';
-import { Course } from '../model/DataModels';
+import { Course, LessonProgress } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { CourseResumeState, hasCourseStarted, resolveCourseResumeState } from './CourseResumeState';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct CourseContent {
   @State courses: Course[] = [];
+  @State lessonProgress: LessonProgress[] = [];
   @State loading: boolean = false;
   @State message: string = '';
 
@@ -21,6 +23,12 @@ export struct CourseContent {
   async loadCourses() {
     try {
       this.courses = (await LocalLearningRepository.getCourses()) ?? [];
+      try {
+        this.lessonProgress = await LocalLearningRepository.getLessonProgress();
+      } catch (error) {
+        this.lessonProgress = [];
+        this.message = '课程已加载，续学位置读取失败';
+      }
     } catch (e) {
       this.message = '本地课程加载失败，请重新打开应用';
     } finally {
@@ -35,6 +43,19 @@ export struct CourseContent {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'CourseContent router.pushUrl failed: %{public}s', err.message);
     });
+  }
+
+  private resumeState(course: Course): CourseResumeState {
+    return resolveCourseResumeState(course.id, course.topics, this.lessonProgress);
+  }
+
+  private courseActionLabel(course: Course): string {
+    return course.progress > 0 || hasCourseStarted(this.resumeState(course)) ? '继续课程' : '进入课程';
+  }
+
+  private courseProgressLabel(course: Course): string {
+    const recentTopic = this.resumeState(course).recentTopic;
+    return recentTopic.length > 0 ? '上次学到 · ' + recentTopic : '学习进度';
   }
 
   @Builder
@@ -120,9 +141,13 @@ export struct CourseContent {
 
                 // 进度行
                 Row() {
-                  Text('学习进度')
+                  Text(this.courseProgressLabel(c))
+                    .layoutWeight(1)
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .margin({ right: 12 })
                   Text(Math.round(c.progress * 100).toString() + '%')
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
@@ -168,7 +193,7 @@ export struct CourseContent {
                     SymbolGlyph($r('sys.symbol.book_open_fill'))
                       .fontSize(16)
                       .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
-                    Text(c.progress > 0 ? '继续课程' : '进入课程')
+                    Text(this.courseActionLabel(c))
                       .fontSize(13)
                       .fontWeight(FontWeight.Medium)
                       .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
