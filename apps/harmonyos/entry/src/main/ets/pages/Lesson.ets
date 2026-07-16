@@ -182,8 +182,7 @@ struct LessonPage {
   }
 
   private primaryActivityTag(activity: LearningActivity): string {
-    if (activity.title.length > 0) return activity.title;
-    return this.topic.length > 0 ? this.topic : this.courseTitle;
+    return activity.focusTag;
   }
 
   private activityIsCorrect(): boolean {

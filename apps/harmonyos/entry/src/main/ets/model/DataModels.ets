@@ -242,6 +242,7 @@ export interface LearningActivity {
   id: string;
   type: string;
   title: string;
+  focusTag: string;
   prompt: string;
   content: string;
   language: string;
