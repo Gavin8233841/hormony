@@ -124,7 +124,8 @@ export async function POST(req: Request) {
       topic,
       count.value,
       difficulty,
-      focusTag.length > 0 ? focusTag : undefined
+      focusTag.length > 0 ? focusTag : undefined,
+      req.signal
     );
     await assertSafeQuiz(quiz);
     if (!isStatelessDeployment()) {

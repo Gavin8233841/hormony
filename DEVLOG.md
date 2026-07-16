@@ -6302,3 +6302,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - Browser 插件未提供，`apps/web/node_modules/.bin/playwright.cmd` 不存在；未安装新依赖，Chat 停止后立即重发的真实浏览器交互为未验证。
 - 当前分支未部署；真实模型 Chat SSE、HarmonyOS 模拟器与真机未验证。本批未修改 HarmonyOS 文件。
+
+---
+
+## [WS05] 2026-07-17：Plan 与 Quiz 请求取消贯穿
+
+背景：Planner Agent、Quiz Agent 与模型层已经支持 `AbortSignal`，但 `/api/plan` 和 `/api/quiz` 路由没有传入 `Request.signal`。客户端断开后，真实模型请求仍可能继续占用超时预算和上游资源。
+
+文件：
+- `apps/web/src/app/api/plan/route.ts`、`apps/web/src/app/api/plan/request-cancellation.test.ts`
+- `apps/web/src/app/api/quiz/route.ts`、`apps/web/src/app/api/quiz/request-cancellation.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- Plan 将 `req.signal` 作为 Planner 的第七个参数传入，沿既有 Agent -> `callModel` -> OpenAI SDK 链路传播取消。
+- Quiz 将 `req.signal` 作为 Quiz Agent 的第七个参数传入；既有课程-Topic 精确校验、五题批处理、Safety 与 questions/grading 分离不变。
+- 两个路由在请求取消时继续使用既有 `modelErrorResponse`，精确返回 HTTP 499 与 `{ error, code: "MODEL_CANCELLED" }`，不伪造成功响应。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/app/api/plan/request-cancellation.test.ts src/app/api/plan/plan-lifecycle.test.ts src/app/api/quiz/request-cancellation.test.ts src/app/api/quiz/quiz-flow.test.ts`：exit 0，4 个测试文件、32 项通过。测试等待 Agent 收到派生 `Request.signal`，中止源控制器后断言 Agent signal 为 aborted，并验证 `499/MODEL_CANCELLED`。
+- `cd apps/web; pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，23 个测试文件、345 项通过；`pnpm build`：exit 0，middleware 产物 26.8 kB。
+- 子 agent `quiz_request_cancellation` 仅修改 Quiz 路由和独立测试，定向 17 项、目标 lint、typecheck 与 diff check 均 exit 0；主线程逐行复核后纳入联合与全量验证。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 首轮 Plan 测试错误地比较源 signal 与 `Request.signal` 对象身份，1 项失败；按 WHATWG Request 派生 signal 的真实行为改为验证取消状态传播后，15/15 项通过。
+- 没有使用真实模型秘密；上游真实模型请求在客户端断开后的网络级取消、本地 production 黑盒与线上通过均未验证。
+- 浏览器交互、HarmonyOS 模拟器与真机未验证；本批未修改 HarmonyOS 文件、模型 ID、题库或竞赛文档。
