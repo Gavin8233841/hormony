@@ -24,7 +24,7 @@ import { QuizLearningStateReducer } from './QuizLearningStateReducer';
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 8;
+const SCHEMA_VERSION: number = 12;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -35,16 +35,39 @@ const KEY_STUDY_EVENTS: string = 'study_events';
 const KEY_LESSON_PROGRESS: string = 'lesson_progress';
 const KEY_REVIEW_ITEMS: string = 'review_items';
 const KEY_TOPIC_MASTERY: string = 'topic_mastery';
+const KEY_QUIZ_STATS: string = 'quiz_stats';
 const KEY_QUIZ_LEARNING_STATE: string = 'quiz_learning_state';
 const KEY_FORM_IDS: string = 'form_ids';
 
+interface LegacyQuizStatsAggregate {
+  totalQuestions: number;
+  accuracy: number;
+  studyDates: string[];
+  updatedAt: string;
+}
+
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
+  private static initializationTask: Promise<void> | null = null;
   private static quizStateQueue: Promise<void> = Promise.resolve();
+  private static lessonProgressQueue: Promise<void> = Promise.resolve();
 
   static async initialize(context: common.Context): Promise<void> {
+    if (LocalLearningRepository.initializationTask !== null) {
+      return LocalLearningRepository.initializationTask;
+    }
     if (LocalLearningRepository.store !== null) return;
 
+    const operation = LocalLearningRepository.initializeStore(context);
+    LocalLearningRepository.initializationTask = operation;
+    try {
+      await operation;
+    } finally {
+      LocalLearningRepository.initializationTask = null;
+    }
+  }
+
+  private static async initializeStore(context: common.Context): Promise<void> {
     const config: relationalStore.StoreConfig = {
       name: STORE_NAME,
       securityLevel: relationalStore.SecurityLevel.S1
@@ -60,10 +83,16 @@ export class LocalLearningRepository {
       throw new Error('本地学习仓库初始化失败: ' + String(error));
     }
     LocalLearningRepository.store = store;
-    const previousVersion = await LocalLearningRepository.getValue<number>('schema_version') ?? 0;
-    await LocalLearningRepository.migrate(previousVersion);
-    await LocalLearningRepository.putValue<number>('schema_version', SCHEMA_VERSION);
-    await LocalLearningRepository.ensureDefaults();
+    try {
+      const previousVersion = await LocalLearningRepository.getValue<number>('schema_version') ?? 0;
+      await LocalLearningRepository.migrate(previousVersion);
+      await LocalLearningRepository.putValue<number>('schema_version', SCHEMA_VERSION);
+      await LocalLearningRepository.ensureDefaults();
+      await LocalLearningRepository.flushPendingLessonCompletionEvents();
+    } catch (error) {
+      LocalLearningRepository.store = null;
+      throw new Error('本地学习仓库初始化失败: ' + String(error));
+    }
   }
 
   private static async migrate(previousVersion: number): Promise<void> {
@@ -118,9 +147,32 @@ export class LocalLearningRepository {
       for (const result of results.slice().reverse()) QuizLearningStateReducer.applyResult(state, result);
       await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, state.topicMastery);
     }
-    if (previousVersion < 8) {
+    if (previousVersion < 11) {
       await LocalLearningRepository.migrateQuizLearningState();
     }
+    if (previousVersion < 12) {
+      await LocalLearningRepository.migrateLessonCompletionOutbox();
+    }
+  }
+
+  private static async migrateLessonCompletionOutbox(): Promise<void> {
+    const items = await LocalLearningRepository.loadLessonProgressUnlocked();
+    const events = (await LocalLearningRepository.getValue<StudyEvent[]>(KEY_STUDY_EVENTS)) ?? [];
+    for (const item of items) {
+      if (!LocalLearningRepository.isValidCompletedLessonProgress(item)) continue;
+      const existing = events.find((event: StudyEvent): boolean =>
+        event.type === 'lesson_completed' && event.courseId === item.courseId &&
+        event.topic === item.topic && event.id.trim().length > 0 &&
+        !Number.isNaN(new Date(event.timestamp).getTime()));
+      if (existing !== undefined) {
+        item.completionEventId = existing.id;
+        item.completionEventSyncedAt = existing.timestamp;
+      } else {
+        item.completionEventId = LocalLearningRepository.buildLessonCompletionEventId(item.courseId, item.topic);
+        item.completionEventSyncedAt = undefined;
+      }
+    }
+    await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, items);
   }
 
   private static async migrateQuizLearningState(): Promise<void> {
@@ -134,9 +186,19 @@ export class LocalLearningRepository {
       if (existing !== null) {
         QuizLearningStateReducer.preparePersistentState(existing);
         LocalLearningRepository.sanitizeQuizLearningState(existing);
+        const legacyStats = await LocalLearningRepository.getValue<LegacyQuizStatsAggregate>(KEY_QUIZ_STATS);
+        const appendLegacyHistory = LocalLearningRepository.legacyHistoryPrecedesState(existing, legacyStats);
+        const legacyMastery = await LocalLearningRepository.getValue<TopicMastery[]>(KEY_TOPIC_MASTERY);
+        LocalLearningRepository.mergeLegacyTopicMastery(existing, legacyMastery, appendLegacyHistory);
+        const legacyResults = (await LocalLearningRepository.getValue<QuizResult[]>(KEY_QUIZ_RESULTS)) ?? [];
+        LocalLearningRepository.mergeLegacyRecentResults(existing, legacyResults);
+        const legacyReviews = await LocalLearningRepository.getValue<ReviewItem[]>(KEY_REVIEW_ITEMS);
+        LocalLearningRepository.mergeLegacyReviewItems(existing, legacyReviews);
+        LocalLearningRepository.mergeLegacyQuizEvents(existing, validLegacyEvents);
         QuizLearningStateReducer.applyPendingResults(existing);
         for (const event of validLegacyEvents) QuizLearningStateReducer.applyLearningInsightEvent(existing, event);
-        QuizLearningStateReducer.ensureMasteryMilestones(existing);
+        LocalLearningRepository.mergeLegacyQuizStats(existing, legacyStats, appendLegacyHistory);
+        QuizLearningStateReducer.refreshProfileTopics(existing);
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, existing);
         await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, retainedStudyEvents);
         return;
@@ -185,15 +247,10 @@ export class LocalLearningRepository {
       }
 
       const generatedEvents = state.quizEvents.slice();
+      state.masteryMilestones = [];
       state.quizEvents = validLegacyEvents.filter((event: StudyEvent): boolean =>
         event.type === 'quiz_mastered' || event.type === 'quiz_submitted');
-      for (const generated of generatedEvents) {
-        const exists = state.quizEvents.some((event: StudyEvent): boolean =>
-          event.timestamp === generated.timestamp && event.courseId === generated.courseId &&
-          event.topic === generated.topic && event.totalQuestions === generated.totalQuestions &&
-          event.correctCount === generated.correctCount);
-        if (!exists) state.quizEvents.push(generated);
-      }
+      QuizLearningStateReducer.mergeQuizEvents(state, generatedEvents);
       for (const event of state.quizEvents) {
         const date = LocalLearningRepository.localDateKey(new Date(event.timestamp));
         if (!state.stats.quizDates.includes(date)) state.stats.quizDates.push(date);
@@ -202,12 +259,113 @@ export class LocalLearningRepository {
         }
       }
       for (const event of validLegacyEvents) QuizLearningStateReducer.applyLearningInsightEvent(state, event);
-      state.quizEvents = QuizLearningStateReducer.compactQuizEvents(state.quizEvents);
-      QuizLearningStateReducer.ensureMasteryMilestones(state);
       QuizLearningStateReducer.refreshProfileTopics(state);
+      const legacyStats = await LocalLearningRepository.getValue<LegacyQuizStatsAggregate>(KEY_QUIZ_STATS);
+      LocalLearningRepository.mergeLegacyQuizStats(state, legacyStats, false);
       await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, retainedStudyEvents);
     });
+  }
+
+  private static legacyHistoryPrecedesState(state: QuizLearningState,
+    legacy: LegacyQuizStatsAggregate | null): boolean {
+    if (legacy === null || state.stats.firstSubmittedAt === undefined || legacy.updatedAt.length === 0) return false;
+    const legacyUpdatedAt = new Date(legacy.updatedAt).getTime();
+    const currentFirstSubmittedAt = new Date(state.stats.firstSubmittedAt).getTime();
+    return !Number.isNaN(legacyUpdatedAt) && !Number.isNaN(currentFirstSubmittedAt) &&
+      legacyUpdatedAt < currentFirstSubmittedAt;
+  }
+
+  private static mergeLegacyQuizStats(state: QuizLearningState, legacy: LegacyQuizStatsAggregate | null,
+    appendLegacyHistory: boolean): void {
+    if (legacy === null || !Number.isFinite(legacy.totalQuestions) || legacy.totalQuestions < 0 ||
+      !Number.isFinite(legacy.accuracy) || legacy.accuracy < 0 || legacy.accuracy > 1) return;
+    const legacyCorrectQuestions = Math.round(legacy.totalQuestions * legacy.accuracy);
+    if (appendLegacyHistory) {
+      state.stats.totalQuestions += legacy.totalQuestions;
+      state.stats.correctQuestions += legacyCorrectQuestions;
+    } else if (legacy.totalQuestions >= state.stats.totalQuestions) {
+      state.stats.totalQuestions = legacy.totalQuestions;
+      state.stats.correctQuestions = legacyCorrectQuestions;
+    }
+    for (const date of legacy.studyDates) {
+      if (date.length > 0 && !state.stats.quizDates.includes(date)) state.stats.quizDates.push(date);
+    }
+  }
+
+  private static mergeLegacyTopicMastery(state: QuizLearningState, legacy: TopicMastery[] | null,
+    appendLegacyHistory: boolean): void {
+    if (legacy === null) return;
+    const validLegacy = legacy.filter((item: TopicMastery): boolean =>
+      LocalLearningRepository.isExactCourseTopic(item.courseId, item.topic));
+    let addedAttempts = 0;
+    for (const source of validLegacy) {
+      const index = state.topicMastery.findIndex((item: TopicMastery): boolean =>
+        item.courseId === source.courseId && item.topic === source.topic);
+      if (index < 0) {
+        state.topicMastery.push(source);
+        addedAttempts += source.attempts;
+        continue;
+      }
+      const target = state.topicMastery[index];
+      if (appendLegacyHistory) {
+        target.attempts += source.attempts;
+        target.totalQuestions += source.totalQuestions;
+        target.correctQuestions += source.correctQuestions;
+        target.accuracy = target.totalQuestions > 0 ? target.correctQuestions / target.totalQuestions : 0;
+        target.mastered = QuizLearningStateReducer.isTopicMastered(
+          target.correctQuestions, target.totalQuestions);
+        if (target.lastPracticedAt === undefined ||
+          (source.lastPracticedAt !== undefined && source.lastPracticedAt > target.lastPracticedAt)) {
+          target.lastPracticedAt = source.lastPracticedAt;
+        }
+        addedAttempts += source.attempts;
+      } else if (source.totalQuestions >= target.totalQuestions) {
+        state.topicMastery[index] = source;
+      }
+    }
+    if (appendLegacyHistory) {
+      state.stats.totalAttempts += addedAttempts;
+    } else {
+      const legacyTotals = QuizLearningStateReducer.masteryTotals(validLegacy);
+      if (legacyTotals.totalQuestions >= QuizLearningStateReducer.masteryTotals(state.topicMastery).totalQuestions) {
+        state.stats.totalAttempts = Math.max(state.stats.totalAttempts, legacyTotals.totalAttempts);
+      }
+    }
+  }
+
+  private static mergeLegacyRecentResults(state: QuizLearningState, legacy: QuizResult[]): void {
+    for (const result of legacy) {
+      if (!LocalLearningRepository.isExactCourseTopic(result.courseId, result.topic)) continue;
+      if (!state.appliedQuizIds.includes(result.quizId)) state.appliedQuizIds.push(result.quizId);
+      if (!state.recentResults.some((item: QuizResult): boolean => item.quizId === result.quizId)) {
+        state.recentResults.push(result);
+      }
+    }
+    state.recentResults.sort((left: QuizResult, right: QuizResult): number =>
+      right.submittedAt.localeCompare(left.submittedAt));
+    state.recentResults = state.recentResults.slice(0, 20);
+  }
+
+  private static mergeLegacyReviewItems(state: QuizLearningState, legacy: ReviewItem[] | null): void {
+    if (legacy === null) return;
+    for (const item of legacy) {
+      if (!LocalLearningRepository.isExactCourseTopic(item.courseId, item.topic)) continue;
+      const existing = state.reviewItems.find((current: ReviewItem): boolean =>
+        current.id === item.id || (current.courseId === item.courseId && current.topic === item.topic &&
+          current.questionId === item.questionId && current.stem === item.stem));
+      if (existing === undefined) {
+        state.reviewItems.push(item);
+      } else if ((existing.options ?? []).length === 0 && (item.options ?? []).length > 0) {
+        existing.options = item.options;
+        existing.quizId = item.quizId;
+      }
+    }
+  }
+
+  private static mergeLegacyQuizEvents(state: QuizLearningState, legacy: StudyEvent[]): void {
+    QuizLearningStateReducer.mergeQuizEvents(state, legacy.filter((event: StudyEvent): boolean =>
+      event.type === 'quiz_mastered' || event.type === 'quiz_submitted'));
   }
 
   private static async ensureDefaults(): Promise<void> {
@@ -246,8 +404,19 @@ export class LocalLearningRepository {
     return running;
   }
 
+  private static runLessonProgressTask<T>(task: () => Promise<T>): Promise<T> {
+    const running: Promise<T> = LocalLearningRepository.lessonProgressQueue.then((): Promise<T> => task());
+    LocalLearningRepository.lessonProgressQueue = running.then((): void => {}, (): void => {});
+    return running;
+  }
+
   private static isExactCourseTopic(courseId: string, topic: string): boolean {
     return LearningContentRepository.getTopics(courseId).includes(topic);
+  }
+
+  private static isValidCompletedLessonProgress(item: LessonProgress): boolean {
+    return item.completedAt !== undefined && !Number.isNaN(new Date(item.completedAt).getTime()) &&
+      LocalLearningRepository.isExactCourseTopic(item.courseId, item.topic);
   }
 
   private static isValidStoredStudyEvent(event: StudyEvent): boolean {
@@ -365,6 +534,13 @@ export class LocalLearningRepository {
       const date = LocalLearningRepository.localDateKey(new Date(event.timestamp));
       if (!studyDates.includes(date)) studyDates.push(date);
     }
+    const lessonProgress = await LocalLearningRepository.loadLessonProgressUnlocked();
+    for (const item of lessonProgress) {
+      const completedAt = item.completedAt;
+      if (completedAt === undefined || !LocalLearningRepository.isValidCompletedLessonProgress(item)) continue;
+      const date = LocalLearningRepository.localDateKey(new Date(completedAt));
+      if (!studyDates.includes(date)) studyDates.push(date);
+    }
     profile.weakTopics = state.weakTopics.slice();
     profile.strongTopics = state.strongTopics.slice();
     profile.stats = {
@@ -384,9 +560,15 @@ export class LocalLearningRepository {
     const courses = await LocalLearningRepository.getValue<Course[]>(KEY_COURSES);
     if (courses === null) return null;
     const events = await LocalLearningRepository.getStudyEvents();
+    const lessonProgress = await LocalLearningRepository.loadLessonProgressUnlocked();
     const state = await LocalLearningRepository.getQuizLearningState();
     return courses.map((course: Course): Course => {
       const completedTopics: string[] = [];
+      for (const item of lessonProgress) {
+        if (item.courseId !== course.id || !LocalLearningRepository.isValidCompletedLessonProgress(item) ||
+          !course.topics.includes(item.topic) || completedTopics.includes(item.topic)) continue;
+        completedTopics.push(item.topic);
+      }
       for (const event of events) {
         if (event.courseId !== course.id || event.topic === undefined || !course.topics.includes(event.topic)) continue;
         if (event.type !== 'lesson_completed') continue;
@@ -484,7 +666,13 @@ export class LocalLearningRepository {
     const course = courses.find((item: Course): boolean => item.id === courseId);
     if (course === undefined) return receipt;
     const storedEvents = (await LocalLearningRepository.getValue<StudyEvent[]>(KEY_STUDY_EVENTS)) ?? [];
+    const lessonProgress = (await LocalLearningRepository.getValue<LessonProgress[]>(KEY_LESSON_PROGRESS)) ?? [];
     const completedTopics: string[] = [];
+    for (const item of lessonProgress) {
+      if (item.courseId !== courseId || !LocalLearningRepository.isValidCompletedLessonProgress(item) ||
+        !course.topics.includes(item.topic) || completedTopics.includes(item.topic)) continue;
+      completedTopics.push(item.topic);
+    }
     for (const event of storedEvents) {
       if (event.type !== 'lesson_completed' || event.courseId !== courseId || event.topic === undefined ||
         !course.topics.includes(event.topic) || completedTopics.includes(event.topic)) continue;
@@ -559,37 +747,82 @@ export class LocalLearningRepository {
   }
 
   static async getLessonProgress(courseId?: string): Promise<LessonProgress[]> {
-    const items = (await LocalLearningRepository.getValue<LessonProgress[]>(KEY_LESSON_PROGRESS)) ?? [];
+    const items = await LocalLearningRepository.loadLessonProgressUnlocked();
     return courseId === undefined ? items : items.filter((item: LessonProgress): boolean => item.courseId === courseId);
+  }
+
+  private static async loadLessonProgressUnlocked(): Promise<LessonProgress[]> {
+    return (await LocalLearningRepository.getValue<LessonProgress[]>(KEY_LESSON_PROGRESS)) ?? [];
+  }
+
+  private static buildLessonCompletionEventId(courseId: string, topic: string): string {
+    return 'lesson_completed:v1:' + courseId.length + ':' + courseId + ':' + topic.length + ':' + topic;
+  }
+
+  private static async flushPendingLessonCompletionEvents(): Promise<void> {
+    return LocalLearningRepository.runLessonProgressTask(async (): Promise<void> => {
+      const items = await LocalLearningRepository.loadLessonProgressUnlocked();
+      for (const item of items) {
+        if (!LocalLearningRepository.isValidCompletedLessonProgress(item) ||
+          item.completionEventSyncedAt !== undefined) continue;
+        await LocalLearningRepository.flushLessonCompletionEventUnlocked(items, item);
+      }
+    });
+  }
+
+  private static async flushLessonCompletionEventUnlocked(items: LessonProgress[],
+    item: LessonProgress): Promise<void> {
+    if (item.completedAt === undefined) return;
+    const storedEventId = item.completionEventId;
+    const eventId = storedEventId !== undefined && storedEventId.trim().length > 0 ? storedEventId :
+      LocalLearningRepository.buildLessonCompletionEventId(item.courseId, item.topic);
+    if (storedEventId !== eventId) {
+      item.completionEventId = eventId;
+      await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, items);
+    }
+    await LocalLearningRepository.appendStudyEvent({
+      id: eventId,
+      type: 'lesson_completed',
+      timestamp: item.completedAt,
+      courseId: item.courseId,
+      topic: item.topic
+    });
+    item.completionEventSyncedAt = new Date().toISOString();
+    await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, items);
   }
 
   static async completeLessonChunk(courseId: string, topic: string, chunkId: string,
     topicChunkCount: number): Promise<void> {
-    const items = await LocalLearningRepository.getLessonProgress();
-    const index = items.findIndex((item: LessonProgress): boolean => item.courseId === courseId && item.topic === topic);
-    const now = new Date().toISOString();
-    const item: LessonProgress = index >= 0 ? items[index] : {
-      courseId: courseId,
-      topic: topic,
-      completedChunkIds: [],
-      updatedAt: now
-    };
-    const wasCompleted = item.completedAt !== undefined;
-    if (!item.completedChunkIds.includes(chunkId)) item.completedChunkIds.push(chunkId);
-    item.updatedAt = now;
-    if (topicChunkCount > 0 && item.completedChunkIds.length >= topicChunkCount) item.completedAt = now;
-    if (index >= 0) items[index] = item;
-    else items.push(item);
-    await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, items);
-    if (!wasCompleted && item.completedAt !== undefined) {
-      await LocalLearningRepository.appendStudyEvent({
-        id: 'lesson_' + courseId + '_' + topic,
-        type: 'lesson_completed',
-        timestamp: item.completedAt,
-        courseId: courseId,
-        topic: topic
-      });
+    if (!LocalLearningRepository.isExactCourseTopic(courseId, topic)) {
+      throw new Error('课程进度 Topic 不属于当前课程');
     }
+    if (chunkId.trim().length === 0 || topicChunkCount <= 0) {
+      throw new Error('课程进度分块参数无效');
+    }
+    return LocalLearningRepository.runLessonProgressTask(async (): Promise<void> => {
+      const items = await LocalLearningRepository.loadLessonProgressUnlocked();
+      const index = items.findIndex((item: LessonProgress): boolean =>
+        item.courseId === courseId && item.topic === topic);
+      const now = new Date().toISOString();
+      const item: LessonProgress = index >= 0 ? items[index] : {
+        courseId: courseId,
+        topic: topic,
+        completedChunkIds: [],
+        updatedAt: now
+      };
+      if (!item.completedChunkIds.includes(chunkId)) item.completedChunkIds.push(chunkId);
+      item.updatedAt = now;
+      if (item.completedAt === undefined && item.completedChunkIds.length >= topicChunkCount) {
+        item.completedAt = now;
+        item.completionEventId = LocalLearningRepository.buildLessonCompletionEventId(courseId, topic);
+      }
+      if (index >= 0) items[index] = item;
+      else items.push(item);
+      await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, items);
+      if (item.completedAt !== undefined && item.completionEventSyncedAt === undefined) {
+        await LocalLearningRepository.flushLessonCompletionEventUnlocked(items, item);
+      }
+    });
   }
 
   static async getTopicMastery(courseId?: string): Promise<TopicMastery[]> {
@@ -681,6 +914,9 @@ export class LocalLearningRepository {
         item.type !== 'quiz_mastered' && item.type !== 'quiz_submitted' &&
         LocalLearningRepository.isValidStoredStudyEvent(item));
       const existing = events.find((item: StudyEvent): boolean => item.id === event.id);
+      if (existing !== undefined && !LocalLearningRepository.sameStudyEvent(existing, event)) {
+        throw new Error('学习活动 ID 与已保存内容冲突');
+      }
       const persistedEvent = existing ?? event;
       const alreadyAggregated = event.type === 'lesson_activity' &&
         state.appliedInsightEventIds.includes(event.id);
@@ -707,11 +943,28 @@ export class LocalLearningRepository {
     }
     const tags = (event.tags ?? []).filter((tag: string): boolean => tag.trim().length > 0);
     if (tags.length === 0) throw new Error('课程互动缺少标签');
+    if (event.source === 'lesson_self_assessment') return;
     const totalQuestions = event.totalQuestions ?? 1;
     const correctCount = event.correctCount ?? 0;
     if (totalQuestions <= 0 || correctCount < 0 || correctCount > totalQuestions) {
       throw new Error('课程互动计数无效');
     }
+  }
+
+  private static sameStudyEvent(left: StudyEvent, right: StudyEvent): boolean {
+    if (left.id !== right.id || left.type !== right.type || left.timestamp !== right.timestamp ||
+      left.courseId !== right.courseId || left.topic !== right.topic || left.taskId !== right.taskId ||
+      left.totalQuestions !== right.totalQuestions || left.correctCount !== right.correctCount ||
+      left.source !== right.source || left.difficulty !== right.difficulty || left.accuracy !== right.accuracy) {
+      return false;
+    }
+    const leftTags = left.tags ?? [];
+    const rightTags = right.tags ?? [];
+    if (leftTags.length !== rightTags.length) return false;
+    for (let index = 0; index < leftTags.length; index += 1) {
+      if (leftTags[index] !== rightTags[index]) return false;
+    }
+    return true;
   }
 
   static async getAchievements(): Promise<AchievementProgress[]> {

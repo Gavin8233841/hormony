@@ -6845,3 +6845,41 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 竞赛生产目标 Vercel 会提供 `req.ip`；Docker 或其他自托管环境缺少可信 IP 时使用共享限流桶，属于备用部署限制，真实多用户隔离未验证。
 - 真实浏览器停止后立即重发、真实模型网络取消与 Chat/Plan/Quiz 正文、当前主线上线部署均未验证。
 - HarmonyOS 模拟器、真机和正式签名未验证；本批没有修改 HarmonyOS 文件或用户保留的课程 JSON。
+
+---
+
+## 2026-07-17 [MAIN+WS02] schema 12 学习事实、完成 outbox 与错题重练一致性收口
+
+背景：WS02 已证明旧版 schema 8 会覆盖历史已发布 schema 10，且近期答题、截断活动明细、Lesson 完成、首次掌握 milestone 与旧 AI 错题降级之间存在多处长期事实不一致。主线逐项复核 `2a600e0`，补齐迁移反例、完成事件 outbox、替代题身份和活动重试，并拒绝把构建成功冒充设备运行成功。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+- `apps/web/src/lib/data/mistake-review-flow.test.ts`
+- `scripts/test_lesson_activity_resume_contract.py`
+- `DEVLOG.md`
+
+行为变化：
+- ArkData schema 升至 12；从 v10 精确键迁移累计题数、正确数、日期、Topic 掌握、错题与测验事件，只有时间边界明确不重叠时才合并两段历史。累计 `accuracy/mastered` 重新计算，首次掌握只从完整、合法且与累计统计一致的事件重放，随后才压缩到 500 条；已持久 milestone 不因后续正确率下降撤销。
+- quiz 事件只接受非空白精确 ID、合法时间、课程/Topic 和计数；相同 ID 异载荷拒绝为明确冲突。自由回答自评只保留幂等学习事实，不再污染客观题统计。
+- 旧 AI 错题无法恢复原题时，只采用精确同课程同 Topic 的精选题并置于首位；保留复习项 `id`，同时更新真实 `questionId/source/quizId` 与题目内容。无同 Topic 题时明确失败，答对或答错均原位更新，不生成第二条复习项。
+- Lesson 互动保存失败后缓存完整事件并复用原 ID、时间和载荷重试，成功后才移除；schema 12 为首次 Lesson 完成写入稳定长度前缀事件 ID，并以 `completionEventSyncedAt` 管理可重试 outbox。
+- LessonProgress 使用独立 Promise 队列串行完成写入，首次 `completedAt` 保持不变；事件写失败、同步标记写失败和初始化冲刷失败均可同进程重试。空白完成事件 ID 自动恢复，同 ID 异语义不会误标同步。
+- 课程进度、答题回执和画像学习天数直接合并合法 `LessonProgress.completedAt`，即使有界 `study_events` 已淘汰完成事件仍不回退；非法课程 Topic 和无效完成时间不进入任何长期统计。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`：exit 0，38/38 通过；覆盖 v10/v8 迁移、501 条事件、非法事件、LessonProgress 长期事实、schema 12 outbox 失败恢复、ID 冲突和真实分隔符碰撞。
+- `cd apps/web; pnpm exec vitest run src/lib/data/mistake-review-flow.test.ts`：exit 0，6/6 通过。
+- `python -m unittest scripts.test_lesson_activity_resume_contract`：exit 0，11/11 通过。
+- `cd apps/web; pnpm lint`、`pnpm typecheck`：exit 0；`pnpm test`：exit 0，25 个文件、396/396 通过；`pnpm build`：exit 0，Next.js 14.2.18 生产构建完成。
+- API 12 增量 HAP 首轮明确失败，暴露可选完成时间未收窄和 ArkTS 不支持的抛错表达式；修复后多轮重跑均通过，最终 `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` exit 0，`BUILD SUCCESSFUL in 24 s 541 ms`，`CompileArkTS` 与 `PackageHap` 完成。
+- `hdc list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；真实 ArkData 升级、进程终止后恢复、课程进度 UI、错题重练点击和跨日复习均未做设备验证。
+- HAP 未配置 `signingConfigs`，构建跳过签名；安装、真机与多设备行为未验证。
+- 本批未调用线上 Quiz 或真实模型，不声明线上通过。

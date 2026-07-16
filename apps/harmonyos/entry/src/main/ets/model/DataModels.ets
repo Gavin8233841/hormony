@@ -180,6 +180,8 @@ export interface LessonProgress {
   topic: string;
   completedChunkIds: string[];
   completedAt?: string;
+  completionEventId?: string;
+  completionEventSyncedAt?: string;
   updatedAt: string;
 }
 

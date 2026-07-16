@@ -164,4 +164,61 @@ describe("HarmonyOS 错题复习入口契约", () => {
       "!usedQuestionIds.includes(question.id)"
     );
   });
+
+  it("旧 AI 错题缺少选项时替代题仍应推进原复习项且不在题组重复", () => {
+    const loadStart = practiceSource.indexOf(
+      "private async loadQuestions(selectedReviewItemId: string)"
+    );
+    const loadEnd = practiceSource.indexOf(
+      "\n  private questionFromReview",
+      loadStart
+    );
+    const loadSource = practiceSource.slice(loadStart, loadEnd);
+    const missingOriginal = loadSource.indexOf("if (selectedQuestion !== null)");
+    const fallbackLookup = loadSource.indexOf(
+      "const fallbackQuestion = available.find",
+      missingOriginal
+    );
+    const exactCourse = loadSource.indexOf(
+      "question.courseId === this.courseId",
+      fallbackLookup
+    );
+    const exactTopic = loadSource.indexOf(
+      "question.topic === this.topic",
+      exactCourse
+    );
+    const unavailable = loadSource.indexOf(
+      "if (fallbackQuestion === undefined)",
+      exactTopic
+    );
+    const bindOriginalReview = loadSource.indexOf(
+      "ordered.push({ question: fallbackQuestion, reviewItemId: selectedReview.id })",
+      unavailable
+    );
+    const reserveQuestionId = loadSource.indexOf(
+      "usedQuestionIds.push(fallbackQuestion.id)",
+      bindOriginalReview
+    );
+    const remainingQuestions = loadSource.indexOf(
+      "for (const question of available)",
+      reserveQuestionId
+    );
+
+    expect(loadStart).toBeGreaterThan(-1);
+    expect(loadEnd).toBeGreaterThan(loadStart);
+    expect(fallbackLookup).toBeGreaterThan(missingOriginal);
+    expect(exactCourse).toBeGreaterThan(fallbackLookup);
+    expect(exactTopic).toBeGreaterThan(exactCourse);
+    expect(unavailable).toBeGreaterThan(exactTopic);
+    const unavailableBranch = loadSource.slice(unavailable, bindOriginalReview);
+    expect(unavailableBranch).toContain("原错题缺少可重练选项，且同主题暂无精选题");
+    expect(unavailableBranch).toContain("this.hasError = true");
+    expect(unavailableBranch).toContain("return;");
+    expect(bindOriginalReview).toBeGreaterThan(unavailable);
+    expect(reserveQuestionId).toBeGreaterThan(bindOriginalReview);
+    expect(remainingQuestions).toBeGreaterThan(reserveQuestionId);
+    expect(loadSource).toContain(
+      "this.reviewItemIds = selectedItems.map((item: PracticeQuestionItem): string => item.reviewItemId)"
+    );
+  });
 });

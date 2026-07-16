@@ -123,6 +123,16 @@ struct PracticePage {
           ordered.push({ question: selectedQuestion, reviewItemId: selectedReview.id });
           usedQuestionIds.push(selectedQuestion.id);
         } else {
+          const fallbackQuestion = available.find((question: CuratedQuestion): boolean =>
+            question.courseId === this.courseId && question.topic === this.topic &&
+            !usedQuestionIds.includes(question.id));
+          if (fallbackQuestion === undefined) {
+            this.message = '原错题缺少可重练选项，且同主题暂无精选题';
+            this.hasError = true;
+            return;
+          }
+          ordered.push({ question: fallbackQuestion, reviewItemId: selectedReview.id });
+          usedQuestionIds.push(fallbackQuestion.id);
           notice = '原错题缺少可重练选项，已切换为同主题精选题';
         }
       } else {

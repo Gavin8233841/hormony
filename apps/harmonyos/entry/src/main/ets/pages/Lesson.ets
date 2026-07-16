@@ -36,6 +36,7 @@ struct LessonPage {
   @State feedbackVisible: boolean = false;
   @State attemptedActivityIds: string[] = [];
   @State pendingActivityIds: string[] = [];
+  private pendingActivityEvents: LearningStudyEvent[] = [];
   @State conceptStepIndex: number = 0;
   @State codeRunStepIndex: number = -1;
   @State activityEvidenceMessage: string = '';
@@ -44,6 +45,8 @@ struct LessonPage {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topic = AppStorage.get<string>('selectedContentTopic') ?? '';
+    this.pendingActivityEvents = this.pendingActivityEvents.filter((event: LearningStudyEvent): boolean =>
+      event.courseId === this.courseId && event.topic === this.topic);
     this.completedChunkIds = [];
     this.currentIndex = 0;
     this.message = '';
@@ -199,39 +202,47 @@ struct LessonPage {
     });
   }
 
-  private async persistActivityEvidence(activity: LearningActivity, correct: boolean,
-    selfAssessed: boolean): Promise<void> {
-    const now = new Date().toISOString();
+  private async persistActivityEvidence(activity: LearningActivity, correct: boolean, selfAssessed: boolean): Promise<void> {
     let event: LearningStudyEvent;
-    if (selfAssessed) {
-      event = {
-        id: 'lesson_activity_' + now + '_' + activity.id,
-        type: 'lesson_activity',
-        timestamp: now,
-        courseId: this.courseId,
-        topic: this.topic,
-        taskId: activity.id,
-        source: 'lesson_self_assessment',
-        difficulty: this.activityDifficulty(activity),
-        tags: this.activityTags(activity)
-      };
+    const cachedEvent = this.pendingActivityEvents.find((item: LearningStudyEvent): boolean =>
+      item.courseId === this.courseId && item.topic === this.topic && item.taskId === activity.id);
+    if (cachedEvent !== undefined) {
+      event = cachedEvent;
     } else {
-      event = {
-        id: 'lesson_activity_' + now + '_' + activity.id,
-        type: 'lesson_activity',
-        timestamp: now,
-        courseId: this.courseId,
-        topic: this.topic,
-        taskId: activity.id,
-        source: 'lesson_interactive',
-        difficulty: this.activityDifficulty(activity),
-        accuracy: correct ? 1 : 0,
-        tags: this.activityTags(activity),
-        totalQuestions: 1,
-        correctCount: correct ? 1 : 0
-      };
+      const now = new Date().toISOString();
+      if (selfAssessed) {
+        event = {
+          id: 'lesson_activity_' + now + '_' + activity.id,
+          type: 'lesson_activity',
+          timestamp: now,
+          courseId: this.courseId,
+          topic: this.topic,
+          taskId: activity.id,
+          source: 'lesson_self_assessment',
+          difficulty: this.activityDifficulty(activity),
+          tags: this.activityTags(activity)
+        };
+      } else {
+        event = {
+          id: 'lesson_activity_' + now + '_' + activity.id,
+          type: 'lesson_activity',
+          timestamp: now,
+          courseId: this.courseId,
+          topic: this.topic,
+          taskId: activity.id,
+          source: 'lesson_interactive',
+          difficulty: this.activityDifficulty(activity),
+          accuracy: correct ? 1 : 0,
+          tags: this.activityTags(activity),
+          totalQuestions: 1,
+          correctCount: correct ? 1 : 0
+        };
+      }
+      this.pendingActivityEvents = this.pendingActivityEvents.concat([event]);
     }
     await LocalLearningRepository.appendStudyEvent(event);
+    this.pendingActivityEvents = this.pendingActivityEvents.filter((item: LearningStudyEvent): boolean =>
+      item.id !== event.id);
   }
 
   private appendUniqueTag(tags: string[], value: string): void {

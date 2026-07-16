@@ -11,6 +11,10 @@ LOCAL_REPOSITORY = (
     ROOT
     / "apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets"
 )
+QUIZ_REDUCER = (
+    ROOT
+    / "apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets"
+)
 
 
 class LessonActivityResumeContractTest(unittest.TestCase):
@@ -18,6 +22,7 @@ class LessonActivityResumeContractTest(unittest.TestCase):
     def setUpClass(cls):
         cls.source = LESSON_PAGE.read_text(encoding="utf-8")
         cls.repository_source = LOCAL_REPOSITORY.read_text(encoding="utf-8")
+        cls.reducer_source = QUIZ_REDUCER.read_text(encoding="utf-8")
 
     def test_restore_accepts_only_current_experience_activity_events(self):
         restore = compact(extract_method(self.source, "restoreActivityProgress"))
@@ -184,6 +189,26 @@ class LessonActivityResumeContractTest(unittest.TestCase):
         )
         self.assertIn("Button('重试保存记录')", self.source)
 
+    def test_failed_activity_write_reuses_the_same_event_payload(self):
+        persist = compact(extract_method(self.source, "persistActivityEvidence"))
+
+        cache_lookup = persist.find("this.pendingActivityEvents.find")
+        create_timestamp = persist.find("const now = new Date().toISOString()")
+        cache_event = persist.find(
+            "this.pendingActivityEvents = this.pendingActivityEvents.concat([event])"
+        )
+        write = persist.find("LocalLearningRepository.appendStudyEvent(event)")
+        clear = persist.find(
+            "this.pendingActivityEvents = this.pendingActivityEvents.filter", write
+        )
+
+        self.assertGreaterEqual(cache_lookup, 0)
+        self.assertGreater(create_timestamp, cache_lookup)
+        self.assertGreater(cache_event, create_timestamp)
+        self.assertGreater(write, cache_event)
+        self.assertGreater(clear, write)
+        self.assertIn("item.id !== event.id", persist[clear:])
+
     def test_tutor_handoff_preserves_bounded_learning_evidence(self):
         build_question = compact(
             extract_method(self.source, "buildTutorQuestion")
@@ -226,42 +251,55 @@ class LessonActivityResumeContractTest(unittest.TestCase):
         self.assertGreater(same_tag_quiz, ask_tutor)
 
     def test_self_assessment_is_not_aggregated_as_an_objective_question(self):
-        insights = compact(
-            extract_method(self.repository_source, "getTagInsights")
+        apply_event = compact(
+            extract_method(self.reducer_source, "applyLearningInsightEvent")
         )
-        events_loop = insights.find(
-            "const events = await LocalLearningRepository.getStudyEvents()"
+        source_guard = apply_event.find(
+            "if (event.source === 'lesson_self_assessment') return true"
         )
-        source_guard = insights.find(
-            "event.source === 'lesson_self_assessment'", events_loop
+        objective_total = apply_event.find(
+            "const totalQuestions = Math.max", source_guard
         )
-        fallback = insights.find("event.totalQuestions ?? 1", source_guard)
+        all_insights = compact(
+            extract_method(self.repository_source, "getAllTagInsights")
+        )
 
-        self.assertGreaterEqual(events_loop, 0)
-        self.assertGreater(source_guard, events_loop)
-        self.assertGreater(fallback, source_guard)
+        self.assertGreaterEqual(source_guard, 0)
+        self.assertGreater(objective_total, source_guard)
+        self.assertIn(
+            "const state = await LocalLearningRepository.getQuizLearningState()",
+            all_insights,
+        )
+        self.assertNotIn("getStudyEvents", all_insights)
 
     def test_study_event_writes_are_serial_and_idempotent(self):
         append = compact(
             extract_method(self.repository_source, "appendStudyEvent")
         )
 
-        queue = append.find("LocalLearningRepository.studyEventWriteQueue.then")
-        read = append.find("LocalLearningRepository.getStudyEvents()", queue)
-        duplicate_guard = append.find("value.id === event.id", read)
+        queue = append.find("LocalLearningRepository.runQuizStateTask")
+        read = append.find(
+            "LocalLearningRepository.getValue<StudyEvent[]>(KEY_STUDY_EVENTS)",
+            queue,
+        )
+        duplicate_guard = append.find("item.id === event.id", read)
+        aggregated_guard = append.find(
+            "state.appliedInsightEventIds.includes(event.id)", duplicate_guard
+        )
         write = append.find(
             "LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS",
-            duplicate_guard,
+            aggregated_guard,
         )
-        publish_queue = append.find(
-            "LocalLearningRepository.studyEventWriteQueue = operation.catch", write
+        aggregate = append.find(
+            "QuizLearningStateReducer.applyLearningInsightEvent", write
         )
 
         self.assertGreaterEqual(queue, 0)
         self.assertGreater(read, queue)
         self.assertGreater(duplicate_guard, read)
-        self.assertGreater(write, duplicate_guard)
-        self.assertGreater(publish_queue, write)
+        self.assertGreater(aggregated_guard, duplicate_guard)
+        self.assertGreater(write, aggregated_guard)
+        self.assertGreater(aggregate, write)
 
 
 if __name__ == "__main__":
