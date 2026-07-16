@@ -6597,3 +6597,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 失败或未验证：
 - 当前无模拟器、手机、平板或真机；英文协议术语换行、长答案滚动及布局未验证。
+
+---
+
+## 2026-07-17 [WS03] TCP Reno 快恢复状态机修正
+
+背景：CS103 的知识切片、逐步示例与两项活动都把 TCP Reno 收到第 3 个重复 ACK 后的 `cwnd` 直接设为 `ssthresh`。RFC 5681 第 3.2 节实际要求先设为 `ssthresh+3 MSS`，确认重传数据的新 ACK 到达后才收缩到 `ssthresh`；旧内容省略了整个快恢复中间态。
+
+文件：
+- `DEVLOG.md`
+- `docs/workstreams/03-course-learning-result.md`
+- `apps/web/src/lib/data/cs103-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+行为变化：
+- `FlightSize=18 MSS` 的活动在第 3 个重复 ACK 后得到 `ssthresh=9 MSS, cwnd=12 MSS`；确认重传数据的新 ACK 后 `cwnd` 回落到 9 MSS，再线性增长到最终 10 MSS。
+- 步骤排序明确快重传入口使用 `ssthresh+3 MSS`，退出快恢复必须等待确认新数据的 ACK。
+- Web 与端侧 `cs103_k22/k23` 同步修正并改用 RFC 5681 来源；规格摘要和逐步示例同步。
+- 新增跨端知识切片逐字一致性及真实活动状态契约。
+
+验证：
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python -m unittest scripts.test_lesson_content_facts -v`：退出码 0，5 项通过。
+- `$env:PYTHONDONTWRITEBYTECODE='1'; python scripts/validate-topic-relations.py`：退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约通过。
+- WS03 完整回归：退出码 0，44 项运行，43 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- `cd apps/web; pnpm lint`：退出码 0；无 ESLint 警告或错误。
+- `cd apps/web; pnpm typecheck`：退出码 0。
+- `cd apps/web; pnpm test`：退出码 0；13 个测试文件、167 项测试通过。
+- `cd apps/web; pnpm build`：退出码 0；Next.js 生产构建成功，静态页面生成 10/10。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：退出码 0，`BUILD SUCCESSFUL in 31 s 135 ms`；仍提示未配置 `signingConfigs`。
+
+失败或未验证：
+- 当前无模拟器、手机、平板或真机；逐步示例、中间窗口状态与两项活动反馈的实际布局和滚动未验证。
+- 本批未调用线上 API，不构成线上内容检索或学伴回答证据。

@@ -1567,7 +1567,7 @@
       "慢启动阶段",
       "进入拥塞避免",
       "触发快重传",
-      "快恢复后继续拥塞避免"
+      "退出快恢复并继续拥塞避免"
     ],
     "caseTitle": "现实案例：水库调度系统",
     "caseBody": "水库向下游供水时，闸门开度类比拥塞窗口（cwnd）。刚开始小开度试探（慢启动），确认河道能承受后逐步加大开度（指数增长）；到达警戒水位线（ssthresh）后改为缓慢增加（拥塞避免线性增长）。若发现下游严重溢洪（超时），立即关小闸门到最小重来；若只是局部波动（3个重复ACK），则只减半开度而非全关（快恢复）。下游水厂蓄水池容量类比接收窗口（rwnd），实际放水量取闸门开度和水厂容量的较小值——同时不淹没下游网络和不让水厂溢出。",
@@ -1575,8 +1575,8 @@
     "workedExampleSteps": [
       "慢启动阶段 → cwnd=1，ssthresh=16。每收到一个ACK，cwnd加1，每经过一个RTT翻倍：1→2→4→8→16（4个RTT完成指数增长）",
       "进入拥塞避免 → cwnd=16达到ssthresh，切换为线性增长。每经过一个RTT，cwnd增加1个MSS：16→17→18→...→24（8个RTT）",
-      "触发快重传 → cwnd=24时收到3个重复ACK，判定报文段丢失。ssthresh=24/2=12，cwnd=ssthresh=12（快恢复，cwnd不重置为1）",
-      "快恢复后继续拥塞避免 → cwnd=12，以线性方式增长：12→13→14→...，温和探测网络带宽",
+      "触发快重传 → 假设cwnd与FlightSize均为24 MSS时收到第3个重复ACK。按RFC 5681，ssthresh=max(FlightSize/2, 2 MSS)=12 MSS，立即重传丢失段，并把cwnd暂时膨胀为ssthresh+3 MSS=15 MSS",
+      "退出快恢复并继续拥塞避免 → 每多收到1个重复ACK，cwnd可再增加1 MSS；当确认重传段的新ACK到达时，将cwnd回落到ssthresh=12 MSS，再以线性方式增长：12→13→14→...",
       "对比超时场景 → 若cwnd=24时不是收到3个重复ACK而是RTO超时，则ssthresh=24/2=12，cwnd重置为1，重新进入慢启动阶段（与快恢复的区别在于cwnd是否归1）"
     ],
     "activities": [
@@ -1585,15 +1585,15 @@
         "type": "state_trace",
         "title": "状态推演",
         "focusTag": "拥塞控制",
-        "prompt": "一个TCP连接初始cwnd=1，ssthresh=16。请推演以下操作序列后cwnd和ssthresh的最终值",
-        "content": "初始状态：\ncwnd=1, ssthresh=16\n\n操作序列：\n1. 经过4个RTT的慢启动（cwnd每RTT翻倍）→ cwnd从1经2、4、8变为16，达到ssthresh\n  2. 进入拥塞避免，经过2个RTT线性增长 → cwnd从16变为17，再变为18\n  3. 收到3个重复ACK，触发快重传和快恢复 → ssthresh=floor(18/2)=9，cwnd=ssthresh=9\n  4. 继续拥塞避免1个RTT → cwnd从9变为10\n\n推演过程：\n操作1后：cwnd=16, ssthresh=16（慢启动阶段指数增长，4个RTT：1→2→4→8→16）\n操作2后：cwnd=18, ssthresh=16（拥塞避免线性增长，每RTT加1）\n操作3后：cwnd=9, ssthresh=9（快恢复：ssthresh=cwnd/2=9，cwnd=ssthresh=9，不归1）\n操作4后：cwnd=10, ssthresh=9（拥塞避免线性增长1个RTT）\n\n最终状态：\ncwnd=10, ssthresh=9",
+        "prompt": "一个TCP Reno连接的cwnd和ssthresh均以MSS为单位，初始cwnd=1、ssthresh=16。请按RFC 5681推演以下操作序列后的最终值",
+        "content": "初始状态：\ncwnd=1 MSS, ssthresh=16 MSS\n\n操作序列：\n1. 经过4个RTT的慢启动（cwnd每RTT翻倍）→ cwnd从1经2、4、8变为16，达到ssthresh\n  2. 进入拥塞避免，经过2个RTT线性增长 → cwnd从16变为17，再变为18\n  3. 此时FlightSize=18 MSS，收到第3个重复ACK → ssthresh=9 MSS，立即重传丢失段，cwnd=ssthresh+3 MSS=12 MSS\n  4. 收到确认重传段的新ACK后将cwnd回落到ssthresh=9 MSS；再继续拥塞避免1个RTT，cwnd从9变为10 MSS\n\n推演过程：\n操作1后：cwnd=16, ssthresh=16（慢启动阶段指数增长，4个RTT：1→2→4→8→16）\n操作2后：cwnd=18, ssthresh=16（拥塞避免线性增长，每RTT加1）\n操作3后：cwnd=12 MSS, ssthresh=9 MSS（进入快恢复时用3个重复ACK暂时膨胀窗口）\n操作4收到新ACK后：cwnd=9 MSS, ssthresh=9 MSS（窗口回落）；再经过1个RTT后cwnd=10 MSS\n\n最终状态：\ncwnd=10 MSS, ssthresh=9 MSS",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
-        "answer": "cwnd=10，ssthresh=9",
-        "feedback": "慢启动阶段cwnd每RTT翻倍（指数增长），4个RTT后从1增长到16。达到ssthresh后切换为拥塞避免，每RTT仅加1（线性增长）。收到3个重复ACK触发快重传：ssthresh降为当前cwnd的一半（9），cwnd也设为ssthresh值（9），不重置为1——这是因为3个重复ACK说明网络仍能传输报文段，丢包可能只是偶然。这与知识切片 cs103_k20、cs103_k23 所述慢启动、快恢复机制一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k23"
+        "answer": "cwnd=10 MSS，ssthresh=9 MSS",
+        "feedback": "慢启动和拥塞避免先把cwnd从1推到18 MSS。第3个重复ACK到达时，RFC 5681要求把ssthresh设为FlightSize的一半，并把cwnd设为ssthresh+3 MSS，而不是立刻把cwnd直接设为ssthresh；确认重传段的新ACK到达后才把cwnd回落到ssthresh。知识切片 cs103_k20、cs103_k22、cs103_k23提供阶段概览，本题的窗口数值按RFC 5681第3.2节精确推演",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681第3.2节（Fast Retransmit/Fast Recovery）；知识切片 cs103_k20、cs103_k22、cs103_k23"
       },
       {
         "id": "cs103-TCP流量控制与拥塞控制-2",
@@ -1605,10 +1605,10 @@
         "language": "步骤卡片",
         "interactionMode": "ordered_choice",
         "options": [
-          "收到3个重复ACK，ssthresh设为当前cwnd的一半，cwnd设为ssthresh值（快恢复）",
+          "收到第3个重复ACK，按FlightSize计算ssthresh，重传丢失段，并将cwnd设为ssthresh+3 MSS进入快恢复",
           "cwnd从1开始，每经过一个RTT翻倍（慢启动指数增长）",
           "cwnd达到ssthresh后，每经过一个RTT增加1个MSS（拥塞避免线性增长）",
-          "快恢复后，cwnd以线性方式继续增长探测网络带宽"
+          "确认重传段的新ACK到达后，cwnd回落到ssthresh，退出快恢复并继续拥塞避免"
         ],
         "answerIndexes": [
           1,
@@ -1617,7 +1617,7 @@
           3
         ],
         "answer": "B → C → A → D",
-        "feedback": "TCP Reno拥塞控制的时间线为：连接建立时cwnd=1进入慢启动（B），指数增长快速探测带宽；cwnd达到ssthresh后切换到拥塞避免（C），线性增长温和试探；收到3个重复ACK触发快重传和快恢复（A），ssthresh减半但cwnd不归1；快恢复后继续拥塞避免的线性增长（D）。若发生超时而非3个重复ACK，则cwnd重置为1重新慢启动，这是TCP Tahoe与Reno的关键区别。这与知识切片 cs103_k20、cs103_k21、cs103_k23 所述四阶段算法一致",
+        "feedback": "TCP Reno先经历慢启动（B）和拥塞避免（C）。第3个重复ACK触发快重传时（A），ssthresh按FlightSize减半，cwnd暂时设为ssthresh+3 MSS；确认重传段的新ACK到达后（D），cwnd才回落到ssthresh并转入拥塞避免。若发生RTO超时则走另一条恢复路径，将cwnd降到损失窗口并重新慢启动。知识切片 cs103_k20、cs103_k21、cs103_k23提供四阶段概览，精确窗口变更以RFC 5681第3.1节和第3.2节为准",
         "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k21、cs103_k23"
       }
     ]

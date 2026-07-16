@@ -443,3 +443,36 @@
 ### 未验证
 
 - **未验证**：当前没有模拟器或真机；修订后的英文协议术语换行、长答案滚动及手机/平板显示未验证。
+
+## 批次十七：TCP Reno 快恢复状态机修正
+
+### 行为
+
+- 修正同 Topic 逐步示例和两项活动把第 3 个重复 ACK 到达时的 `cwnd` 直接设为 `ssthresh` 的错误；RFC 5681 要求先临时膨胀为 `ssthresh+3 MSS`，确认重传数据的新 ACK 到达时再收缩到 `ssthresh`。
+- 状态推演补全中间态：`FlightSize=18 MSS` 时得到 `ssthresh=9 MSS`、快恢复入口 `cwnd=12 MSS`，新 ACK 后回落为 9 MSS，再经一个拥塞避免 RTT 得到最终 10 MSS。
+- 同步修正 Web 与 HarmonyOS 的 `cs103_k22/k23`，来源改为 RFC 5681；规格知识摘要、逐步示例、自由推演和步骤排序不再互相矛盾。
+- 新增跨端逐字一致性与真实活动契约，固定入口膨胀、额外重复 ACK、退出收缩及最终答案。
+
+### 文件
+
+- `apps/web/src/lib/data/cs103-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：RFC 5681 第 3.2 节步骤 3 要求重传后将 `cwnd` 设为 `ssthresh plus 3*SMSS`，步骤 6 要求确认新数据的 ACK 到达时将 `cwnd` 设回 `ssthresh`。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts -v`，退出码 0；5 项通过，且 `cs103_k22/k23` 的 Web 与端侧字段逐字一致。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；44 项运行，43 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，退出码均为 0；无 lint 或 TypeScript 错误。
+- **静态诊断通过**：`cd apps/web; pnpm test`，退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：`cd apps/web; pnpm build`，退出码 0；Next.js 生产构建成功并生成 10/10 静态页面。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 31 s 135 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器或真机；逐步示例、中间窗口状态、两项活动反馈的手机/平板实际显示与滚动未验证。
+- **未验证**：本批未调用线上 API，不构成线上内容检索或学伴回答证据。

@@ -12,6 +12,7 @@ KNOWLEDGE_PATH = (
     ROOT
     / "apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json"
 )
+WEB_CS103_KNOWLEDGE_PATH = ROOT / "apps/web/src/lib/data/cs103-knowledge.ts"
 CS101_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS101.md"
 CS102_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS102.md"
 CS103_SPEC_PATH = ROOT / "docs/ACTIVE-LEARNING-SPEC-CS103.md"
@@ -135,6 +136,54 @@ class LessonContentFactsTest(unittest.TestCase):
             "- **答案**：Message → UDP Datagram → IP Datagram → Frame → Bits；最终为 Bits（比特流）",
             spec,
         )
+
+    def test_tcp_reno_fast_recovery_inflates_then_deflates_cwnd(self):
+        experience = find_unique(
+            self.experiences,
+            "cs103/TCP流量控制与拥塞控制 experience",
+            lambda item: item.get("courseId") == "cs103"
+            and item.get("topic") == "TCP流量控制与拥塞控制",
+        )
+        trace = find_unique(
+            experience["activities"],
+            "cs103-TCP流量控制与拥塞控制-1 activity",
+            lambda item: item.get("id") == "cs103-TCP流量控制与拥塞控制-1",
+        )
+        ordering = find_unique(
+            experience["activities"],
+            "cs103-TCP流量控制与拥塞控制-2 activity",
+            lambda item: item.get("id") == "cs103-TCP流量控制与拥塞控制-2",
+        )
+        ordered_steps = [
+            ordering["options"][index]
+            for index in ordering["answerIndexes"]
+        ]
+
+        self.assertIn("cwnd=ssthresh+3 MSS=12 MSS", trace["content"])
+        self.assertIn("cwnd=9 MSS", trace["content"])
+        self.assertEqual("cwnd=10 MSS，ssthresh=9 MSS", trace["answer"])
+        self.assertIn("ssthresh+3 MSS", ordered_steps[2])
+        self.assertIn("新ACK到达后，cwnd回落到ssthresh", ordered_steps[3])
+        self.assertIn("ssthresh+3 MSS=15 MSS", experience["workedExampleSteps"][2])
+
+        web_source = WEB_CS103_KNOWLEDGE_PATH.read_text(encoding="utf-8")
+        for chunk_id in ("cs103_k22", "cs103_k23"):
+            chunk = find_unique(
+                self.knowledge_items,
+                f"{chunk_id} knowledge chunk",
+                lambda item, expected=chunk_id: item.get("id") == expected,
+            )
+            expected_web_fields = (
+                f'id: "{chunk_id}",\n'
+                f'    text: "{chunk["text"]}",\n'
+                f'    source: "{chunk["source"]}"'
+            )
+            self.assertEqual("RFC 5681", chunk["source"])
+            self.assertIn(expected_web_fields, web_source)
+
+        spec = CS103_SPEC_PATH.read_text(encoding="utf-8")
+        self.assertIn("把cwnd临时设为ssthresh+3 MSS", spec)
+        self.assertIn("确认重传数据的新ACK到达时，cwnd回落到ssthresh", spec)
 
 
 if __name__ == "__main__":
