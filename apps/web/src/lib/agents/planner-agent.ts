@@ -51,11 +51,11 @@ export async function runPlannerAgent(
   goal: string,
   durationDays: number,
   dailyMinutes: number,
+  startDate: string,
   profileSnapshot?: LearningProfileSnapshot,
   signal?: AbortSignal
 ): Promise<StudyPlan> {
   const profile = getProfileContext(profileSnapshot);
-  const startDate = new Date().toISOString().slice(0, 10);
   const topicOptions = getTopicOptions();
   const topicCatalog = formatTopicCatalog(topicOptions);
 

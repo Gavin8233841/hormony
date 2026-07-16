@@ -291,6 +291,7 @@ export interface PlanRequest {
   goal: string;
   durationDays: number;
   dailyMinutes: number;
+  startDate: string;
   profile?: UserProfile;
 }
 
@@ -303,6 +304,7 @@ export interface PlanTaskUpdate {
 export interface ChatRequest {
   userId: string;
   message: string;
+  startDate: string;
   history?: ChatMessage[];
   profile?: UserProfile;
   context?: ChatContext;

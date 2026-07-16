@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Send, Loader2, Square } from "lucide-react";
 import type { AgentName, Citation, StreamEvent } from "@/lib/types";
+import { localDateKey } from "@/lib/client-date";
 
 interface ChatItem {
   role: "user" | "assistant";
@@ -99,6 +100,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           userId: "demo",
           message: currentInput,
+          startDate: localDateKey(),
           history: history.length > 0 ? history : undefined,
           context: sessionIdRef.current
             ? { sessionId: sessionIdRef.current }

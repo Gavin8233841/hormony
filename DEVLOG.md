@@ -6367,3 +6367,45 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - `hdc 3.2.0e list targets` 返回 `[Empty]`，近 4 周节奏视觉、筛选交互、记录回流、成就动作、通知与卡片点击均未取得模拟器或真机证据。
 - WS02 reducer 未在本批集成，按课程/Topic/标签隔离的主动标签推荐为未验证且当前未启用。
 - Web 未修改，因此未运行 Web lint、typecheck、test 或 build。
+
+---
+
+## 2026-07-17 [MAIN]：统一本地计划日期与主动回流状态机
+
+背景：WS04 集成复核发现三个跨模块阻断。Planner 用云端 UTC 日期生成首日，而 HarmonyOS 首页按设备本地日期筛选；中国时区 00:00-07:59 可能没有“今日任务”。通知与服务卡片的冷/热启动回流只校验固化参数，连续 Want 可能乱序，嵌套页上的课程入口也只切换底层 Tab。主线按 API 12 SDK 与现有请求/Repository 契约完成收口。
+
+文件：
+- `apps/web/src/lib/client-date.ts`、`client-date.test.ts`、`types.ts`、`api-validation.ts`
+- `apps/web/src/lib/agents/planner-agent.ts`、`planner-agent.test.ts`、`orchestrator.ts`、`orchestrator.test.ts`
+- `apps/web/src/app/api/chat/route.ts`、`api/plan/route.ts`、`api/plan/plan-lifecycle.test.ts`、`api/request-validation.test.ts`
+- `apps/web/src/app/chat/page.tsx`、`apps/web/src/app/plan/page.tsx`
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`Plan.ets`、`Index.ets`
+- `apps/harmonyos/entry/src/main/ets/common/ProactiveLearningService.ets`
+- `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`
+- `scripts/test-proactive-learning-service.mjs`
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`、`docs/workstreams/04-proactive-harmony-result.md`、`DEVLOG.md`
+
+行为变化：
+- Web 与 HarmonyOS 的 Plan、Chat 请求都携带由设备本地年月日生成的 `startDate`；API 对 `YYYY-MM-DD` 格式和真实日历日期做运行时校验，Planner 只按校验值生成首日和后续纯日期，Chat 识别为计划意图时复用同一契约。
+- 合法通知/卡片 Want 先校验来源、长度、动作、页面、课程和 Topic，再从 ArkData 重新解析点击时的 current next-best-action；旧通知不再直接执行创建时固化的过期行动。
+- `EntryAbility` 以单调序号保证连续异步 Want latest-wins；无关 Want 不清空初始化阶段已经排队的合法入口。
+- `Index` 读取当前 API 12 Router path：嵌套页上的课程入口返回既有 `pages/Index` 根页，根页到子页使用 `pushUrl`，子页间使用 `replaceUrl`；目标只在导航确认成功后清除，失败保留并按版本重试一次。
+- 竞赛口径修正为“用户手动创建、非定时提醒；点击回流为源码确认和构建通过，设备运行仍未验证”。
+
+验证：
+- `node --check scripts/test-proactive-learning-service.mjs`：exit 0。
+- `node --test scripts/test-proactive-learning-service.mjs`：exit 0，21/21 通过。
+- 日期、Planner、Orchestrator、API 定向 Vitest：exit 0，5 个文件 42/42 通过。
+- `cd apps/web; pnpm lint`：exit 0，无警告或错误。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，15 个文件 172/172 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 生产构建完成，动态 Chat/Plan API 与静态页面均生成成功。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`BUILD SUCCESSFUL in 33 s 500 ms`。
+- 本机 API 12 SDK 类型声明确认 `Router.getState().path`、`back({ url })`、`pushUrl()`、`replaceUrl()` 与 `UIAbility.onNewWant()` 契约。
+- `git diff --check`：exit 0，仅有工作区既有 LF/CRLF 提示。
+
+失败或未验证：
+- HAP 仍未配置 `signingConfigs`，构建通过不证明安装或竞赛提交包通过。
+- 当前没有模拟器或真机目标；通知权限、通知点击、嵌套页热启动、服务卡片点击、路由失败重试与 ArkData 跨日恢复均未取得运行证据。
+- 未携带 `startDate` 的旧客户端仍使用服务端 UTC 日期作为兼容回退；本次提交中的 Web 与 HarmonyOS 客户端均已发送设备本地日期。

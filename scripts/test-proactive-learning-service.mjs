@@ -11,12 +11,114 @@ const servicePath = path.resolve(scriptDirectory,
   '../apps/harmonyos/entry/src/main/ets/common/ProactiveLearningService.ets');
 const entryAbilityPath = path.resolve(scriptDirectory,
   '../apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets');
+const indexPagePath = path.resolve(scriptDirectory,
+  '../apps/harmonyos/entry/src/main/ets/pages/Index.ets');
 const dataModelsImport = "import { Course, PlanTask } from '../model/DataModels';";
 const metadataModelsImport = `import {
   LearningReviewItem as ReviewItem,
   LearningStudyEvent as StudyEvent
 } from '../model/LearningMetadataModels';`;
 const repositoryImport = "import { LocalLearningRepository } from './LocalLearningRepository';";
+
+function sourceFile(filePath) {
+  return readFileSync(filePath, 'utf8').replaceAll('\r\n', '\n');
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function balancedBlock(source, openBraceIndex, description) {
+  assert.equal(source[openBraceIndex], '{', `${description} opening brace missing`);
+  let depth = 0;
+  let quote = '';
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let index = openBraceIndex; index < source.length; index++) {
+    const character = source[index];
+    const nextCharacter = source[index + 1] ?? '';
+    if (lineComment) {
+      if (character === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === '*' && nextCharacter === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote.length > 0) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === quote) {
+        quote = '';
+      }
+      continue;
+    }
+    if (character === '/' && nextCharacter === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '/' && nextCharacter === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === '`') {
+      quote = character;
+      continue;
+    }
+    if (character === '{') depth += 1;
+    if (character === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return { source: source.slice(openBraceIndex, index + 1), start: openBraceIndex, end: index + 1 };
+      }
+    }
+  }
+  assert.fail(`${description} closing brace missing`);
+}
+
+function methodBlock(source, methodName) {
+  const declaration = new RegExp(
+    `(?:^|\\n)\\s*(?:private\\s+)?(?:static\\s+)?(?:async\\s+)?${escapeRegExp(methodName)}\\s*\\(`, 'm');
+  const match = declaration.exec(source);
+  assert.notEqual(match, null, `${methodName} declaration missing`);
+  const openBraceIndex = source.indexOf('{', match.index + match[0].length);
+  assert.notEqual(openBraceIndex, -1, `${methodName} body missing`);
+  return balancedBlock(source, openBraceIndex, methodName).source;
+}
+
+function conditionalBlock(source, condition, description) {
+  const match = condition.exec(source);
+  assert.notEqual(match, null, `${description} condition missing`);
+  const openBraceIndex = source.indexOf('{', match.index + match[0].length);
+  assert.notEqual(openBraceIndex, -1, `${description} body missing`);
+  return balancedBlock(source, openBraceIndex, description);
+}
+
+function assertOrdered(source, expressions, description) {
+  let cursor = 0;
+  for (const expression of expressions) {
+    const match = expression.exec(source.slice(cursor));
+    assert.notEqual(match, null, `${description}: ${expression} missing or out of order`);
+    cursor += match.index + match[0].length;
+  }
+}
+
+function matchCount(source, expression) {
+  const flags = expression.flags.includes('g') ? expression.flags : expression.flags + 'g';
+  return Array.from(source.matchAll(new RegExp(expression.source, flags))).length;
+}
+
+const clearProactiveTargetPattern =
+  /AppStorage\.setOrCreate\s*<\s*string\s*>\s*\(\s*'proactiveTargetPage'\s*,\s*''\s*\)\s*;/g;
 
 function compileService() {
   let source = readFileSync(servicePath, 'utf8').replaceAll('\r\n', '\n');
@@ -439,22 +541,130 @@ test('validateLaunch 接受无课程参数的合法计划回流', () => {
   assert.equal(launch.taskAction, 'plan');
 });
 
-test('EntryAbility 只在目录校验后请求主动跳转且不读取外部课程标题', () => {
-  const source = readFileSync(entryAbilityPath, 'utf8').replaceAll('\r\n', '\n');
-  const methodStart = source.indexOf('  private async consumeProactiveWant(): Promise<void> {');
-  const methodEnd = source.indexOf('\n  private wantString(', methodStart);
-  assert.notEqual(methodStart, -1, 'EntryAbility.consumeProactiveWant missing');
-  assert.notEqual(methodEnd, -1, 'EntryAbility.consumeProactiveWant boundary changed');
+test('EntryAbility 忽略无关 Want 且保留已排队的合法回流', () => {
+  const source = sourceFile(entryAbilityPath);
+  const queueMethod = methodBlock(source, 'queueProactiveWant');
+  const irrelevantWant = conditionalBlock(queueMethod,
+    /if\s*\(\s*source\s*===\s*undefined\s*\|\|\s*!ProactiveLearningService\.isLaunchSource\s*\(\s*source\s*\)\s*\)/,
+    'irrelevant Want guard');
 
-  const method = source.slice(methodStart, methodEnd);
-  assert.equal(method.includes("this.wantString(want, 'courseTitle')"), false,
+  assert.match(irrelevantWant.source, /\{\s*return\s*;\s*\}/,
+    'irrelevant Want must return without mutating queued launch state');
+  assert.doesNotMatch(irrelevantWant.source, /this\.pendingProactiveWant\s*=/,
+    'irrelevant Want must not clear or replace a valid pending Want');
+  assert.doesNotMatch(irrelevantWant.source, /this\.(?:pendingProactiveWantSequence|proactiveWantSequence)\s*(?:=|\+=)/,
+    'irrelevant Want must not advance or overwrite the valid pending sequence');
+});
+
+test('EntryAbility 连续合法 Want 以单调序号保证 latest-wins', () => {
+  const source = sourceFile(entryAbilityPath);
+  const queueMethod = methodBlock(source, 'queueProactiveWant');
+  const consumeMethod = methodBlock(source, 'consumeProactiveWant');
+  const clearMethod = methodBlock(source, 'clearPendingProactiveWant');
+
+  assert.match(source, /private\s+pendingProactiveWantSequence\s*:\s*number\s*=\s*0\s*;/,
+    'pending Want sequence field missing');
+  assert.match(source, /private\s+proactiveWantSequence\s*:\s*number\s*=\s*0\s*;/,
+    'monotonic Want sequence field missing');
+  assertOrdered(queueMethod, [
+    /this\.proactiveWantSequence\s*\+=\s*1\s*;/,
+    /this\.pendingProactiveWant\s*=\s*want\s*;/,
+    /this\.pendingProactiveWantSequence\s*=\s*this\.proactiveWantSequence\s*;/
+  ], 'valid Want queue must advance and snapshot its sequence');
+  assertOrdered(consumeMethod, [
+    /const\s+sequence\s*=\s*this\.pendingProactiveWantSequence\s*;/,
+    /await\s+LocalLearningRepository\.getCourses\s*\(\s*\)/,
+    /if\s*\(\s*sequence\s*!==\s*this\.pendingProactiveWantSequence\s*\)\s*return\s*;/,
+    /ProactiveLearningService\.validateLaunch\s*\(/,
+    /await\s+ProactiveLearningService\.resolve\s*\(\s*\)/,
+    /if\s*\(\s*sequence\s*!==\s*this\.pendingProactiveWantSequence\s*\)\s*return\s*;/,
+    /this\.clearPendingProactiveWant\s*\(\s*sequence\s*\)\s*;/,
+    /ProactiveLearningService\.requestAction\s*\(\s*currentAction\s*\)\s*;/
+  ], 'only the latest Want may survive repository reads and publish an action');
+  assert.doesNotMatch(consumeMethod, /this\.pendingProactiveWant\s*=\s*null\s*;/,
+    'async consumers must not clear a newer Want directly');
+  assertOrdered(clearMethod, [
+    /if\s*\(\s*sequence\s*!==\s*this\.pendingProactiveWantSequence\s*\)\s*return\s*;/,
+    /this\.pendingProactiveWant\s*=\s*null\s*;/
+  ], 'pending Want clear must be sequence guarded');
+});
+
+test('EntryAbility 校验通知外壳后重新解析当前行动', () => {
+  const source = sourceFile(entryAbilityPath);
+  const consumeMethod = methodBlock(source, 'consumeProactiveWant');
+
+  assert.doesNotMatch(consumeMethod, /this\.wantString\s*\(\s*want\s*,\s*'courseTitle'\s*\)/,
     'EntryAbility must not trust an external courseTitle parameter');
-  const validateIndex = method.indexOf('ProactiveLearningService.validateLaunch(');
-  const requestIndex = method.indexOf('ProactiveLearningService.requestLaunch(launch);');
-  assert.notEqual(validateIndex, -1, 'EntryAbility validateLaunch call missing');
-  assert.notEqual(requestIndex, -1, 'EntryAbility requestLaunch call missing');
-  assert.equal(validateIndex < requestIndex, true, 'EntryAbility must validate before requestLaunch');
-  const validatedLaunchBlock = method.slice(validateIndex, requestIndex);
-  assert.equal(validatedLaunchBlock.includes('if (launch === undefined) return;'), true,
-    'EntryAbility must stop before requestLaunch when validation fails');
+  assertOrdered(consumeMethod, [
+    /const\s+launch\s*=\s*ProactiveLearningService\.validateLaunch\s*\(/,
+    /if\s*\(\s*launch\s*===\s*undefined\s*\)/,
+    /const\s+currentAction\s*=\s*await\s+ProactiveLearningService\.resolve\s*\(\s*\)\s*;/,
+    /ProactiveLearningService\.requestAction\s*\(\s*currentAction\s*\)\s*;/
+  ], 'notification click must validate its envelope and then resolve live learning state');
+  assert.doesNotMatch(consumeMethod, /ProactiveLearningService\.requestLaunch\s*\(\s*launch\s*\)/,
+    'validated notification parameters must not execute a stale fixed action');
+});
+
+test('Index 热启动按当前路径返回根页或切换子页', () => {
+  const source = sourceFile(indexPagePath);
+  const navigateMethod = methodBlock(source, 'navigateProactiveLaunch');
+  const rootPageBranch = conditionalBlock(navigateMethod,
+    /if\s*\(\s*targetPage\s*===\s*'pages\/Index'\s*\)/, 'root-page launch');
+
+  assert.match(navigateMethod, /const\s+currentPage\s*=\s*appRouter\.getState\s*\(\s*\)\.path\s*;/,
+    'hot launch must inspect the current router path');
+  assertOrdered(rootPageBranch.source, [
+    /this\.selectTab\s*\(/,
+    /if\s*\(\s*currentPage\s*===\s*'pages\/Index'\s*\)/,
+    /this\.completeProactiveNavigation\s*\(\s*launchVersion\s*,\s*targetPage\s*\)\s*;/,
+    /appRouter\.back\s*\(\s*\{\s*url\s*:\s*'pages\/Index'\s*\}\s*\)\s*;/,
+    /appRouter\.getState\s*\(\s*\)\.path\s*===\s*'pages\/Index'/,
+    /this\.completeProactiveNavigation\s*\(\s*launchVersion\s*,\s*targetPage\s*\)\s*;/,
+    /this\.failProactiveNavigation\s*\(\s*launchVersion\s*,/
+  ], 'course launch must return a nested route to the API 12 root page before completing');
+  assert.match(navigateMethod,
+    /currentPage\s*===\s*'pages\/Index'\s*\?\s*appRouter\.pushUrl\s*\(\s*\{\s*url\s*:\s*targetPage\s*\}\s*\)\s*:\s*appRouter\.replaceUrl\s*\(\s*\{\s*url\s*:\s*targetPage\s*\}\s*\)/s,
+    'subpage launch must push from root and replace an already nested page');
+});
+
+test('Index 合法目标仅在导航确认成功后消费且失败只重试一次', () => {
+  const source = sourceFile(indexPagePath);
+  const consumeMethod = methodBlock(source, 'consumeProactiveLaunch');
+  const navigateMethod = methodBlock(source, 'navigateProactiveLaunch');
+  const completeMethod = methodBlock(source, 'completeProactiveNavigation');
+  const failMethod = methodBlock(source, 'failProactiveNavigation');
+  const invalidTarget = conditionalBlock(navigateMethod,
+    /if\s*\(\s*!ProactiveLearningService\.isTargetPage\s*\(\s*targetPage\s*\)\s*\)/,
+    'invalid proactive target');
+  const validNavigation = navigateMethod.slice(0, invalidTarget.start) +
+    navigateMethod.slice(invalidTarget.end);
+
+  assert.equal(matchCount(consumeMethod, clearProactiveTargetPattern), 0,
+    'queued target must not be cleared before navigation starts');
+  assert.equal(matchCount(validNavigation, clearProactiveTargetPattern), 0,
+    'valid target must not be cleared before asynchronous navigation confirms success');
+  assert.equal(matchCount(failMethod, clearProactiveTargetPattern), 0,
+    'navigation failure must preserve the target for retry');
+  assert.equal(matchCount(completeMethod, clearProactiveTargetPattern), 1,
+    'successful navigation must clear the exact pending target once');
+  assertOrdered(completeMethod, [
+    /launchVersion\s*===\s*this\.proactiveLaunchVersion/,
+    /targetPage\s*===\s*\(\s*AppStorage\.get\s*<\s*string\s*>\s*\(\s*'proactiveTargetPage'\s*\)/,
+    /AppStorage\.setOrCreate\s*<\s*string\s*>\s*\(\s*'proactiveTargetPage'\s*,\s*''\s*\)\s*;/,
+    /this\.consumedLaunchVersion\s*=\s*launchVersion\s*;/
+  ], 'completion must still own the current version and target before consuming it');
+  assertOrdered(navigateMethod, [
+    /const\s+navigation\s*=/,
+    /navigation\.then\s*\(/,
+    /this\.completeProactiveNavigation\s*\(/,
+    /\.catch\s*\(/,
+    /this\.failProactiveNavigation\s*\(/
+  ], 'promise navigation must separate success completion from failure retention');
+  assertOrdered(failMethod, [
+    /this\.releaseProactiveNavigation\s*\(\s*launchVersion\s*\)\s*;/,
+    /this\.retryLaunchVersion\s*!==\s*launchVersion/,
+    /this\.retryLaunchVersion\s*=\s*launchVersion\s*;/,
+    /setTimeout\s*\(/,
+    /this\.consumeProactiveLaunch\s*\(\s*\)\s*;/
+  ], 'failure must retain the target and schedule one version-scoped retry');
 });

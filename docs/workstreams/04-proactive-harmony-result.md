@@ -23,7 +23,8 @@
 - `HomeContent.ets` 只消费统一行动，不再维护第二套排序；首屏说明推荐依据和当前进度。
 - 首页通知入口区分创建中、创建成功和权限/发布失败，失败状态使用错误语义。
 - `LearningReminder.ets` 使用 API 12 `WantAgent`，通知正文和点击参数来自同一行动。
-- `EntryAbility.ets` 在 `onCreate` 与 `onNewWant` 消费卡片/通知参数；`Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动页面回流。
+- `EntryAbility.ets` 在 `onCreate` 与 `onNewWant` 消费卡片/通知参数；合法外壳通过目录校验后重新解析当前 ArkData 行动，单调序号保证连续 Want 只执行最后一次，无关 Want 不清除已排队入口。
+- `Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动；嵌套页上的课程入口使用 API 12 `Router.back({ url: 'pages/Index' })` 返回根页，其他目标按当前路由栈执行 `pushUrl/replaceUrl`，只在导航确认成功后消费目标。
 - `EntryAbility.ets` 先完成内容仓库与 ArkData 课程目录同步，再校验来源、128 字符长度上限、动作/页面映射、课程和精确 Topic；外部 `courseTitle` 被忽略，标题从本地目录推导，非法 Want 不写 `AppStorage`。
 - `LearningFormUpdater.ets` 与 `LearningPlanCard.ets` 展示同一行动、依据、进度和 CTA，`FormLink` 传递精确目标页面及学习上下文。
 
@@ -32,7 +33,7 @@
 - 学习事件按本地时区分组和显示，不再直接截取 UTC ISO 字符串。
 - 近 4 周学习节奏、连续天数、活跃天数、事件数和分类筛选全部由本机真实事件计算。
 - 每条计划、课程互动、课程完成、精选练习和 AI 测验记录按已有 AppStorage 契约回到真实页面；旧事件 Topic 不再属于当前课程时只回到课程详情。
-- `Achievements.ets` 展示每项里程碑的真实来源、剩余量和本地解锁日期；首个未解锁目标使用本地课程目录中的精确 Topic 提供可执行动作。
+- `Achievements.ets` 展示每项里程碑的真实来源、剩余量和本地解锁日期；最接近解锁的目标使用本地课程目录、未计数互动和未掌握 Topic 提供可增长的精确动作。
 
 ### WS02 标签洞察依赖
 
@@ -68,8 +69,8 @@
 |---|---|---|
 | **源码确认** | DevEco Studio API 12 SDK 类型声明 | 已确认 `NotificationRequest.wantAgent`、`wantAgent.getWantAgent()`、`UIAbility.onNewWant()`、`@Watch`、`FormLink` 的 `router/params` |
 | **源码确认** | WS02 未提交 reducer 与测试 | 三元组分组与跨 Topic 隔离用例存在；本批未修改、未提交或运行 WS02 测试 |
-| **源码确认** | `node --test scripts/test-proactive-learning-service.mjs` | exit 0，17/17 通过；直接执行当前 `.ets` 服务，覆盖混合洞察零读取、零进度空态、旧计划四类无效任务、课程 Topic 和 Want 边界 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 24 s 351 ms` |
+| **源码确认** | `node --test scripts/test-proactive-learning-service.mjs` | exit 0，21/21 通过；直接执行当前 `.ets` 服务并约束无关 Want、latest-wins、点击时重解析、根页回流、子页替换及失败保留重试 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 33 s 500 ms` |
 | **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
 | **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |

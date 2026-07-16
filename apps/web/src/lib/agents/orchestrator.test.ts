@@ -41,6 +41,7 @@ describe("orchestrator 前置检索调度", () => {
     const result = await orchestrate({
       userId: "demo",
       message: "帮我制定数据结构复习计划",
+      startDate: "2026-07-17",
     });
 
     expect(result.intent).toBe("plan");
@@ -51,6 +52,7 @@ describe("orchestrator 前置检索调度", () => {
     const result = await orchestrate({
       userId: "demo",
       message: "分析我的薄弱知识点",
+      startDate: "2026-07-17",
     });
 
     expect(result.intent).toBe("evaluate");
@@ -72,6 +74,7 @@ describe("orchestrator 前置检索调度", () => {
     const result = await orchestrate({
       userId: "demo",
       message: "围绕数组与线性表出题",
+      startDate: "2026-07-17",
       context: { courseId: "cs101" },
     });
 

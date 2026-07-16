@@ -215,6 +215,12 @@ struct PlanPage {
     return typeof value === 'string' ? value.trim() : '';
   }
 
+  private localDateKey(date: Date = new Date()): string {
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return date.getFullYear().toString() + '-' + month + '-' + day;
+  }
+
   private validCourseId(courseId: string): boolean {
     return courseId === 'cs101' || courseId === 'cs102' || courseId === 'cs103';
   }
@@ -827,6 +833,7 @@ struct PlanPage {
         goal: this.goal.trim(),
         durationDays: this.days,
         dailyMinutes: 90,
+        startDate: this.localDateKey(),
         profile: (await LocalLearningRepository.getProfile()) ?? undefined
       };
       const response = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req));

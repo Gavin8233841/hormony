@@ -11,6 +11,7 @@ import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
 import { readJsonObject } from "@/lib/request-json";
 import {
   readBoundedInteger,
+  readDateKey,
   sanitizeLearningProfile,
 } from "@/lib/api-validation";
 
@@ -69,6 +70,13 @@ export async function POST(req: Request) {
     "dailyMinutes"
   );
   if (!dailyMinutes.ok) return dailyMinutes.response;
+  const startDate = readDateKey(
+    body.startDate,
+    new Date().toISOString().slice(0, 10),
+    "INVALID_START_DATE",
+    "startDate"
+  );
+  if (!startDate.ok) return startDate.response;
   const profile = sanitizeLearningProfile(body.profile);
   if (!profile.ok) return profile.response;
   const profileSafetyFlags = profile.value ? validateUserInput(profileSafetyText(profile.value)) : [];
@@ -104,6 +112,7 @@ export async function POST(req: Request) {
       goal,
       durationDays.value,
       dailyMinutes.value,
+      startDate.value,
       profile.value as LearningProfileSnapshot | undefined
     );
     await assertSafePlan(plan);

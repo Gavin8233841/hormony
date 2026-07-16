@@ -14,7 +14,7 @@ import { getModelRuntimeInfo } from "@/lib/agents/model";
 import { validateUserInput } from "@/lib/agents/safety-agent";
 import { modelErrorResponse } from "@/lib/api-errors";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
-import { sanitizeLearningProfile, validationError } from "@/lib/api-validation";
+import { readDateKey, sanitizeLearningProfile, validationError } from "@/lib/api-validation";
 import { isCourseId } from "@/lib/data";
 
 export const runtime = "nodejs";
@@ -50,6 +50,13 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = sanitizeUserId(body.userId);
+  const startDate = readDateKey(
+    body.startDate,
+    new Date().toISOString().slice(0, 10),
+    "INVALID_START_DATE",
+    "startDate"
+  );
+  if (!startDate.ok) return startDate.response;
   const profile = sanitizeLearningProfile(body.profile);
   if (!profile.ok) return profile.response;
   const profileSafetyFlags = profile.value ? validateUserInput(profileSafetyText(profile.value)) : [];
@@ -85,6 +92,7 @@ export async function POST(req: NextRequest) {
   const chatRequest: ChatRequest = {
     userId,
     message,
+    startDate: startDate.value,
     profile: profile.value,
     context: context.value,
     history: history.value,

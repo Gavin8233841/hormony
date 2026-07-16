@@ -684,6 +684,12 @@ export struct ChatContent {
     .backgroundColor(Constants.COLOR_BG_PAGE)
   }
 
+  private localDateKey(date: Date = new Date()): string {
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return date.getFullYear().toString() + '-' + month + '-' + day;
+  }
+
   sendMessage(question?: string): void {
     const content = question !== undefined ? question.trim() : this.inputText.trim();
     if (content.length === 0 || this.loading || !this.cloudAgentReady) {
@@ -735,6 +741,7 @@ export struct ChatContent {
     const req: ChatRequest = {
       userId: Constants.DEMO_USER_ID,
       message: message,
+      startDate: this.localDateKey(),
       history: requestHistory,
       context: {
         courseId: AppStorage.get<string>('selectedCourseId') ?? 'cs101'

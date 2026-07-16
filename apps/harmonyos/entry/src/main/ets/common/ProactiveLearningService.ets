@@ -165,6 +165,17 @@ export class ProactiveLearningService {
     AppStorage.setOrCreate<number>('proactiveLaunchVersion', version + 1);
   }
 
+  static requestAction(action: ProactiveLearningAction): void {
+    ProactiveLearningService.requestLaunch({
+      targetPage: action.targetPage,
+      courseId: action.courseId,
+      courseTitle: action.courseTitle,
+      topic: action.topic,
+      focusTag: action.focusTag,
+      taskAction: action.taskAction
+    });
+  }
+
   static isTargetPage(page: string): boolean {
     return page === 'pages/Index' || page === 'pages/Plan' || page === 'pages/MistakeBook' ||
       page === 'pages/Quiz' || page === 'pages/Practice' || page === 'pages/Lesson';

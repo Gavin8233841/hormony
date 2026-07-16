@@ -17,6 +17,8 @@ export default class EntryAbility extends UIAbility {
   private mainWindow: window.Window | null = null;
   private avoidAreaChangeCallback: ((options: window.AvoidAreaOptions) => void) | null = null;
   private pendingProactiveWant: Want | null = null;
+  private pendingProactiveWantSequence: number = 0;
+  private proactiveWantSequence: number = 0;
   private repositoriesReady: boolean = false;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -117,10 +119,11 @@ export default class EntryAbility extends UIAbility {
   private queueProactiveWant(want: Want): void {
     const source = this.wantString(want, 'source');
     if (source === undefined || !ProactiveLearningService.isLaunchSource(source)) {
-      this.pendingProactiveWant = null;
       return;
     }
+    this.proactiveWantSequence += 1;
     this.pendingProactiveWant = want;
+    this.pendingProactiveWantSequence = this.proactiveWantSequence;
     if (this.repositoriesReady) {
       this.consumeProactiveWant().catch((error: Error): void => {
         hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
@@ -131,8 +134,8 @@ export default class EntryAbility extends UIAbility {
 
   private async consumeProactiveWant(): Promise<void> {
     const want = this.pendingProactiveWant;
-    this.pendingProactiveWant = null;
     if (want === null) return;
+    const sequence = this.pendingProactiveWantSequence;
     const source = this.wantString(want, 'source');
     const targetPage = this.wantString(want, 'targetPage');
     const courseId = this.wantString(want, 'courseId');
@@ -141,13 +144,26 @@ export default class EntryAbility extends UIAbility {
     const taskAction = this.wantString(want, 'taskAction');
     if (source === undefined || targetPage === undefined || courseId === undefined || topic === undefined ||
       focusTag === undefined || taskAction === undefined) {
+      this.clearPendingProactiveWant(sequence);
       return;
     }
     const courses = await LocalLearningRepository.getCourses() ?? [];
+    if (sequence !== this.pendingProactiveWantSequence) return;
     const launch = ProactiveLearningService.validateLaunch(
       courses, source, targetPage, courseId, topic, focusTag, taskAction);
-    if (launch === undefined) return;
-    ProactiveLearningService.requestLaunch(launch);
+    if (launch === undefined) {
+      this.clearPendingProactiveWant(sequence);
+      return;
+    }
+    const currentAction = await ProactiveLearningService.resolve();
+    if (sequence !== this.pendingProactiveWantSequence) return;
+    this.clearPendingProactiveWant(sequence);
+    ProactiveLearningService.requestAction(currentAction);
+  }
+
+  private clearPendingProactiveWant(sequence: number): void {
+    if (sequence !== this.pendingProactiveWantSequence) return;
+    this.pendingProactiveWant = null;
   }
 
   private wantString(want: Want, key: string): string | undefined {

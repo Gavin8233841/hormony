@@ -34,6 +34,23 @@ export function readBoundedInteger(
   return { ok: true, value };
 }
 
+export function readDateKey(
+  value: unknown,
+  defaultValue: string,
+  code: string,
+  label: string
+): ValidationResult<string> {
+  if (value === undefined) return { ok: true, value: defaultValue };
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return validationError(`${label} 必须是 YYYY-MM-DD 日期`, code);
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    return validationError(`${label} 必须是真实日历日期`, code);
+  }
+  return { ok: true, value };
+}
+
 export function sanitizeLearningProfile(
   profile: unknown
 ): ValidationResult<LearningProfileSnapshot | undefined> {

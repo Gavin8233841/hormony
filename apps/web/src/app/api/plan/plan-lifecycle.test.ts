@@ -36,6 +36,7 @@ describe("学习计划生命周期", () => {
           goal: "两周复习数据结构",
           durationDays: 14,
           dailyMinutes: 90,
+          startDate: "2032-02-29",
         }),
       })
     );
@@ -44,6 +45,7 @@ describe("学习计划生命周期", () => {
     expect(generateResponse.status).toBe(200);
     expect(generated.tasks).toHaveLength(2);
     expect(generated.goal).toBe("两周复习数据结构");
+    expect(generated.tasks[0]?.date).toBe("2032-02-29");
     expect(generated.tasks[0]).toMatchObject({
       courseId: "cs101",
       topic: "二叉树与BST",
