@@ -6265,3 +6265,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 首次在 `apps/web` 目录误用根目录相对生成器路径，命令 exit 1，随后同源测试因端侧 JSON 陈旧按预期失败；从仓库根重新生成后定向测试 7/7 通过。
 - 29 道题尚未完成具名学科专家逐题签字；不能宣称“答案 100% 正确”。
 - 未执行模拟器逐题答题、真机或线上 API 回归；HAP 未配置正式签名。
+
+---
+
+## 2026-07-17 [WS06]：课程 CTA 与 Topic 整行 Lesson 冒烟路径
+
+背景：WS03 提交 `4fd5bef` 已把课程入口改为“进入课程/继续课程”两种真实进度状态，并由 Topic 整行进入 `pages/Lesson`；现有冒烟仍断言已删除的“真实学习进度/精选练习”路径。
+
+文件：
+- `scripts/harmonyos-app-smoke.ps1`
+- `docs/workstreams/06-competition-release-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 从 `knowledge-chunks.json` 读取精确 Topic 文本，不在脚本中复制 Topic 名单。
+- 同时接受“进入课程”和“继续课程”，从每次实时 UI 树定位精确文本及最近可见、可点击祖先，使用整行 `bounds` 计算点击中心。
+- Topic 行缺少合法 `bounds` 时失败，不退回文本坐标；进入后精确断言 `pages/Lesson` 与所选 Topic 标题。
+- 移除“真实学习进度”“精选练习”和固定选择 A 的旧路径；离线自测扩展至 13 项。
+
+验证：
+- `git show 4fd5bef -- apps/harmonyos/entry/src/main/ets/pages/Course.ets apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`：exit 0，确认两种 CTA、Topic 整行与 Lesson 路由契约。
+- PowerShell AST 解析：exit 0，`AST_PARSE=PASS`。
+- PowerShell 7.6.3 `./scripts/harmonyos-app-smoke.ps1 -SelfTest`：exit 0，13/13 通过。
+- Windows PowerShell 5.1 同一 `-SelfTest`：exit 0，13/13 通过。
+- `hdc list targets`：exit 0，返回 `[Empty]`。
+
+失败或未验证：
+- 未执行安装、启动、实时页面点击或截图；模拟器与真机均未验证。
+- 当前 WS06 分支尚未集成 WS03 `4fd5bef` 页面改动，需在主线集成后执行设备流程。
+- 本批只修改无破坏性冒烟脚本与记录，未重新构建 HAP。

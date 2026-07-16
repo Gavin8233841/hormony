@@ -30,6 +30,7 @@ $HDC = "C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains
 $HVIGOR = Join-Path $HARMONYOS_DIR "hvigorw.bat"
 $BUNDLE_NAME = "com.c4ai.hormony"
 $HAP_PATH = Join-Path $HARMONYOS_DIR "entry\build\default\outputs\default\entry-default-unsigned.hap"
+$KNOWLEDGE_CHUNKS_PATH = Join-Path $HARMONYOS_DIR "entry\src\main\resources\rawfile\learning\knowledge-chunks.json"
 $TIMESTAMP = Get-Date -Format "yyyyMMdd-HHmmss"
 $SCREENSHOT_DIR = Join-Path $PROJECT_ROOT "screenshots\trae-smoke-$TIMESTAMP"
 
@@ -150,6 +151,16 @@ function Test-UiNodeVisible($node) {
     return ($visibleProperty.Value -is [string] -and $visibleProperty.Value -ceq 'true')
 }
 
+function Test-UiNodeClickable($node) {
+    if ($null -eq $node -or $null -eq $node.PSObject.Properties['attributes']) {
+        return $false
+    }
+    $clickableProperty = $node.attributes.PSObject.Properties['clickable']
+    if ($null -eq $clickableProperty) { return $false }
+    if ($clickableProperty.Value -is [bool]) { return $clickableProperty.Value }
+    return ($clickableProperty.Value -is [string] -and $clickableProperty.Value -ceq 'true')
+}
+
 function Get-UiNodes($node) {
     if ($null -eq $node) { return }
     Write-Output $node
@@ -175,6 +186,34 @@ function Get-PagePath($uiTree) {
         }
     }
     return $null
+}
+
+function Get-SourceTopicTexts() {
+    if (-not (Test-Path -LiteralPath $KNOWLEDGE_CHUNKS_PATH -PathType Leaf)) {
+        throw "Knowledge chunks source does not exist: $KNOWLEDGE_CHUNKS_PATH"
+    }
+
+    try {
+        $chunks = Get-Content -LiteralPath $KNOWLEDGE_CHUNKS_PATH -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        throw "Knowledge chunks source is invalid JSON: $($_.Exception.Message)"
+    }
+
+    $topics = @()
+    foreach ($chunk in @($chunks)) {
+        if ($null -eq $chunk.PSObject.Properties['topic'] -or
+            -not ($chunk.topic -is [string]) -or
+            [string]::IsNullOrWhiteSpace($chunk.topic)) {
+            throw "Knowledge chunk is missing an exact topic text"
+        }
+        if (-not ($topics -ccontains $chunk.topic)) {
+            $topics += [string]$chunk.topic
+        }
+    }
+    if ($topics.Count -eq 0) {
+        throw "Knowledge chunks source contains no topic texts"
+    }
+    return $topics
 }
 
 function ConvertTo-Coordinate([object]$value) {
@@ -249,6 +288,89 @@ function Get-BoundsCenter($bounds) {
     }
 }
 
+function Get-ExactTextClickableTargets(
+    $node,
+    [string[]]$texts,
+    [object[]]$ancestors = @()
+) {
+    if ($null -eq $node -or $null -eq $node.PSObject.Properties['attributes']) { return }
+
+    $textProperty = $node.attributes.PSObject.Properties['text']
+    if ($null -ne $textProperty -and
+        $textProperty.Value -is [string] -and
+        $texts -ccontains $textProperty.Value -and
+        (Test-UiNodeVisible $node)) {
+        $lineage = @($node)
+        for ($index = $ancestors.Count - 1; $index -ge 0; $index--) {
+            $lineage += $ancestors[$index]
+        }
+        foreach ($clickableNode in $lineage) {
+            if ((Test-UiNodeVisible $clickableNode) -and (Test-UiNodeClickable $clickableNode)) {
+                $center = Get-BoundsCenter $clickableNode.attributes.bounds
+                if ($null -ne $center) {
+                    Write-Output ([PSCustomObject]@{
+                        Text = [string]$textProperty.Value
+                        TextElement = $node
+                        Element = $clickableNode
+                        Center = $center
+                    })
+                }
+                break
+            }
+        }
+    }
+
+    if ($null -ne $node.PSObject.Properties['children'] -and $node.children) {
+        $childAncestors = @($ancestors) + @($node)
+        foreach ($child in @($node.children)) {
+            Get-ExactTextClickableTargets $child $texts $childAncestors
+        }
+    }
+}
+
+function Get-BoundedExactTextTargets($uiTree, [string[]]$texts) {
+    $targets = @(Get-ExactTextClickableTargets $uiTree $texts)
+    $sortProperties = @(
+        @{ Expression = { $_.Center.Rectangle.Top }; Ascending = $true },
+        @{ Expression = { $_.Center.Rectangle.Left }; Ascending = $true }
+    )
+    return @($targets | Sort-Object -Property $sortProperties)
+}
+
+function Click-FirstVisibleExactText(
+    [string[]]$texts,
+    [string]$description,
+    [int]$maxAttempts = 6
+) {
+    if ($texts.Count -eq 0) {
+        Write-Step "Click: $description" "FAIL" "No exact source texts were supplied"
+        return $null
+    }
+
+    $targets = @()
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        $targets = @(Get-BoundedExactTextTargets (Get-UiTree) $texts)
+        if ($targets.Count -gt 0) { break }
+        if ($attempt -lt $maxAttempts) { Start-Sleep -Milliseconds 500 }
+    }
+    if ($targets.Count -eq 0) {
+        Write-Step "Click: $description" "FAIL" "No visible clickable row with bounds matched the exact source texts"
+        return $null
+    }
+
+    $target = $targets[0]
+    $x = [string]$target.Center.X
+    $y = [string]$target.Center.Y
+    Invoke-HdcShell -arguments @("uitest", "uiInput", "click", $x, $y) | Out-Null
+    Start-Sleep -Milliseconds 500
+    $rectangle = $target.Center.Rectangle
+    Write-Step "Click: $description" "PASS" (
+        "exactText=$($target.Text) " +
+        "clickableBounds=[$($rectangle.Left),$($rectangle.Top)][$($rectangle.Right),$($rectangle.Bottom)] center=($x,$y)"
+    )
+    return [string]$target.Text
+}
+
 function Click-Element(
     [string]$text,
     [string]$description,
@@ -319,10 +441,6 @@ function Verify-Page($pagePath, $description, [int]$maxAttempts = 8) {
     }
     Write-Step "Page: $description" "PASS" $actual
     return $true
-}
-
-function Click-FirstOptionA() {
-    return Click-Element 'A' 'Choose option A'
 }
 
 function Swipe-Viewport($direction) {
@@ -444,6 +562,135 @@ function Invoke-SelfTest() {
                 $matches = @(Find-ElementByText $tree '课程')
                 Assert-SelfTest ($matches.Count -eq 1) 'Exact visible text search returned the wrong count'
                 Assert-SelfTest ((Get-PagePath $tree) -ceq 'pages/Index') 'Page path was not found'
+            }
+        },
+        @{
+            Name = 'course CTA entry and continue states'
+            Run = {
+                foreach ($ctaText in @('进入课程', '继续课程')) {
+                    $tree = [PSCustomObject]@{
+                        attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[0,0][100,200]' }
+                        children = @(
+                            [PSCustomObject]@{
+                                attributes = [PSCustomObject]@{
+                                    visible = 'true'
+                                    clickable = 'true'
+                                    bounds = '[10,90][90,160]'
+                                }
+                                children = @(
+                                    [PSCustomObject]@{
+                                        attributes = [PSCustomObject]@{
+                                            visible = 'true'
+                                            text = $ctaText
+                                            bounds = '[25,110][75,140]'
+                                        }
+                                        children = @()
+                                    }
+                                )
+                            }
+                        )
+                    }
+                    $targets = @(Get-BoundedExactTextTargets $tree @('进入课程', '继续课程'))
+                    Assert-SelfTest ($targets.Count -eq 1) "Wrong target count for course CTA: $ctaText"
+                    Assert-SelfTest ($targets[0].Text -ceq $ctaText) "Wrong exact course CTA selected: $ctaText"
+                    Assert-SelfTest (
+                        $targets[0].Center.Rectangle.Left -eq 10 -and
+                        $targets[0].Center.Rectangle.Top -eq 90 -and
+                        $targets[0].Center.Rectangle.Right -eq 90 -and
+                        $targets[0].Center.Rectangle.Bottom -eq 160
+                    ) "Course CTA did not use the clickable button bounds: $ctaText"
+                }
+            }
+        },
+        @{
+            Name = 'topmost exact Topic uses clickable row bounds'
+            Run = {
+                $sourceTopics = @(Get-SourceTopicTexts)
+                Assert-SelfTest ($sourceTopics.Count -eq 33) 'Knowledge source did not expose the exact 33 Topic texts'
+                $upperTopic = '数组与线性表'
+                $lowerTopic = '链表'
+                Assert-SelfTest ($sourceTopics -ccontains $upperTopic) 'Fixed upper Topic is absent from the knowledge source'
+                Assert-SelfTest ($sourceTopics -ccontains $lowerTopic) 'Fixed lower Topic is absent from the knowledge source'
+                $tree = [PSCustomObject]@{
+                    attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[0,0][100,300]' }
+                    children = @(
+                        [PSCustomObject]@{ attributes = [PSCustomObject]@{ visible = 'true'; text = '下一步 · ' + $upperTopic; bounds = '[10,20][90,50]' }; children = @() },
+                        [PSCustomObject]@{
+                            attributes = [PSCustomObject]@{ visible = 'true'; clickable = $true; bounds = '[5,80][95,160]' }
+                            children = @(
+                                [PSCustomObject]@{
+                                    attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[10,90][90,150]' }
+                                    children = @(
+                                        [PSCustomObject]@{
+                                            attributes = [PSCustomObject]@{ visible = 'true'; text = $upperTopic; bounds = '[20,105][80,130]' }
+                                            children = @()
+                                        }
+                                    )
+                                }
+                            )
+                        },
+                        [PSCustomObject]@{
+                            attributes = [PSCustomObject]@{ visible = 'true'; clickable = 'true'; bounds = '[5,190][95,270]' }
+                            children = @(
+                                [PSCustomObject]@{
+                                    attributes = [PSCustomObject]@{ visible = 'true'; text = $lowerTopic; bounds = '[20,215][80,240]' }
+                                    children = @()
+                                }
+                            )
+                        }
+                    )
+                }
+                $targets = @(Get-BoundedExactTextTargets $tree @($upperTopic, $lowerTopic))
+                Assert-SelfTest ($targets.Count -eq 2) 'Topic row matching included a non-exact text or lost a source Topic'
+                Assert-SelfTest ($targets[0].Text -ceq $upperTopic) 'Topmost exact Topic row was not selected from live bounds'
+                Assert-SelfTest (
+                    $targets[0].Center.Rectangle.Left -eq 5 -and
+                    $targets[0].Center.Rectangle.Top -eq 80 -and
+                    $targets[0].Center.Rectangle.Right -eq 95 -and
+                    $targets[0].Center.Rectangle.Bottom -eq 160
+                ) 'Topmost Topic target did not use the whole clickable row bounds'
+            }
+        },
+        @{
+            Name = 'clickable exact text without row bounds rejected'
+            Run = {
+                $tree = [PSCustomObject]@{
+                    attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[0,0][100,200]' }
+                    children = @(
+                        [PSCustomObject]@{
+                            attributes = [PSCustomObject]@{ visible = 'true'; clickable = 'true' }
+                            children = @(
+                                [PSCustomObject]@{
+                                    attributes = [PSCustomObject]@{
+                                        visible = 'true'
+                                        text = '数组与线性表'
+                                        bounds = '[20,100][80,130]'
+                                    }
+                                    children = @()
+                                }
+                            )
+                        }
+                    )
+                }
+                $targets = @(Get-BoundedExactTextTargets $tree @('数组与线性表'))
+                Assert-SelfTest ($targets.Count -eq 0) 'Clickable Topic row without bounds was accepted'
+            }
+        },
+        @{
+            Name = 'Lesson page path asserted exactly'
+            Run = {
+                $tree = [PSCustomObject]@{
+                    attributes = [PSCustomObject]@{
+                        visible = 'true'
+                        pagePath = 'pages/Lesson'
+                        bounds = '[0,0][100,200]'
+                    }
+                    children = @()
+                }
+                $actual = Get-PagePath $tree
+                Assert-SelfTest ($actual -ceq 'pages/Lesson') 'Exact Lesson page path was not accepted'
+                Assert-SelfTest ($actual -cne 'pages/lesson') 'Lesson page path assertion was not case-sensitive'
+                Assert-SelfTest ($actual -cne 'pages/LessonDetail') 'A different Lesson page path was accepted'
             }
         },
         @{
@@ -611,41 +858,25 @@ foreach ($courseName in @("数据结构", "操作系统", "计算机网络")) {
     if (-not (Verify-TextExists $courseName "Course list: $courseName")) { exit 1 }
 }
 
-# 7. 进入课程详情与精选练习
-Write-Output "`n[INFO] Entering course detail and practice..."
-if (-not (Click-Element "进入课程" "First course")) { exit 1 }
+# 7. 进入课程详情与精确 Topic 行
+Write-Output "`n[INFO] Entering course detail and a source-backed Topic row..."
+$courseCta = Click-FirstVisibleExactText @('进入课程', '继续课程') 'First visible course CTA'
+if ([string]::IsNullOrWhiteSpace($courseCta)) { exit 1 }
 if (-not (Verify-Page "pages/CourseDetail" "Course detail")) { exit 1 }
-if (-not (Verify-TextExists "真实学习进度" "Course detail content")) { exit 1 }
+if (-not (Verify-TextExists "课程进度" "Course progress")) { exit 1 }
+if (-not (Verify-TextExists "主题路径" "Course Topic path")) { exit 1 }
 Take-Screenshot "03-course-detail"
-if (-not (Click-Element "精选练习" "Curated practice")) { exit 1 }
-if (-not (Verify-Page "pages/Practice" "Practice")) { exit 1 }
-if (-not (Verify-TextExists "离线精选题库" "Practice question")) { exit 1 }
-Take-Screenshot "04-practice"
+$sourceTopics = @(Get-SourceTopicTexts)
+$selectedTopic = Click-FirstVisibleExactText $sourceTopics 'Topmost visible source Topic row'
+if ([string]::IsNullOrWhiteSpace($selectedTopic)) { exit 1 }
+if (-not (Verify-Page "pages/Lesson" "Lesson from Topic row")) { exit 1 }
+if (-not (Verify-TextExists $selectedTopic "Lesson Topic title")) { exit 1 }
+Take-Screenshot "04-lesson"
 
-# 8. 完成五题并进入逐题复盘
-for ($questionIndex = 0; $questionIndex -lt 5; $questionIndex++) {
-    if (-not (Click-FirstOptionA)) { exit 1 }
-    if ($questionIndex -lt 4) {
-        if (-not (Click-Element "下一题" "Next question")) { exit 1 }
-    } else {
-        if (-not (Click-Element "提交评分" "Submit practice")) { exit 1 }
-    }
-}
-if (-not (Verify-TextExists "本轮已完成" "Practice result")) { exit 1 }
-if (-not (Verify-TextExists "逐题复盘" "Question review")) { exit 1 }
-Take-Screenshot "05-practice-result"
-
-# 9. 从错题解析进入真实学伴，再返回主框架
-if (-not (Click-Element "向学伴追问" "Ask tutor from review")) { exit 1 }
-if (-not (Verify-Page "pages/Chat" "Tutor follow-up")) { exit 1 }
-Take-Screenshot "06-review-chat"
 Invoke-HdcShell -arguments @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
-Start-Sleep -Milliseconds 500
+if (-not (Verify-Page "pages/CourseDetail" "Course detail after Lesson")) { exit 1 }
 Invoke-HdcShell -arguments @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
-Start-Sleep -Milliseconds 500
-Invoke-HdcShell -arguments @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
-Start-Sleep -Milliseconds 500
-if (-not (Verify-Page "pages/Index" "Root after practice")) { exit 1 }
+if (-not (Verify-Page "pages/Index" "Root after Lesson")) { exit 1 }
 
 # 13. 点击"学伴" Tab
 Write-Output "`n[INFO] Navigating to Chat tab..."

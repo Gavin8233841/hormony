@@ -144,3 +144,34 @@
 - **未验证**：29 道题尚未完成具名学科专家逐题签字，不能宣称“答案 100% 正确”。
 - **未验证**：未进行模拟器逐题作答、真机或线上 API 回归；本批只达到静态诊断通过与构建通过。
 - **未验证**：HAP 未配置正式签名，构建通过不等于可发布安装包通过。
+
+## 批次 5：课程 CTA 与 Topic 整行 Lesson 冒烟路径
+
+背景：WS03 提交 `4fd5bef` 已将课程入口收敛为“进入课程/继续课程”两种真实进度状态，并由 Topic 整行进入 `pages/Lesson`；批次 2 的脚本仍断言已移除的“真实学习进度/精选练习”路径。
+
+文件：
+
+- `scripts/harmonyos-app-smoke.ps1`
+- `docs/workstreams/06-competition-release-result.md`
+- `DEVLOG.md`
+
+行为变化：
+
+- 从知识切片原始数据读取 33 个精确 Topic 文本，不在脚本中复制维护 Topic 名单。
+- 同时接受“进入课程”和“继续课程”，每次从实时 UI 树找到精确文本，再使用最近可见、可点击祖先的整行 `bounds` 计算点击中心。
+- Topic 可点击行缺少合法 `bounds` 时直接失败，不退回标题文本坐标；进入后精确断言大小写一致的 `pages/Lesson` 与所选 Topic 标题。
+- 删除已失效的“真实学习进度”“精选练习”和固定选择 A 的旧课程路径断言。
+- 固定 fixture 新增两种 CTA、最上方精确 Topic、整行无 bounds 拒绝和 Lesson 路径大小写边界，共 13 项离线自测。
+
+验证：
+
+- **源码确认**：`git show 4fd5bef -- apps/harmonyos/entry/src/main/ets/pages/Course.ets apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`，exit 0；确认两种 CTA、Topic 整行点击与 `pages/Lesson` 路由契约。
+- **静态诊断通过**：PowerShell AST 解析，exit 0，`AST_PARSE=PASS`。
+- **静态诊断通过**：PowerShell 7.6.3 执行 `./scripts/harmonyos-app-smoke.ps1 -SelfTest`，exit 0，13/13 通过。
+- **静态诊断通过**：Windows PowerShell 5.1 执行同一 `-SelfTest`，exit 0，13/13 通过。
+
+未验证：
+
+- **未验证**：`hdc list targets` 返回 `[Empty]`；没有执行安装、启动、实时页面点击或截图，不能标记为模拟器通过或真机通过。
+- **未验证**：当前 WS06 分支尚未集成 WS03 `4fd5bef` 的页面改动；脚本按该已核实契约前置更新，需在主线集成后执行设备流程。
+- **未验证**：本批只修改无破坏性冒烟脚本与记录，未重新构建 HAP。
