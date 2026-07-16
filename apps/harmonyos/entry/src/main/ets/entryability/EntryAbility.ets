@@ -11,13 +11,14 @@ import { HttpClient } from '../common/HttpClient';
 import { Course, HealthResponse } from '../model/DataModels';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { SafeAreaInsets } from '../common/SafeArea';
-import { ProactiveLearningService } from '../common/ProactiveLearningService';
+import { ProactiveLearningLaunch, ProactiveLearningService } from '../common/ProactiveLearningService';
 
 export default class EntryAbility extends UIAbility {
   private mainWindow: window.Window | null = null;
   private avoidAreaChangeCallback: ((options: window.AvoidAreaOptions) => void) | null = null;
   private pendingProactiveWant: Want | null = null;
   private repositoriesReady: boolean = false;
+  private consumedProactiveLaunchKey: string = '';
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.queueProactiveWant(want);
@@ -147,7 +148,22 @@ export default class EntryAbility extends UIAbility {
     const launch = ProactiveLearningService.validateLaunch(
       courses, source, targetPage, courseId, topic, focusTag, taskAction);
     if (launch === undefined) return;
+    const launchKey = this.proactiveLaunchKey(source, launch);
+    if (launchKey === this.consumedProactiveLaunchKey) return;
+    this.consumedProactiveLaunchKey = launchKey;
     ProactiveLearningService.requestLaunch(launch);
+  }
+
+  private proactiveLaunchKey(source: string, launch: ProactiveLearningLaunch): string {
+    return JSON.stringify({
+      source: source,
+      targetPage: launch.targetPage,
+      courseId: launch.courseId,
+      courseTitle: launch.courseTitle,
+      topic: launch.topic,
+      focusTag: launch.focusTag,
+      taskAction: launch.taskAction
+    });
   }
 
   private wantString(want: Want, key: string): string | undefined {
@@ -205,6 +221,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onBackground(): void {
+    this.consumedProactiveLaunchKey = '';
     console.info('EntryAbility onBackground');
   }
 }
