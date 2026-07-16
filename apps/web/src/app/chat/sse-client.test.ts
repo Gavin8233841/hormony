@@ -1,11 +1,44 @@
 import { describe, expect, it } from "vitest";
 import type { StreamEvent } from "@/lib/types";
 import {
+  buildChatHistory,
+  ChatRequestCoordinator,
   ChatRequestError,
   ChatStreamProtocolError,
   consumeChatEventStream,
   readChatRequestError,
 } from "./sse-client";
+
+describe("chat request contract", () => {
+  it("只发送最后十二条历史且逐条截到一千字符", () => {
+    const history = buildChatHistory(
+      Array.from({ length: 14 }, (_, index) => ({
+        role: index % 2 === 0 ? "user" as const : "assistant" as const,
+        content: `${index}:` + "历".repeat(1200),
+      }))
+    );
+
+    expect(history).toHaveLength(12);
+    expect(history[0].content.startsWith("2:")).toBe(true);
+    expect(history.every((message) => message.content.length <= 1000)).toBe(true);
+    expect(history[11].content.startsWith("13:")).toBe(true);
+  });
+
+  it("旧请求的结束回调不能清除停止后启动的新控制器", () => {
+    const coordinator = new ChatRequestCoordinator();
+    const first = coordinator.start();
+
+    expect(coordinator.stop()).toBe(first);
+    expect(first.signal.aborted).toBe(true);
+    expect(coordinator.isCurrent(first)).toBe(false);
+
+    const second = coordinator.start();
+    expect(coordinator.isCurrent(first)).toBe(false);
+    expect(coordinator.finish(first)).toBe(false);
+    expect(coordinator.isCurrent(second)).toBe(true);
+    expect(coordinator.finish(second)).toBe(true);
+  });
+});
 
 function streamFrom(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();

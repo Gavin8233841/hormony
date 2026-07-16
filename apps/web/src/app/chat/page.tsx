@@ -3,7 +3,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { AlertCircle, Send, Loader2, Square } from "lucide-react";
 import type { AgentName, Citation } from "@/lib/types";
+import { localDateKey } from "@/lib/client-date";
 import {
+  buildChatHistory,
+  ChatRequestCoordinator,
   ChatRequestError,
   ChatStreamProtocolError,
   consumeChatEventStream,
@@ -70,11 +73,15 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const requestCoordinatorRef = useRef<ChatRequestCoordinator | null>(null);
+  if (requestCoordinatorRef.current === null) {
+    requestCoordinatorRef.current = new ChatRequestCoordinator();
+  }
   const sessionIdRef = useRef<string | null>(null);
 
   const send = useCallback(async () => {
-    if (!input.trim() || loading) return;
+    const coordinator = requestCoordinatorRef.current;
+    if (!coordinator || !input.trim() || loading) return;
     const userMsg: ChatItem = { role: "user", content: input.trim() };
     const currentInput = input.trim();
     setMessages((m) => [...m, userMsg]);
@@ -82,10 +89,7 @@ export default function ChatPage() {
     setLoading(true);
 
     // 构建对话历史（最近 6 轮）
-    const history = messages.slice(-12).map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    const history = buildChatHistory(messages);
 
     const assistantMsg: ChatItem = {
       role: "assistant",
@@ -96,8 +100,7 @@ export default function ChatPage() {
     };
     setMessages((m) => [...m, assistantMsg]);
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const controller = coordinator.start();
 
     try {
       const res = await fetch("/api/chat", {
@@ -106,6 +109,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           userId: "demo",
           message: currentInput,
+          startDate: localDateKey(),
           history: history.length > 0 ? history : undefined,
           context: sessionIdRef.current
             ? { sessionId: sessionIdRef.current }
@@ -119,6 +123,7 @@ export default function ChatPage() {
       }
 
       const streamResult = await consumeChatEventStream(res.body, (evt) => {
+        if (!coordinator.isCurrent(controller)) return;
         if (evt.type === "done") return;
         setMessages((m) => {
           const last = m[m.length - 1];
@@ -140,10 +145,11 @@ export default function ChatPage() {
         });
       });
 
-      if (streamResult.sessionId) {
+      if (coordinator.isCurrent(controller) && streamResult.sessionId) {
         sessionIdRef.current = streamResult.sessionId;
       }
     } catch (err) {
+      if (!coordinator.isCurrent(controller)) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setMessages((m) => {
           const last = m[m.length - 1];
@@ -170,22 +176,31 @@ export default function ChatPage() {
         });
       }
     } finally {
-      setLoading(false);
-      abortRef.current = null;
+      if (coordinator.finish(controller)) {
+        setLoading(false);
+      }
     }
   }, [input, loading, messages]);
 
   // 卸载时中止未完成的 SSE 请求
   useEffect(() => {
     return () => {
-      abortRef.current?.abort();
+      requestCoordinatorRef.current?.stop("unmounted");
     };
   }, []);
 
   const stop = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
+    const stopped = requestCoordinatorRef.current?.stop();
+    if (!stopped) return;
     setLoading(false);
+    setMessages((current) => {
+      const last = current[current.length - 1];
+      if (!last || last.role !== "assistant") return current;
+      return [
+        ...current.slice(0, -1),
+        { ...last, content: last.content || "（已取消）" },
+      ];
+    });
   }, []);
 
   const suggestions = [
