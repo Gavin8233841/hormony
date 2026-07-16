@@ -275,3 +275,85 @@
 - **未验证**：NOTICE 仍含正式提交前待人工处理标记；最终逐包许可证附件、原创声明、AI 使用明细、团队签字和发布证据索引未完成。
 - **未验证**：最终签名 HAP、含 HAP 的 Demo/源码 ZIP、PDF、MP4、文件名、大小、SHA-256、独立目录解压和从零构建尚未验收。源码子集门禁通过不等于最终 ZIP 通过。
 - **未验证**：没有模拟器、真机或线上流程证据；构建通过不等于安装、运行、真机或线上通过。
+
+## 批次 8：最终 Demo/源码 ZIP 发布 manifest 与真实性门禁
+
+背景：批次 7 的 `--submission-path` 只能证明 Git manifest 展开的源码子集逐字
+一致，不能核验最终 ZIP 中的 HAP、许可证索引、原创/AI 声明和发布证据，也没有
+把包声明绑定到执行门禁时的明确提交。
+
+文件：
+
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-release-bundle.py`
+- `scripts/test_validate_release_bundle.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 包根 `release-manifest.json` 顶层只接受 `sourceCommit` 与 `nonGitFiles`；附件项
+  只接受 `path`、`role`、`bytes`、`sha256`。HAP、第三方许可证索引、原创声明、
+  AI 使用说明和发布证据索引五种角色必须且只能各出现一次。
+- `sourceCommit` 必须为本仓库可解析的 40 位小写完整提交，并等于运行门禁时的
+  当前 `HEAD`。脚本直接读取该提交的 Git tree、源码 manifest 和 blob，不使用
+  工作树同名文件替代，再复用既有源码提交集合门禁检查必要文件、NOTICE、禁止项
+  和可识别敏感信息。
+- 最终 ZIP 的源码集合必须与提交快照逐字一致；五个非 Git 附件必须与 manifest
+  的路径集合、正整数字节数和 SHA-256 一致。未声明附件、Git/非 Git 重叠、空
+  HAP、多 HAP、错误角色或错误扩展名都会阻断。
+- ZIP 与 HAP 都拒绝路径穿越、非规范路径、大小写折叠冲突、重复条目、符号链接、
+  特殊文件和加密条目；共享路径校验拒绝反斜杠，Windows `zipfile` 读取原始 ZIP
+  时会先将其规范化为 `/`。ZIP 注释、条目文件名、条目注释、扩展字段、
+  HAP 容器和 HAP 解压后条目均进入敏感信息扫描，错误只输出规则名，路径本身
+  命中时统一显示 `<redacted-path>`。
+- 内部门禁限制 `release-manifest.json` 不超过 64 KiB、包内路径 UTF-8 编码不
+  超过 512 字节、HAP 单条目解压后不超过 64 MiB、HAP 可读条目合计不超过
+  256 MiB。以上均为项目安全上限，不是尚未核实的官方门户大小限制。
+- 官方 PDF 的精确边界是：应用赛题提交 Demo 时，HAP 位于 ZIP；Agent 赛题提供
+  运行所需源码。规程第 5 页又明确初赛第 4 项 Demo 可选，而报名手册第 10 页
+  列出 PDF、MP4、ZIP 三项且未标可选。鸿学伴把 HAP、双端源码、NOTICE、声明和
+  证据索引合并验收是内部加严口径，不冒充两份 PDF 一致规定的初赛硬要求。
+
+验证：
+
+- **静态诊断通过**：`python -m unittest scripts/test_validate_release_bundle.py -v`，
+  exit 0，19/19 通过；覆盖路径、重复条目、符号链接、角色/路径唯一性、bytes、
+  SHA-256、HEAD 绑定、ZIP/HAP 元数据、长字段和秘密不回显。
+- **静态诊断通过**：`python -m py_compile scripts/validate-release-bundle.py scripts/test_validate_release_bundle.py`，
+  exit 0。
+- **源码确认**：独立子 agent 复跑 19/19，且对 60013 字符路径、秘密路径与 SHA
+  错误、10000 层 JSON、10 类非规范路径及大小写折叠重复执行只读固定输入；全部
+  被拒绝，路径正文和秘密值未回显，未再发现错误放行。
+- **静态诊断通过**：既有内容门禁单测 29/29、Node 单一源测试 4/4、147/36
+  生成一致性检查、165 题/33 Topic 内容门禁、Topic 关系门禁和冒烟自测 13/13
+  均 exit 0。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`、`pnpm test`
+  均 exit 0；13 个测试文件、169 项测试通过，无 ESLint 警告或错误。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建成功。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，
+  exit 0，`BUILD SUCCESSFUL in 4 s 910 ms`；仍有未配置 `signingConfigs` 的既有警告。
+
+失败后纠正：
+
+- 初始实现把 manifest 自己声明的提交作为期望提交，比较属于同值自证；改为绑定
+  当前 `HEAD`，并让声明提交的 Git 快照再次经过既有源码包门禁。
+- 独立对抗固定输入先后发现 ZIP/HAP 元数据未扫描、长引号字段跨固定 overlap
+  漏检、超长路径可通过、秘密路径会在后续 SHA 错误中回显，以及深层 JSON 可能
+  触发未捕获递归错误；逐项增加元数据扫描、整条 HAP 条目扫描、安全上限、统一
+  路径脱敏和解析异常边界后复跑通过。
+- 新增长度测试首次用 2000 层 JSON 期望触发解析边界，但当前 Python 正常解析，
+  因此单测 exit 1；按已复现输入改为 10000 层后，同一测试与全量 19 项 exit 0。
+- outer ZIP 反斜杠用例最初断言读取后的错误仍含反斜杠，单项测试 exit 1；核对
+  `ZipInfo.filename` 后确认 Windows `zipfile` 已先规范化为 `/`，改为直接固定共享
+  路径函数的反斜杠拒绝合同，同时保留 outer ZIP 的 `a/./b` 拒绝断言。
+
+未验证：
+
+- **未验证**：本批没有生成、修改或提交最终 ZIP、HAP、许可证附件、声明或发布
+  证据文件；因此没有运行 `--bundle-path` 的真实最终包通过记录。
+- **未验证**：HAP 只完成增量构建且仍未配置正式签名；可读 ZIP 静态检查不等于
+  正式签名、安装、模拟器或真机通过。
+- **未验证**：许可证索引、原创声明和 AI 使用说明的文件存在性门禁不等于内容
+  已由真实团队审阅、权利已解决或声明已签署。
+- **未验证**：最终 PDF、MP4、门户实时字段、大小限制、上传结果和线上业务流程
+  仍未验收。
