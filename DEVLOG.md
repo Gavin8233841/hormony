@@ -6141,3 +6141,43 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批次是文档接力批次，未重新运行 Web `pnpm lint/typecheck/test/build`。
 - 本批次未重新运行 HarmonyOS HAP 构建；沿用上一批 `Chat.ets` 静态诊断、HAP 构建、线上 Health/Chat SSE 与模拟器 fallback 证据。
 - 工作区仍保留 `.trae/progress.json` 和未跟踪本地资产；未执行清理、回滚、目录移动或删除。
+
+---
+
+## 2026-07-17 [WS01] 学伴与计划端侧真实闭环
+
+背景：竞赛主线要求关闭 Chat 真实输入未触发新 POST、SSE 失败/取消不可观察、历史恢复不完整，以及 Plan 长等待、旧计划丢失和本机保存失败只能重新调用模型的问题。本批在 `codex/ws01-chat-plan` 上按当前 API 12 源码与在线契约实现，未采用静态回答或本地模板伪造模型能力。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/HttpClient.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `docs/workstreams/01-chat-plan-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Chat TextInput 使用双向绑定，键盘 `SubmitEvent.text` 与发送按钮统一进入真实 `POST /api/chat` SSE 路径。
+- 请求代次与取消令牌覆盖画像读取、SSE 和备用地址；取消后旧回调不能污染下一问，也不会调度 fallback POST。
+- 非 2xx 保留 HTTP 状态和结构化业务错误码；SSE error、done、提前结束、空正文和取消分别展示，技术详情默认折叠。
+- 只有完整问答对进入下一问上下文和 ArkData；历史读取/保存失败分开恢复，历史写入串行合并且保存失败可重试。
+- Plan 初始 ArkData 读取锁定生成，本次目标和周期在首个异步操作前冻结；旧计划在取消、网络失败、校验失败和保存失败时保留。
+- Plan 阶段由真实操作推进；网络阶段可取消，保存阶段禁止取消；已校验计划保存失败只重试 ArkData，不重新调用模型。
+- Plan 保存后更新首页共享任务并调用现有服务卡片刷新入口；因 WS04 当前接口返回 void，只表述“已发起更新”，不伪装卡片成功。
+
+验证：
+- `git status --short`、`git log -5 --oneline`：exit 0；基线 `dd2fe16`，分支 `codex/ws01-chat-plan`。
+- 最终源码不变量断言：exit 0，`SOURCE_INVARIANTS_OK count=17`。
+- `git diff --check -- <WS01 三个产品文件>`：exit 0，仅 LF/CRLF 工作区提示。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：最终 exit 0，`CompileArkTS` 与 `PackageHap` 成功，`BUILD SUCCESSFUL in 27 s 625 ms`；既有 signingConfigs 未配置警告保留。
+- 线上 Health：HTTP 200，`status=ready`、`deploymentMode=stateless`、`model.configured=true`、`model.mode=model`、模型名 `doubao-seed-2-1-pro-260628`。
+- 线上 Chat：HTTP 200；12 个 SSE 事件，正文 1745 字符、引用 3 条、无 error、唯一 done 为最后事件，正文包含代码围栏与表格。
+- 线上 Plan：HTTP 200；目标匹配，10 项结构完整任务，`agentTrace=4`。
+- Chat 长度边界：HTTP 400，`code=MESSAGE_TOO_LONG`；Plan 长度边界：HTTP 400，`code=GOAL_TOO_LONG`。
+- `hdc list targets`：exit 0，返回 `[Empty]`。
+- 独立子 agent 两轮只读复核：最初发现 Plan 读取竞态、历史保存并发、失败上下文污染和取消 fallback；主线修复后复核确认四项均关闭，`git diff --check` exit 0。
+
+失败或未验证：
+- 首次结构化 SSE 错误实现触发 `arkts-no-structural-typing`，该次构建失败；改为 `HttpStreamError` 后多次增量构建通过。
+- 无 HDC 运行目标，TextInput 新输入后的端侧 POST、SSE done/error/cancel UI、Plan 慢请求、ArkData 保存失败注入与重启恢复均为模拟器未验证；真机未验证。
+- `LearningFormUpdater.ets` 归 WS04、`scripts/harmonyos-app-smoke.ps1` 归 WS06，本批不暂存、不提交；精确续批要求记录在 WS01 结果文档。
+- Web 源码未修改，未重复运行 Web `pnpm lint/typecheck/test/build`。

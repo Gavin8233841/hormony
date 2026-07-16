@@ -9,7 +9,95 @@ import { util } from '@kit.ArkTS';
 import { Constants } from './Constants';
 import { StreamEvent } from '../model/DataModels';
 
+interface ApiErrorPayload {
+  error?: string;
+  code?: string;
+}
+
+export class HttpStatusError extends Error {
+  readonly statusCode: number;
+  readonly errorCode: string;
+  readonly userMessage: string;
+
+  constructor(statusCode: number, errorCode: string, userMessage: string) {
+    super('HTTP ' + statusCode.toString() + (errorCode.length > 0 ? ' [' + errorCode + ']' : '') +
+      (userMessage.length > 0 ? ': ' + userMessage : ''));
+    this.statusCode = statusCode;
+    this.errorCode = errorCode;
+    this.userMessage = userMessage;
+  }
+}
+
+export class HttpStreamError {
+  readonly message: string;
+  readonly statusCode: number;
+  readonly errorCode: string;
+  readonly userMessage: string;
+
+  constructor(message: string, statusCode: number, errorCode: string, userMessage: string) {
+    this.message = message;
+    this.statusCode = statusCode;
+    this.errorCode = errorCode;
+    this.userMessage = userMessage;
+  }
+}
+
+export class HttpRequestCancellation {
+  private request: http.HttpRequest | null = null;
+  private cancelled: boolean = false;
+
+  bind(request: http.HttpRequest): void {
+    if (this.cancelled) {
+      try {
+        request.destroy();
+      } catch (_) {
+      }
+      return;
+    }
+    this.request = request;
+  }
+
+  cancel(): void {
+    if (this.cancelled) return;
+    this.cancelled = true;
+    const request = this.request;
+    this.request = null;
+    if (request !== null) {
+      try {
+        request.destroy();
+      } catch (_) {
+      }
+    }
+  }
+
+  isCancelled(): boolean {
+    return this.cancelled;
+  }
+
+  release(request: http.HttpRequest): void {
+    if (this.request === request) {
+      this.request = null;
+    }
+  }
+}
+
 export class HttpClient {
+  private static statusError(statusCode: number, result: string): HttpStatusError {
+    let errorCode: string = '';
+    let userMessage: string = '';
+    try {
+      const payload: ApiErrorPayload = JSON.parse(result);
+      if (typeof payload.code === 'string') {
+        errorCode = payload.code.trim().slice(0, 80);
+      }
+      if (typeof payload.error === 'string') {
+        userMessage = payload.error.trim().slice(0, 240);
+      }
+    } catch (_) {
+    }
+    return new HttpStatusError(statusCode, errorCode, userMessage);
+  }
+
   /**
    * 发送 GET 请求
    */
@@ -26,7 +114,8 @@ export class HttpClient {
           expectDataType: http.HttpDataType.STRING,
         });
         if (response.responseCode !== 200) {
-          throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+          const errorBody = typeof response.result === 'string' ? response.result : '';
+          throw HttpClient.statusError(response.responseCode, errorBody);
         }
         const result = response.result;
         if (typeof result !== 'string') {
@@ -51,11 +140,16 @@ export class HttpClient {
   /**
    * 发送 POST 请求
    * body 参数为 JSON 字符串（调用方负责 JSON.stringify）
+   * cancellation 取消后不会继续尝试备用地址
    */
-  static async post<T>(path: string, body: string): Promise<T> {
+  static async post<T>(path: string, body: string, cancellation?: HttpRequestCancellation): Promise<T> {
     let lastNetworkError: Error = new Error('Network request failed');
     for (const baseUrl of Constants.API_BASE_URLS) {
+      if (cancellation?.isCancelled()) {
+        throw new Error('REQUEST_CANCELLED');
+      }
       const httpRequest = http.createHttp();
+      cancellation?.bind(httpRequest);
       try {
         const response = await httpRequest.request(baseUrl + path, {
           method: http.RequestMethod.POST,
@@ -65,8 +159,12 @@ export class HttpClient {
           readTimeout: Constants.MODEL_REQUEST_TIMEOUT,
           expectDataType: http.HttpDataType.STRING,
         });
+        if (cancellation?.isCancelled()) {
+          throw new Error('REQUEST_CANCELLED');
+        }
         if (response.responseCode !== 200) {
-          throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+          const errorBody = typeof response.result === 'string' ? response.result : '';
+          throw HttpClient.statusError(response.responseCode, errorBody);
         }
         const result = response.result;
         if (typeof result !== 'string') {
@@ -76,12 +174,16 @@ export class HttpClient {
         return parsed;
       } catch (e) {
         const error = e instanceof Error ? e : new Error('Network request failed');
+        if (cancellation?.isCancelled() || error.message === 'REQUEST_CANCELLED') {
+          throw new Error('REQUEST_CANCELLED');
+        }
         if (error.message.startsWith('HTTP ') || error.message === 'Response is not a string' ||
           error.name === 'SyntaxError') {
           throw error;
         }
         lastNetworkError = error;
       } finally {
+        cancellation?.release(httpRequest);
         httpRequest.destroy();
       }
     }
@@ -105,7 +207,8 @@ export class HttpClient {
           expectDataType: http.HttpDataType.STRING,
         });
         if (response.responseCode !== 200) {
-          throw new Error('HTTP ' + response.responseCode + ': ' + response.result);
+          const errorBody = typeof response.result === 'string' ? response.result : '';
+          throw HttpClient.statusError(response.responseCode, errorBody);
         }
         const result = response.result;
         if (typeof result !== 'string') {
@@ -137,8 +240,9 @@ export class HttpClient {
     body: string,
     onEvent: (event: StreamEvent) => void,
     onDone: () => void,
-    onError: (err: Error) => void,
-    onCreated?: (req: http.HttpRequest) => void
+    onError: (err: HttpStreamError) => void,
+    onCreated?: (req: http.HttpRequest) => void,
+    cancellation?: HttpRequestCancellation
   ): void {
     let doneCalled: boolean = false;
     let eventBuffer: string = '';
@@ -179,9 +283,15 @@ export class HttpClient {
     };
 
     const startRequest = (baseIndex: number): void => {
+      if (cancellation?.isCancelled()) return;
       const httpRequest = http.createHttp();
       let cleanedUp: boolean = false;
       let receivedData: boolean = false;
+      let responseText: string = '';
+      let responseCode: number = 0;
+      let streamEnded: boolean = false;
+      cancellation?.bind(httpRequest);
+      if (cancellation?.isCancelled()) return;
       if (onCreated) {
         onCreated(httpRequest);
       }
@@ -189,6 +299,7 @@ export class HttpClient {
       const cleanup = (): void => {
         if (cleanedUp) return;
         cleanedUp = true;
+        cancellation?.release(httpRequest);
         try {
           httpRequest.off('dataReceive');
         } catch (e) {
@@ -217,16 +328,32 @@ export class HttpClient {
         cleanup();
       };
 
+      const finishHttpError = (): void => {
+        if (cleanedUp) return;
+        const statusError = HttpClient.statusError(responseCode, responseText);
+        onError(new HttpStreamError(statusError.message, statusError.statusCode, statusError.errorCode,
+          statusError.userMessage));
+        cleanup();
+      };
+
       httpRequest.on('dataReceive', (data: ArrayBuffer) => {
         receivedData = true;
         const text = decoder.decodeToString(new Uint8Array(data), { stream: true });
+        if (responseText.length < 4096) {
+          responseText += text.slice(0, 4096 - responseText.length);
+        }
         if (consumeText(text)) {
           cleanup();
         }
       });
 
       httpRequest.on('dataEnd', () => {
-        finishStream();
+        streamEnded = true;
+        if (responseCode === 200) {
+          finishStream();
+        } else if (responseCode > 0) {
+          finishHttpError();
+        }
       });
 
       httpRequest.requestInStream(Constants.API_BASE_URLS[baseIndex] + path, {
@@ -238,14 +365,13 @@ export class HttpClient {
         extraData: body,
         connectTimeout: Constants.CONNECT_TIMEOUT,
         readTimeout: Constants.SSE_TIMEOUT,
-      }).then((responseCode: number) => {
-        if (responseCode !== 200) {
-          onError(new Error('HTTP ' + responseCode));
-          cleanup();
-          return;
-        }
-        if (!receivedData) {
+      }).then((statusCode: number) => {
+        responseCode = statusCode;
+        if (!streamEnded) return;
+        if (responseCode === 200) {
           finishStream();
+        } else {
+          finishHttpError();
         }
       }).catch((e: Error) => {
         if (doneCalled) {
@@ -253,11 +379,12 @@ export class HttpClient {
           return;
         }
         cleanup();
+        if (cancellation?.isCancelled()) return;
         if (!receivedData && baseIndex + 1 < Constants.API_BASE_URLS.length) {
           startRequest(baseIndex + 1);
           return;
         }
-        onError(e);
+        onError(new HttpStreamError(e.message, 0, '', ''));
       });
     };
 
