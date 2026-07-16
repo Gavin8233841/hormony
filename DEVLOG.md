@@ -6660,3 +6660,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 失败或未验证：
 - 本批没有产品代码或资源变化，未重复执行 HAP、模拟器或真机验证；最近一次 HAP 构建属于前一 TCP Reno 批次。
+
+---
+
+## 2026-07-17 [WS03] 满缓冲区信号量死锁推演修正
+
+背景：`cs102-同步与互斥-1` 正确判断会死锁，但旧答案称消费者“先 P(mutex)”。`cs102_k42` 明确消费者先 `P(full)` 再 `P(mutex)`；缓冲区满时 full 可通过，随后才被生产者持有的 mutex 阻塞。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS102.md`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_facts.py`。
+
+行为变化：修正消费者信号量顺序和反馈；来源补入 `cs102_k34`；契约从 `mutex=1, empty=0, full=2` 执行四次 wait，证明生产者阻塞于 empty、消费者通过 full 后阻塞于 mutex。
+
+验证：内容契约 8 项通过；topic/内容关系校验通过；WS03 完整回归 45 项运行、44 项通过、1 项既有预期失败；增量 HAP `BUILD SUCCESSFUL in 4 s 462 ms`，命令退出码均为 0。
+
+失败或未验证：无模拟器或真机，答案、反馈和来源长文本显示未验证。

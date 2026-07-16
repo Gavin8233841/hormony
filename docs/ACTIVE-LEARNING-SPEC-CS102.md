@@ -414,9 +414,9 @@ void producer() {
     }
 }
 ```
-- **答案**：程序将死锁。当缓冲区满时（empty=0），生产者先 P(mutex) 成功（mutex=0），然后 P(empty) 阻塞等待空位。但消费者需要先 P(mutex) 才能消费释放空位，而 mutex 已被生产者持有，消费者也阻塞。生产者和消费者互相等待，系统死锁
-- **反馈**：正确的 P 操作顺序是先获取资源信号量（empty/full）再获取互斥锁（mutex）（知识切片 cs102_k42）。错误代码中生产者先 P(mutex) 再 P(empty)，当 empty=0 时生产者持有 mutex 却阻塞在 P(empty)，消费者无法获取 mutex 消费数据，形成死锁。这与死锁的"占有并等待"条件一致（知识切片 cs102_k34）：生产者占有 mutex 等待 empty，消费者等待 mutex。修复方法：交换 P(mutex) 和 P(empty) 的顺序，V 操作顺序不影响正确性
-- **来源**：操作系统概念（Silberschatz）；知识切片 cs102_k42
+- **答案**：程序将死锁。当缓冲区满时（empty=0），生产者先 P(mutex) 成功（mutex=0），然后 P(empty) 阻塞等待空位。消费者可先通过 P(full)，但随后会阻塞在 P(mutex)，无法消费并释放空位。生产者和消费者互相等待，系统死锁
+- **反馈**：正确的 P 操作顺序是先获取资源信号量（empty/full）再获取互斥锁（mutex）（知识切片 cs102_k42）。错误代码中生产者先 P(mutex) 再 P(empty)，当 empty=0 时生产者持有 mutex 却阻塞在 P(empty)；消费者执行 P(full) 后无法获取 mutex，也就不能消费并释放空位。这与死锁的"占有并等待"条件一致（知识切片 cs102_k34）：生产者占有 mutex 等待 empty，消费者等待 mutex。修复方法是交换生产者 P(mutex) 和 P(empty) 的顺序
+- **来源**：操作系统概念（Silberschatz）；知识切片 cs102_k34、cs102_k42
 
 ### 主动练习 2（步骤排序）
 - **类型**：step_order

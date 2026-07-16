@@ -214,6 +214,43 @@ class LessonContentFactsTest(unittest.TestCase):
         self.assertIn("最终：S=0, B=3, C=5, A=7", activity["answer"])
         self.assertIn("知识切片 cs101_k27", activity["feedback"])
 
+    def test_full_buffer_deadlock_blocks_consumer_after_full_wait(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "同步与互斥",
+            "cs102-同步与互斥-1",
+        )
+        knowledge = find_unique(
+            self.knowledge_items,
+            "cs102_k42 knowledge chunk",
+            lambda item: item.get("id") == "cs102_k42",
+        )
+        semaphores = {"mutex": 1, "empty": 0, "full": 2}
+
+        def wait(name):
+            if semaphores[name] == 0:
+                return False
+            semaphores[name] -= 1
+            return True
+
+        self.assertTrue(wait("mutex"))
+        self.assertFalse(wait("empty"))
+        self.assertTrue(wait("full"))
+        self.assertFalse(wait("mutex"))
+
+        self.assertIn("消费者先P(full)、P(mutex)", knowledge["text"])
+        self.assertLess(
+            activity["content"].index("P(mutex)"),
+            activity["content"].index("P(empty)"),
+        )
+        self.assertIn("消费者可先通过 P(full)", activity["answer"])
+        self.assertIn("随后会阻塞在 P(mutex)", activity["answer"])
+        self.assertIn("知识切片 cs102_k34、cs102_k42", activity["source"])
+
+        spec = CS102_SPEC_PATH.read_text(encoding="utf-8")
+        self.assertIn("消费者可先通过 P(full)", spec)
+
     def test_red_black_root_step_is_kept_in_the_source_spec(self):
         spec = CS101_SPEC_PATH.read_text(encoding="utf-8")
 
