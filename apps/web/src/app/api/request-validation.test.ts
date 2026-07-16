@@ -140,6 +140,18 @@ describe("API request validation", () => {
       code: "INVALID_DAILY_MINUTES",
     },
     {
+      name: "plan invalid local start date",
+      handler: postPlan,
+      body: { goal: "复习数据结构", startDate: "2026-02-29" },
+      code: "INVALID_START_DATE",
+    },
+    {
+      name: "plan non-string local start date",
+      handler: postPlan,
+      body: { goal: "复习数据结构", startDate: 20260717 },
+      code: "INVALID_START_DATE",
+    },
+    {
       name: "plan overlong goal",
       handler: postPlan,
       body: { goal: "x".repeat(501) },

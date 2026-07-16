@@ -31,6 +31,7 @@ const COURSE_TITLES: Record<string, string> = {
 };
 
 const ACTIONS: PlanAction[] = ["lesson", "practice", "quiz", "review"];
+const MAX_PLAN_TASKS = 10;
 
 const ACTION_TYPES: Record<PlanAction, PlanTask["type"]> = {
   lesson: "reading",
@@ -51,6 +52,7 @@ export async function runPlannerAgent(
   const profile = getProfileContext(profileSnapshot);
   const topicOptions = getTopicOptions();
   const topicCatalog = formatTopicCatalog(topicOptions);
+  const targetTaskCount = Math.min(durationDays, MAX_PLAN_TASKS);
 
   const systemPrompt = `你是一位学习规划专家。根据学生画像和学习目标，制定结构化学习计划。
 输出 JSON 数组，每个元素格式：{"courseId":"cs101","topic":"数组与线性表","action":"lesson|practice|quiz|review","title":"","reason":"为什么现在做这项任务","estimatedMin":45}
@@ -67,7 +69,7 @@ ${topicCatalog}`;
 目标：${goal}
 周期：${durationDays} 天
 每日可用时间：${dailyMinutes} 分钟
-请生成 ${Math.min(durationDays, 10)} 个关键任务。`;
+请生成 ${targetTaskCount} 个关键任务。`;
 
   const raw = await callModel(systemPrompt, userPrompt, {
     temperature: 0.4,
@@ -100,17 +102,19 @@ function parseTasks(
   try {
     const arr: unknown = JSON.parse(extractJsonPayload(raw));
     if (Array.isArray(arr)) {
-      const selected = arr.slice(0, 10);
+      const maxTaskCount = Math.min(durationDays, MAX_PLAN_TASKS);
+      if (arr.length > maxTaskCount) return [];
+      const selected = arr;
       const startTime = Date.parse(startDate + "T00:00:00.000Z");
       const parsedItems: ParsedPlanItem[] = [];
       for (const item of selected) {
-        if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+        if (!item || typeof item !== "object" || Array.isArray(item)) return [];
         const t = item as Record<string, unknown>;
         const courseId = typeof t.courseId === "string" ? t.courseId.trim() : "";
         const topic = typeof t.topic === "string" ? t.topic.trim() : "";
         const option = findTopicOption(courseId, topic, topicOptions);
         const rawAction = typeof t.action === "string" ? t.action.trim() : "";
-        if (option === undefined || !isPlanAction(rawAction)) continue;
+        if (option === undefined || !isPlanAction(rawAction)) return [];
         const title = typeof t.title === "string" ? t.title.trim() : "";
         const reason = typeof t.reason === "string" ? t.reason.trim() : "";
         const estimatedMin = t.estimatedMin;
@@ -124,7 +128,7 @@ function parseTasks(
           estimatedMin < 15 ||
           estimatedMin > 180
         ) {
-          continue;
+          return [];
         }
         parsedItems.push({
           courseId: option.courseId,
@@ -136,7 +140,7 @@ function parseTasks(
           estimatedMin: Math.min(estimatedMin, dailyMinutes),
         });
       }
-      return parsedItems.map((item: ParsedPlanItem, i: number) => {
+      const tasks = parsedItems.map((item: ParsedPlanItem, i: number) => {
         const dayOffset = Math.min(durationDays - 1, Math.floor(i * durationDays / parsedItems.length));
         const taskDate = new Date(startTime + dayOffset * 86400000).toISOString().slice(0, 10);
         return {
@@ -151,11 +155,22 @@ function parseTasks(
           reason: item.reason,
         };
       });
+      return fitsDailyBudget(tasks, dailyMinutes) ? tasks : [];
     }
   } catch {
     return [];
   }
   return [];
+}
+
+function fitsDailyBudget(tasks: PlanTask[], dailyMinutes: number): boolean {
+  const minutesByDate = new Map<string, number>();
+  for (const task of tasks) {
+    const total = (minutesByDate.get(task.date) ?? 0) + task.estimatedMin;
+    if (total > dailyMinutes) return false;
+    minutesByDate.set(task.date, total);
+  }
+  return true;
 }
 
 function getTopicOptions(): TopicOption[] {

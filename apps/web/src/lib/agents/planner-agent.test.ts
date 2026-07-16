@@ -2,42 +2,76 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { runPlannerAgent } from "./planner-agent";
 
+const originalModelResponse = process.env.TEST_MODEL_RESPONSE;
+const START_DATE = "2026-07-17";
+
+function modelTask(index: number) {
+  return {
+    courseId: "cs101",
+    topic: "二叉树与BST",
+    action: "review",
+    title: `复习二叉树 ${index}`,
+    reason: "先复盘树结构错题",
+    estimatedMin: 30,
+  };
+}
+
 afterEach(() => {
-  delete process.env.TEST_MODEL_RESPONSE;
+  if (originalModelResponse === undefined) delete process.env.TEST_MODEL_RESPONSE;
+  else process.env.TEST_MODEL_RESPONSE = originalModelResponse;
 });
 
-describe("Planner Agent local start date", () => {
-  it("uses the client local date as the first plan day", async () => {
-    process.env.TEST_MODEL_RESPONSE = JSON.stringify([
-      {
-        courseId: "cs101",
-        topic: "数组与线性表",
-        action: "lesson",
-        title: "学习数组与线性表",
-        reason: "先补齐线性结构基础",
-        estimatedMin: 45,
-      },
-      {
-        courseId: "cs101",
-        topic: "栈与队列",
-        action: "practice",
-        title: "练习栈与队列",
-        reason: "用练习巩固受限线性结构",
-        estimatedMin: 45,
-      },
-    ]);
+describe("Planner Agent 模型输出边界", () => {
+  it("拒绝超过计划周期可安排数量的任务，避免单日总时长越界", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([modelTask(1), modelTask(2)]);
 
-    const plan = await runPlannerAgent(
-      "demo",
-      "复习数据结构",
-      2,
-      90,
-      "2026-07-17"
+    await expect(
+      runPlannerAgent("planner_test", "复习数据结构", 1, 30, START_DATE)
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
+  it("拒绝超过十项的模型任务数组而不是静默截断", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify(
+      Array.from({ length: 11 }, (_, index) => modelTask(index + 1))
     );
 
-    expect(plan.tasks.map((task) => task.date)).toEqual([
-      "2026-07-17",
-      "2026-07-18",
+    await expect(
+      runPlannerAgent("planner_test", "复习数据结构", 14, 90, START_DATE)
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
+  it("拒绝超过既有字段上限的任务文本", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([
+      { ...modelTask(1), title: "题".repeat(121) },
     ]);
+
+    await expect(
+      runPlannerAgent("planner_test", "复习数据结构", 7, 90, START_DATE)
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
+  it("任一任务结构非法时拒绝整份计划而不是返回残缺任务", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([
+      modelTask(1),
+      { ...modelTask(2), action: "unknown" },
+    ]);
+
+    await expect(
+      runPlannerAgent("planner_test", "复习数据结构", 7, 90, START_DATE)
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+  });
+
+  it("使用客户端本地日期作为计划首日", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([modelTask(1)]);
+
+    const plan = await runPlannerAgent(
+      "planner_test",
+      "复习数据结构",
+      7,
+      90,
+      "2032-02-29"
+    );
+
+    expect(plan.tasks[0]?.date).toBe("2032-02-29");
   });
 });

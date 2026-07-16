@@ -6720,3 +6720,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 当前分支尚未部署，以上 production 证据为本地新构建，不等同线上通过。
 - 真实模型调用、浏览器交互、HarmonyOS 模拟器与真机未验证；本批未修改 HarmonyOS 文件。
+
+---
+
+## [WS05] 2026-07-17：Agent 输出边界、Chat SSE 预算与 Plan Save 契约
+
+背景：Chat 流取消未贯穿请求信号，异常编排可无限累计事件；Planner/Quiz 对部分模型字段会跳过坏项或静默截断；`/api/plan/save` 允许缺少核心字段、虚假日历日期与重复任务 ID。Web 与服务端还需要保留主线 `startDate/readDateKey` 的本地日历契约。
+
+文件：
+- `apps/web/src/app/api/chat/route.ts`、`apps/web/src/app/api/chat/stream-limits.test.ts`
+- `apps/web/src/app/api/plan/route.ts`、`apps/web/src/app/api/plan/save/route.ts`、`apps/web/src/app/api/plan/plan-lifecycle.test.ts`
+- `apps/web/src/app/api/request-validation.test.ts`
+- `apps/web/src/app/plan/page.tsx`
+- `apps/web/src/lib/agents/orchestrator.ts`、`orchestrator.test.ts`、`planner-agent.ts`、`planner-agent.test.ts`、`quiz-agent.ts`、`quiz-agent.test.ts`
+- `apps/web/src/lib/api-validation.ts`、`client-date.ts`、`client-date.test.ts`、`types.ts`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 将 `Request.signal` 贯穿到 orchestrator/model；reader 断开或请求取消后停止编排和写流。SSE 单事件上限 64 KiB、总响应 512 KiB、最多 128 个事件，超限严格以 `OUTPUT_LIMIT_EXCEEDED -> done` 终止且计入总预算。
+- Planner 最多接受 `min(durationDays, 10)` 项；任一任务的对象、真实 Topic、动作、标题、原因、整数时长或每日总预算非法时拒绝整份模型输出，不再返回残缺计划。
+- Quiz 强制 `choice`、四个有序选项、A-D 答案、题干/选项/解析长度与 1-3 个短标签；生成总量不符合请求时保持 `MODEL_INVALID_RESPONSE`，既有五题批处理与真实模型修复链保留。
+- Chat 与 Plan 接受经 `readDateKey` 校验的 `startDate`；Web 使用本地日历字段生成日期键，避免 UTC 跨日，Planner 首项从该日期安排。
+- `/api/plan/save` 强制每项任务具有 `id/title/date/estimatedMin/type`，按真实日历校验日期并以去除首尾空白后的 ID 检查唯一性；拒绝 `tasks:[{}]`、`2026-02-31` 与重复 ID，接受并保留 `2032-02-29`，不再生成随机 ID 或核心字段默认值。
+- `c9572d2` 已有课程与 33 Topic 逐字匹配契约保持不变；未修改题库内容、生产模型 ID 或 HarmonyOS 文件。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/app/api/chat/stream-limits.test.ts src/app/api/plan/plan-lifecycle.test.ts src/app/api/request-validation.test.ts src/lib/agents/planner-agent.test.ts src/lib/agents/quiz-agent.test.ts src/lib/agents/orchestrator.test.ts src/lib/client-date.test.ts`：exit 0，7 个测试文件、139 项通过。
+- `cd apps/web; pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，21 个测试文件、343 项通过；`pnpm build`：exit 0。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 当前分支未部署；带真实模型的 Chat SSE 正文、Plan 与 Quiz 仍为未验证。
+- 浏览器交互、HarmonyOS 模拟器与真机未验证；本批未修改 HarmonyOS 文件。

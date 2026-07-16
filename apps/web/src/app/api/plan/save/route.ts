@@ -5,7 +5,7 @@ import { store } from "@/lib/store/db";
 import type { PlanTask, StudyPlan } from "@/lib/types";
 import { isCourseId } from "@/lib/data";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
-import { readUserId } from "@/lib/api-validation";
+import { readDateKey, readUserId } from "@/lib/api-validation";
 import { validateUserInput } from "@/lib/agents/safety-agent";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   const taskObjects = tasks as unknown as Record<string, unknown>[];
 
   for (const task of taskObjects) {
-    const taskValidation = validateTask(task);
+    const taskValidation = validateTaskFields(task);
     if (taskValidation) return taskValidation;
   }
   const traceValidation = validateTrace(body.agentTrace);
@@ -82,6 +82,19 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  const taskIds = new Set<string>();
+  for (const task of taskObjects) {
+    const requiredValidation = validateRequiredTaskFields(task);
+    if (requiredValidation) return requiredValidation;
+    const taskId = String(task.id).trim();
+    if (taskIds.has(taskId)) {
+      return Response.json(
+        { error: "同一计划中的任务 id 必须唯一", code: "INVALID_TASK_ID" },
+        { status: 400 }
+      );
+    }
+    taskIds.add(taskId);
+  }
 
   const plan: StudyPlan = {
     planId: body.planId?.trim() ?? `plan_${Date.now().toString(36)}`,
@@ -102,7 +115,7 @@ export async function POST(req: Request) {
   return Response.json(plan);
 }
 
-function validateTask(task: Record<string, unknown>): Response | null {
+function validateTaskFields(task: Record<string, unknown>): Response | null {
   if (task.id !== undefined && (typeof task.id !== "string" || task.id.trim().length < 1 || task.id.length > 100)) {
     return Response.json({ error: "任务 id 长度必须为 1-100 字符", code: "INVALID_TASK_ID" }, { status: 400 });
   }
@@ -112,13 +125,12 @@ function validateTask(task: Record<string, unknown>): Response | null {
   if (task.title !== undefined && (typeof task.title !== "string" || task.title.trim().length === 0 || task.title.length > 200)) {
     return Response.json({ error: "任务标题长度必须为 1-200 字符", code: "INVALID_TASK_TITLE" }, { status: 400 });
   }
-  if (task.date !== undefined && (typeof task.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(task.date))) {
-    return Response.json({ error: "任务日期必须为 YYYY-MM-DD", code: "INVALID_TASK_DATE" }, { status: 400 });
+  if (task.date !== undefined) {
+    const date = readDateKey(task.date, "", "INVALID_TASK_DATE", "任务日期");
+    if (!date.ok) return date.response;
   }
-  if (task.estimatedMin !== undefined) {
-    if (typeof task.estimatedMin !== "number" || !Number.isFinite(task.estimatedMin) || !Number.isInteger(task.estimatedMin) || task.estimatedMin < 5 || task.estimatedMin > 480) {
-      return Response.json({ error: "任务时长必须为 5-480 分钟整数", code: "INVALID_ESTIMATED_MIN" }, { status: 400 });
-    }
+  if (task.estimatedMin !== undefined && (typeof task.estimatedMin !== "number" || !Number.isFinite(task.estimatedMin) || !Number.isInteger(task.estimatedMin) || task.estimatedMin < 5 || task.estimatedMin > 480)) {
+    return Response.json({ error: "任务时长必须为 5-480 分钟整数", code: "INVALID_ESTIMATED_MIN" }, { status: 400 });
   }
   if (task.done !== undefined && typeof task.done !== "boolean") {
     return Response.json({ error: "任务完成状态必须是布尔值", code: "INVALID_DONE" }, { status: 400 });
@@ -206,15 +218,15 @@ export async function OPTIONS() {
 }
 
 function sanitizeTask(t: Record<string, unknown>): PlanTask {
-  const type = isPlanType(String(t.type)) ? String(t.type) as PlanTask["type"] : "review";
+  const type = String(t.type) as PlanTask["type"];
   const courseId = t.courseId === undefined ? undefined : String(t.courseId);
   const topic = t.topic === undefined ? undefined : String(t.topic).trim();
   const action = t.action === undefined ? undefined : String(t.action);
   return {
-    id: String(t.id ?? `task_${Math.random().toString(36).slice(2, 8)}`),
-    title: String(t.title ?? "未命名任务").slice(0, 200),
-    date: String(t.date ?? new Date().toISOString().slice(0, 10)),
-    estimatedMin: Math.min(Math.max(Number(t.estimatedMin) || 30, 5), 480),
+    id: String(t.id).trim(),
+    title: String(t.title).trim(),
+    date: String(t.date),
+    estimatedMin: Number(t.estimatedMin),
     type,
     courseId,
     topic,
@@ -251,6 +263,25 @@ function validateTrace(trace: unknown): Response | null {
       { error: "agentTrace 每项必须是 160 字符以内字符串", code: "INVALID_AGENT_TRACE" },
       { status: 400 }
     );
+  }
+  return null;
+}
+
+function validateRequiredTaskFields(task: Record<string, unknown>): Response | null {
+  if (task.id === undefined) {
+    return Response.json({ error: "任务 id 长度必须为 1-100 字符", code: "INVALID_TASK_ID" }, { status: 400 });
+  }
+  if (task.title === undefined) {
+    return Response.json({ error: "任务标题长度必须为 1-200 字符", code: "INVALID_TASK_TITLE" }, { status: 400 });
+  }
+  if (task.date === undefined) {
+    return Response.json({ error: "任务日期必须是 YYYY-MM-DD 日期", code: "INVALID_TASK_DATE" }, { status: 400 });
+  }
+  if (task.estimatedMin === undefined) {
+    return Response.json({ error: "任务时长必须为 5-480 分钟整数", code: "INVALID_ESTIMATED_MIN" }, { status: 400 });
+  }
+  if (task.type === undefined) {
+    return Response.json({ error: "任务包含不支持的类型", code: "INVALID_TASK_TYPE" }, { status: 400 });
   }
   return null;
 }

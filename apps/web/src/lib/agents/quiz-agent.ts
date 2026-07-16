@@ -13,6 +13,11 @@ import type { Quiz, QuizQuestion } from "@/lib/types";
 
 const MAX_QUESTIONS_PER_MODEL_BATCH = 5;
 const MAX_RAW_OUTPUT_FOR_REPAIR = 3600;
+const MAX_QUESTION_STEM_LENGTH = 500;
+const MAX_QUESTION_OPTION_LENGTH = 200;
+const MAX_QUESTION_EXPLANATION_LENGTH = 1000;
+const MAX_QUESTION_TAGS = 3;
+const MAX_QUESTION_TAG_LENGTH = 12;
 
 export async function runQuizAgent(
   userId: string,
@@ -76,10 +81,24 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
         signal: input.signal,
       }
     );
-    let batch = parseQuestions(raw, batchSize, input.topic, input.difficulty, input.focusTag, usedStems);
+    let batch = parseQuestions(
+      raw,
+      batchSize,
+      input.count,
+      input.difficulty,
+      input.focusTag,
+      usedStems
+    );
     if (batch.length < batchSize) {
       const repairedRaw = await repairQuizJson(raw, batchSize, input, questions);
-      batch = parseQuestions(repairedRaw, batchSize, input.topic, input.difficulty, input.focusTag, usedStems);
+      batch = parseQuestions(
+        repairedRaw,
+        batchSize,
+        input.count,
+        input.difficulty,
+        input.focusTag,
+        usedStems
+      );
     }
     if (batch.length === 0) break;
     const beforeCount = questions.length;
@@ -103,7 +122,8 @@ function quizSystemPrompt(): string {
 - easy：考查定义、术语、直接性质或一步识别，适合刚学完概念的学生。
 - medium：给出简短场景或对比，需要应用概念完成一步推理。
 - hard：必须包含边界条件、运行过程、故障诊断或多步判断，不能只问定义。
-tags 必须是 1-3 个中文短标签，用于学习画像量化，优先使用知识点、能力类型或错误类型，例如：概念理解、代码推演、复杂度分析、边界条件、协议状态、调度策略。
+题干不超过 ${MAX_QUESTION_STEM_LENGTH} 字符，每个带标号选项不超过 ${MAX_QUESTION_OPTION_LENGTH} 字符。
+tags 必须是 1-${MAX_QUESTION_TAGS} 个不超过 ${MAX_QUESTION_TAG_LENGTH} 字符的中文短标签，用于学习画像量化，优先使用知识点、能力类型或错误类型，例如：概念理解、代码推演、复杂度分析、边界条件、协议状态、调度策略。
 如果提供重点标签，每道题的 tags 必须包含该重点标签，并围绕它设计考查点。
 每题必须有 4 个选项，答案只能是 A、B、C、D，解析 50-90 字说明正确理由。
 只输出 JSON，不要 Markdown 代码块，不要输出额外说明。`;
@@ -168,7 +188,7 @@ ${raw.slice(0, MAX_RAW_OUTPUT_FOR_REPAIR)}`;
 function parseQuestions(
   raw: string,
   count: number,
-  topic: string,
+  maxOutputCount: number,
   difficulty: "easy" | "medium" | "hard",
   focusTag?: string,
   usedStems?: Set<string>
@@ -179,21 +199,30 @@ function parseQuestions(
     if (arr.length > 0) {
       const parsed: QuizQuestion[] = [];
       for (const item of arr) {
-        if (parsed.length >= count) break;
         if (!item || typeof item !== "object") continue;
         const q = item as Record<string, unknown>;
+        if (q.type !== "choice") continue;
         const stem = typeof q.stem === "string" ? q.stem.trim() : "";
         const options = normalizeOptions(q.options);
         const answer = normalizeAnswer(q.answer, options);
         const explanation =
           typeof q.explanation === "string" ? q.explanation.trim() : "";
-        const tags = parseTags(q.tags, topic, focusTag);
+        const tags = parseTags(q.tags, focusTag);
         const normalizedStem = normalizeStem(stem);
         if (usedStems?.has(normalizedStem)) continue;
         const validOptions = options.length === 4 && options.every((option, index) =>
+          option.length <= MAX_QUESTION_OPTION_LENGTH &&
           option.toUpperCase().startsWith(`${String.fromCharCode(65 + index)}.`)
         );
-        if (!stem || !validOptions || !/^[A-D]$/i.test(answer) || !explanation) continue;
+        if (
+          stem.length < 1 ||
+          stem.length > MAX_QUESTION_STEM_LENGTH ||
+          !validOptions ||
+          !/^[A-D]$/i.test(answer) ||
+          explanation.length < 1 ||
+          explanation.length > MAX_QUESTION_EXPLANATION_LENGTH ||
+          tags === null
+        ) continue;
         parsed.push({
           id: generateId("q"),
           type: "choice",
@@ -204,8 +233,9 @@ function parseQuestions(
           difficulty,
           tags,
         });
+        if (parsed.length > maxOutputCount) return [];
       }
-      return parsed;
+      return parsed.slice(0, count);
     }
   } catch {
     return [];
@@ -260,18 +290,25 @@ function normalizeAnswer(value: unknown, options: string[]): string {
   return "";
 }
 
-function parseTags(value: unknown, topic: string, focusTag?: string): string[] {
-  const source = Array.isArray(value) ? value : [];
-  const tags = source
-    .map(String)
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0 && tag.length <= 12)
-    .filter((tag, index, values) => values.indexOf(tag) === index)
-    .slice(0, 3);
+function parseTags(value: unknown, focusTag?: string): string[] | null {
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_QUESTION_TAGS) {
+    return null;
+  }
+  const tags: string[] = [];
+  for (const valueItem of value) {
+    if (typeof valueItem !== "string") return null;
+    const tag = valueItem.trim();
+    if (tag.length < 1 || tag.length > MAX_QUESTION_TAG_LENGTH) return null;
+    if (!tags.includes(tag)) tags.push(tag);
+  }
+  if (tags.length === 0) return null;
   const normalizedFocusTag = typeof focusTag === "string" ? focusTag.trim() : "";
-  if (normalizedFocusTag.length > 0 && normalizedFocusTag.length <= 12 && !tags.includes(normalizedFocusTag)) {
+  if (
+    normalizedFocusTag.length > 0 &&
+    normalizedFocusTag.length <= MAX_QUESTION_TAG_LENGTH &&
+    !tags.includes(normalizedFocusTag)
+  ) {
     tags.unshift(normalizedFocusTag);
   }
-  const normalizedTags = tags.slice(0, 3);
-  return normalizedTags.length > 0 ? normalizedTags : [topic.slice(0, 12)];
+  return tags.slice(0, MAX_QUESTION_TAGS);
 }
