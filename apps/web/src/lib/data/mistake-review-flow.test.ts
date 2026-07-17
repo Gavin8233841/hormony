@@ -544,4 +544,32 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(practiceSource.slice(retryButtonStart - 500, retryButtonStart))
       .toContain("this.loadRetryAvailable");
   });
+
+  it("错题读取、解析和复习操作应提供 48 vp 触控区与精确读屏语义", () => {
+    expect(mistakeBookSource).toContain("正在读取本机错题与复习时间");
+
+    const reloadStart = mistakeBookSource.indexOf("Button('重新读取')");
+    const reloadEnd = mistakeBookSource.indexOf(".onClick((): void => { this.loadItems(); })", reloadStart);
+    const reloadSource = mistakeBookSource.slice(reloadStart, reloadEnd);
+    expect(reloadStart).toBeGreaterThan(-1);
+    expect(reloadSource).toContain(".height(48)");
+    expect(reloadSource).toContain(".accessibilityText('重新读取本机错题')");
+
+    const detailStart = mistakeBookSource.indexOf("Button(this.expandedId === item.id ?");
+    const detailEnd = mistakeBookSource.indexOf(".onClick((): void => { this.expandedId", detailStart);
+    const detailSource = mistakeBookSource.slice(detailStart, detailEnd);
+    expect(detailStart).toBeGreaterThan(-1);
+    expect(detailSource).toContain(".height(48)");
+    expect(detailSource).toContain("'收起解析：'");
+    expect(detailSource).toContain("'查看解析：'");
+
+    const reviewStart = mistakeBookSource.indexOf("Button(this.isDue(item) ?");
+    const reviewEnd = mistakeBookSource.indexOf(".onClick((): void => { this.retry(item); })", reviewStart);
+    const reviewSource = mistakeBookSource.slice(reviewStart, reviewEnd);
+    expect(reviewStart).toBeGreaterThan(-1);
+    expect(reviewSource).toContain(".height(48)");
+    expect(reviewSource).toContain("'重练原题：'");
+    expect(reviewSource).toContain("'练同主题精选题：'");
+    expect(reviewSource).toContain("this.reviewTimeLabel(item)");
+  });
 });

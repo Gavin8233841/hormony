@@ -645,7 +645,7 @@ struct PracticePage {
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
         Button('放弃草稿')
-          .height(40)
+          .height(48)
           .fontSize(11)
           .fontColor(Constants.COLOR_ERROR)
           .backgroundColor(Constants.COLOR_ERROR_LIGHT)
@@ -697,7 +697,8 @@ struct PracticePage {
       }
       Column({ space: 10 }) {
         ForEach(this.activeQuestion.options, (option: string): void => {
-          AnswerOption(option, this.activeAnswer === option, (): void => { this.choose(option); })
+          AnswerOption(option, this.activeAnswer === option, this.attemptSubmittedAt.length === 0,
+            (): void => { this.choose(option); })
         })
       }
       .width('100%')
@@ -862,7 +863,7 @@ struct PracticePage {
             .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_WARNING)
           if (this.draftSaveFailed) {
             Button('保存草稿')
-              .height(40)
+              .height(48)
               .fontSize(12)
               .fontColor(Constants.COLOR_BRAND)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)

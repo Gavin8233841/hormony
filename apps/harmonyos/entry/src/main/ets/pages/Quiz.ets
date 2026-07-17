@@ -1342,7 +1342,7 @@ struct QuizPage {
         .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
       if (this.draftReadFailed) {
         Button('恢复草稿')
-          .height(40)
+          .height(48)
           .fontSize(12)
           .fontColor(Constants.COLOR_BRAND)
           .backgroundColor(Constants.COLOR_BRAND_LIGHT)
@@ -1350,7 +1350,7 @@ struct QuizPage {
           .onClick((): void => { this.restoreDraft(this.lifecycleRunId); })
       } else if (this.draftSaveFailed) {
         Button('保存草稿')
-          .height(40)
+          .height(48)
           .fontSize(12)
           .fontColor(Constants.COLOR_BRAND)
           .backgroundColor(Constants.COLOR_BRAND_LIGHT)
@@ -1407,7 +1407,7 @@ struct QuizPage {
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
           Button('放弃草稿')
-            .height(40)
+            .height(48)
             .fontSize(11)
             .fontColor(Constants.COLOR_ERROR)
             .backgroundColor(Constants.COLOR_ERROR_LIGHT)
@@ -1466,7 +1466,8 @@ struct QuizPage {
 
         Column({ space: 10 }) {
           ForEach(this.currentQuestionOptions(), (option: string): void => {
-            AnswerOption(option, this.currentAnswerText() === option, (): void => { this.chooseAnswer(option); })
+            AnswerOption(option, this.currentAnswerText() === option, this.attemptSubmittedAt.length === 0,
+              (): void => { this.chooseAnswer(option); })
           })
         }
         .width('100%')

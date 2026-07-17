@@ -111,7 +111,13 @@ struct MistakeBookPage {
         TitleBar('错题本', this.reviewSummary, () => this.getUIContext().getRouter().back())
       }
       if (this.loading) {
-        Column().width('90%').height(200).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
+        Column()
+          .width('90%')
+          .height(200)
+          .backgroundColor(Constants.COLOR_BG_SKELETON)
+          .borderRadius(Constants.RADIUS_LG)
+          .accessibilityGroup(true)
+          .accessibilityText('正在读取本机错题与复习时间')
       } else if (this.items.length === 0 && this.message.length > 0) {
         Column({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(42).fontColor([Constants.COLOR_ERROR])
@@ -119,11 +125,13 @@ struct MistakeBookPage {
             .fontSize(15)
             .fontColor(Constants.COLOR_ERROR)
           Button('重新读取')
-            .height(40)
+            .height(48)
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
             .backgroundColor(Constants.COLOR_BRAND)
             .borderRadius(Constants.RADIUS_MD)
+            .accessibilityText('重新读取本机错题')
+            .accessibilityDescription('再次读取错题、到期时间和复习状态')
             .onClick((): void => { this.loadItems(); })
         }
         .layoutWeight(1)
@@ -225,21 +233,27 @@ struct MistakeBookPage {
                 Row({ space: 10 }) {
                   Button(this.expandedId === item.id ? '收起解析' : '查看解析')
                     .layoutWeight(1)
-                    .height(40)
+                    .height(48)
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_PRIMARY)
                     .backgroundColor(Constants.COLOR_BG_TAG)
                     .borderRadius(Constants.RADIUS_MD)
+                    .accessibilityText((this.expandedId === item.id ? '收起解析：' : '查看解析：') + item.stem)
+                    .accessibilityDescription('查看你的答案、正确答案和本题解析')
                     .onClick((): void => { this.expandedId = this.expandedId === item.id ? '' : item.id; })
                   Button(this.isDue(item) ?
                     (this.hasOriginalQuestion(item) ? '重练原题' : '练同主题精选题') : '等待到期')
                     .layoutWeight(1)
-                    .height(40)
+                    .height(48)
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                     .backgroundColor(this.isDue(item) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER)
                     .borderRadius(Constants.RADIUS_MD)
                     .enabled(this.isDue(item))
+                    .accessibilityText((this.isDue(item) ?
+                      (this.hasOriginalQuestion(item) ? '重练原题：' : '练同主题精选题：') : '等待到期：') + item.stem)
+                    .accessibilityDescription(this.isDue(item) ? '打开精选练习并写回同一复习项' :
+                      this.reviewTimeLabel(item))
                     .onClick((): void => { this.retry(item); })
                 }
                 .width('100%')

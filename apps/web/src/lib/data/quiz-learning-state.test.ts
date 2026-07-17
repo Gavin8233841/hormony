@@ -375,6 +375,15 @@ const practicePageSource = readFileSync(
   ),
   "utf8"
 );
+const buildersSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../../harmonyos/entry/src/main/ets/common/Builders.ets",
+      import.meta.url
+    )
+  ),
+  "utf8"
+);
 const lessonPageSource = readFileSync(
   fileURLToPath(
     new URL(
@@ -1700,6 +1709,28 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 });
 
 describe("Quiz 与 Practice 结果页下一步动作", () => {
+  it("答题选项与逐题解析提供稳定读屏状态和不小于 48 vp 的操作区", () => {
+    const answerStart = buildersSource.indexOf("export function AnswerOption(");
+    const reviewStart = buildersSource.indexOf("export function ReviewDetailRow(", answerStart);
+    const answerSource = buildersSource.slice(answerStart, reviewStart);
+    const reviewSource = buildersSource.slice(reviewStart);
+    expect(answerStart).toBeGreaterThan(-1);
+    expect(reviewStart).toBeGreaterThan(answerStart);
+    expect(answerSource).toContain("enabled: boolean");
+    expect(answerSource).toContain(".constraintSize({ minHeight: 58 })");
+    expect(answerSource).toContain(".enabled(enabled)");
+    expect(answerSource).toContain("option + (selected ? '，已选择' : '，未选择')");
+    expect(answerSource).toContain("答案已冻结，等待确认写回");
+    expect(reviewSource).toContain(".constraintSize({ minHeight: 48 })");
+    expect(reviewSource).toContain(".accessibilityGroup(true)");
+    expect(reviewSource).toContain("回答正确");
+    expect(reviewSource).toContain("解析已展开");
+    expect(reviewSource).toContain(".height(48)");
+    expect(reviewSource).toContain("向学伴追问第 ");
+    expect(quizPageSource).toContain("this.attemptSubmittedAt.length === 0,");
+    expect(practicePageSource).toContain("this.attemptSubmittedAt.length === 0,");
+  });
+
   it("Quiz 只接受与本次请求课程、Topic、重点标签和题数完全一致的题组", () => {
     const validation = pageMethod(quizPageSource, "validateQuizPackage").source;
     expect(validation).toContain("response.courseId !== this.courseId");

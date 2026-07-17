@@ -171,7 +171,7 @@ export function StagedProgress(title: string, subtitle: string, activeIndex: num
 }
 
 @Builder
-export function AnswerOption(option: string, selected: boolean, onSelect: () => void) {
+export function AnswerOption(option: string, selected: boolean, enabled: boolean, onSelect: () => void) {
   Button({ type: ButtonType.Normal }) {
     Row({ space: 12 }) {
       Text(option.substring(0, 1))
@@ -204,6 +204,9 @@ export function AnswerOption(option: string, selected: boolean, onSelect: () => 
   .backgroundColor(selected ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_CARD)
   .border({ width: 1, color: selected ? Constants.COLOR_BRAND : Constants.COLOR_BORDER })
   .borderRadius(Constants.RADIUS_MD)
+  .enabled(enabled)
+  .accessibilityText(option + (selected ? '，已选择' : '，未选择'))
+  .accessibilityDescription(enabled ? '选择此答案' : '答案已冻结，等待确认写回')
   .onClick((): void => { onSelect(); })
 }
 
@@ -231,6 +234,11 @@ export function ReviewDetailRow(
         .fontColor([Constants.COLOR_TEXT_SECONDARY])
     }
     .width('100%')
+    .constraintSize({ minHeight: 48 })
+    .accessibilityGroup(true)
+    .accessibilityText('第 ' + (index + 1).toString() + ' 题，' +
+      (detail.isCorrect ? '回答正确' : '回答错误') + (expanded ? '，解析已展开' : '，解析已收起'))
+    .accessibilityDescription(expanded ? '收起本题解析' : '展开本题解析')
     .onClick((): void => { onToggle(); })
 
     if (expanded) {
@@ -284,11 +292,13 @@ export function ReviewDetailRow(
               .fontColor(Constants.COLOR_BRAND)
           }
         }
-        .height(36)
+        .height(48)
         .padding({ left: 12, right: 12 })
         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
         .borderRadius(Constants.RADIUS_MD)
         .alignSelf(ItemAlign.Start)
+        .accessibilityText('向学伴追问第 ' + (index + 1).toString() + ' 题')
+        .accessibilityDescription('携带本题、你的答案和正确答案打开学伴')
         .onClick((): void => { onAskTutor(); })
       }
       .width('100%')
