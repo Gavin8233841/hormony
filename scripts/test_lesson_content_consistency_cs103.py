@@ -101,7 +101,7 @@ RENO_REQUIRED = (
     "cwnd=10 MSS，ssthresh=9 MSS",
     "按FlightSize计算ssthresh，重传丢失段，并将cwnd设为ssthresh+3 MSS进入快恢复",
     "确认重传段的新ACK到达后，cwnd回落到ssthresh，退出快恢复并继续拥塞避免",
-    "RFC 5681第3.2节（Fast Retransmit/Fast Recovery）",
+    "第3.2节（Fast Retransmit/Fast Recovery）",
 )
 RENO_FORBIDDEN = (
     "cwnd=ssthresh=9",
@@ -352,8 +352,8 @@ class Cs103LessonContentConsistencyTest(unittest.TestCase):
             "cwnd=ssthresh+3 MSS=12 MSS",
             "cwnd=ssthresh=9 MSS",
         ).replace(
-            "收到确认重传段的新ACK后将cwnd回落到ssthresh=9 MSS；再继续拥塞避免1个RTT，",
-            "继续拥塞避免1个RTT，",
+            "收到确认重传段的新ACK后将cwnd回落到ssthresh=9 MSS；再按题设完成1轮拥塞避免，",
+            "按题设继续1轮拥塞避免，",
         ).replace(
             "按FlightSize计算ssthresh，重传丢失段，并将cwnd设为ssthresh+3 MSS进入快恢复",
             "ssthresh设为当前cwnd的一半，cwnd设为ssthresh值（快恢复）",

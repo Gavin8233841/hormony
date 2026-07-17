@@ -767,3 +767,39 @@
 - 生成前目标测试按预期在旧 TLS 活动产物上失败 1 项；生成后新增断言把“不能表述为”误写成“不表示为”，修正精确字面量后 18 项通过。
 - 首次 WS03 回归命令包含仓库不存在的 `scripts.test_lesson_content_consistency_cs101`，退出码 1；通过 `rg --files` 读取实际测试文件后重跑正确的 10 个模块，退出码 0。
 - **未验证**：当前无模拟器、手机、平板或真机；两项 TLS 活动、长反馈滚动及手机/平板布局未验证。本批未调用线上 API，不构成线上检索或学伴回答证据。
+
+## 批次二十八：Reno ACK 调度与 OSPF 泛洪并发边界
+
+### 行为
+
+- 两个 Reno 活动不再把“每 RTT 精确翻倍/增加 1 MSS”写成 RFC 的无条件时钟语义。题面固定逐段 ACK、无延迟 ACK，并把拥塞避免按轮聚合为增加 1 MSS 的教学离散规则；答案数值保持 `cwnd=10 MSS, ssthresh=9 MSS`，快恢复继续使用 `FlightSize/2`、`ssthresh+3` 和新 ACK 后回落。
+- `cs103_k20/k21` 改为 ACK 驱动增长：慢启动每个确认新数据的 ACK 至多增加 1 SMSS；拥塞避免近似执行 `cwnd += SMSS*SMSS/cwnd`。同标签题 `cs103_q35-q37` 同步区分典型指数形态、延迟 ACK、快恢复临时膨胀和 AIMD 概念模型。
+- OSPF 排序活动不再把泛洪放在完整同步之后。新顺序为 `B→A→C→D→E`：2-Way、ExStart、Exchange/开始参与泛洪、请求列表补齐至 Full、按题设等待 Full 后运行 SPF。
+- `cs103_k42` 明确 Exchange 状态即可参与泛洪和发送 LSR；请求列表未清空时进入 Loading 继续请求，接收 LSU 直至 Full。SPF 使用区域 LSDB，题面固定拓扑并显式等待 Full 只是为了形成唯一演练顺序，不包装成协议必然时序。
+- 子 agent 核验 RFC 并交付 7 项初始测试；主代理复核后扩展为 10 项，覆盖规格、生成活动、Web/raw 切片、同标签题、delayed-ACK 可执行输入及 OSPF 错序 fixture。
+
+### 文件与生成边界
+
+- 活动唯一源：`docs/ACTIVE-LEARNING-SPEC-CS103.md`；经 `scripts/generate-learning-activities.mjs` 更新 `lesson-experiences.json` 的 `$[27]` Reno 示例/两项活动和 `$[31].activities[1]` OSPF 排序活动，共 23 个叶字段。
+- 题库唯一源：`apps/web/src/lib/data/quizzes.ts`；经 `scripts/generate-quizzes-json.mjs` 更新端侧 `quizzes.json` 的 `$[122]`（`cs103_q35`）、`$[123].explanation`（`cs103_q36`）和 `$[124]`（`cs103_q37`），共 9 个叶字段；首标签仍为 `拥塞控制`。
+- 知识同步：`apps/web/src/lib/data/cs103-knowledge.ts` 与端侧 `knowledge-chunks.json` 的 `cs103_k20`、`cs103_k21`、`cs103_k42` 正文/来源逐字一致。
+- 契约：`scripts/test_cs103_non_tls_lesson_facts.py`、`scripts/test_lesson_content_consistency_cs103.py`。
+
+### 证据
+
+- **源码确认**：RFC 5681 第 3.1 节规定慢启动对每个累计确认新数据的 ACK 至多增加 1 SMSS，并给出拥塞避免公式；第 4.2 节允许延迟 ACK 至少每两个满尺寸段确认一次。官方文本 HTTP 200，正文长度 44339 字符。
+- **源码确认**：RFC 2328 第 7.2 节明确邻接从 Database Exchange 开始即用于 flooding；第 10.1 节明确 Exchange 或更高状态可发送全部 OSPF 报文并可发送 LSR；请求列表清空后进入 Full。官方文本 HTTP 200，正文长度 524985 字符。
+- **静态诊断通过**：修正前 `python -m unittest scripts.test_cs103_non_tls_lesson_facts -v` 退出码 1，7 项中两个 Reno 子项和一个 OSPF 项精准红灯；5 项独立红绿 fixture 已由子 agent 单独运行通过。
+- **静态诊断通过**：两个生成器均退出码 0；33/33 Topic、59 个活动与 165 道选择题保持完整，题库源/产物逐字段一致。
+- **静态诊断通过**：目标测试退出码 0；28 项通过。新测试中的 delayed-ACK 固定输入真实推进 `cwnd: 1→2→3`，拒绝无条件得到 4；OSPF 错误 fixture 拒绝 `B→A→D→C→E`。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 同标签闭环全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；94 项运行，93 项通过，1 项跨 WS02 reducer 契约为预期失败；`lesson_self_assessment` 仍不计入客观掌握度。
+- **静态诊断通过**：`cd apps/web; pnpm lint; pnpm typecheck; pnpm test` 均退出码 0；13 个测试文件、167 项通过。
+- **构建通过**：`cd apps/web; pnpm build`，退出码 0；Next.js 生产构建成功，静态页面生成 10/10。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 26 s 122 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- 新知识测试最初把否定说明中的“等待数据库完整同步后才泛洪”当禁用子串，产生 1 项误报；已改为只拒绝明确的 Full 后才泛洪断言，错误顺序由结构化选项和答案执行验证。
+- 目标交叉回归曾因旧测试要求连续出现 `RFC 5681第3.2节` 而失败 1 项；来源合法扩展为第 3.1/3.2/4.2 节后，将契约收紧为精确章节片段并同步真实旧状态 fixture，重跑 28 项通过。
+- **未验证**：当前无模拟器、手机、平板或真机；长题面、五步排序拖动、同标签题跳转和反馈滚动的实际布局未验证。本批未调用线上 API。

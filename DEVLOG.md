@@ -6786,3 +6786,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：RFC 8446 官方文本 HTTP 200 且核对第 2、2.3、4.4.2、4.2.3 节正文；生成器退出码 0，33 Topic/59 活动；CS103 目标 18 项通过；关系校验通过；WS03 回归 84 项运行、83 项通过、1 项既有 expected failure；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 22 s 250 ms`。
 
 失败或未验证：生成前旧产物红灯 1 项；生成后新增断言字面量错误红灯 1 项；首次完整回归误列不存在的 CS101 测试模块而退出 1，读取实际文件名后均已重跑通过。无模拟器、手机、平板或真机，TLS 活动与长文本布局未验证；HAP 未配置 `signingConfigs`，未调用线上 API。
+
+---
+
+## 2026-07-17 [WS03] Reno ACK 调度与 OSPF 泛洪并发边界
+
+背景：Reno 活动、知识切片和同标签题把窗口增长写成脱离 ACK 调度的精确 RTT 时钟规则；OSPF 活动又把 LSA 泛洪排在完整数据库同步之后。RFC 5681 允许 delayed ACK，RFC 2328 则规定邻接从 Database Exchange 开始即参与泛洪。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS103.md`、`apps/web/src/lib/data/cs103-knowledge.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`、`apps/web/src/lib/data/quizzes.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_cs103_non_tls_lesson_facts.py`、`scripts/test_lesson_content_consistency_cs103.py`。
+
+行为变化：Reno 题面固定逐段 ACK、无 delayed ACK 和按轮聚合的教学离散规则，知识与 `cs103_q35-q37` 改为 ACK 驱动增长、`FlightSize/2`、`ssthresh+3` 及新 ACK 后回落；OSPF 排序改为 `B→A→C→D→E`，明确 Exchange 即参与泛洪/可发送 LSR，未清空的请求列表在 Loading 继续补齐，到 Full 后只因题设才运行一次 SPF。子 agent 的 7 项初稿经复核扩展为 10 项跨源/产物/同标签题可执行契约。
+
+验证：RFC 5681/2328 官方文本 HTTP 200 且核对对应正文；两个生成器退出码 0，33 Topic/59 活动、165 题逐字段一致；目标 28 项通过；关系校验通过；WS03 回归 94 项运行、93 项通过、1 项既有 expected failure；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 26 s 122 ms`。
+
+失败或未验证：修正前 3 个真实活动子项红灯；一次否定说明子串误报和一次旧来源精确片段不匹配均已收紧契约后重跑通过。无模拟器、手机、平板或真机，长题面、排序拖动、同标签题跳转与反馈滚动未验证；HAP 未配置 `signingConfigs`，未调用线上 API。

@@ -1573,8 +1573,8 @@
     "caseBody": "水库向下游供水时，闸门开度类比拥塞窗口（cwnd）。刚开始小开度试探（慢启动），确认河道能承受后逐步加大开度（指数增长）；到达警戒水位线（ssthresh）后改为缓慢增加（拥塞避免线性增长）。若发现下游严重溢洪（超时），立即关小闸门到最小重来；若只是局部波动（3个重复ACK），则只减半开度而非全关（快恢复）。下游水厂蓄水池容量类比接收窗口（rwnd），实际放水量取闸门开度和水厂容量的较小值——同时不淹没下游网络和不让水厂溢出。",
     "workedExampleTitle": "TCP拥塞窗口从慢启动到快恢复的变化过程",
     "workedExampleSteps": [
-      "慢启动阶段 → cwnd=1，ssthresh=16。每收到一个ACK，cwnd加1，每经过一个RTT翻倍：1→2→4→8→16（4个RTT完成指数增长）",
-      "进入拥塞避免 → cwnd=16达到ssthresh，切换为线性增长。每经过一个RTT，cwnd增加1个MSS：16→17→18→...→24（8个RTT）",
+      "慢启动阶段 → 本例固定每个满尺寸报文段由一个确认新数据的ACK单独确认且不使用延迟ACK。cwnd=1、ssthresh=16时，连续发送可按轮得到1→2→4→8→16",
+      "进入拥塞避免 → 本例把每轮完整窗口数据的ACK聚合为cwnd增加1 MSS的离散步骤：16→17→18→...→24；这是为状态推演固定的更新规则，不是脱离ACK调度的时钟保证",
       "触发快重传 → 假设cwnd与FlightSize均为24 MSS时收到第3个重复ACK。按RFC 5681，ssthresh=max(FlightSize/2, 2 MSS)=12 MSS，立即重传丢失段，并把cwnd暂时膨胀为ssthresh+3 MSS=15 MSS",
       "退出快恢复并继续拥塞避免 → 每多收到1个重复ACK，cwnd可再增加1 MSS；当确认重传段的新ACK到达时，将cwnd回落到ssthresh=12 MSS，再以线性方式增长：12→13→14→...",
       "对比超时场景 → 若cwnd=24时不是收到3个重复ACK而是RTO超时，则ssthresh=24/2=12，cwnd重置为1，重新进入慢启动阶段（与快恢复的区别在于cwnd是否归1）"
@@ -1585,29 +1585,29 @@
         "type": "state_trace",
         "title": "状态推演",
         "focusTag": "拥塞控制",
-        "prompt": "一个TCP Reno连接的cwnd和ssthresh均以MSS为单位，初始cwnd=1、ssthresh=16。请按RFC 5681推演以下操作序列后的最终值",
-        "content": "初始状态：\ncwnd=1 MSS, ssthresh=16 MSS\n\n操作序列：\n1. 经过4个RTT的慢启动（cwnd每RTT翻倍）→ cwnd从1经2、4、8变为16，达到ssthresh\n  2. 进入拥塞避免，经过2个RTT线性增长 → cwnd从16变为17，再变为18\n  3. 此时FlightSize=18 MSS，收到第3个重复ACK → ssthresh=9 MSS，立即重传丢失段，cwnd=ssthresh+3 MSS=12 MSS\n  4. 收到确认重传段的新ACK后将cwnd回落到ssthresh=9 MSS；再继续拥塞避免1个RTT，cwnd从9变为10 MSS\n\n推演过程：\n操作1后：cwnd=16, ssthresh=16（慢启动阶段指数增长，4个RTT：1→2→4→8→16）\n操作2后：cwnd=18, ssthresh=16（拥塞避免线性增长，每RTT加1）\n操作3后：cwnd=12 MSS, ssthresh=9 MSS（进入快恢复时用3个重复ACK暂时膨胀窗口）\n操作4收到新ACK后：cwnd=9 MSS, ssthresh=9 MSS（窗口回落）；再经过1个RTT后cwnd=10 MSS\n\n最终状态：\ncwnd=10 MSS, ssthresh=9 MSS",
+        "prompt": "本题固定确认与离散更新规则：每个满尺寸报文段都由一个确认新数据的ACK单独确认，不使用延迟ACK；慢启动每轮按ACK增长，拥塞避免每完成一轮窗口数据后将cwnd增加1 MSS。一个TCP Reno连接初始cwnd=1、ssthresh=16（均以MSS为单位），请推演最终值",
+        "content": "初始状态：\ncwnd=1 MSS, ssthresh=16 MSS\n\n操作序列：\n1. 按题设逐段确认规则完成4轮慢启动 → cwnd从1经2、4、8变为16，达到ssthresh\n  2. 按题设离散更新规则完成2轮拥塞避免 → cwnd从16变为17，再变为18\n  3. 此时FlightSize=18 MSS，收到第3个重复ACK → ssthresh=9 MSS，立即重传丢失段，cwnd=ssthresh+3 MSS=12 MSS\n  4. 收到确认重传段的新ACK后将cwnd回落到ssthresh=9 MSS；再按题设完成1轮拥塞避免，cwnd从9变为10 MSS\n\n推演过程：\n操作1后：cwnd=16, ssthresh=16（题设逐段确认，4轮为1→2→4→8→16）\n操作2后：cwnd=18, ssthresh=16（题设将每轮拥塞避免聚合为增加1 MSS）\n操作3后：cwnd=12 MSS, ssthresh=9 MSS（进入快恢复时用3个重复ACK暂时膨胀窗口）\n操作4收到新ACK后：cwnd=9 MSS, ssthresh=9 MSS（窗口回落）；再按题设完成1轮后cwnd=10 MSS\n\n最终状态：\ncwnd=10 MSS, ssthresh=9 MSS",
         "language": "推演草稿",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
         "answer": "cwnd=10 MSS，ssthresh=9 MSS",
-        "feedback": "慢启动和拥塞避免先把cwnd从1推到18 MSS。第3个重复ACK到达时，RFC 5681要求把ssthresh设为FlightSize的一半，并把cwnd设为ssthresh+3 MSS，而不是立刻把cwnd直接设为ssthresh；确认重传段的新ACK到达后才把cwnd回落到ssthresh。知识切片 cs103_k20、cs103_k22、cs103_k23提供阶段概览，本题的窗口数值按RFC 5681第3.2节精确推演",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681第3.2节（Fast Retransmit/Fast Recovery）；知识切片 cs103_k20、cs103_k22、cs103_k23"
+        "feedback": "在题设逐段ACK、无延迟ACK和按轮聚合拥塞避免的固定规则下，慢启动与拥塞避免先把cwnd从1推到18 MSS。第3个重复ACK到达时，RFC 5681要求把ssthresh设为FlightSize的一半，并把cwnd设为ssthresh+3 MSS，而不是立刻把cwnd直接设为ssthresh；确认重传段的新ACK到达后才把cwnd回落到ssthresh。RFC 5681第3.1节按确认新数据的ACK增加cwnd；第4.2节允许延迟ACK，因此每RTT翻倍不是无条件保证。知识切片 cs103_k20、cs103_k22、cs103_k23提供阶段概览，本题的快重传和快恢复窗口数值按RFC 5681第3.2节精确推演",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681第3.1节（Slow Start and Congestion Avoidance）、第3.2节（Fast Retransmit/Fast Recovery）、第4.2节（Generating Acknowledgments）；知识切片 cs103_k20、cs103_k22、cs103_k23"
       },
       {
         "id": "cs103-TCP流量控制与拥塞控制-2",
         "type": "step_order",
         "title": "步骤排序",
         "focusTag": "拥塞控制",
-        "prompt": "以下是TCP Reno拥塞控制从连接建立到遇到3个重复ACK的各阶段。请将打乱的步骤排列为正确的时间顺序",
+        "prompt": "本题固定确认与离散更新规则：每个满尺寸报文段都由一个确认新数据的ACK单独确认，不使用延迟ACK；慢启动每轮按ACK增长，拥塞避免每完成一轮窗口数据后将cwnd增加1 MSS。请排列该TCP Reno连接从慢启动到快恢复的题设事件",
         "content": "",
         "language": "步骤卡片",
         "interactionMode": "ordered_choice",
         "options": [
           "收到第3个重复ACK，按FlightSize计算ssthresh，重传丢失段，并将cwnd设为ssthresh+3 MSS进入快恢复",
-          "cwnd从1开始，每经过一个RTT翻倍（慢启动指数增长）",
-          "cwnd达到ssthresh后，每经过一个RTT增加1个MSS（拥塞避免线性增长）",
+          "按题设逐段确认完成慢启动各轮，cwnd从1开始按1→2→4→8增长",
+          "cwnd达到ssthresh后，按题设每完成一轮窗口数据将cwnd增加1 MSS",
           "确认重传段的新ACK到达后，cwnd回落到ssthresh，退出快恢复并继续拥塞避免"
         ],
         "answerIndexes": [
@@ -1617,8 +1617,8 @@
           3
         ],
         "answer": "B → C → A → D",
-        "feedback": "TCP Reno先经历慢启动（B）和拥塞避免（C）。第3个重复ACK触发快重传时（A），ssthresh按FlightSize减半，cwnd暂时设为ssthresh+3 MSS；确认重传段的新ACK到达后（D），cwnd才回落到ssthresh并转入拥塞避免。若发生RTO超时则走另一条恢复路径，将cwnd降到损失窗口并重新慢启动。知识切片 cs103_k20、cs103_k21、cs103_k23提供四阶段概览，精确窗口变更以RFC 5681第3.1节和第3.2节为准",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681（TCP Congestion Control）；知识切片 cs103_k20、cs103_k21、cs103_k23"
+        "feedback": "TCP Reno先按题设规则经历慢启动（B）和拥塞避免（C）。第3个重复ACK触发快重传时（A），ssthresh按FlightSize减半，cwnd暂时设为ssthresh+3 MSS；确认重传段的新ACK到达后（D），cwnd才回落到ssthresh并转入拥塞避免。若发生RTO超时则走另一条恢复路径，将cwnd降到损失窗口并重新慢启动。RFC 5681第3.1节按确认新数据的ACK增加cwnd；第4.2节允许延迟ACK，因此每RTT翻倍不是无条件保证。知识切片 cs103_k20、cs103_k21、cs103_k23提供四阶段概览",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 5681第3.1节（Slow Start and Congestion Avoidance）、第3.2节（Fast Retransmit/Fast Recovery）、第4.2节（Generating Acknowledgments）；知识切片 cs103_k20、cs103_k21、cs103_k23"
       }
     ]
   },
@@ -1850,27 +1850,27 @@
         "type": "step_order",
         "title": "步骤排序",
         "focusTag": "路由决策",
-        "prompt": "以下是OSPF路由器从启动到计算出路由表的主要步骤。请将打乱的步骤排列为正确的执行顺序",
+        "prompt": "题设假定拓扑在本轮同步期间保持稳定，并明确等待相邻路由器达到Full后再执行一次路由计算。以下是OSPF路由器建立邻接、同步数据库并按题设计算路由表的事件，请排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
         "interactionMode": "ordered_choice",
         "options": [
-          "交换数据库描述报文（DBD），互相了解对方链路状态数据库（LSDB）的摘要",
-          "通过Hello协议发现邻居并建立邻接关系",
-          "各路由器独立运行Dijkstra算法，基于完整LSDB计算最短路径树并生成路由表",
-          "通过LSR/LSU/LSAck请求、交换和确认LSA，完成LSDB的完整同步",
-          "泛洪LSA（链路状态通告）在全区域同步链路状态数据库"
+          "进入ExStart，协商主从关系和初始DD序列号",
+          "Hello协议发现邻居并确认双向通信",
+          "进入Exchange并交换DBD摘要；邻接从Database Exchange开始即参与LSA泛洪",
+          "Exchange中建立请求列表并可发送LSR；未清空则进入Loading继续请求，接收LSU直至列表清空后到达Full",
+          "按题设等待Full后，以当前区域LSDB为输入运行Dijkstra并生成路由表"
         ],
         "answerIndexes": [
           1,
           0,
+          2,
           3,
-          4,
-          2
+          4
         ],
-        "answer": "B → A → D → E → C",
-        "feedback": "OSPF建立邻接和计算路由的流程为：先通过Hello协议发现邻居建立邻接关系（B），再交换DBD了解对方LSDB摘要（A），然后通过LSR/LSU/LSAck完成LSDB的详细同步（D），LSA在全区域泛洪使所有路由器的LSDB一致（E），最后每台路由器独立运行Dijkstra算法基于完整的LSDB计算最短路径树生成路由表（C）。与距离向量算法不同，链路状态算法中每台路由器都拥有完整拓扑图，收敛速度快且无计数到无穷问题。这与知识切片 cs103_k42 所述\"通过Hello协议发现邻居、泛洪LSA同步LSDB、运行Dijkstra算法\"一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 2328（OSPF v2）；知识切片 cs103_k42"
+        "answer": "B → A → C → D → E",
+        "feedback": "Hello协议先发现邻居并确认双向通信（B），随后进入ExStart协商主从关系和初始DD序列号（A）。进入Exchange后交换DBD摘要，同时邻接从Database Exchange开始即参与LSA泛洪（C）；Exchange中形成请求列表并可发送LSR，若列表未清空则进入Loading继续请求，接收LSU直至列表清空后到达Full（D）。RFC 2328第7.2节和第10.1节表明，泛洪不是“LSDB完整同步之后才开始”的独立后续阶段。只有因为题设固定拓扑并明确等待Full，最后才按当前区域LSDB运行Dijkstra生成路由表（E）",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 2328第7.2节（The Synchronization of Databases）、第10.1节（Neighbor states）、第16节（Calculation of the routing table）；知识切片 cs103_k42"
       }
     ]
   },
