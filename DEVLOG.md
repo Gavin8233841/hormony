@@ -6758,3 +6758,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：RFC 9000/9002 官方 HTML 与文本均返回 HTTP 200，正文确认 STREAM frame 多路复用、丢失信息按需在新帧发送和拥塞控制，两份标准文本 `FEC` 词项计数均为 0；生成器退出码 0，33 Topic/59 活动；CS103 目标 10 项、关系校验、WS03 64 项回归均通过（1 项既有 expected failure）；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 18 s 595 ms`。
 
 失败或未验证：无模拟器或真机，UDP 推演输入、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。
+
+---
+
+## 2026-07-17 [WS03] CS102 题面自洽与并发模型边界
+
+背景：四处活动仍把未发生的释放写进题面、把中断驱动 I/O 泛化为逐字节中断、混用资源分配图与进程等待图，并把一种条件变量持锁轨迹写成唯一强制模式，导致题面事实或模型前提不可证明。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS102.md`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_consistency_cs102.py`、`scripts/test_cs102_concurrency_lesson_facts.py`。
+
+行为变化：FF 题面只声明实际存在的分配请求；DMA 与需 CPU 逐字节搬运的程序控制 I/O 对比；死锁题明确每类资源仅一个实例、wait-for 边表示必须等待，并区分多实例检测；条件变量题明确持同一锁、signal 后 unlock 的约定轨迹，同时说明 POSIX 允许无锁 signal 的边界。子 agent 核验 OS Concepts/POSIX 并实现并发状态执行与错误 fixtures，主代理补齐 16 活动全字段、FF 与 DMA 固定输入契约。
+
+验证：生成器退出码 0，33 Topic/59 活动；目标 12 项、关系校验、WS03 76 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 17 s 267 ms`。
+
+失败或未验证：无模拟器或真机，代码填空、七步排序、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。

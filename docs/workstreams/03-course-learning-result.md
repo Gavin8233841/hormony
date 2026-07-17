@@ -701,3 +701,35 @@
 ### 未验证
 
 - **未验证**：当前无模拟器、手机、平板或真机；UDP 推演输入、反馈滚动和手机/平板布局未验证。
+
+## 批次二十六：CS102 题面自洽与并发模型边界
+
+### 行为
+
+- `cs102-内存管理基础-1` 的操作只有三次分配，题面从“分配/释放请求序列”改为“分配请求序列”；固定输入恢复旧题面时会同时报告缺少真实释放操作和题面类型不符。
+- `cs102-I/O系统与磁盘调度-2` 不再宣称中断驱动 I/O 必然每传输一个字节中断一次，改为依据 `cs102_k31` 比较需 CPU 逐字节搬运的程序控制 I/O 与 DMA 块传输；契约绑定直接传输和完成中断两个事实。
+- `cs102-死锁-2` 明确题设是“每类资源仅有一个实例”的 wait-for graph，且每条边表示一个进程必须等待另一进程释放资源，因此有环即死锁、环是充要条件；反馈同时说明多实例模型需用 Available/Allocation/Request 检测，不能把一般资源分配图的任意环直接判为死锁。
+- `cs102-同步与互斥-2` 明确排序的是状态修改线程持有同一互斥锁、在 signal/broadcast 后释放锁的一条正确轨迹。反馈依据 POSIX 说明 wait 原子释放并阻塞、返回前重新持锁，以及 signal 可不持锁但要求可预测调度时应持锁，避免把题设轨迹误写成唯一合法 API 顺序。
+- 子 agent 依据 OS Concepts 官方第 8 章材料和 POSIX.1-2024 实现 wait-for 模型分支、条件变量状态执行与四类错误固定输入；主代理逐段复核并新增 16 个 CS102 活动的类型、答案、引用闭包，以及 FF/DMA 红绿契约。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_consistency_cs102.py`
+- `scripts/test_cs102_concurrency_lesson_facts.py`
+
+### 证据
+
+- **源码确认**：`cs102_k31` 明确 DMA 在设备与内存间直接传输、CPU 无需逐字节参与，并在传输完成后通过中断通知 CPU。
+- **源码确认**：Operating System Concepts 10e 官方第 8 章幻灯片第 11、33 页分别区分一般资源分配图的多实例“可能死锁”和每类资源单实例 wait-for graph 的“有环即死锁”。
+- **源码确认**：POSIX.1-2024 `pthread_cond_wait()` 规定调用方持锁、原子释放并阻塞，返回前重新获取同一锁；`pthread_cond_signal()/broadcast()` 可在未持关联锁时调用，但要求可预测调度时调用方应持锁。官方页面本轮读取均返回 HTTP 200，且已核对上述正文。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；33/33 Topic、59 个活动，类型分布不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_consistency_cs102 scripts.test_cs102_concurrency_lesson_facts -v`，退出码 0；12 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；76 项运行，75 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 17 s 267 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器、手机、平板或真机；代码填空、七步排序、反馈滚动和手机/平板布局未验证。
