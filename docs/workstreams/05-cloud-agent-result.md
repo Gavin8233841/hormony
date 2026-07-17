@@ -263,3 +263,29 @@
 
 - 首轮联合回归 28/29：内部预算已触发，但测试自身先通过 `vi.waitFor` 推进时钟，导致 99999ms 前置断言失败；只冲刷 0ms 微任务后 30/30 通过，失败未计作通过。
 - **未验证**：真实模型上游连接在 100 秒时的网络级取消、线上平台 120 秒回收、当前分支线上部署、浏览器、HarmonyOS 模拟器与真机。未修改 HarmonyOS、题库内容、RAG、缓存策略、生产模型 ID 或秘密。
+
+## 13. Plan 请求总预算与资源清理
+
+### 13.1 源码确认与行为
+
+- Planner 当前只执行一次模型调用，默认单次 45 秒超时；但 `MODEL_TIMEOUT_MS` 可由部署环境配置为超过路由 `maxDuration=120` 的值，旧路由本身没有硬 deadline，挂起的 Agent 也不会被平台配置主动中止。
+- Plan 路由复用模型层 `withModelRequestBudget`，将整个 Planner 操作限制为 100000ms，并把派生 signal 贯穿既有模型调用。
+- 内部 deadline 精确映射为 `504/MODEL_TIMEOUT`；外部 Request 中止继续映射为 `499/MODEL_CANCELLED`。成功、失败和取消路径均由预算 helper 清理 timer 与父 Request.signal listener。
+- 输出 Safety、Plan 结构校验、日期和本地优先边界不变；本批没有给只有一次模型调用的 Planner 增加重试或静态降级。
+
+### 13.2 测试与复核
+
+- 新增 Plan 路由级预算测试，确认 99999ms 时 Planner signal 未中止、100000ms 精确中止并返回 504；成功响应后 `vi.getTimerCount()` 为 0，父 signal 的 abort listener 已调用对应 remove。
+- 既有 Request 取消测试继续验证派生 signal 被中止且响应为 499；Plan 生命周期与 Planner 输出边界联合回归通过。
+- 定向命令：`pnpm exec vitest run src/app/api/plan/request-budget.test.ts src/app/api/plan/request-cancellation.test.ts src/app/api/plan/plan-lifecycle.test.ts src/lib/agents/planner-agent.test.ts` exit 0，4 个测试文件、22 项通过。
+
+### 13.3 验证
+
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，28 个测试文件、364 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面和全部 dynamic API route 的生产构建，middleware 26.8 kB。
+- 本地 production 黑盒：`127.0.0.1:4322`，显式无模型测试响应、stateless/off；有效 Plan 请求为 HTTP 503、`MODEL_UNAVAILABLE`，`dailyMinutes=10` 为 HTTP 400、`INVALID_DAILY_MINUTES`。实例 PID 10836 已停止，端口已关闭。
+
+### 13.4 未验证
+
+- **未验证**：真实模型连接在 100 秒时的网络级取消、线上平台 120 秒回收、当前分支线上部署、浏览器、HarmonyOS 模拟器与真机。
+- 本批未修改 DEVLOG、HarmonyOS、Quiz、Chat SSE 终态、RAG、缓存策略、生产模型 ID 或秘密。
