@@ -669,3 +669,35 @@
 ### 未验证
 
 - **未验证**：当前无模拟器、手机、平板或真机；五步排序交互与题面长文本在实际设备上的显示未验证。
+
+## 批次二十五：UDP 乱序推演与 QUIC 恢复语义校正
+
+### 行为
+
+- 修正 `cs103-UDP协议-2` 的自相矛盾推演：旧操作先让 D1 正常到达，再让 D3 到达，却把 `[D1,D3]` 称为乱序。当前流程明确 D1 在网络中延迟、D2 丢失、D3 先到、D1 后到，端侧操作轨迹、最终状态和答案统一为 `[D3,D1]`。
+- 删除“标准 QUIC 通过前向纠错恢复”的错误表述。活动反馈与 `cs103_k26` 现依据 RFC 9000/9002 描述多路复用、确认与丢失检测、将丢失信息按需放入新帧发送及拥塞控制，并明确不把 FEC 定义为核心恢复机制。
+- Web `cs103_k26` 与 HarmonyOS `knowledge-chunks.json` 同步为逐字一致内容，来源更新为“计算机网络：自顶向下方法；RFC 9000/9002”，避免 Lesson 正文修正后离线检索仍返回旧事实。
+- 子 agent 修正 CS103 规格并建立当前绿灯/旧文案红灯契约；主代理复核官方标准后补充 Web/端侧切片结构化比对和生成活动契约，直接检查端侧 `$[28].activities[1]` 的操作序列、答案、反馈与来源。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `apps/web/src/lib/data/cs103-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_consistency_cs103.py`
+
+### 证据
+
+- **源码确认**：RFC 9000 第 2 节规定通过交织多条流的 STREAM frame 实现多路复用；第 13.3 节规定丢失包不整包重传，而是按需在新帧中再次发送所载信息；RFC 9002 第 3 节定义确认、判丢和新包发送，第 7 节定义拥塞控制。官方 HTML 与文本本轮读取均返回 HTTP 200，且 RFC 9000/9002 文本中的 `FEC` 词项计数均为 0。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；33/33 Topic、59 个活动，类型分布不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_consistency_cs103 -v`，退出码 0；10 项通过，包含当前规格/生成产物/双端切片绿灯与旧 `[D1,D3]`、FEC 文案固定输入红灯。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；64 项运行，63 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`cd apps/web; pnpm lint; pnpm typecheck; pnpm test` 均退出码 0；13 个测试文件、167 项通过。
+- **构建通过**：`cd apps/web; pnpm build`，退出码 0；Next.js 生产构建成功。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 18 s 595 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器、手机、平板或真机；UDP 推演输入、反馈滚动和手机/平板布局未验证。

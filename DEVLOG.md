@@ -6744,3 +6744,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：生成器退出码 0，33 Topic/59 活动；目标 22 项、关系校验、WS03 54 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 16 s 122 ms`。
 
 失败或未验证：无模拟器或真机，五步排序交互及题面长文本在手机/平板的显示未验证；HAP 未配置 `signingConfigs`。
+
+---
+
+## 2026-07-17 [WS03] UDP 乱序推演与 QUIC 恢复语义校正
+
+背景：`cs103-UDP协议-2` 先让 D1 到达，再称随后到达的 D3“乱序”，最终 `[D1,D3]` 实际没有颠倒发送顺序；活动和 `cs103_k26` 还把前向纠错写成标准 QUIC 的核心能力，与 RFC 9000/9002 定义的确认、丢失检测、新帧重发和拥塞控制不符。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS103.md`、`apps/web/src/lib/data/cs103-knowledge.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_consistency_cs103.py`。
+
+行为变化：题面改为 D1 延迟、D2 丢失、D3 先到、D1 后到，端侧最终缓存与答案统一为 `[D3,D1]`；QUIC 反馈和 `cs103_k26` 统一为多路复用、可靠交付、确认/丢失检测、按需在新帧中重发信息及拥塞控制，不再宣称标准核心 FEC。子 agent 修正规格并建立固定输入，主代理补齐 Web/端侧知识切片逐字一致、生成 JSON 契约与 RFC 来源。
+
+验证：RFC 9000/9002 官方 HTML 与文本均返回 HTTP 200，正文确认 STREAM frame 多路复用、丢失信息按需在新帧发送和拥塞控制，两份标准文本 `FEC` 词项计数均为 0；生成器退出码 0，33 Topic/59 活动；CS103 目标 10 项、关系校验、WS03 64 项回归均通过（1 项既有 expected failure）；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 18 s 595 ms`。
+
+失败或未验证：无模拟器或真机，UDP 推演输入、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。
