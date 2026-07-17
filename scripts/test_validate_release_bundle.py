@@ -125,6 +125,35 @@ def file_record(path: str, role: str, content: bytes) -> dict[str, object]:
     }
 
 
+def release_evidence_bytes(hap: bytes) -> bytes:
+    records = [
+        {
+            "id": record_id,
+            "claim": f"{record_id} 固定输入发布事实",
+            "level": "未验证",
+            "recordedAt": "2026-07-17T12:00:00+08:00",
+            "command": None,
+            "exitCode": None,
+            "environment": None,
+            "artifacts": [],
+            "businessChecks": [],
+            "notes": "固定输入只证明门禁合同，不代表产品流程通过",
+        }
+        for record_id in sorted(MODULE.EVIDENCE_GATE.REQUIRED_RECORD_IDS)
+    ]
+    return json.dumps(
+        {
+            "schemaVersion": 1,
+            "sourceCommit": SOURCE_COMMIT,
+            "hapSha256": hashlib.sha256(hap).hexdigest(),
+            "records": records,
+            "limitations": ["模拟器、真机、线上和门户上传均未验证"],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
 def complete_fixture(
     hap: bytes | None = None,
 ) -> tuple[dict[str, bytes], dict[str, bytes], dict[str, object]]:
@@ -133,14 +162,13 @@ def complete_fixture(
         MODULE.CONTENT_GATE.SUBMISSION_MANIFEST: b"source manifest\n",
         MODULE.CONTENT_GATE.COMPETITION_NOTICE: b"reviewed notice\n",
     }
+    resolved_hap = hap if hap is not None else zip_bytes([("module.json", b"{}")])
     attachments = {
-        "release/app.hap": hap
-        if hap is not None
-        else zip_bytes([("module.json", b"{}")]),
+        "release/app.hap": resolved_hap,
         "release/third-party-licenses.md": b"license index\n",
         "release/originality.md": b"originality declaration\n",
         "release/ai-usage.md": b"ai usage declaration\n",
-        "release/evidence.json": b"{}\n",
+        "release/evidence.json": release_evidence_bytes(resolved_hap),
     }
     role_by_path = {
         "release/app.hap": "hap",
@@ -171,6 +199,21 @@ def with_document(entries: dict[str, bytes], document: dict[str, object]) -> dic
         separators=(",", ":"),
     ).encode("utf-8")
     return result
+
+
+def with_attachment(
+    entries: dict[str, bytes],
+    document: dict[str, object],
+    path: str,
+    content: bytes,
+) -> dict[str, bytes]:
+    result = dict(entries)
+    result[path] = content
+    records = document["nonGitFiles"]
+    record = next(item for item in records if item["path"] == path)
+    record["bytes"] = len(content)
+    record["sha256"] = hashlib.sha256(content).hexdigest()
+    return with_document(result, document)
 
 
 class ReleaseBundleGateTests(unittest.TestCase):
@@ -246,6 +289,44 @@ class ReleaseBundleGateTests(unittest.TestCase):
 
         self.assertTrue(any("bytes 与实际文件大小不一致" in error for error in errors))
         self.assertTrue(any("sha256 与实际文件哈希不一致" in error for error in errors))
+
+    def test_release_evidence_empty_object_is_rejected_after_manifest_rehash(self) -> None:
+        entries, sources, document = complete_fixture()
+
+        mutated_entries = with_attachment(
+            entries,
+            document,
+            "release/evidence.json",
+            b"{}",
+        )
+        errors = self.check(mutated_entries, sources)
+        output = "\n".join(errors)
+
+        self.assertIn("发布证据索引 缺少字段", output)
+        self.assertIn("发布证据索引缺少发布面", output)
+
+    def test_release_evidence_commit_and_hap_bindings_use_bundle_bytes(self) -> None:
+        entries, sources, document = complete_fixture()
+        evidence_document = json.loads(entries["release/evidence.json"])
+        evidence_document["sourceCommit"] = "b" * 40
+        evidence_document["hapSha256"] = "c" * 64
+        evidence_content = json.dumps(
+            evidence_document,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+        mutated_entries = with_attachment(
+            entries,
+            document,
+            "release/evidence.json",
+            evidence_content,
+        )
+        errors = self.check(mutated_entries, sources)
+        output = "\n".join(errors)
+
+        self.assertIn("sourceCommit 与 release-manifest.json 不一致", output)
+        self.assertIn("hapSha256 与实际 HAP 字节不一致", output)
 
     def test_source_commit_must_match_current_git_commit_and_resolve(self) -> None:
         entries, sources, _ = complete_fixture()

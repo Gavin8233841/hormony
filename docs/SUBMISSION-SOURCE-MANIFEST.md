@@ -30,10 +30,12 @@
     "scripts/test_validate_competition_content.py",
     "scripts/test_validate_official_deliverables.py",
     "scripts/test_validate_release_bundle.py",
+    "scripts/test_validate_release_evidence.py",
     "scripts/validate-competition-content.py",
     "scripts/validate-competition-evidence.py",
     "scripts/validate-official-deliverables.py",
     "scripts/validate-release-bundle.py",
+    "scripts/validate-release-evidence.py",
     "scripts/validate-topic-relations.py"
   ],
   "exclude": [
@@ -70,6 +72,40 @@
 - `originality-declaration`
 - `ai-usage-declaration`
 - `release-evidence-index`
+
+`release-evidence-index` 对应的 UTF-8 JSON 是项目内部证据合同。顶层必须且只能包含
+`schemaVersion`、`sourceCommit`、`hapSha256`、`records`、`limitations`；
+`schemaVersion` 固定为 `1`，提交与 HAP 哈希分别绑定 `release-manifest.json` 和包内
+唯一 HAP 的实际字节，`limitations` 至少保留一项真实边界。
+
+`records` 必须恰好覆盖以下七个发布面各一次，不接受缺失、重复、大小写变体或额外
+标识：
+
+- `source-package`
+- `web-validation`
+- `harmonyos-build`
+- `golden-demo`
+- `final-media`
+- `license-and-originality`
+- `portal-upload`
+
+每条记录必须且只能包含 `id`、`claim`、`level`、`recordedAt`、`command`、
+`exitCode`、`environment`、`artifacts`、`businessChecks`、`notes`。`level` 只接受
+仓库定义的七种精确证据等级；`recordedAt` 必须是含时区的 RFC 3339 秒级时间。
+静态诊断和构建通过必须记录命令与 `exitCode=0`，构建通过还必须记录产物；模拟器、
+真机和线上通过还必须同时记录成功命令、明确环境、证据文件与业务检查。`未验证`
+必须说明真实缺口，且不得夹带命令、退出码、环境、产物或业务通过字段。结构通过
+只证明索引完整且如实绑定，不会把任一记录自动升级为产品通过。
+
+独立检查命令如下；最终包检查会自动用 manifest 提交和包内 HAP 实际哈希执行同一
+校验，因此最终以完整发布包门禁为准：
+
+```powershell
+python -B scripts/validate-release-evidence.py `
+  --index-path <发布证据索引的明确路径> `
+  --source-commit <release-manifest.json 的完整提交> `
+  --hap-sha256 <包内唯一 HAP 的 SHA-256>
+```
 
 运行命令：
 

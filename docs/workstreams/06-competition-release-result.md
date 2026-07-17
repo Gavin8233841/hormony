@@ -555,3 +555,68 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
 - **未验证**：黄金时间轴连续不等于真实 Chat、Quiz、卡片/通知和 ArkData 回写
   已在同一提交、同一 HAP、同一账号状态运行通过。
 - **未验证**：最终旁白、字幕、原始录屏、完整播放和镜头/证据编号映射尚不存在。
+
+## 批次 12：正式发布证据索引与包内提交/HAP 绑定门禁
+
+背景：最终发布包此前只要求 `release-evidence-index` 角色的附件存在且 bytes/SHA-256
+与 manifest 一致，没有解析附件语义；同步修改附件与 manifest 后，空 JSON 对象也能
+满足完整发布包门禁。评分矩阵 13 行已有独立 Markdown 门禁，本批只负责最终发布
+流水的七个证据面，不复制评分声明 schema。
+
+文件：
+
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-release-evidence.py`
+- `scripts/test_validate_release_evidence.py`
+- `scripts/validate-release-bundle.py`
+- `scripts/test_validate_release_bundle.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 新增只读 UTF-8 JSON 门禁。顶层与记录字段使用精确白名单，拒绝重复键、未知字段、
+  超限内容和非法时间；`sourceCommit` 与 `hapSha256` 分别绑定发布 manifest 和包内
+  唯一 HAP 的实际字节。
+- 记录必须恰好覆盖 `source-package`、`web-validation`、`harmonyos-build`、
+  `golden-demo`、`final-media`、`license-and-originality`、`portal-upload` 七个发布面
+  各一次；缺失、重复、额外标识和大小写变体都会失败。该固定集合是项目内部加严，
+  不冒充官方 PDF 新增字段。
+- 证据等级只接受仓库七种精确等级。静态诊断/构建记录必须绑定成功命令，构建记录
+  必须有产物；模拟器、真机、线上记录还必须有成功命令、明确环境、证据文件和业务
+  检查。`未验证` 必须说明缺口，且不得夹带命令、退出码、环境、产物或业务通过字段。
+- 完整发布包门禁动态复用新门禁。合法七记录固定输入保持正向通过；将索引替换为
+  空对象并同步更新 manifest bytes/hash 后仍失败；分别伪造索引提交与 HAP 哈希时，
+  两个绑定错误都会从完整包检查返回。
+- 独立子 agent 只读复核确认必须使用固定完整集合并阻断“未验证”夹带通过字段。
+  复核提出的 13 个评分声明 ID 已由既有评分矩阵门禁负责；本批保留七个发布流水面，
+  避免用一个 JSON 同时承担评分声明与发布验收两种合同。子 agent 未修改文件或 Git。
+
+验证：
+
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_release_evidence.py -v`，
+  exit 0，7/7 通过；覆盖完整七记录、提交/HAP 绑定、精确字段、缺失/重复/额外 ID、
+  证据等级、未验证互斥、时间、重复 JSON 键和资源上限。
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_release_bundle.py -v`，
+  exit 0，27/27 通过；新增全包空对象和提交/HAP 绑定固定输入，既有归档结构、资源
+  上限、秘密不回显及合法 ZIP/HAP 正向控制继续通过。
+- **静态诊断通过**：`python -B scripts/test_validate_official_deliverables.py`，
+  exit 0，18/18 通过。
+- **静态诊断通过**：内容门禁单测 29/29、Node 单一源测试 4/4、147/36 生成一致性、
+  165 题/33 Topic 内容门禁、Topic 关系门禁、评分证据 6/6 与两个 PowerShell 运行时
+  的冒烟自测 13/13 均 exit 0。内容门禁继续报告答案位置 `A=42、B=43、C=41、D=39`、
+  难度 `easy=67、medium=65、hard=33`。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均 exit 0；
+  13 个测试文件、169 项测试通过，无 ESLint 警告或错误。
+- **构建通过**：Web `pnpm build` exit 0；HarmonyOS API 12 增量命令
+  `.\hvigorw.bat assembleHap --no-daemon` exit 0，`BUILD SUCCESSFUL in 6 s 504 ms`；
+  仍有未配置 `signingConfigs` 的既有警告。
+
+未验证：
+
+- **未验证**：本批没有生成或提交发布证据 JSON、最终 ZIP、HAP、PDF 或 MP4；固定
+  输入通过只证明门禁合同，不能证明正式附件已经准备或完整发布包通过。
+- **未验证**：增量 HAP 未配置正式签名，也没有安装、模拟器、真机或线上业务流程
+  证据；构建通过不能升级为这些等级。
+- **未验证**：内容门禁未联网复查 36 条外部 URL，NOTICE 仍含正式提交前人工处理
+  标记；许可证/原创/AI 声明签署、最终媒体完整播放和门户上传均未验证。

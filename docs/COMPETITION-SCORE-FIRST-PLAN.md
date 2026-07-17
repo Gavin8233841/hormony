@@ -237,7 +237,29 @@ PDF 检查清单：
 5. 安装 HAP 到明确设备并运行黄金路径；记录 ZIP 与 HAP SHA-256、文件大小、构建命令和退出码。
 6. 文件名严格替换真实值：`03-作品名称+参赛队伍名称.zip`。门户大小上限为**未验证**，队长上传前核对。
 
-当前 `python scripts/validate-competition-content.py --submission-path <目录或ZIP>` 只校验 Git manifest 展开的源码集合逐字一致，并明确排除 HAP；它是最终 ZIP 的源码子集门禁，不是最终 ZIP 通过证明。包含 HAP、许可证附件、原创/AI 声明和发布证据索引的正式包仍为**未验证**，不得用源码子集通过替代。
+当前 `python -B scripts/validate-competition-content.py --submission-path <目录或ZIP>`
+只校验 Git manifest 展开的源码集合逐字一致，并明确排除 HAP；它是最终 ZIP 的
+源码子集门禁，不是最终 ZIP 通过证明。完整发布包必须再执行：
+
+```powershell
+python -B scripts/validate-release-bundle.py --bundle-path <最终 ZIP 的明确路径>
+```
+
+包内 `release-evidence-index` 还会由完整发布包门禁自动绑定
+`release-manifest.json` 的 `sourceCommit` 与唯一 HAP 的实际 SHA-256。需要在打包前
+单独检查索引时执行：
+
+```powershell
+python -B scripts/validate-release-evidence.py `
+  --index-path <发布证据索引的明确路径> `
+  --source-commit <完整提交> `
+  --hap-sha256 <唯一 HAP 的 SHA-256>
+```
+
+索引必须恰好覆盖源码包、Web 校验、HarmonyOS 构建、黄金演示、最终媒体、许可证/
+原创性和门户上传七个发布面；其中未采集到真实运行证据的记录继续保持**未验证**，
+不得夹带通过字段。包含 HAP、许可证附件、原创/AI 声明和发布证据索引的正式包当前
+仍为**未验证**，不得用源码子集、索引结构或固定输入测试通过替代。
 
 ## 十一、NOTICE、原创声明与 AI 使用说明
 

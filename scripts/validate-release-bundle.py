@@ -31,6 +31,16 @@ if CONTENT_GATE_SPEC is None or CONTENT_GATE_SPEC.loader is None:
 CONTENT_GATE = importlib.util.module_from_spec(CONTENT_GATE_SPEC)
 CONTENT_GATE_SPEC.loader.exec_module(CONTENT_GATE)
 
+EVIDENCE_GATE_PATH = Path(__file__).with_name("validate-release-evidence.py")
+EVIDENCE_GATE_SPEC = importlib.util.spec_from_file_location(
+    "validate_release_evidence_for_bundle",
+    EVIDENCE_GATE_PATH,
+)
+if EVIDENCE_GATE_SPEC is None or EVIDENCE_GATE_SPEC.loader is None:
+    raise RuntimeError(f"无法加载发布证据索引门禁: {EVIDENCE_GATE_PATH}")
+EVIDENCE_GATE = importlib.util.module_from_spec(EVIDENCE_GATE_SPEC)
+EVIDENCE_GATE_SPEC.loader.exec_module(EVIDENCE_GATE)
+
 RELEASE_MANIFEST_PATH = "release-manifest.json"
 RELEASE_MANIFEST_FIELDS = frozenset({"sourceCommit", "nonGitFiles"})
 NON_GIT_FILE_FIELDS = frozenset({"path", "role", "bytes", "sha256"})
@@ -756,6 +766,23 @@ def check_release_bundle_entries(
                 f"nonGitFiles.sha256 与实际文件哈希不一致: "
                 f"{_path_display(record.path)}"
             )
+
+    records_by_role = {record.role: record for record in manifest.non_git_files}
+    evidence_record = records_by_role.get("release-evidence-index")
+    hap_record = records_by_role.get("hap")
+    if evidence_record is not None:
+        evidence_content = entries.get(evidence_record.path)
+        hap_content = entries.get(hap_record.path) if hap_record is not None else None
+        if evidence_content is not None:
+            if manifest.source_commit is None or hap_content is None:
+                errors.append("发布证据索引无法绑定有效 sourceCommit 与唯一 HAP")
+            else:
+                _, evidence_errors = EVIDENCE_GATE.validate_release_evidence(
+                    evidence_content,
+                    manifest.source_commit,
+                    hashlib.sha256(hap_content).hexdigest(),
+                )
+                errors.extend(evidence_errors)
 
     hap_paths = sorted(
         name for name in entries if PurePosixPath(name).suffix.casefold() == ".hap"
