@@ -289,3 +289,31 @@
 
 - **未验证**：真实模型连接在 100 秒时的网络级取消、线上平台 120 秒回收、当前分支线上部署、浏览器、HarmonyOS 模拟器与真机。
 - 本批未修改 DEVLOG、HarmonyOS、Quiz、Chat SSE 终态、RAG、缓存策略、生产模型 ID 或秘密。
+
+## 14. Chat 编排总预算与中止原因隔离
+
+### 14.1 源码确认与行为
+
+- Chat 的 Tutor、Planner、Evaluator 分支至多执行一次模型调用；Quiz 意图会进入批次生成与修复，在当前边界下最多 8 次调用。旧 Chat 路由只有单次模型 timeout、客户端断连和输出上限控制，没有覆盖整段编排的总 deadline。
+- Chat 路由现在使用 100000ms 总预算包裹完整 `orchestrateStream`。超时前已建立 HTTP 200 时，流只追加一次 `error(code=MODEL_TIMEOUT) -> done`；首事件前超时仍由既有 JSON 错误路径返回 504。
+- 模型预算 helper 新增独立 `abortSignal`，用于组合 Chat 已有的输出上限/reader 取消控制器。内部 route abort 的 Error reason 原样保留，因此 `OUTPUT_LIMIT_EXCEEDED` 不会被误映射为 `MODEL_CANCELLED`。
+- 外部 Request abort 仍标记 clientCancelled，不向已断开的流补写 error/done；成功、超时和内部 abort 都清理 deadline timer、Request signal listener 与内部 abortSignal listener。
+- 本批没有改变首个 `done` 后的单终态守卫、事件数量/字节上限、Safety 顺序、RAG 课程隔离或 no-store 响应头。
+
+### 14.2 委派与两级复核
+
+- 子 agent `chat_request_budget_test` 只新增 Chat 路由预算测试。实现前目标测试 exit 1：100000ms 时编排 signal 仍为未中止；同文件的外部 Request abort 用例已通过。子 agent 未修改生产源码、未暂存或提交。
+- 共享区实现后子 agent 复测 2/2 通过；主线程逐行复核并联合 Chat 输出上限、单终态、Plan/Quiz 预算与模型 helper 资源测试，6 个文件、18 项全部通过。
+- 模型 helper 单元回归独立确认成功后 timer 计数为 0、两类 signal listener 均 remove，并确认内部 `OUTPUT_LIMIT_EXCEEDED` Error 对象作为派生 signal.reason 和最终 rejection 原样保留。
+
+### 14.3 验证
+
+- 定向联合：`pnpm exec vitest run src/lib/agents/model-budget.test.ts src/app/api/chat/request-budget.test.ts src/app/api/chat/stream-limits.test.ts src/app/api/chat/terminal-boundary.test.ts src/app/api/plan/request-budget.test.ts src/app/api/quiz/request-budget.test.ts` exit 0，6 个测试文件、18 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，30 个测试文件、368 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成生产构建，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- 本地 production 黑盒：`127.0.0.1:4323`，显式无模型测试响应、stateless/off；有效 Chat 请求为 HTTP 503、`MODEL_UNAVAILABLE`、JSON content-type，未建立 SSE。实例 PID 57996 已停止，端口已关闭。
+
+### 14.4 未验证
+
+- **未验证**：真实模型编排在 100 秒时的网络级取消、已建立线上 SSE 的 timeout 事件、线上平台 120 秒回收、当前分支线上部署、真实浏览器断连、HarmonyOS 模拟器与真机。
+- 本批未修改 DEVLOG、HarmonyOS、Quiz 生成实现、Chat SSE 单终态、RAG、缓存策略、生产模型 ID 或秘密。

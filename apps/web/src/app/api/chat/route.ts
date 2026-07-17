@@ -9,7 +9,11 @@
 import { NextRequest } from "next/server";
 import { orchestrateStream } from "@/lib/agents/orchestrator";
 import type { ChatMessage, ChatRequest, StreamEvent } from "@/lib/types";
-import { getModelRuntimeInfo, ModelCancelledError } from "@/lib/agents/model";
+import {
+  getModelRuntimeInfo,
+  ModelCancelledError,
+  withModelRequestBudget,
+} from "@/lib/agents/model";
 import { validateUserInput } from "@/lib/agents/safety-agent";
 import { modelErrorResponse } from "@/lib/api-errors";
 import { isJsonObject, readJsonObject } from "@/lib/request-json";
@@ -30,6 +34,7 @@ export const maxDuration = 120;
 const MAX_SSE_EVENT_BYTES = 64 * 1024;
 const MAX_SSE_TOTAL_BYTES = 512 * 1024;
 const MAX_SSE_EVENTS = 128;
+const CHAT_REQUEST_BUDGET_MS = 100_000;
 const OUTPUT_LIMIT_CODE = "OUTPUT_LIMIT_EXCEEDED";
 const OUTPUT_LIMIT_MESSAGE = "模型输出超过流式响应限制，请缩短问题后重试";
 
@@ -203,7 +208,14 @@ export async function POST(req: NextRequest) {
   // 后台启动编排（不阻塞当前函数；错误在 catch 中捕获并触发 500 或流中错误事件）
   const orchestratePromise = (async () => {
     try {
-      await orchestrateStream(chatRequest, emit, abortController.signal);
+      await withModelRequestBudget(
+        (signal) => orchestrateStream(chatRequest, emit, signal),
+        {
+          timeoutMs: CHAT_REQUEST_BUDGET_MS,
+          signal: req.signal,
+          abortSignal: abortController.signal,
+        }
+      );
     } catch (err) {
       orchestrateError = err;
       if (!primed) {

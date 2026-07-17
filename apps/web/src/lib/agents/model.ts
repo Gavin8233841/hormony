@@ -236,6 +236,7 @@ export interface ModelCallOptions {
 export interface ModelRequestBudgetOptions {
   timeoutMs: number;
   signal?: AbortSignal;
+  abortSignal?: AbortSignal;
 }
 
 export async function withModelRequestBudget<T>(
@@ -249,12 +250,17 @@ export async function withModelRequestBudget<T>(
   const timeoutMs = Math.floor(options.timeoutMs);
   const controller = new AbortController();
   const timeoutError = new ModelTimeoutError(`模型请求总预算超过 ${timeoutMs}ms`);
+  const abortSignal = options.abortSignal;
   let timeoutTriggered = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancelListener: (() => void) | undefined;
+  let abortListener: (() => void) | undefined;
 
   try {
     if (options.signal?.aborted) throw new ModelCancelledError();
+    if (abortSignal?.aborted) {
+      throw abortReason(abortSignal);
+    }
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
@@ -270,6 +276,16 @@ export async function withModelRequestBudget<T>(
             reject(new ModelCancelledError());
           };
           options.signal?.addEventListener("abort", cancelListener, { once: true });
+      })
+      : undefined;
+    const abortPromise = abortSignal
+      ? new Promise<never>((_, reject) => {
+          abortListener = () => {
+            const error = abortReason(abortSignal);
+            controller.abort(error);
+            reject(error);
+          };
+          abortSignal.addEventListener("abort", abortListener, { once: true });
         })
       : undefined;
 
@@ -277,6 +293,7 @@ export async function withModelRequestBudget<T>(
       operation(controller.signal),
       timeoutPromise,
       ...(cancelPromise ? [cancelPromise] : []),
+      ...(abortPromise ? [abortPromise] : []),
     ]);
   } catch (error) {
     if (timeoutTriggered) throw timeoutError;
@@ -287,7 +304,16 @@ export async function withModelRequestBudget<T>(
     if (options.signal && cancelListener) {
       options.signal.removeEventListener("abort", cancelListener);
     }
+    if (abortSignal && abortListener) {
+      abortSignal.removeEventListener("abort", abortListener);
+    }
   }
+}
+
+function abortReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error
+    ? signal.reason
+    : new ModelCancelledError();
 }
 
 // 统一调用入口：返回纯文本
