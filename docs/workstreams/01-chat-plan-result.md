@@ -24,6 +24,7 @@ Plan 的旧实现还存在三个闭环缺口：生成开始即隐藏旧任务；
 - 非 2xx SSE 响应等待状态码和响应体都到达后，结构化解析 `{ error, code }`，与正常 `done` 路径互斥。
 - 只有完整的 user/assistant 问答对进入下一问上下文和 ArkData；失败、取消、流式残片及其孤立问题均排除。
 - 历史读取失败与保存失败分开处理：读取失败只允许重新读取，避免空历史覆盖；保存失败可独立重试。
+- ArkData 旧会话会先清洗角色、正文、引用和过程字段，只恢复连续完整的 user/assistant 对；损坏记录数量可见，顶层数据无法读取时可选择“跳过旧会话”继续提问，且该操作不会立即删除本机数据。
 - 历史写入串行合并，旧快照不会在新回答之后完成并覆盖最新问答。
 - 本机历史恢复、保存中、保存成功和保存失败显示在固定高度状态区。
 - 复用现有 Markdown Builder：引用可折叠，代码可横向滚动并可继续提问，窄屏表格转换为可读分组，原表格 Builder 仍保留。
@@ -52,6 +53,8 @@ Plan 的旧实现还存在三个闭环缺口：生成开始即隐藏旧任务；
 - `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
 - `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `scripts/test-ws01-chat-history-recovery.mjs`
+- `scripts/test-ws01-sse-terminal-contract.mjs`
 - `docs/workstreams/01-chat-plan-result.md`
 - `DEVLOG.md`
 
@@ -69,6 +72,12 @@ Plan 的旧实现还存在三个闭环缺口：生成开始即隐藏旧任务；
 
 该测试不替代模拟器交互、网络抓包或 ArkData 重启验证；它用于在无 HDC 目标时阻止已确认控制流被后续改动静默回退。
 
+第三批继续增加两组可执行测试：
+
+- `test-ws01-chat-history-recovery.mjs` 从当前 `Chat.ets` 提取并执行真实恢复方法体，以损坏 ArkData 形状验证完整问答配对、证据字段清洗、损坏数量提示及跳过后恢复发送，共 4 项。
+- `test-ws01-sse-terminal-contract.mjs` 同时读取 HarmonyOS SSE 客户端与 Web Chat 路由/编排源码，执行真实分帧方法，覆盖 UTF-8 和 JSON chunk 边界、多行 data、唯一 done、error 后不保存及非 2xx `{ error, code }`，共 5 项。
+- 三个 WS01 测试文件合并运行共 16 项，全部通过；这些测试仍不替代端侧 UI 与网络证据。
+
 ## 旧提交选择性复核
 
 - `ffe0e85`：当前 `Chat.ets` 已有代码语言标签、行号、横向滚动和“解释这段”入口，保留当前实现，不整提交合并。
@@ -84,8 +93,10 @@ Plan 的旧实现还存在三个闭环缺口：生成开始即隐藏旧任务；
 | 源码确认 | 17 项 Chat/Plan/HttpClient 源码不变量断言 | exit 0，`SOURCE_INVARIANTS_OK count=17` |
 | 静态诊断通过 | `node --check scripts/test-ws01-chat-plan-source-contract.mjs` | exit 0 |
 | 静态诊断通过 | `node --test scripts/test-ws01-chat-plan-source-contract.mjs` | exit 0，7/7 通过 |
+| 静态诊断通过 | 三个 WS01 Node 测试合并运行 | exit 0，16/16 通过 |
 | 静态诊断通过 | `git diff --check`（WS01 三个产品文件） | exit 0，仅 Git 的 LF/CRLF 工作区提示 |
 | 构建通过 | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | exit 0，`CompileArkTS`、`PackageHap` 成功，最终 `BUILD SUCCESSFUL in 27 s 625 ms`；未配置 signingConfigs 的既有警告保留 |
+| 构建通过 | 历史恢复批次增量 HAP | exit 0，`CompileArkTS` 7.807 s、`PackageHap` 1.078 s，`BUILD SUCCESSFUL in 16 s 615 ms` |
 | 线上通过 | `GET https://hormony-ruddy.vercel.app/api/health` | HTTP 200；`status=ready`、`deploymentMode=stateless`、`model.configured=true`、`model.mode=model`、`model.name=doubao-seed-2-1-pro-260628` |
 | 线上通过 | `POST https://hormony-ruddy.vercel.app/api/chat` | HTTP 200；12 个 SSE 事件，顺序为 thinking/trace/delta/citation/done；正文 1745 字符、引用 3 条、`done=1` 且最后一帧为 done、无 error；正文含代码围栏和表格分隔符 |
 | 线上通过 | `POST https://hormony-ruddy.vercel.app/api/plan` | HTTP 200；目标匹配，10 项任务，必需字段检查无失败，`agentTrace=4` |
@@ -122,6 +133,7 @@ Chat 冒烟还需从 UI 树 bounds 输入新问题，验证发送按钮状态、
 ## 未验证
 
 - 模拟器：TextInput 新输入到真实 POST、SSE error/done/cancel UI、Plan 慢请求取消与重试、本机保存失败注入、应用重启后的 ArkData 恢复，均因无 HDC 目标未验证。
+- 运行工具只读核查：HDC 3.2.0e、Emulator CLI 26.0.0.200 可用，已配置 `Pura 90 Pro Max`（HarmonyOS 6.1.1(24)），但四个实例均为 `isRunning=false`，未启动、安装或生成截图。
 - 真机：全部未验证。
 - 服务卡片更新数量与失败回执：等待 WS04 文件集成后未验证。
 - Web 源码未修改，未重复执行 Web `pnpm lint/typecheck/test/build`。

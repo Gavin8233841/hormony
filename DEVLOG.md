@@ -6207,3 +6207,34 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - `hdc list targets` 仍无运行目标；模拟器和真机链路未验证，源码契约测试不替代 UI 树、POST 日志、SSE done 或 ArkData 重启证据。
 - `LearningFormUpdater.ets` 和 `scripts/harmonyos-app-smoke.ps1` 的共享工作区改动未触碰、未暂存；服务卡片回执等待 WS04 集成，通用 UI 冒烟等待 WS06 集成。
+
+---
+
+## 2026-07-17 [WS01] 损坏历史恢复与 SSE 终态回归
+
+背景：首批已区分历史读取/保存失败，但 ArkData 顶层不是数组时页面只能反复重读，输入与发送会持续锁定；数组中的非法角色、空正文或错误类型证据字段也会直接进入 UI。并行复核同时需要把 Web error→done 与 HarmonyOS 不保存失败回答的跨端契约固化为可执行测试。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `scripts/test-ws01-chat-history-recovery.mjs`
+- `scripts/test-ws01-sse-terminal-contract.mjs`
+- `docs/workstreams/01-chat-plan-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 恢复 ArkData 历史前校验顶层数组，清洗角色、正文、引用、agentTrace 和 thinking，只保留连续完整的 user/assistant 对并限制为最近 24 条。
+- 单条损坏记录会断开待配对问题，避免把前一个问题与后续无关回答拼成伪造问答；恢复提示显示跳过数量。
+- 顶层历史无法读取时保留“重新读取”，并新增“跳过旧会话”；跳过只释放当前页面发送，不立即覆盖本机数据，新回答真实完成后再按既有 ArkData 路径保存。
+- 新增历史恢复执行测试与跨端 SSE 终态测试；测试直接提取当前 ArkTS 方法体并核对 Web 路由/编排事件，不使用静态成功回答冒充模型能力。
+
+验证：
+- `node --check` 三个 WS01 测试文件：exit 0。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs scripts/test-ws01-chat-history-recovery.mjs scripts/test-ws01-sse-terminal-contract.mjs`：exit 0，16/16 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，`CompileArkTS` 与 `PackageHap` 实际执行，`BUILD SUCCESSFUL in 16 s 615 ms`；既有 signingConfigs 警告保留。
+- `git diff --check`：exit 0。
+- 只读运行核查：HDC 3.2.0e、Emulator CLI 26.0.0.200；`hdc list targets` exit 0 且返回 `[Empty]`。
+
+失败或未验证：
+- 已配置 `Pura 90 Pro Max`（HarmonyOS 6.1.1(24)）但 `isRunning=false`，其余三个实例也未运行；未获运行目标，因此没有安装、UI 树、Chat 新 POST、SSE UI 或 ArkData 重启证据，模拟器与真机仍为未验证。
+- `LearningFormUpdater.ets` 与 `scripts/harmonyos-app-smoke.ps1` 归 WS04/WS06，本批未触碰、未暂存；未生成截图、日志、HAP 提交物或临时文件。

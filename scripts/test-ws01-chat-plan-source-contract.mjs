@@ -170,14 +170,43 @@ test('SSE done and error paths are exclusive and preserve structured failures', 
 });
 
 test('Chat restores and serializes only complete local conversation turns', () => {
+  const restoreHelpers = section(chat, '  private restoredHistoryStrings(', '  private async loadLocalHistory(', 'Chat history sanitizers');
+  assert.match(restoreHelpers, /if \(!Array\.isArray\(values\)\) return restored;/);
+  assert.match(restoreHelpers, /if \(item === null \|\| typeof item !== 'object'\) return null;/);
+  assert.match(restoreHelpers, /if \(item\.role !== 'user' && item\.role !== 'assistant'\) return null;/);
+  assert.match(restoreHelpers, /if \(typeof item\.content !== 'string'\) return null;/);
+  assertOrder(restoreHelpers, [
+    'const message = this.restoredHistoryMessage(item);',
+    'if (message === null) {',
+    'pendingUser = null;',
+    "if (message.role === 'user') {",
+    'pendingUser = message;',
+    '} else if (pendingUser !== null) {',
+    'restored.push(pendingUser);',
+    'restored.push(message);',
+    'pendingUser = null;'
+  ], 'Chat restores adjacent complete turns');
+
   const load = section(chat, '  private async loadLocalHistory(): Promise<void> {', '  private retryLocalHistoryLoad(', 'Chat history load');
   assertOrder(load, [
     'await LocalLearningRepository.getChatHistory();',
-    'const restored: DisplayMessage[] = [];',
+    "if (!Array.isArray(history)) throw new Error('INVALID_LOCAL_CHAT_HISTORY');",
+    'const restored = this.restoredCompleteHistory(history);',
+    'const skippedCount = Math.max(history.length - restored.length, 0);',
     'this.messages = restored;',
     'this.historyLoadFailed = false;'
   ], 'Chat history restore');
   assert.match(load, /catch \(error\) \{\s*this\.historyLoadFailed = true;/);
+  assert.match(load, /可重试或跳过旧会话/);
+
+  const skip = section(chat, '  private skipUnreadableHistory(): void {', '  private cancelCurrentRequest(', 'Chat unreadable history recovery');
+  assertOrder(skip, [
+    'if (!this.historyLoadFailed',
+    'this.messages = [];',
+    'this.historyLoadFailed = false;',
+    "this.historyMessage = '已跳过旧会话，新回答完成后会保存到本机';"
+  ], 'Chat can continue without deleting unreadable history immediately');
+  assert.doesNotMatch(skip, /saveChatHistory/);
 
   const completeHistory = section(chat, '  private completeChatHistory(', '  private async saveLocalHistory(', 'Complete chat history');
   assert.match(completeHistory, /assistantMessage\.role === 'assistant' && assistantMessage\.content\.length > 0 &&\s*!assistantMessage\.failed && !assistantMessage\.cancelled && !assistantMessage\.streaming/);

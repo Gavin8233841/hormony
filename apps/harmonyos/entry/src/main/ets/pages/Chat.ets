@@ -489,38 +489,99 @@ export struct ChatContent {
     return this.answerSteps[index].description;
   }
 
+  private restoredHistoryStrings(values?: string[]): string[] {
+    const restored: string[] = [];
+    if (!Array.isArray(values)) return restored;
+    for (const value of values) {
+      if (typeof value !== 'string') continue;
+      const text = value.trim();
+      if (text.length > 0) restored.push(text);
+    }
+    return restored;
+  }
+
+  private restoredHistoryCitations(values?: Citation[]): Citation[] {
+    const restored: Citation[] = [];
+    if (!Array.isArray(values)) return restored;
+    for (const value of values) {
+      if (value === null || typeof value !== 'object' || typeof value.doc !== 'string') continue;
+      const doc = value.doc.trim();
+      if (doc.length === 0) continue;
+      const snippet = typeof value.snippet === 'string' ? value.snippet.trim() : '';
+      if (snippet.length > 0) {
+        restored.push({ doc: doc, snippet: snippet });
+      } else {
+        restored.push({ doc: doc });
+      }
+    }
+    return restored;
+  }
+
+  private restoredHistoryMessage(item: ChatMessage): DisplayMessage | null {
+    if (item === null || typeof item !== 'object') return null;
+    if (item.role !== 'user' && item.role !== 'assistant') return null;
+    if (typeof item.content !== 'string') return null;
+    const content = item.content.trim();
+    if (content.length === 0) return null;
+    const message: DisplayMessage = {
+      role: item.role,
+      content: content,
+      citations: this.restoredHistoryCitations(item.citations),
+      agentTrace: this.restoredHistoryStrings(item.agentTrace),
+      thinking: this.restoredHistoryStrings(item.thinking),
+      agentExpanded: false,
+      citationExpanded: false,
+      streaming: false,
+      failed: false,
+      cancelled: false,
+      statusMessage: '',
+      httpStatus: 0,
+      errorCode: '',
+      statusExpanded: false,
+      retryQuestion: ''
+    };
+    return message;
+  }
+
+  private restoredCompleteHistory(history: ChatMessage[]): DisplayMessage[] {
+    const restored: DisplayMessage[] = [];
+    let pendingUser: DisplayMessage | null = null;
+    for (const item of history) {
+      const message = this.restoredHistoryMessage(item);
+      if (message === null) {
+        pendingUser = null;
+        continue;
+      }
+      if (message.role === 'user') {
+        pendingUser = message;
+      } else if (pendingUser !== null) {
+        restored.push(pendingUser);
+        restored.push(message);
+        pendingUser = null;
+      }
+    }
+    return restored.slice(-24);
+  }
+
   private async loadLocalHistory(): Promise<void> {
     try {
       const history = await LocalLearningRepository.getChatHistory();
-      const restored: DisplayMessage[] = [];
-      for (const item of history) {
-        const message: DisplayMessage = {
-          role: item.role,
-          content: item.content,
-          citations: item.citations ?? [],
-          agentTrace: item.agentTrace ?? [],
-          thinking: item.thinking ?? [],
-          agentExpanded: false,
-          citationExpanded: false,
-          streaming: false,
-          failed: false,
-          cancelled: false,
-          statusMessage: '',
-          httpStatus: 0,
-          errorCode: '',
-          statusExpanded: false,
-          retryQuestion: ''
-        };
-        restored.push(message);
-      }
+      if (!Array.isArray(history)) throw new Error('INVALID_LOCAL_CHAT_HISTORY');
+      const restored = this.restoredCompleteHistory(history);
+      const skippedCount = Math.max(history.length - restored.length, 0);
       this.messages = restored;
       this.historyLoadFailed = false;
       this.historySaveFailed = false;
-      this.historyMessage = restored.length > 0 ?
-        '已恢复最近 ' + restored.length.toString() + ' 条本机会话' : '';
+      if (restored.length > 0) {
+        this.historyMessage = skippedCount > 0 ?
+          '已恢复 ' + restored.length.toString() + ' 条，跳过 ' + skippedCount.toString() + ' 条损坏记录' :
+          '已恢复最近 ' + restored.length.toString() + ' 条本机会话';
+      } else {
+        this.historyMessage = history.length > 0 ? '旧会话中没有可恢复的完整问答，已开始新会话' : '';
+      }
     } catch (error) {
       this.historyLoadFailed = true;
-      this.historyMessage = '本机会话暂时无法读取';
+      this.historyMessage = '本机会话暂时无法读取，可重试或跳过旧会话';
     } finally {
       this.historyLoading = false;
     }
@@ -532,6 +593,14 @@ export struct ChatContent {
     this.historyLoadFailed = false;
     this.historyMessage = '正在恢复本机会话';
     this.loadLocalHistory();
+  }
+
+  private skipUnreadableHistory(): void {
+    if (!this.historyLoadFailed || this.historyLoading || this.historySaving || this.loading) return;
+    this.messages = [];
+    this.historyLoadFailed = false;
+    this.historySaveFailed = false;
+    this.historyMessage = '已跳过旧会话，新回答完成后会保存到本机';
   }
 
   private cancelCurrentRequest(showStatus: boolean): void {
@@ -811,6 +880,18 @@ export struct ChatContent {
                 if (this.historyLoadFailed) this.retryLocalHistoryLoad();
                 else this.retryLocalHistorySave();
               })
+            if (this.historyLoadFailed) {
+              Button('跳过旧会话')
+                .height(28)
+                .fontSize(11)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                .backgroundColor(Constants.COLOR_BG_TAG)
+                .borderRadius(14)
+                .enabled(!this.loading && !this.historySaving && !this.historyLoading)
+                .onClick((): void => {
+                  this.skipUnreadableHistory();
+                })
+            }
           }
         }
         .width('100%')
