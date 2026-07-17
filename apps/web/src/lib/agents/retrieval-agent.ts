@@ -1,13 +1,14 @@
 // Retrieval Agent：RAG 知识库检索
 
 import { retrieve, formatContext } from "@/lib/rag";
+import { selectRetrievedChunks } from "@/lib/rag/course-boundary";
 import type { AgentResult, Citation } from "@/lib/types";
 
 export async function runRetrievalAgent(
   query: string,
   courseId?: string
 ): Promise<AgentResult> {
-  const chunks = retrieve(query, courseId, 3);
+  const chunks = selectRetrievedChunks(retrieve(query, courseId, 3), courseId, 3);
   const context = formatContext(chunks);
   const citations: Citation[] = chunks.map((c) => ({
     doc: c.source,

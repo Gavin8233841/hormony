@@ -156,3 +156,34 @@
 - 定向验证：4 个测试文件、32 项通过；全量 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0，全量测试为 23 文件、345 项。
 - 首轮 Plan 测试错误比较源/派生 signal 对象身份，1 项失败；改为验证 WHATWG Request 的取消状态传播后，Plan 15/15 项通过。失败未被记为通过证据。
 - **未验证**：真实模型上游网络请求的取消、本批本地 production 黑盒与线上部署。
+
+## 9. RAG 课程隔离与 Safety 输出边界
+
+### 9.1 行为与边界
+
+- 新增检索结果运行时白名单：只接受非空 `id/text/source`、受支持 `courseId`、精确课程 Topic、有限数值 score，并要求结果数量不超过调用方请求数量。
+- 合法空数组保持正常无结果；非数组、超量、畸形、跨课程或非法 Topic 被视为下游合约失效。Knowledge 返回既有 `500/INTERNAL_ERROR`，Chat 终止处理，不降级为无引用通用回答。
+- 返回值按 `KnowledgeChunk` 合约重建，检索层附带的未知字段不会进入 Tutor 上下文或 Knowledge Search 响应；无 Topic 的本地上传切片继续兼容。
+- Knowledge Search 在输出 Safety 和 JSON 响应前应用课程边界；Chat Retrieval Agent 在格式化上下文和生成引用前应用同一边界。
+- Chat 对 RAG 正文和引用先执行 Safety；失败时直接发出 `SAFETY_BLOCKED -> done`，不进入 Tutor。通过后 SSE Retrieval trace 也只公开真实检索条数，不再在后置 Safety 前发送 RAG 正文。
+- 147 条内置知识切片及三门课程的 33 Topic 对照全部通过新边界，没有误删合法课程资料。
+
+### 9.2 委派与复核
+
+- 子 agent `knowledge_cross_course_contract` 独立新增 Knowledge Search 路由反例，红测确认合法 `cs101` 请求会原样返回异常 `cs102` 切片；同课程真实 Safety 反例已在旧实现正确返回 `502/SAFETY_BLOCKED`。主线程逐行复核后采用测试并补充非法 Topic、Chat 隔离、trace 和 RAG Safety 回归。
+- 独立只读复核 `rag_boundary_review` 指出静默过滤会混淆正常空结果与下游合约失效；主线程采纳为 fail-closed `INTERNAL_ERROR`，没有固化伪空结果。
+
+### 9.3 验证
+
+- 定向回归：`pnpm exec vitest run src/app/api/knowledge/search/course-isolation.test.ts src/lib/agents/orchestrator.test.ts src/lib/rag/course-boundary.test.ts` exit 0，3 个测试文件、12 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，25 个测试文件、354 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成生产构建，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- 最终重建后本地 production 黑盒：`127.0.0.1:4318`，显式 stateless/off；Health `503/degraded`、`deploymentMode=stateless`、`persistence.mode=stateless`、`model.configured=false`。Knowledge Search `200` 返回 3 条 `cs101` 切片，全部课程-Topic 和字段白名单有效；OPTIONS `204`，安全头有效；Knowledge Upload 为 `404/ENDPOINT_DISABLED`。监听端口已关闭。
+
+### 9.4 失败与未验证
+
+- 首次 typecheck 因测试 mock 的字面量返回类型过窄 exit 2；显式标注 `string` 后定向与全量 typecheck 均 exit 0。
+- fail-closed 调整后的首轮目标测试为 11/12；旧测试仍把三门课程混合全集传给指定课程边界。改为逐门课程验证精确下游结果后目标测试通过，失败未计作通过证据。
+- 前两次 production 断言已完成业务响应，但 PowerShell 对多值 header 的读取方式不正确而 exit 1；按实际响应头字典归一化后严格脚本 exit 0，失败未计作通过。
+- production 响应中的 Next RSC `Vary` 覆盖了 middleware 追加的 `Origin`；本节没有把 `Vary: Origin` 记作通过，留给独立 middleware 批次修复。
+- **未验证**：线上部署、真实模型 Tutor 输出、浏览器交互、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS 文件、生产模型 ID、题库内容或秘密。

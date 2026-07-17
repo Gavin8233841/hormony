@@ -6329,3 +6329,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 首轮 Plan 测试错误地比较源 signal 与 `Request.signal` 对象身份，1 项失败；按 WHATWG Request 派生 signal 的真实行为改为验证取消状态传播后，15/15 项通过。
 - 没有使用真实模型秘密；上游真实模型请求在客户端断开后的网络级取消、本地 production 黑盒与线上通过均未验证。
 - 浏览器交互、HarmonyOS 模拟器与真机未验证；本批未修改 HarmonyOS 文件、模型 ID、题库或竞赛文档。
+
+---
+
+## [WS05] 2026-07-17：RAG 课程隔离与 Safety 输出边界
+
+背景：Knowledge Search 信任 retrieve 的返回课程，Chat 还会在输出 Safety 前把 RAG 正文放入 SSE trace；检索层异常或持久数据污染时，跨课程资料、未知字段或不安全正文可能越过课程与 Safety 边界。
+
+文件：
+- `apps/web/src/lib/rag/course-boundary.ts`、`course-boundary.test.ts`
+- `apps/web/src/lib/agents/retrieval-agent.ts`、`orchestrator.ts`、`orchestrator.test.ts`
+- `apps/web/src/app/api/knowledge/search/route.ts`、`course-isolation.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- RAG 结果统一执行运行时结构、受支持课程、精确课程-Topic、有限 score 和数量边界，并按 `KnowledgeChunk` 白名单字段重建；未知字段被剥离。
+- 合法空数组保持正常无结果；非数组、超量、畸形、跨课程或非法 Topic fail-closed。Knowledge 返回既有 `500/INTERNAL_ERROR`，Chat 终止处理，不降级为无引用通用回答。
+- Knowledge Search 在输出 Safety 前应用该边界；Chat Retrieval Agent 在格式化上下文和引用前应用同一边界，147 条内置切片全部保留。
+- Chat 在 Tutor 调用前审核 RAG 正文与引用；失败时发出 `SAFETY_BLOCKED -> done` 且不产生 delta。通过时 Retrieval trace 只公开检索条数，不发送原始 RAG 正文。
+- 子 agent `knowledge_cross_course_contract` 的路由红测经主线程复核采用，并补齐非法 Topic、Chat 跨课程、trace 和 Safety 回归；`rag_boundary_review` 指出的伪空结果阻断已修复为明确内部失败。
+
+验证：
+- 定向 3 文件 12 项：exit 0。
+- `cd apps/web; pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，25 个文件、354 项；`pnpm build`：exit 0，middleware 26.8 kB。
+- 最终重建后本地 production `127.0.0.1:4318`（stateless/off）：Knowledge Search `200`、3 条均为 `cs101` 且 Topic/字段白名单有效；OPTIONS `204`；安全头有效；Knowledge Upload `404/ENDPOINT_DISABLED`；Health `503/degraded`、`model.configured=false`、`persistence.mode=stateless`。监听端口已关闭。
+- `git diff --check`：exit 0。
+
+失败或未验证：
+- 首次 typecheck 因测试 mock 返回类型过窄 exit 2，修正后全量通过。前两次 production 脚本因 PowerShell 多值 header 读取错误 exit 1，按实际字典归一化后严格断言 exit 0。
+- fail-closed 调整后首次目标测试为 11/12，原因是旧测试把三门课程混合全集传给指定课程边界；改为逐课程精确结果后通过，未把该失败记作通过。
+- production Next RSC 响应覆盖了 middleware 追加的 `Vary: Origin`，本批未记作通过，下一独立 middleware 批次处理。
+- 当前分支未部署；线上、真实模型 Tutor、浏览器、HarmonyOS 模拟器与真机未验证。本批未修改 HarmonyOS 文件、模型 ID、题库内容或秘密。

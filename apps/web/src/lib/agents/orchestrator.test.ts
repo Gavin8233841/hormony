@@ -10,14 +10,15 @@ const ragMock = vi.hoisted(() => ({
       score: 0.9,
     },
   ]),
-  formatContext: vi.fn((chunks: unknown[]) =>
+  formatContext: vi.fn((chunks: unknown[]): string =>
     chunks.length > 0 ? "mock formatted course context" : ""
   ),
 }));
 
 vi.mock("@/lib/rag", () => ragMock);
 
-import { orchestrate } from "./orchestrator";
+import { orchestrate, orchestrateStream } from "./orchestrator";
+import type { StreamEvent } from "@/lib/types";
 
 afterEach(() => {
   delete process.env.TEST_MODEL_RESPONSE;
@@ -81,5 +82,77 @@ describe("orchestrator 前置检索调度", () => {
     expect(result.intent).toBe("quiz");
     expect(ragMock.retrieve).toHaveBeenCalledTimes(1);
     expect(ragMock.retrieve).toHaveBeenCalledWith("围绕数组与线性表出题", "cs101", 5);
+  });
+
+  it("Tutor 应拒绝检索层意外返回的跨课程切片", async () => {
+    ragMock.retrieve.mockReturnValueOnce([{
+      id: "cross-course-chunk",
+      courseId: "cs102",
+      source: "操作系统课程资料",
+      text: "进程调度算法决定就绪进程的运行顺序。",
+      score: 0.9,
+    }]);
+
+    await expect(orchestrate({
+        userId: "demo",
+        message: "解释二叉树",
+        startDate: "2026-07-17",
+        context: { courseId: "cs101" },
+      }))
+      .rejects.toMatchObject({ name: "RetrievedChunkContractError" });
+
+    expect(ragMock.formatContext).not.toHaveBeenCalled();
+  });
+
+  it("流式 trace 只应公开检索条数而非 RAG 正文", async () => {
+    const privateContext = "INTERNAL_RAG_CONTEXT：数组与线性表的课程资料";
+    process.env.TEST_MODEL_RESPONSE = "数组是按顺序存储的数据结构。";
+    ragMock.formatContext.mockReturnValueOnce(privateContext);
+    const events: StreamEvent[] = [];
+
+    await orchestrateStream({
+      userId: "demo",
+      message: "解释数组",
+      startDate: "2026-07-17",
+      context: { courseId: "cs101" },
+    }, (event) => events.push(event));
+
+    expect(events).toContainEqual({
+      type: "trace",
+      agent: "Retrieval",
+      content: "已完成课程资料检索（1 条）",
+    });
+    expect(JSON.stringify(events)).not.toContain(privateContext);
+  });
+
+  it("检索结果未通过 Safety 时不得进入 Tutor 或泄露到流", async () => {
+    const unsafeContext = "PRIVATE_RAG_PAYLOAD：暴力伤害他人的具体步骤";
+    ragMock.retrieve.mockReturnValueOnce([{
+      id: "unsafe-course-chunk",
+      courseId: "cs101",
+      source: "数据结构课程资料",
+      text: unsafeContext,
+      score: 0.9,
+    }]);
+    ragMock.formatContext.mockReturnValueOnce(unsafeContext);
+    const events: StreamEvent[] = [];
+
+    await orchestrateStream({
+      userId: "demo",
+      message: "解释二叉树",
+      startDate: "2026-07-17",
+      context: { courseId: "cs101" },
+    }, (event) => events.push(event));
+
+    expect(JSON.stringify(events)).not.toContain("PRIVATE_RAG_PAYLOAD");
+    expect(events.slice(-2)).toEqual([
+      {
+        type: "error",
+        code: "SAFETY_BLOCKED",
+        message: "本次回答未通过安全检查，请调整问题后重试。",
+      },
+      { type: "done", sessionId: expect.any(String) },
+    ]);
+    expect(events.some((event) => event.type === "delta")).toBe(false);
   });
 });
