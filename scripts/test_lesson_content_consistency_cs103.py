@@ -160,6 +160,137 @@ QUIC_KNOWLEDGE_FORBIDDEN = (
 )
 QUIC_KNOWLEDGE_SOURCE = "计算机网络：自顶向下方法；RFC 9000/9002"
 
+TLS_EARLY_DATA_REQUIRED = (
+    "TLS 1.3完整握手仍是1-RTT",
+    "客户端与服务器已共享PSK",
+    "恢复握手才允许客户端在首个flight附带0-RTT early data",
+    "其余握手仍按1-RTT的PSK恢复流程继续",
+    "0-RTT数据没有跨连接防重放保证",
+    "不能表述为“握手0 RTT完成”",
+    "RFC 8446第2.3节（0-RTT Data）",
+)
+TLS_EARLY_DATA_FORBIDDEN = (
+    "TLS 1.3简化了这一过程为1-RTT甚至0-RTT",
+    "TLS 1.3握手可在0 RTT完成",
+    "0-RTT握手完成",
+)
+TLS_EARLY_DATA_LEGACY_FIXTURE = """
+- **反馈**：TLS 1.3简化了这一过程为1-RTT甚至0-RTT。
+- **来源**：RFC 5246（TLS 1.2）；知识切片 cs103_k32
+"""
+
+TLS_TRUST_ANCHOR_REQUIRED = (
+    "构建到本地独立配置根CA信任锚的证书路径",
+    "信任来自本地配置而非根证书自签名",
+    "服务器发送的证书列表包含终端证书（shop.example.com）和中间CA证书，但省略根CA证书",
+    "本地信任库已独立配置对应根CA作为信任锚",
+    "本地信任锚中的根CA公钥验证中间CA证书签名",
+    "信任锚的自签名不作为证书路径的一部分验证",
+    "终端证书和中间CA证书均在有效期内",
+    "信任并非来自服务器发送根证书或验证根证书自签名",
+    "证书路径到本地信任锚、域名、有效期和吊销状态均通过",
+    "第4.4.2节允许服务器证书列表省略对端已持有的信任锚",
+    "第4.2.3节明确自签证书或信任锚的签名不参与路径验证",
+    "RFC 8446第4.4.2节（Certificate）、第4.2.3节（Signature Algorithms）",
+)
+TLS_TRUST_ANCHOR_FORBIDDEN = (
+    "服务器返回的证书链包含：终端证书（shop.example.com）→ 中间CA证书 → 根CA证书",
+    "客户端收到3级证书链",
+    "验证根CA证书 → 根CA证书是自签名的",
+    "所有证书均在有效期内",
+    "根CA证书是自签名的，且已预装在本地信任库中（信任锚），验证通过",
+)
+TLS_TRUST_ANCHOR_LEGACY_FIXTURE = """
+- **题目**：服务器返回的证书链包含：终端证书（shop.example.com）→ 中间CA证书 → 根CA证书
+- **初始状态**：客户端收到3级证书链，本地信任库中预装有根CA证书
+  3. 验证根CA证书 → 根CA证书是自签名的，且已预装在本地信任库中（信任锚），验证通过
+  5. 检查有效期和吊销状态 → 所有证书均在有效期内
+- **反馈**：根CA自签名且预装在系统或浏览器中，不需要在网络中传输
+"""
+
+TLS_TOPIC_REQUIRED = (
+    "TLS 1.3完整握手以1-RTT完成密钥协商",
+    "根CA信任锚由客户端独立配置并可从服务器证书链省略",
+    "支持（EC）DHE、PSK-only及PSK与（EC）DHE组合三类密钥交换模式",
+    "TLS 1.3并非强制所有模式具备前向安全性",
+    "采用ECDHE等临时密钥交换时",
+    "PSK-only或0-RTT早期数据不能直接套用这个结论",
+)
+TLS_TOPIC_FORBIDDEN = (
+    "TLS 1.3强制使用ECDHE和DHE，弃用RSA密钥交换",
+    "TLS 1.3强制要求前向安全性",
+    "核对照片是否是你本人（域名匹配SAN/CN）",
+)
+
+TLS_KNOWLEDGE_CONTRACTS = {
+    "cs103_k32": {
+        "source": "计算机网络：自顶向下方法；RFC 8446第2.3节",
+        "required": (
+            "TLS 1.3的完整握手以1-RTT完成密钥协商",
+            "双方共享PSK且服务器允许early data",
+            "附加在1-RTT的PSK恢复握手上",
+            "不表示握手在服务器响应前完成",
+            "没有跨连接防重放保证",
+        ),
+        "forbidden": (
+            "TLS 1.3简化了握手为1-RTT甚至0-RTT",
+            "TLS 1.3握手可在0 RTT完成",
+        ),
+    },
+    "cs103_k33": {
+        "source": (
+            "计算机网络：自顶向下方法；RFC 8446第4.4.2节、"
+            "第4.2.3节；RFC 5280"
+        ),
+        "required": (
+            "信任锚由客户端操作系统或浏览器独立配置",
+            "可从服务器证书链中省略",
+            "自签名证书或信任锚的签名不作为认证路径的一部分验证",
+            "信任来自本地配置的锚",
+        ),
+        "forbidden": (
+            "信任来自根证书自签名",
+            "服务器必须发送根CA证书",
+        ),
+    },
+    "cs103_k34": {
+        "source": "计算机网络：自顶向下方法；RFC 8446第2节",
+        "required": (
+            "TLS 1.3移除了RSA密钥传输，但RSA仍可用于证书签名",
+            "（EC）DHE、PSK-only和PSK与（EC）DHE组合",
+            "PSK-only模式本身不提供由临时密钥交换带来的前向安全性",
+        ),
+        "forbidden": (
+            "TLS 1.3完全移除了RSA密钥交换",
+            "强制使用具备前向安全性的ECDHE和DHE",
+            "TLS 1.3仅支持ECDHE和DHE",
+        ),
+    },
+    "cs103_k35": {
+        "source": "计算机网络：自顶向下方法；RFC 8446第2节、第2.3节",
+        "required": (
+            "TLS 1.3并非强制所有模式都具备前向安全性",
+            "PSK-only模式本身不提供由临时密钥交换带来的前向安全性",
+            "0-RTT早期数据仅由PSK派生密钥保护",
+            "不具备前向安全性且没有跨连接防重放保证",
+        ),
+        "forbidden": (
+            "TLS 1.3强制要求前向安全性",
+            "仅支持ECDHE和DHE密钥交换",
+        ),
+    },
+}
+
+TLS_KNOWLEDGE_LEGACY_FIXTURES = {
+    "cs103_k32": "TLS 1.3简化了握手为1-RTT甚至0-RTT。",
+    "cs103_k33": "服务器必须发送根CA证书，信任来自根证书自签名。",
+    "cs103_k34": (
+        "TLS 1.3完全移除了RSA密钥交换，"
+        "强制使用具备前向安全性的ECDHE和DHE。"
+    ),
+    "cs103_k35": "TLS 1.3强制要求前向安全性，仅支持ECDHE和DHE密钥交换。",
+}
+
 
 class Cs103LessonContentConsistencyTest(unittest.TestCase):
     @classmethod
@@ -332,6 +463,153 @@ class Cs103LessonContentConsistencyTest(unittest.TestCase):
         )
         self.assertIn("forbidden legacy text: 由应用层自行实现，如QUIC", errors)
         self.assertIn("forbidden legacy text: 前向纠错（FEC）", errors)
+
+    def test_tls_early_data_contract_accepts_psk_first_flight_semantics(self):
+        topic = extract_topic(self.source, "HTTPS与TLS")
+        activity = extract_activity(topic, 1)
+
+        self.assertEqual(
+            [],
+            missing_or_forbidden_errors(
+                activity,
+                TLS_EARLY_DATA_REQUIRED,
+                TLS_EARLY_DATA_FORBIDDEN,
+            ),
+        )
+
+    def test_tls_early_data_contract_rejects_zero_rtt_handshake_fixture(self):
+        errors = missing_or_forbidden_errors(
+            TLS_EARLY_DATA_LEGACY_FIXTURE,
+            TLS_EARLY_DATA_REQUIRED,
+            TLS_EARLY_DATA_FORBIDDEN,
+        )
+
+        self.assertIn(
+            "forbidden legacy text: TLS 1.3简化了这一过程为1-RTT甚至0-RTT",
+            errors,
+        )
+        self.assertTrue(
+            any("0-RTT数据没有跨连接防重放保证" in error for error in errors)
+        )
+
+    def test_tls_trust_anchor_contract_accepts_local_anchor_path(self):
+        topic = extract_topic(self.source, "HTTPS与TLS")
+
+        self.assertEqual(
+            [],
+            missing_or_forbidden_errors(
+                topic,
+                TLS_TRUST_ANCHOR_REQUIRED,
+                TLS_TRUST_ANCHOR_FORBIDDEN,
+            ),
+        )
+
+    def test_tls_trust_anchor_contract_rejects_server_root_fixture(self):
+        errors = missing_or_forbidden_errors(
+            TLS_TRUST_ANCHOR_LEGACY_FIXTURE,
+            TLS_TRUST_ANCHOR_REQUIRED,
+            TLS_TRUST_ANCHOR_FORBIDDEN,
+        )
+
+        self.assertIn(
+            "forbidden legacy text: 客户端收到3级证书链",
+            errors,
+        )
+        self.assertIn(
+            "forbidden legacy text: 验证根CA证书 → 根CA证书是自签名的",
+            errors,
+        )
+        self.assertTrue(
+            any("信任锚的自签名不作为证书路径的一部分验证" in error for error in errors)
+        )
+
+    def test_tls_topic_summary_preserves_mode_and_trust_boundaries(self):
+        topic = extract_topic(self.source, "HTTPS与TLS")
+
+        self.assertEqual(
+            [],
+            missing_or_forbidden_errors(
+                topic,
+                TLS_TOPIC_REQUIRED,
+                TLS_TOPIC_FORBIDDEN,
+            ),
+        )
+
+    def test_tls_knowledge_chunks_are_synced_and_follow_rfc8446(self):
+        chunks = json.loads(KNOWLEDGE_PATH.read_text(encoding="utf-8"))
+        web_source = WEB_KNOWLEDGE_PATH.read_text(encoding="utf-8")
+
+        for chunk_id, contract in TLS_KNOWLEDGE_CONTRACTS.items():
+            matches = [item for item in chunks if item.get("id") == chunk_id]
+            self.assertEqual(1, len(matches), chunk_id)
+            chunk = matches[0]
+            web_text, web_chunk_source = extract_web_chunk(web_source, chunk_id)
+
+            self.assertEqual(web_text, chunk["text"], chunk_id)
+            self.assertEqual(contract["source"], chunk["source"], chunk_id)
+            self.assertEqual(web_chunk_source, chunk["source"], chunk_id)
+            self.assertEqual(
+                [],
+                missing_or_forbidden_errors(
+                    chunk["text"],
+                    contract["required"],
+                    contract["forbidden"],
+                ),
+                chunk_id,
+            )
+
+    def test_tls_knowledge_contract_rejects_legacy_mode_claims(self):
+        for chunk_id, fixture in TLS_KNOWLEDGE_LEGACY_FIXTURES.items():
+            contract = TLS_KNOWLEDGE_CONTRACTS[chunk_id]
+            errors = missing_or_forbidden_errors(
+                fixture,
+                contract["required"],
+                contract["forbidden"],
+            )
+
+            self.assertTrue(
+                any(error.startswith("forbidden legacy text:") for error in errors),
+                chunk_id,
+            )
+
+    def test_generated_tls_activities_preserve_rfc_semantics(self):
+        experiences = json.loads(EXPERIENCES_PATH.read_text(encoding="utf-8"))
+        matches = [
+            experience
+            for experience in experiences
+            if experience.get("courseId") == "cs103"
+            and experience.get("topic") == "HTTPS与TLS"
+        ]
+        self.assertEqual(1, len(matches))
+        activities = {
+            activity["id"]: activity
+            for activity in matches[0].get("activities", [])
+        }
+        self.assertEqual(
+            {"cs103-HTTPS与TLS-1", "cs103-HTTPS与TLS-2"},
+            set(activities),
+        )
+
+        ordering = activities["cs103-HTTPS与TLS-1"]
+        self.assertEqual([1, 0, 3, 2], ordering["answerIndexes"])
+        self.assertEqual("B → A → D → C", ordering["answer"])
+        self.assertIn("0-RTT early data", ordering["feedback"])
+        self.assertIn("不能表述为“握手0 RTT完成”", ordering["feedback"])
+        self.assertIn("RFC 8446第2.3节", ordering["source"])
+
+        trace = activities["cs103-HTTPS与TLS-2"]
+        self.assertIn("服务器发送的证书列表包含终端证书", trace["prompt"])
+        self.assertIn("但省略根CA证书", trace["prompt"])
+        self.assertIn("本地信任锚中的根CA公钥", trace["content"])
+        self.assertIn("信任锚的自签名不作为证书路径的一部分验证", trace["content"])
+        self.assertEqual(
+            "证书路径到本地信任锚、域名、有效期和吊销状态均通过，"
+            "客户端继续密钥交换",
+            trace["answer"],
+        )
+        self.assertIn("信任来源是客户端对信任锚的独立配置", trace["feedback"])
+        self.assertIn("RFC 8446第4.4.2节", trace["source"])
+        self.assertIn("第4.2.3节", trace["source"])
 
 
 if __name__ == "__main__":

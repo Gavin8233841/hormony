@@ -6772,3 +6772,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：生成器退出码 0，33 Topic/59 活动；目标 12 项、关系校验、WS03 76 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 17 s 267 ms`。
 
 失败或未验证：无模拟器或真机，代码填空、七步排序、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。
+
+---
+
+## 2026-07-17 [WS03] TLS 1.3 模式边界与证书信任锚
+
+背景：HTTPS/TLS 内容把 0-RTT 写成握手可在 0 RTT 完成，把根 CA 自签名误作信任来源，并称 TLS 1.3 仅支持 DHE/ECDHE 且强制前向安全；这些概括分别越过 RFC 8446 的 early data、认证路径和 PSK 模式边界。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS103.md`、`apps/web/src/lib/data/cs103-knowledge.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_consistency_cs103.py`。
+
+行为变化：0-RTT 改为共享 PSK 时附加到 1-RTT 握手首个 flight 的 early data；证书推演改为服务器省略客户端已独立配置的信任锚，且不验证锚的自签名；知识切片列全三类 TLS 1.3 密钥交换模式，区分 RSA 密钥传输与签名，并限定 PSK-only/0-RTT 的前向安全边界。活动唯一源为 CS103 规格，经现有生成器只更新 `$[29]` 的 `caseBody`、`workedExampleSteps[2]` 和两项活动共 7 个字段；Web/raw 四切片由测试逐字比对。子 agent 提供两活动与初始固定输入，主代理核对 RFC 并补全跨端、摘要、生成产物契约。
+
+验证：RFC 8446 官方文本 HTTP 200 且核对第 2、2.3、4.4.2、4.2.3 节正文；生成器退出码 0，33 Topic/59 活动；CS103 目标 18 项通过；关系校验通过；WS03 回归 84 项运行、83 项通过、1 项既有 expected failure；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 22 s 250 ms`。
+
+失败或未验证：生成前旧产物红灯 1 项；生成后新增断言字面量错误红灯 1 项；首次完整回归误列不存在的 CS101 测试模块而退出 1，读取实际文件名后均已重跑通过。无模拟器、手机、平板或真机，TLS 活动与长文本布局未验证；HAP 未配置 `signingConfigs`，未调用线上 API。

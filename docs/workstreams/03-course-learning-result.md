@@ -733,3 +733,37 @@
 ### 未验证
 
 - **未验证**：当前无模拟器、手机、平板或真机；代码填空、七步排序、反馈滚动和手机/平板布局未验证。
+
+## 批次二十七：TLS 1.3 模式边界与证书信任锚
+
+### 行为
+
+- `cs103_k32` 与 TLS 排序活动不再把 0-RTT 写成握手已经完成；明确它只在双方共享 PSK 时作为 early data 加入首个 flight，其余消息继续完成 1-RTT PSK 握手，且没有跨连接防重放保证。
+- `cs103_k33` 与证书路径推演改为服务器发送终端和中间 CA 证书、客户端独立配置根 CA 信任锚；信任锚可从服务器链省略，其自签名不作为认证路径的一部分验证。
+- `cs103_k34/k35` 列出 TLS 1.3 的 `(EC)DHE`、PSK-only、PSK 与 `(EC)DHE` 三类模式，区分“移除 RSA 密钥传输”和“RSA 仍可用于签名”，并删除“所有 TLS 1.3 模式强制前向安全”的错误概括。
+- 现实案例把前向安全结论限定在 ECDHE 等临时密钥交换，明确 PSK-only 和 0-RTT 不能直接套用；规格中的四条知识摘要同步修正。
+- 子 agent 完成两项活动和初始固定输入，主代理复核 RFC 原文后补齐 Web/raw 四切片逐字一致、四类旧语义拒绝、规格摘要与生成活动字段契约。
+
+### 文件与生成边界
+
+- 唯一活动源：`docs/ACTIVE-LEARNING-SPEC-CS103.md`。
+- 生成器：`scripts/generate-learning-activities.mjs`；生成产物：`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`。
+- 生成 JSON 仅变化 9 个叶路径：`$[29].caseBody`、`$[29].workedExampleSteps[2]`、`$[29].activities[0].feedback`、`$[29].activities[0].source`、`$[29].activities[1].prompt`、`content`、`answer`、`feedback`、`source`。
+- 知识切片同步文件：`apps/web/src/lib/data/cs103-knowledge.ts` 与 `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`；`scripts/test_lesson_content_consistency_cs103.py` 对 `cs103_k32` 至 `cs103_k35` 的正文和来源逐字比对。
+
+### 证据
+
+- **源码确认**：RFC 8446 第 2 节列出 `(EC)DHE`、PSK-only、PSK with `(EC)DHE` 三类密钥交换；第 2.3 节说明 0-RTT early data 加入 1-RTT 握手首个 flight，且不具前向安全和跨连接防重放保证；第 4.4.2 节允许独立分发的信任锚从服务器证书链省略；第 4.2.3 节说明自签名证书或信任锚签名不参与认证路径验证。官方文本读取返回 HTTP 200，正文长度 337736 字符，并核对上述原文。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；33/33 Topic、59 个活动，类型分布不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_consistency_cs103 -v`，退出码 0；18 项通过，包含生成前旧产物红灯、当前规格/产物/双端切片绿灯及四类旧 TLS 固定输入红灯。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；84 项运行，83 项通过，1 项跨 WS02 reducer 契约为预期失败；Socket 的 `connect()` 调用起始时间拒绝 fixture 同时通过。
+- **静态诊断通过**：`cd apps/web; pnpm lint; pnpm typecheck; pnpm test` 均退出码 0；13 个测试文件、167 项通过。
+- **构建通过**：`cd apps/web; pnpm build`，退出码 0；Next.js 生产构建成功，静态页面生成 10/10。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 22 s 250 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- 生成前目标测试按预期在旧 TLS 活动产物上失败 1 项；生成后新增断言把“不能表述为”误写成“不表示为”，修正精确字面量后 18 项通过。
+- 首次 WS03 回归命令包含仓库不存在的 `scripts.test_lesson_content_consistency_cs101`，退出码 1；通过 `rg --files` 读取实际测试文件后重跑正确的 10 个模块，退出码 0。
+- **未验证**：当前无模拟器、手机、平板或真机；两项 TLS 活动、长反馈滚动及手机/平板布局未验证。本批未调用线上 API，不构成线上检索或学伴回答证据。
