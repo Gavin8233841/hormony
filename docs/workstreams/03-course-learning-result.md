@@ -867,3 +867,33 @@
 
 - 旧内容目标测试退出码 1：规格/产物缺少 `$TTL`，`cs103_k39` 缺少 MINIMUM/否定缓存语义。首次修正后契约仍因正确的“`$TTL` 提供默认 TTL”和否定说明含“默认 TTL”而误报；改为按语义主体拒绝旧断言后 3 项通过。
 - **未验证**：当前无模拟器、手机、平板或真机；区域文件代码块、反馈滚动和布局未验证。本批未调用线上 API。
+
+## 批次三十一：LCS 与编辑距离前缀索引一致性
+
+### 行为
+
+- `cs101_k38` 明确 `dp[i][j]` 的两个维度表示长度为 `i/j` 的前缀，而 C++ 字符串使用零基下标，因此当前前缀末尾必须比较 `X[i-1]` 与 `Y[j-1]`；不再把前缀长度直接写成字符下标 `X[i]/Y[j]`。
+- 动态规划活动 1 的规格反馈同步修正引用公式。原 C++ 循环已经正确使用 `X[i-1] == Y[j-1]`，填空答案和 LCS 数值不变。
+- 同标签题 `cs101_q48` 的编辑距离解释使用相同索引契约，并补全相等分支与删除、插入、替换三项转移公式。
+- 子 agent 交付 `scripts/test_cs101_algorithm_lesson_facts.py`：单字符 `X=Y="A"` 使用正确比较得到 LCS 1，旧 `X[i]/Y[j]` 在第一个非空状态立即越界；另独立执行两组 Lomuto 分区和稳定 merge 输入，确认排序活动没有同类事实缺口。
+
+### 文件与生成边界
+
+- 规格源：`docs/ACTIVE-LEARNING-SPEC-CS101.md`；知识唯一源：`apps/web/src/lib/data/cs101-knowledge.ts`；题库唯一源：`apps/web/src/lib/data/quizzes.ts`。
+- `scripts/generate-knowledge-json.mjs` 只更新端侧 `knowledge-chunks.json` 的 `$[37].text`（`cs101_k38`）；`scripts/generate-quizzes-json.mjs` 只更新 `quizzes.json` 的 `$[38].explanation`（`cs101_q48`），两份生成器均完成源/产物一致性校验。
+- 按主线程保护要求，本批未运行学习活动生成器，未修改或暂存 `lesson-experiences.json`，也未修改 `DEVLOG.md`。因此受保护产物 `$[12].activities[0].feedback` 仍含旧引用公式，未被本批写成一致性通过；主线程采用规格提交后需在其受控工作树生成该单一产物字段。
+
+### 证据
+
+- **源码确认**：规格中的 C++ 实现从 `i=1/j=1` 开始并使用 `X[i-1] == Y[j-1]`；状态 `dp[i][j]` 表示两个长度为 `i/j` 的前缀，因此单字符状态 `dp[1][1]` 只能读取下标 0。
+- **静态诊断通过**：修正前 `python scripts/test_cs101_algorithm_lesson_facts.py` 退出码 1，规格、Web/raw `cs101_k38` 和 `cs101_q48` 共 5 个内容表面子项精准红灯；最终退出码 0，3 项测试通过，包含正确/错误索引执行 fixture 与 Web/raw 逐字一致。
+- **静态诊断通过**：`node scripts/generate-knowledge-json.mjs` 与 `node scripts/generate-quizzes-json.mjs` 均退出码 0；147 条知识切片和 165 道端侧选择题分别与 Web 唯一源完全一致。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；Topic/切片/题库/experience 引用、DAG、层级和 Lesson 路由闭环通过。该命令不证明受保护 Lesson 反馈已同步。
+- **静态诊断通过**：以当前已跟踪测试模块加入 CS101 新契约，退出码 0；109 项运行，108 项通过，1 项跨 WS02 reducer 契约为预期失败。TLS 后续批次的未跟踪红灯测试未计入通过数。
+- **静态诊断通过**：Web lint/typecheck 与 13 文件/167 测试均退出码 0。
+- **构建通过**：Web 生产构建退出码 0，静态页面生成 10/10；HarmonyOS API 12 增量 `assembleHap` 退出码 0，`BUILD SUCCESSFUL in 29 s 842 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- 首次源修正后目标测试仍因 `cs101_q48` 只写“比较 X[i-1] 与 Y[j-1]”而没有精确相等条件退出码 1；改为 `X[i-1]=Y[j-1]` 后重生成题库，3 项通过。
+- **未验证**：受保护的 `lesson-experiences.json` 未生成，`$[12].activities[0].feedback` 仍待主线程受控同步；无模拟器、手机、平板或真机，代码填空与长反馈显示未验证。本批未调用线上 API。
