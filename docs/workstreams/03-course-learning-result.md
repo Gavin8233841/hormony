@@ -897,3 +897,36 @@
 
 - 首次源修正后目标测试仍因 `cs101_q48` 只写“比较 X[i-1] 与 Y[j-1]”而没有精确相等条件退出码 1；改为 `X[i-1]=Y[j-1]` 后重生成题库，3 项通过。
 - **未验证**：受保护的 `lesson-experiences.json` 未生成，`$[12].activities[0].feedback` 仍待主线程受控同步；无模拟器、手机、平板或真机，代码填空与长反馈显示未验证。本批未调用线上 API。
+
+## 批次三十二：TLS 测验认证与密钥协商边界
+
+### 行为
+
+- `cs103_q12` 不再把 ECDHE 称为“非对称加密”。解释明确 TLS 1.3 使用 `(EC)DHE` 密钥协商或 PSK 建立共享密钥材料，再派生 AEAD 保护应用流量的对称密钥；证书签名用于认证，不承担应用数据加密。
+- `cs103_q13` 将题面限定为使用证书认证的 HTTPS，并补齐证书路径终止于客户端本地独立配置的信任锚、CertificateVerify 证明服务器持有终端证书私钥的两个步骤。
+- `cs103_q43` 区分完整握手 1-RTT 与 PSK 恢复握手首个 flight 中的 0-RTT early data，明确 PSK-only 可省略 Certificate/CertificateVerify，删除“TLS 1.3 所有连接都必须使用数字证书”的绝对断言。
+- `cs103_q44` 直接询问信任锚为何受信任，正确项改为客户端操作系统或应用本地独立配置；反馈明确自签名只是信任锚信息的可选承载形式，不自动产生信任，服务器可省略客户端已持有的锚。
+- `cs103_q45` 把前向安全性限定在临时 `(EC)DHE` 并销毁临时私钥的模式，明确 PSK-only 和 0-RTT early data 没有这项保证。Web-only 简答题 `cs103_q14` 同步区分证书公钥验证 CertificateVerify 与 KeyShare 完成密钥协商。
+- 子 agent 新增 `scripts/test_cs103_tls_quiz_facts.py`，逐字段比对 Web/raw 五道选择题，并以六份旧文案 fixture 验证门禁能够拒绝旧语义。
+
+### 文件与生成边界
+
+- 题库唯一源：`apps/web/src/lib/data/quizzes.ts`；`scripts/generate-quizzes-json.mjs` 生成端侧 `quizzes.json` 并完成 165 道选择题全字段一致性校验。
+- 端侧精确变化：`$[135].explanation`（`cs103_q12`）；`$[136].question/explanation`（`cs103_q13`）；`$[137].explanation/tags[1]`（`cs103_q43`）；`$[138].question/options/explanation`（`cs103_q44`）；`$[139].explanation/tags[1]`（`cs103_q45`）。`cs103_q14` 是 Web 简答题，不进入只含选择题的端侧 JSON。
+- q43 第二标签由旧解释中的“删除”误触为“结构操作”，修正后按题干“相比”确定为“概念辨析”；q45 在明确 TLS/PSK 模式后由“概念理解”确定为“协议机制”。两项均由现有 `buildQuestionTags/abilityTag` 从唯一源重新计算，不是手工修改生成产物。
+- 按主线程保护要求，本批未修改或生成 `lesson-experiences.json`，未修改 `DEVLOG.md`；没有触碰页面、仓储、Web API 或 WS06 发布脚本。
+
+### 证据
+
+- **源码确认**：RFC 8446 第 2 节列出 `(EC)DHE`、PSK-only、PSK with `(EC)DHE` 三种模式；第 4.2.8 节定义 KeyShare 承载 DH/ECDH 密钥协商参数；第 4.4.2 节规定使用证书认证时发送 Certificate，而 PSK 模式可省略；第 4.4.3 节规定 CertificateVerify 显式证明证书私钥持有并保护此前握手完整性。
+- **源码确认**：RFC 5280 第 6.1.1 节把 trust anchor information 作为路径验证输入，明确它因可信带外流程交付而受信任；自签名证书只是一种可选输入形式。RFC 官方文本本轮读取均返回 HTTP 200，并核对上述正文。
+- **静态诊断通过**：修正前 `python scripts/test_cs103_tls_quiz_facts.py` 退出码 1，生产语义契约的 q12/q13/q43/q44/q45/q14 六个子项全部红灯；Web/raw 同步子测试和六份旧 fixture 拒绝子测试已通过。修正后退出码 0，3 项测试全部通过。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0；165 道端侧选择题与 Web 唯一源逐字段一致。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的引用、DAG、层级与 Lesson 路由闭环通过。
+- **静态诊断通过**：以当前已跟踪测试模块加入 TLS 新契约，退出码 0；112 项运行，111 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：Web lint/typecheck 与 13 文件/167 测试均退出码 0。
+- **构建通过**：Web 生产构建退出码 0，静态页面生成 10/10；HarmonyOS API 12 增量 `assembleHap` 退出码 0，`BUILD SUCCESSFUL in 24 s 568 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- **未验证**：当前无模拟器、手机、平板或真机；五道选择题解释换行、选项可读性和简答题 Web 显示未验证。本批未调用线上 API。
