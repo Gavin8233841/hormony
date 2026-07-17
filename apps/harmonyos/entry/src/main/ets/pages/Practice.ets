@@ -544,9 +544,11 @@ struct PracticePage {
       weakTopics: totalCorrect < this.questions.length ? [this.topic] : [],
       submittedAt: this.attemptSubmittedAt
     };
+    let draftPersisted = false;
     try {
       this.draftSaveRunId += 1;
       await this.persistDraft();
+      draftPersisted = true;
       const receipt = await LocalLearningRepository.appendQuizResult(result);
       this.correctCount = totalCorrect;
       this.details = nextDetails;
@@ -563,7 +565,9 @@ struct PracticePage {
         this.hasError = false;
       }
     } catch (error) {
-      this.message = '答题结果写回未确认，答案已冻结并保存，请重试提交';
+      this.draftSaveFailed = !draftPersisted;
+      this.message = draftPersisted ? '答题结果写回未确认，答案已冻结并保存，请重试提交' :
+        '提交前草稿保存失败，本次尚未写回；答案已冻结，请重试保存并提交';
       this.hasError = true;
     } finally {
       this.saving = false;

@@ -1768,11 +1768,15 @@ describe("Quiz 与 Practice 结果页下一步动作", () => {
     expect(quizChoose).toContain("this.queueDraftSave()");
     expect(quizSubmit).toContain("if (this.attemptSubmittedAt.length === 0)");
     expect(quizSubmit).toContain("await this.persistDraft()");
+    expect(quizSubmit).toContain("let draftPersisted = false");
+    expect(quizSubmit).toContain("提交前草稿保存失败，本次尚未写回");
     expect(quizSubmit).toContain("clearAiQuizDraft");
     expect(practiceChoose).toContain("this.attemptSubmittedAt.length > 0");
     expect(practiceChoose).toContain("this.queueDraftSave()");
     expect(practiceSubmit).toContain("if (this.attemptSubmittedAt.length === 0)");
     expect(practiceSubmit).toContain("await this.persistDraft()");
+    expect(practiceSubmit).toContain("let draftPersisted = false");
+    expect(practiceSubmit).toContain("提交前草稿保存失败，本次尚未写回");
     expect(practiceSubmit).toContain("clearCuratedPracticeDraft");
   });
 
