@@ -1,6 +1,7 @@
 // POST /api/knowledge/search - RAG knowledge retrieval
 
 import { retrieve } from "@/lib/rag";
+import { selectRetrievedChunks } from "@/lib/rag/course-boundary";
 import { store } from "@/lib/store/db";
 import { readJsonObject } from "@/lib/request-json";
 import { isStatelessDeployment } from "@/lib/deployment";
@@ -55,7 +56,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const chunks = retrieve(query, body.courseId, topK.value);
+    const chunks = selectRetrievedChunks(
+      retrieve(query, body.courseId, topK.value),
+      body.courseId,
+      topK.value
+    );
     const outputSafety = await runSafetyAgent(
       chunks.map((chunk) => chunk.text).join("\n"),
       chunks.map((chunk) => ({

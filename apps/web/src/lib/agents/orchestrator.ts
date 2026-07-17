@@ -14,6 +14,7 @@ import { runEvaluatorAgent } from "./evaluator-agent";
 import { runSafetyAgent } from "./safety-agent";
 import type { AgentResult, Citation, StreamEvent, ChatRequest, ChatMessage, SafetyResult } from "@/lib/types";
 import { generateId } from "@/lib/utils";
+import { SafetyBlockedError } from "@/lib/api-errors";
 
 // 简易意图识别（关键词路由）
 type Intent = "tutor" | "plan" | "quiz" | "evaluate" | "general";
@@ -60,7 +61,11 @@ async function runPreAgents(
   intent: Intent,
   req: ChatRequest,
   emit?: (event: StreamEvent) => void
-): Promise<{ profileResult: AgentResult; retrievalResult: AgentResult }> {
+): Promise<{
+  profileResult: AgentResult;
+  retrievalResult: AgentResult;
+  retrievalSafety: SafetyResult;
+}> {
   const shouldRetrieve = intent === "tutor" || intent === "general";
   emit?.({ type: "thinking", agent: "Profile" });
   if (shouldRetrieve) emit?.({ type: "thinking", agent: "Retrieval" });
@@ -72,14 +77,25 @@ async function runPreAgents(
       ])
     : [await runProfileAgent(req.profile), skippedRetrievalResult(intent)];
 
-  emit?.({ type: "trace", agent: "Profile", content: profileResult.content });
-  emit?.({
-    type: "trace",
-    agent: "Retrieval",
-    content: retrievalResult.content.slice(0, 200),
-  });
+  const retrievalSafety: SafetyResult = shouldRetrieve
+    ? await runSafetyAgent(
+        retrievalResult.content,
+        retrievalResult.citations ?? []
+      )
+    : { passed: true, flags: [], hallucinationRisk: "low" };
 
-  return { profileResult, retrievalResult };
+  emit?.({ type: "trace", agent: "Profile", content: profileResult.content });
+  if (retrievalSafety.passed) {
+    emit?.({
+      type: "trace",
+      agent: "Retrieval",
+      content: shouldRetrieve
+        ? `已完成课程资料检索（${retrievalResult.citations?.length ?? 0} 条）`
+        : retrievalResult.content,
+    });
+  }
+
+  return { profileResult, retrievalResult, retrievalSafety };
 }
 
 function skippedRetrievalResult(intent: Intent): AgentResult {
@@ -213,8 +229,11 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
   const agentResults: AgentResult[] = [];
 
   // 1. 前置 Agent：Profile + Retrieval
-  const { profileResult, retrievalResult } = await runPreAgents(intent, req);
+  const { profileResult, retrievalResult, retrievalSafety } = await runPreAgents(intent, req);
   agentResults.push(profileResult, retrievalResult);
+  if (!retrievalSafety.passed) {
+    throw new SafetyBlockedError("检索结果未通过安全审核");
+  }
 
   // 2. 按意图路由到主 Agent
   const mainResult = await routeMainAgent(intent, req, retrievalResult, history);
@@ -251,7 +270,16 @@ export async function orchestrateStream(
   const { intent, sessionId, history } = prepareContext(req);
 
   // 1. 前置 Agent：Profile + Retrieval（流式推送 trace）
-  const { retrievalResult } = await runPreAgents(intent, req, emit);
+  const { retrievalResult, retrievalSafety } = await runPreAgents(intent, req, emit);
+  if (!retrievalSafety.passed) {
+    emit({
+      type: "error",
+      code: "SAFETY_BLOCKED",
+      message: "本次回答未通过安全检查，请调整问题后重试。",
+    });
+    emit({ type: "done", sessionId });
+    return;
+  }
 
   // 2. 按意图路由到主 Agent
   const mainResult = await routeMainAgent(intent, req, retrievalResult, history, emit, signal);

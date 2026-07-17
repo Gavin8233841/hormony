@@ -6912,3 +6912,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - HAP 未配置 `signingConfigs`，构建明确跳过签名；不能据此声明安装通过。
 - 服务卡片由系统冷启动、真实 ArkData 升级、模拟器、真机和多设备行为未验证。
 - 本批未调用线上 API 或真实模型，不声明线上通过。
+
+---
+
+## 2026-07-17 [MAIN+WS05] RAG 课程隔离与 Safety 输出边界
+
+背景：Knowledge Search 原先信任检索层返回的课程与结构；Chat 还会在输出 Safety 前把 RAG 正文放入 SSE trace。检索异常、缓存污染或持久数据污染时，跨课程切片、非法 Topic、未知字段或不安全正文可能越过课程与输出边界。本批逐文件复核并采用 WS05 提交 `ce8f843`，不整枝合并其旧基线。
+
+文件：
+- `apps/web/src/lib/rag/course-boundary.ts`、`course-boundary.test.ts`
+- `apps/web/src/lib/agents/retrieval-agent.ts`、`orchestrator.ts`、`orchestrator.test.ts`
+- `apps/web/src/app/api/knowledge/search/route.ts`、`course-isolation.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- RAG 结果统一执行运行时对象、受支持课程、精确课程-Topic、有限 score 和数量边界，并重建 `KnowledgeChunk` 白名单字段；非数组、超量、畸形、跨课程或非法 Topic 明确 fail-closed，合法空结果保持正常。
+- Knowledge Search 在输出 Safety 前执行同一边界；Chat Retrieval Agent 在格式化上下文和引用前执行边界，异常不会静默降级成无引用通用回答。
+- Chat 在 Tutor 调用前审核检索正文与引用；失败时只发送 `SAFETY_BLOCKED -> done`，不产生 delta。通过时 Retrieval trace 只公开检索条数，不发送原始 RAG 正文。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/lib/rag/course-boundary.test.ts src/app/api/knowledge/search/course-isolation.test.ts src/lib/agents/orchestrator.test.ts`：exit 0，3 个文件、12/12 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，27 个测试文件、405/405 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面，middleware 26.8 kB。
+
+失败或未验证：
+- 本批没有使用真实模型秘密；真实 Tutor、线上部署、浏览器 SSE 与缓存面板未验证。
+- 来源分支记录了本地 production 契约，但主线本批未重新执行，不提升为本批新验证。
+- HarmonyOS 模拟器、真机和多设备行为未验证；本批未修改 HarmonyOS、模型 ID 或题库内容。
