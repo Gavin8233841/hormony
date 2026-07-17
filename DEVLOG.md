@@ -6942,3 +6942,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本批没有使用真实模型秘密；真实 Tutor、线上部署、浏览器 SSE 与缓存面板未验证。
 - 来源分支记录了本地 production 契约，但主线本批未重新执行，不提升为本批新验证。
 - HarmonyOS 模拟器、真机和多设备行为未验证；本批未修改 HarmonyOS、模型 ID 或题库内容。
+
+---
+
+## 2026-07-17 [MAIN+WS05] API CORS 缓存隔离
+
+背景：WS05 的 production 黑盒确认 middleware 追加的 `Vary: Origin` 会被 Next.js 14.2.18 App Route 的 RSC Vary 覆盖。允许 Origin 的响应若可被共享缓存存储，可能向其他 Origin 复用错误的 CORS 头；继续修改 middleware Vary 不能跨过框架后置重设。本批逐文件复核并采用提交 `9fdb797`。
+
+文件：
+- `apps/web/src/middleware.ts`、`apps/web/src/middleware.test.ts`
+- `apps/web/src/app/api/chat/route.ts`、`stream-limits.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 所有经过 middleware 的 API 响应设置 `Cache-Control: private, no-store`，关闭允许、不受信及无 Origin 请求的浏览器与共享缓存存储。
+- middleware 自行终止的 OPTIONS、`ENDPOINT_DISABLED` 和限流响应继续保留允许来源 CORS、`Vary: Origin` 与安全头；不受信 Origin 继续不回显。
+- Chat SSE 显式使用 `private, no-store, no-transform`，不允许实时模型事件被存储或重验证。
+- pass-through API 的最终 Vary 仍由 Next RSC 重建；本批以 no-store 消除跨 Origin 缓存复用风险，不声称框架行为已改变。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/middleware.test.ts src/app/api/chat/stream-limits.test.ts`：exit 0，2 个文件、47/47 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，27 个测试文件、406/406 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面，middleware 26.8 kB。
+
+失败或未验证：
+- 来源分支已有本地 production 响应头断言，主线本批未重新运行，不提升为本批新验证。
+- 线上 CDN/反向代理、真实模型 Chat SSE 响应头与浏览器缓存面板未验证；pass-through 的 `Vary: Origin` 仍受当前 Next 版本限制。
+- 本批未修改 HarmonyOS、生产模型 ID、题库或秘密。

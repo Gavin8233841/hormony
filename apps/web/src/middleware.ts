@@ -69,6 +69,9 @@ function applyCorsHeaders(res: NextResponse, req: NextRequest) {
   }
   res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  // Next 14 App Router 会在 middleware 之后重建 RSC Vary；禁止存储可避免
+  // 允许来源的 CORS 响应被共享缓存复用于其他 Origin。
+  res.headers.set("Cache-Control", "private, no-store");
 }
 
 function cleanupExpiredRateLimits(now: number): void {

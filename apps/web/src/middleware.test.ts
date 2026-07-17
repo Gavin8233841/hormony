@@ -7,6 +7,7 @@ const originalDeploymentMode = process.env.DEPLOYMENT_MODE;
 const originalOriginAllowlist = process.env.ORIGIN_ALLOWLIST;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_KEY_CAPACITY = 1000;
+const API_CACHE_CONTROL = "private, no-store";
 
 const STATEFUL_API_PREFIXES = [
   "/api/conversations",
@@ -70,6 +71,7 @@ function expectCorsHeaders(response: Response, origin: string): void {
   expect(response.headers.get("Vary")?.split(",").map((value) => value.trim())).toContain("Origin");
   expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, PUT, PATCH, DELETE, OPTIONS");
   expect(response.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, Authorization");
+  expect(response.headers.get("Cache-Control")).toBe(API_CACHE_CONTROL);
 }
 
 async function expectEndpointDisabled(response: Response): Promise<void> {
@@ -166,7 +168,18 @@ describe("middleware API gateway", () => {
     expect(response.status).toBe(404);
     expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
     expect(response.headers.get("Vary")).toBeNull();
+    expect(response.headers.get("Cache-Control")).toBe(API_CACHE_CONTROL);
     expectSecurityHeaders(response);
+  });
+
+  it("prevents API response storage when the request has no Origin", () => {
+    process.env.DEPLOYMENT_MODE = "stateless";
+
+    const response = middleware(apiRequest("/api/health"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe(API_CACHE_CONTROL);
+    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
   });
 
   it("adds CORS and Retry-After headers to rate-limit errors", async () => {

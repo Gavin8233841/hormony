@@ -114,6 +114,7 @@
 - Web Chat 停止后重发与历史请求边界：`bfdad5d fix(web): 隔离 Chat 停止后重发状态`。
 - 第三批结果证据：`6290c92 docs(ws05): 记录第三批生产可靠性证据`。
 - Plan 与 Quiz 请求取消贯穿：`2b240af fix(web): 贯穿 Plan 与 Quiz 请求取消`。
+- RAG 课程隔离与 Safety 输出边界：`ce8f843 fix(web): 封闭 RAG 课程与 Safety 边界`。
 
 ## 6. 失败与未验证
 
@@ -185,5 +186,27 @@
 - 首次 typecheck 因测试 mock 的字面量返回类型过窄 exit 2；显式标注 `string` 后定向与全量 typecheck 均 exit 0。
 - fail-closed 调整后的首轮目标测试为 11/12；旧测试仍把三门课程混合全集传给指定课程边界。改为逐门课程验证精确下游结果后目标测试通过，失败未计作通过证据。
 - 前两次 production 断言已完成业务响应，但 PowerShell 对多值 header 的读取方式不正确而 exit 1；按实际响应头字典归一化后严格脚本 exit 0，失败未计作通过。
-- production 响应中的 Next RSC `Vary` 覆盖了 middleware 追加的 `Origin`；本节没有把 `Vary: Origin` 记作通过，留给独立 middleware 批次修复。
+- production 响应中的 Next RSC `Vary` 覆盖了 middleware 追加的 `Origin`；本节没有把 `Vary: Origin` 记作通过，留给独立 middleware 批次处理。
 - **未验证**：线上部署、真实模型 Tutor 输出、浏览器交互、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS 文件、生产模型 ID、题库内容或秘密。
+
+## 10. API CORS 缓存隔离
+
+### 10.1 源码确认与行为
+
+- Next.js 14.2.18 的 `base-server.js` 在 App Route 渲染阶段用 RSC 请求头重设 `Vary`，发生在 middleware 响应头合并之后；本地 production 也确认 pass-through API 最终为 `Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch`。仅修改 middleware 的 `Vary` 无法覆盖该框架行为。
+- middleware 现在对全部 API 响应设置标准 `Cache-Control: private, no-store`。即使 pass-through 的 `Vary: Origin` 被框架覆盖，允许来源的 CORS 响应也不能进入浏览器或共享缓存，避免跨 Origin 复用。
+- 不受信 Origin 继续不回显 `Access-Control-Allow-Origin`；middleware 自行终止的 OPTIONS、`ENDPOINT_DISABLED` 和限流响应继续保留 `Vary: Origin`。
+- Chat SSE 从 `no-cache, no-transform` 收紧为 `private, no-store, no-transform`，避免实时模型事件被存储后重验证。
+
+### 10.2 验证
+
+- 定向回归：`pnpm exec vitest run src/middleware.test.ts src/app/api/chat/stream-limits.test.ts` exit 0，2 个测试文件、47 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，25 个测试文件、355 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 生产构建完成，middleware 26.8 kB。
+- 本地 production `127.0.0.1:4319` 严格断言 exit 0：允许 Origin Knowledge `200`、不受信 Origin Knowledge `200`、无 Origin Health `503`、Chat `503/MODEL_UNAVAILABLE` 均包含语义等价的 `private + no-store`；不受信 Origin 未回显；OPTIONS `204` 和 Knowledge Upload `404/ENDPOINT_DISABLED` 保留 `Vary: Origin`。PID 51756 已停止，端口已关闭。
+
+### 10.3 失败与未验证
+
+- 第一轮 production 脚本按字符串顺序比较 `private, no-store`，而 Node 最终规范化为 `no-store, private`，因此 exit 1；改为解析指令集合并同时要求 `private`、`no-store` 后 exit 0。失败未计作通过。
+- pass-through API 的最终 `Vary` 仍由 Next 14 RSC 管理；本批通过禁止存储关闭跨 Origin 缓存风险，没有伪称框架 Vary 已修复。
+- **未验证**：线上 CDN/反向代理行为、真实模型 Chat SSE 的 production 响应头、浏览器缓存面板。未修改 HarmonyOS、生产模型 ID 或秘密。
