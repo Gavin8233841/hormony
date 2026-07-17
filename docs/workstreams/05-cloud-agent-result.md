@@ -237,3 +237,29 @@
 - 首个 production 启动参数未建立监听，探针超时 exit 124；改用实际 Next CLI 后实例启动。首个业务请求因 userId 含连字符得到 `400/INVALID_USER_ID`；按已读取的精确契约改为字母和下划线后断言 exit 0，失败未计作通过。
 - 额外 Quiz 总预算子 agent 因账户并发额度未启动，没有修改文件；该风险留待本批提交后由主代理从源码与测试继续评估。
 - **未验证**：当前分支线上部署、带真实模型的 SSE 正文与迟到异常、真实浏览器断连、HarmonyOS 模拟器与真机。未修改 HarmonyOS、RAG、缓存策略、生产模型 ID 或秘密。
+
+## 12. Quiz 模型调用总预算
+
+### 12.1 源码确认与行为
+
+- 旧 Quiz 循环接受修复后的部分批次。请求上限 20 题、每轮最多新增 1 题、每轮一次生成加一次修复时，单请求最多 40 次顺序模型调用；模型层只提供每次 45 秒超时，路由 `maxDuration=120` 不是内部 deadline。
+- 模型层新增总预算执行器，统一组合内部 timeout 与外部 AbortSignal。Quiz 路由使用 100000ms 总预算，在平台 120 秒时限前为 Safety、序列化和回收预留 20 秒。
+- 内部 deadline 中止派生 signal 并映射为 `504/MODEL_TIMEOUT`；用户断开仍映射为 `499/MODEL_CANCELLED`，两条路径都清理 timer 与外部 signal listener。
+- Quiz Agent 在单批内按规范化题干去重；一次修复后仍无法得到完整批次即 `MODEL_INVALID_RESPONSE`。合法 20 题现在最多 4 批，每批最多生成和修复各一次，模型调用上界收敛为 8。
+
+### 12.2 委派与复核
+
+- 子 agent `quiz_request_budget_test` 只新增路由预算测试。修复前目标测试 exit 1：100000ms 后 Agent signal 仍为未中止；同文件的外部取消 `499/MODEL_CANCELLED` 已通过。子 agent 未修改生产源码、未暂存或提交。
+- 主线程逐行复核并采用测试；首次联合运行发现测试初始化的 `vi.waitFor` 会推进 fake clock，改为 0ms 微任务冲刷后保留原产品断言，并补齐不足批次与同批重复题的两次调用收束回归。
+
+### 12.3 验证
+
+- 定向联合：`pnpm exec vitest run src/app/api/quiz/request-budget.test.ts src/app/api/quiz/request-cancellation.test.ts src/lib/agents/quiz-agent.test.ts src/app/api/quiz/quiz-flow.test.ts` exit 0，4 个测试文件、30 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，27 个测试文件、362 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成生产构建，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- 本地 production 黑盒：`127.0.0.1:4321`，显式无模型测试响应、stateless/off；有效 Quiz 请求为 HTTP 503、`MODEL_UNAVAILABLE`，`count=21` 为 HTTP 400、`INVALID_COUNT`。实例 PID 60304 已停止，端口已关闭。
+
+### 12.4 失败与未验证
+
+- 首轮联合回归 28/29：内部预算已触发，但测试自身先通过 `vi.waitFor` 推进时钟，导致 99999ms 前置断言失败；只冲刷 0ms 微任务后 30/30 通过，失败未计作通过。
+- **未验证**：真实模型上游连接在 100 秒时的网络级取消、线上平台 120 秒回收、当前分支线上部署、浏览器、HarmonyOS 模拟器与真机。未修改 HarmonyOS、题库内容、RAG、缓存策略、生产模型 ID 或秘密。

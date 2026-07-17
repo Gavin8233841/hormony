@@ -6418,3 +6418,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 首个 production 启动参数未形成监听，探针超时 exit 124；改用仓库实际 Next CLI 启动后成功。首个 HTTP 探针使用含连字符的 userId，按源码契约得到 `400/INVALID_USER_ID`；改为仅含字母和下划线的有效值后严格断言 exit 0，失败未计作通过。
 - 额外 Quiz 总预算子 agent 因账户并发额度未启动，未产生文件或结论；按主线程校准留到本批提交后由主代理评估。
 - **未验证**：线上部署、带真实模型的 Chat SSE terminal 行为、浏览器断连、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS、RAG、缓存策略、生产模型 ID 或秘密。
+
+---
+
+## [WS05] 2026-07-17：Quiz 模型调用总预算
+
+背景：Quiz 每批最多请求 5 题，但修复后的部分批次仍会被接受。请求 20 题时，若模型每轮只交付 1 道有效题，旧循环最多触发 20 轮、每轮一次生成加一次修复，即 40 次顺序模型调用；每次 45 秒超时且路由 `maxDuration=120` 不提供内部总截止时间。
+
+文件：
+- `apps/web/src/lib/agents/model.ts`
+- `apps/web/src/lib/agents/quiz-agent.ts`、`quiz-agent.test.ts`
+- `apps/web/src/app/api/quiz/route.ts`、`request-budget.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 模型层新增可复用总预算执行器，同时竞速操作、内部 deadline 与外部请求取消；100 秒内部预算返回 `504/MODEL_TIMEOUT`，外部取消继续返回 `499/MODEL_CANCELLED`，并清理 timer/listener。
+- Quiz 路由在 120 秒平台时限内使用 100 秒内部预算，为输出 Safety、序列化和平台回收预留 20 秒。
+- Quiz Agent 对同批题干去重；一次 JSON 修复后仍不足完整批次立即 `MODEL_INVALID_RESPONSE`，不再把部分批次加入循环。`count=20` 因此最多 4 批、每批生成和修复各一次，即最多 8 次模型调用。
+- 子 agent `quiz_request_budget_test` 独立新增路由红测：修复前 100000ms 后 Agent signal 仍为未中止，外部取消 499 回归已通过；主线程复核后采用并修正 fake clock 初始化，不改变产品断言。
+
+验证：
+- 定向联合：`pnpm exec vitest run src/app/api/quiz/request-budget.test.ts src/app/api/quiz/request-cancellation.test.ts src/lib/agents/quiz-agent.test.ts src/app/api/quiz/quiz-flow.test.ts`：exit 0，4 个测试文件、30 项通过。
+- `cd apps/web; pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，27 个测试文件、362 项通过。
+- `cd apps/web; pnpm build`：exit 0；Next.js 14.2.18 完成生产构建，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- 本地 production `127.0.0.1:4321`，显式无模型测试响应、stateless/off：有效 Quiz 请求为 HTTP 503、`MODEL_UNAVAILABLE`；`count=21` 为 HTTP 400、`INVALID_COUNT`。监听 PID 60304 已停止，端口已关闭。
+
+失败或未验证：
+- 主线程首轮联合回归 28/29：预算已触发，但测试的 `vi.waitFor` 先推进 fake clock，随后再前进 99999ms 时已越界；改为只冲刷 0ms 微任务后，99999ms 未取消、100000ms 精确超时，30/30 通过。失败未计作通过。
+- **未验证**：带真实模型的 100 秒网络级取消、线上平台 120 秒回收、线上部署、浏览器、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS、题库内容、RAG、缓存策略、生产模型 ID 或秘密。

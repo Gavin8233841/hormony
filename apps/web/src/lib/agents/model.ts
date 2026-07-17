@@ -233,6 +233,63 @@ export interface ModelCallOptions {
   signal?: AbortSignal;
 }
 
+export interface ModelRequestBudgetOptions {
+  timeoutMs: number;
+  signal?: AbortSignal;
+}
+
+export async function withModelRequestBudget<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  options: ModelRequestBudgetOptions
+): Promise<T> {
+  if (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0) {
+    throw new RangeError("模型请求总预算必须为正数");
+  }
+
+  const timeoutMs = Math.floor(options.timeoutMs);
+  const controller = new AbortController();
+  const timeoutError = new ModelTimeoutError(`模型请求总预算超过 ${timeoutMs}ms`);
+  let timeoutTriggered = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancelListener: (() => void) | undefined;
+
+  try {
+    if (options.signal?.aborted) throw new ModelCancelledError();
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        timeoutTriggered = true;
+        controller.abort(timeoutError);
+        reject(timeoutError);
+      }, timeoutMs);
+    });
+    const cancelPromise = options.signal
+      ? new Promise<never>((_, reject) => {
+          cancelListener = () => {
+            controller.abort(options.signal?.reason);
+            reject(new ModelCancelledError());
+          };
+          options.signal?.addEventListener("abort", cancelListener, { once: true });
+        })
+      : undefined;
+
+    return await Promise.race([
+      operation(controller.signal),
+      timeoutPromise,
+      ...(cancelPromise ? [cancelPromise] : []),
+    ]);
+  } catch (error) {
+    if (timeoutTriggered) throw timeoutError;
+    if (options.signal?.aborted) throw new ModelCancelledError();
+    throw error;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    if (options.signal && cancelListener) {
+      options.signal.removeEventListener("abort", cancelListener);
+    }
+  }
+}
+
 // 统一调用入口：返回纯文本
 export async function callModel(
   systemPrompt: string,

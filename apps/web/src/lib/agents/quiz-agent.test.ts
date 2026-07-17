@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runQuizAgent } from "./quiz-agent";
 
 const originalModelResponse = process.env.TEST_MODEL_RESPONSE;
+const originalModelResponseSequence = process.env.TEST_MODEL_RESPONSE_SEQUENCE;
+const originalModelResponseSequenceScope = process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE;
 
 function modelQuestion(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -26,9 +28,43 @@ async function expectInvalidModelResponse(payload: unknown) {
 afterEach(() => {
   if (originalModelResponse === undefined) delete process.env.TEST_MODEL_RESPONSE;
   else process.env.TEST_MODEL_RESPONSE = originalModelResponse;
+  if (originalModelResponseSequence === undefined) delete process.env.TEST_MODEL_RESPONSE_SEQUENCE;
+  else process.env.TEST_MODEL_RESPONSE_SEQUENCE = originalModelResponseSequence;
+  if (originalModelResponseSequenceScope === undefined) {
+    delete process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE;
+  } else {
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = originalModelResponseSequenceScope;
+  }
 });
 
 describe("Quiz Agent 模型输出边界", () => {
+  it("修复后仍不足完整批次时立即拒绝而不继续放大模型调用", async () => {
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：批次预算";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      [modelQuestion()],
+      [modelQuestion({ stem: "平衡二叉树的高度约束是什么？" })],
+    ]);
+
+    await expect(
+      runQuizAgent("quiz_test", "cs101", "二叉树与BST", 5, "medium", "批次预算")
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+    expect(JSON.parse(process.env.TEST_MODEL_RESPONSE_SEQUENCE ?? "null")).toEqual([]);
+  });
+
+  it("同批重复题修复后仍重复时立即拒绝", async () => {
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：重复预算";
+    const duplicateBatch = Array.from({ length: 5 }, () => modelQuestion());
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      duplicateBatch,
+      duplicateBatch,
+    ]);
+
+    await expect(
+      runQuizAgent("quiz_test", "cs101", "二叉树与BST", 5, "medium", "重复预算")
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+    expect(JSON.parse(process.env.TEST_MODEL_RESPONSE_SEQUENCE ?? "null")).toEqual([]);
+  });
+
   it("拒绝超过用户请求总量的题目而不是静默截断", async () => {
     await expectInvalidModelResponse([
       modelQuestion(),
