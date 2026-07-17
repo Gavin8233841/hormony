@@ -157,6 +157,7 @@ describe("chat SSE resource limits", () => {
     const response = await POST(chatRequest());
     const { events } = await readEvents(response);
 
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store, no-transform");
     expect(events).toEqual([
       { type: "thinking", agent: "Tutor" },
       { type: "delta", content: "二叉树讲解" },
