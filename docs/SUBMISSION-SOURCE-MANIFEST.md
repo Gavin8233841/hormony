@@ -26,10 +26,12 @@
     "scripts/simulator-api-gateway.mjs",
     "scripts/start-simulator-gateway.ps1",
     "scripts/test-chat.mjs",
+    "scripts/test_validate_competition_evidence.py",
     "scripts/test_validate_competition_content.py",
     "scripts/test_validate_official_deliverables.py",
     "scripts/test_validate_release_bundle.py",
     "scripts/validate-competition-content.py",
+    "scripts/validate-competition-evidence.py",
     "scripts/validate-official-deliverables.py",
     "scripts/validate-release-bundle.py",
     "scripts/validate-topic-relations.py"

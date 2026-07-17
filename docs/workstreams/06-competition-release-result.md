@@ -503,3 +503,55 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
   等于成片编码、音画同步、字幕可读性或 5 分钟演示完成。
 - **未验证**：官方最新作品说明模板文件仍不在仓库；当前门禁不能证明最终 PDF
   使用了门户当期模板。门户大小限制、10 次额度余量和实际上传结果未在线核验。
+
+## 批次 11：评分证据矩阵与黄金 4:45 演示结构门禁
+
+背景：50/20/20/10 + 应用价值 20 证据矩阵、初赛一句话/两图/800 字和黄金镜头
+表已经写入交付计划，但没有自动检查分值、证据等级、字数与时间轴连续性；文档
+编辑可能重新引入旧失实口径或把未采集的图片写成已完成。
+
+文件：
+
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-competition-evidence.py`
+- `scripts/test_validate_competition_evidence.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 直接把现有 Markdown 作为单一来源，解析评分矩阵的精确表头与 13 行数据；五个
+  官方维度必须为创新性 50、完备度 20、前景评估 20、规范性 10、实际应用价值
+  20，且证据等级只能使用仓库定义的七种明确等级。
+- 一句话创新点和 800 字介绍必须分别是唯一非空 Markdown 引用；当前介绍为 467
+  个 Unicode 字符。严格交付口径必须保留图 1、图 2 两个小节，真实证据采集前
+  两图各自保持**未验证**。
+- 黄金镜头表逐段解析 `mm:ss-mm:ss`，要求从 00:00 无空档、无重叠地连续到
+  04:45，任何段不得超过 300 秒。当前为 7 段、总终点 285 秒。
+- 正式产品叙事、两图说明和镜头表拒绝“总题库 60 题”“78/78”“答案 100%
+  正确”“所有 AI 输出都有引用”；审计章节可保留这些文字用于说明禁止项。
+- 门禁和测试纳入源码提交 manifest；命令输出明确说明只证明结构与口径，不提升
+  卡片、通知、模型请求、ArkData 回写、两图或成片的证据等级。
+- 独立只读复核纠正矩阵中的 NOTICE 状态：仓库已有未签署审计草案，但最终逐包
+  许可证索引、真实团队审阅和签署声明仍为**未验证**，不再写成文件尚未生成。
+
+验证：
+
+- **静态诊断通过**：`python -B -m py_compile scripts/validate-competition-evidence.py scripts/test_validate_competition_evidence.py`，exit 0。
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_competition_evidence.py -v`，
+  exit 0，6/6 通过；覆盖错误分值、非法证据等级、时间轴空档/超时、801 字介绍、
+  缺图和正式叙事重新出现旧失实口径。
+- **静态诊断通过**：`python -B scripts/validate-competition-evidence.py`，exit 0，
+  `scoreRows=13; timelineSegments=7; timelineSeconds=285; introductionCharacters=467`。
+
+失败后纠正：
+
+- 首轮新单测把当前镜头表误数为 6 段，实际表格为 7 段，单测 exit 1；按 Markdown
+  真实行数修正固定断言后 6/6 通过，未修改产品镜头表或压缩时间段。
+
+未验证：
+
+- **未验证**：两张图仍未从最终 HAP 采集；门禁只要求继续如实标记未验证。
+- **未验证**：黄金时间轴连续不等于真实 Chat、Quiz、卡片/通知和 ArkData 回写
+  已在同一提交、同一 HAP、同一账号状态运行通过。
+- **未验证**：最终旁白、字幕、原始录屏、完整播放和镜头/证据编号映射尚不存在。
