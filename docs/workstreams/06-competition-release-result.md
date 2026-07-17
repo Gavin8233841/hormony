@@ -620,3 +620,59 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
   证据；构建通过不能升级为这些等级。
 - **未验证**：内容门禁未联网复查 36 条外部 URL，NOTICE 仍含正式提交前人工处理
   标记；许可证/原创/AI 声明签署、最终媒体完整播放和门户上传均未验证。
+
+## 批次 13：黄金 4:45 镜头 ID、分列业务锚点与同版合同门禁
+
+背景：批次 11 只检查镜头表四列非空、时间连续和 04:45 收束。纯内存固定输入把
+`01:20-02:25` 的 Chat 段替换成“占位操作/占位讲解/占位证据”后，旧门禁仍输出
+`GENERIC_TIMELINE_FALSE_PASS=True`、`ERROR_COUNT=0`。它不能阻止镜头表保留时间但
+丢失真实 Chat、Quiz、ArkData 或主动服务业务合同。
+
+文件：
+
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `scripts/validate-competition-evidence.py`
+- `scripts/test_validate_competition_evidence.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 黄金时间轴增加 `D01-release-identity` 至 `D07-evidence-close` 七个稳定镜头 ID，
+  与现有七段和 `00:00` 到 `04:45` 时间逐段绑定；缺失、重复、额外、乱序或时间变化
+  均会失败。这些 ID、4:45 目标和锚点是项目内部加严，不冒充官方新增要求；官方
+  边界仍是视频不超过 5 分钟并完整展示核心功能。
+- 每个镜头分别校验“画面与操作”“讲解重点”“通过证据”三列，共 52 个当前计划中
+  已存在的最小业务锚点。把全部关键词堆入错误列不能通过；Chat 段必须分别保留
+  真实等待/SSE/当次引用、Agent 链路，以及新 `POST /api/chat`、`done` 和实际返回
+  检查，其他六段同样约束发布身份、主动服务、Topic、Quiz、ArkData 与证据收束。
+- 时间轴还必须保留“同一提交、同一 HAP、同一测试账号状态、真实线上调用”四项
+  全链路合同。把它改成不同版本、不同账号或历史缓存时，静态计划门禁明确失败。
+- 计划要求 `D01..D07` 同时进入原始片段清单和证据登记表，每段记录完整提交、
+  HAP SHA-256、采集时间、设备、方向、分辨率和原始证据路径；真实素材未采集前
+  明确保持**未验证**。
+- 独立子 agent 只读确认七个 ID、七段、时间和原 30 个锚点均与当前计划精确一致，
+  同时复现“锚点堆错列”和“同版合同改反仍通过”两个漏检。本批逐项修复并扩展为
+  52 个分列锚点与 4 个上下文锚点；子 agent 未修改文件或 Git。
+
+验证：
+
+- **源码确认**：修复前纯内存占位 Chat 固定输入返回零错误；修复后同类输入、锚点
+  放错列、七段逐项移除 52 个锚点、镜头 ID 重复/缺失、时间不连续/超限和四项同版
+  合同反向表述均由固定测试拒绝。
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_competition_evidence.py -v`，
+  exit 0，8/8 通过；子测试逐一覆盖 52 个分列业务锚点。
+- **静态诊断通过**：`python -B scripts/validate-competition-evidence.py`，exit 0，
+  `scoreRows=13; timelineSegments=7; timelineSeconds=285; introductionCharacters=467`。
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_competition_content.py -v`，
+  exit 0，29/29 通过；`python -B scripts/validate-competition-content.py` exit 0，
+  165 题/33 Topic、147/36、33 个 Lesson 体验与源码 manifest 预检继续通过。
+
+未验证：
+
+- **未验证**：`D01..D07` 原始片段、证据登记表、最终两图和 MP4 均不存在；门禁只
+  证明计划保留可复现合同，不证明任何镜头已经拍摄或真实业务已经通过。
+- **未验证**：同一提交/HAP/账号的整条链路、最终 HAP 的服务卡片和系统通知、端侧
+  新输入触发真实 Chat SSE、Quiz 全流程及 ArkData 退出重进持久化均未验证。
+- **未验证**：本批只修改文档和 Python 门禁，没有重复执行 Web/HAP 构建；批次 12
+  的构建记录属于前一提交，不自动升级为本批提交证据。签名 HAP、PDF/ZIP、最终
+  媒体完整播放和门户上传仍未验证。

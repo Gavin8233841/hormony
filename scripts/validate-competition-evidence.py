@@ -50,11 +50,68 @@ SCORE_HEADER = (
     "证据等级",
     "发布验收",
 )
-TIMELINE_HEADER = ("时间", "画面与操作", "讲解重点", "通过证据")
+TIMELINE_HEADER = ("镜头 ID", "时间", "画面与操作", "讲解重点", "通过证据")
 SCORE_LABEL_PATTERN = re.compile(
     r"^(创新性|完备度|前景评估|规范性|实际应用价值) ([0-9]+)$"
 )
 TIME_RANGE_PATTERN = re.compile(r"^([0-9]{2}):([0-9]{2})-([0-9]{2}):([0-9]{2})$")
+TIMELINE_CONTEXT_ANCHORS = (
+    "同一提交",
+    "同一 HAP",
+    "同一测试账号状态",
+    "真实线上调用",
+)
+DEMO_SEGMENTS = (
+    (
+        "D01-release-identity",
+        "00:00-00:15",
+        ("Git 短哈希", "HAP SHA-256", "设备", "采集时间"),
+        ("一句话创新点", "未经验证"),
+        ("证据登记表",),
+    ),
+    (
+        "D02-proactive-service",
+        "00:15-00:45",
+        ("服务卡片", "系统学习提醒"),
+        ("HarmonyOS 主动服务", "本地计划"),
+        ("最终 HAP", "权限流程"),
+    ),
+    (
+        "D03-topic-context",
+        "00:45-01:20",
+        ("对应课程", "Topic"),
+        ("下一步任务", "明确上下文"),
+        ("UI 树", "课程 ID", "Topic 一致"),
+    ),
+    (
+        "D04-live-chat",
+        "01:20-02:25",
+        ("真实等待态", "SSE 正文", "当次引用"),
+        ("Profile + Retrieval + Tutor + Safety", "实际出现的引用"),
+        ("POST /api/chat", "SSE", "done", "实际返回校验"),
+    ),
+    (
+        "D05-live-quiz",
+        "02:25-03:35",
+        ("AI 测验", "作答并提交"),
+        ("Quiz Agent", "不泄露答案", "提交后再评分"),
+        ("Topic 一致", "评分结构", "没有静态题替换"),
+    ),
+    (
+        "D06-arkdata-persistence",
+        "03:35-04:20",
+        ("本地回写", "退出并重新进入"),
+        ("ArkData", "持久化", "真实结果变化"),
+        ("重进后保持", "UI 和日志"),
+    ),
+    (
+        "D07-evidence-close",
+        "04:20-04:45",
+        ("图 1", "端云边界", "适用人群"),
+        ("真实学习闭环", "无状态云端", "端侧隐私"),
+        ("逐项", "视频前段"),
+    ),
+)
 
 
 class EvidenceMetrics(NamedTuple):
@@ -252,9 +309,61 @@ def validate_plan(content: str) -> tuple[EvidenceMetrics, list[str]]:
     )
     errors.extend(table_errors)
 
+    timeline_text = "\n".join(timeline_section)
+    missing_context_anchors = [
+        anchor for anchor in TIMELINE_CONTEXT_ANCHORS if anchor not in timeline_text
+    ]
+    if missing_context_anchors:
+        errors.append(
+            "黄金演示缺少同版全链路合同: " + ",".join(missing_context_anchors)
+        )
+
+    if len(timeline_rows) != len(DEMO_SEGMENTS):
+        errors.append(
+            "黄金演示镜头数量必须恰好为 "
+            f"{len(DEMO_SEGMENTS)}，实际 {len(timeline_rows)}"
+        )
+
     previous_end = 0
+    seen_shot_ids: set[str] = set()
     for row_index, row in enumerate(timeline_rows):
-        raw_range, operation, narration, evidence = row
+        shot_id, raw_range, operation, narration, evidence = row
+        if shot_id in seen_shot_ids:
+            errors.append(f"黄金演示镜头 ID 重复: {shot_id}")
+        seen_shot_ids.add(shot_id)
+
+        if row_index < len(DEMO_SEGMENTS):
+            (
+                expected_id,
+                expected_range,
+                operation_anchors,
+                narration_anchors,
+                evidence_anchors,
+            ) = DEMO_SEGMENTS[row_index]
+            if shot_id != expected_id:
+                errors.append(
+                    f"黄金演示第 {row_index + 1} 段镜头 ID 必须为 "
+                    f"{expected_id}，实际 {shot_id}"
+                )
+            if raw_range != expected_range:
+                errors.append(
+                    f"黄金演示镜头 {expected_id} 时间必须为 "
+                    f"{expected_range}，实际 {raw_range}"
+                )
+            for column_label, column_value, required_anchors in (
+                ("画面与操作", operation, operation_anchors),
+                ("讲解重点", narration, narration_anchors),
+                ("通过证据", evidence, evidence_anchors),
+            ):
+                missing_anchors = [
+                    anchor for anchor in required_anchors if anchor not in column_value
+                ]
+                if missing_anchors:
+                    errors.append(
+                        f"黄金演示镜头 {expected_id} {column_label}缺少业务证据锚点: "
+                        + ",".join(missing_anchors)
+                    )
+
         match = TIME_RANGE_PATTERN.fullmatch(raw_range)
         if match is None:
             errors.append(f"黄金演示第 {row_index + 1} 段时间格式无效")
@@ -274,6 +383,14 @@ def validate_plan(content: str) -> tuple[EvidenceMetrics, list[str]]:
         previous_end = end
         if not operation or not narration or not evidence:
             errors.append(f"黄金演示第 {row_index + 1} 段存在空字段")
+
+    expected_shot_ids = {segment[0] for segment in DEMO_SEGMENTS}
+    missing_shot_ids = sorted(expected_shot_ids - seen_shot_ids)
+    unexpected_shot_ids = sorted(seen_shot_ids - expected_shot_ids)
+    if missing_shot_ids:
+        errors.append("黄金演示缺少镜头 ID: " + ",".join(missing_shot_ids))
+    if unexpected_shot_ids:
+        errors.append("黄金演示包含未定义镜头 ID: " + ",".join(unexpected_shot_ids))
     if previous_end != 285:
         errors.append(f"黄金演示必须精确收束于 04:45，实际 {previous_end} 秒")
 
