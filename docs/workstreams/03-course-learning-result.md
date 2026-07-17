@@ -641,3 +641,31 @@
 ### 未验证
 
 - **未验证**：当前无模拟器、手机、平板或真机；七步排序的拖动、提交反馈、长文本滚动和手机/平板布局未验证。
+
+## 批次二十四：MLFQ 周期提升时点唯一化
+
+### 行为
+
+- 修正 `cs102-CPU调度算法-2` 的非唯一排序条件：priority boost 是系统周期事件，旧题面未说明本轮触发时点，步骤 D 可以在进程降到 Q2 前后多个位置出现。
+- 题面现明确假设本轮提升发生在该进程已进入 Q2 并执行之后，因此 `B → C → E → A → D` 成为与题设一致的唯一依赖链；反馈与 `cs102_k09` 的防饥饿语义保持不变。
+- 子 agent 新增可执行步骤契约：精确锁定五个选项，从 `answerIndexes` 还原 A-E 并逐字生成答案，执行 `B→C→E→A→D`，同时校验 `cs102_k09` 来源与切片元数据。
+- 旧题面 fixture 仅因缺少提升时点红灯；把 D 提前到 A 之前的 fixture 仅因违反 `A→D` 红灯，避免用静态字符串假装证明顺序正确。
+
+### 文件
+
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `scripts/test_lesson_content_facts.py`
+
+### 证据
+
+- **源码确认**：`cs102_k09` 只规定定期提升所有进程以防饥饿，并未规定提升必然发生在某次 Q2 执行之后；当前题面的显式假设提供了本题所需时点。
+- **静态诊断通过**：`node scripts/generate-learning-activities.mjs`，退出码 0；33/33 Topic、59 个活动，类型分布不变。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_content_facts scripts.test_lesson_content_consistency_cs102 -v`，退出码 0；22 项通过。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py`，退出码 0；33 Topic、147 切片、165 题、33 experience 与 Lesson 闭环契约全部通过。
+- **静态诊断通过**：WS03 完整回归退出码 0；54 项运行，53 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，退出码 0；`BUILD SUCCESSFUL in 16 s 122 ms`，仍提示未配置 `signingConfigs`。
+
+### 未验证
+
+- **未验证**：当前无模拟器、手机、平板或真机；五步排序交互与题面长文本在实际设备上的显示未验证。

@@ -431,6 +431,86 @@ def socket_step_contract_errors(activity):
     return errors
 
 
+MLFQ_STEP_KEYS = ["A", "B", "C", "D", "E"]
+MLFQ_EXPECTED_OPTIONS = {
+    "A": "进程在 Q2（最低优先级队列，时间片最长）中执行",
+    "B": "新进程进入最高优先级队列 Q0（时间片最短）",
+    "C": "Q0 时间片用完，进程未完成，被降级到 Q1（时间片更长）",
+    "D": "定期执行优先级提升（priority boost），将所有进程移回 Q0",
+    "E": "Q1 时间片用完，进程仍未完成，被降级到 Q2",
+}
+MLFQ_DEPENDENCIES = [
+    ("B", "C"),
+    ("C", "E"),
+    ("E", "A"),
+    ("A", "D"),
+]
+MLFQ_BOOST_ASSUMPTION = "本轮优先级提升发生在该进程已进入 Q2 并执行之后"
+
+
+def mlfq_step_contract_errors(activity, knowledge_items):
+    errors = []
+    if MLFQ_BOOST_ASSUMPTION not in activity.get("prompt", ""):
+        errors.append("prompt must place this priority boost after Q2 execution")
+
+    options = activity.get("options", [])
+    answer_indexes = activity.get("answerIndexes", [])
+    if len(options) != len(MLFQ_STEP_KEYS):
+        return [
+            *errors,
+            f"expected {len(MLFQ_STEP_KEYS)} MLFQ options, got {len(options)}",
+        ]
+    if len(set(options)) != len(options):
+        errors.append("MLFQ options must not contain duplicates")
+    option_by_key = dict(zip(MLFQ_STEP_KEYS, options))
+    for key, expected in MLFQ_EXPECTED_OPTIONS.items():
+        if option_by_key.get(key) != expected:
+            errors.append(
+                f"MLFQ option {key} is {option_by_key.get(key)!r}, expected {expected!r}"
+            )
+
+    valid_indexes = set(range(len(options)))
+    if (
+        len(answer_indexes) != len(options)
+        or set(answer_indexes) != valid_indexes
+        or len(set(answer_indexes)) != len(answer_indexes)
+    ):
+        errors.append("answerIndexes must be a complete permutation without duplicates")
+        return errors
+
+    ordered_keys = [MLFQ_STEP_KEYS[index] for index in answer_indexes]
+    rendered_answer = " → ".join(ordered_keys)
+    if activity.get("answer") != rendered_answer:
+        errors.append(
+            f"answer {activity.get('answer')!r} does not match indexes {rendered_answer!r}"
+        )
+    positions = {key: index for index, key in enumerate(ordered_keys)}
+    for before, after in MLFQ_DEPENDENCIES:
+        if positions[before] >= positions[after]:
+            errors.append(f"MLFQ dependency requires {before} before {after}")
+
+    source_ids = set(
+        CS102_KNOWLEDGE_ID_PATTERN.findall(activity.get("source", ""))
+    )
+    if source_ids != {"cs102_k09"}:
+        errors.append("MLFQ source must reference exactly cs102_k09")
+    if "cs102_k09" not in activity.get("feedback", ""):
+        errors.append("MLFQ feedback must cite cs102_k09")
+    knowledge = next(
+        (item for item in knowledge_items if item.get("id") == "cs102_k09"),
+        None,
+    )
+    if knowledge is None:
+        errors.append("knowledge chunk cs102_k09 must exist")
+    elif (
+        knowledge.get("courseId") != "cs102"
+        or knowledge.get("topic") != "CPU调度算法"
+        or knowledge.get("source") != "操作系统概念"
+    ):
+        errors.append("knowledge chunk cs102_k09 metadata must remain exact")
+    return errors
+
+
 class LessonContentFactsTest(unittest.TestCase):
     def setUp(self):
         self.experiences = load_json(EXPERIENCES_PATH)
@@ -712,6 +792,59 @@ class LessonContentFactsTest(unittest.TestCase):
                 f"expected {SOCKET_REQUIRED_OPTIONS['G']!r}"
             ],
             socket_step_contract_errors(wrong_activity),
+        )
+
+    def test_mlfq_step_contract_accepts_generated_dependency_order(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "CPU调度算法",
+            "cs102-CPU调度算法-2",
+        )
+
+        self.assertEqual(
+            [],
+            mlfq_step_contract_errors(activity, self.knowledge_items),
+        )
+        self.assertEqual(
+            ["B", "C", "E", "A", "D"],
+            [MLFQ_STEP_KEYS[index] for index in activity["answerIndexes"]],
+        )
+        self.assertEqual("B → C → E → A → D", activity["answer"])
+
+    def test_mlfq_step_contract_rejects_ambiguous_and_early_boost_fixtures(self):
+        activity = find_activity(
+            self.experiences,
+            "cs102",
+            "CPU调度算法",
+            "cs102-CPU调度算法-2",
+        )
+        old_prompt_activity = {
+            **activity,
+            "prompt": activity["prompt"].replace(
+                f"假设{MLFQ_BOOST_ASSUMPTION}，",
+                "",
+            ),
+        }
+        early_boost_activity = {
+            **activity,
+            "answerIndexes": [1, 2, 4, 3, 0],
+            "answer": "B → C → E → D → A",
+        }
+
+        self.assertEqual(
+            ["prompt must place this priority boost after Q2 execution"],
+            mlfq_step_contract_errors(
+                old_prompt_activity,
+                self.knowledge_items,
+            ),
+        )
+        self.assertEqual(
+            ["MLFQ dependency requires A before D"],
+            mlfq_step_contract_errors(
+                early_boost_activity,
+                self.knowledge_items,
+            ),
         )
 
     def test_red_black_root_step_is_kept_in_the_source_spec(self):

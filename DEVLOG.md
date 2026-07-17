@@ -6730,3 +6730,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：POSIX.1-2024 `listen()`、`connect()`、`accept()` 页面均返回 HTTP 200，且正文分别确认监听队列、尝试/异步建连和从 pending queue 取连接语义；生成器、目标 22 项、关系校验、WS03 54 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 16 s 122 ms`。首次目标回归因未跟踪总审计脚本仍固定旧 Socket 文案失败 2 项，修正其契约后同一命令转绿，该脚本不纳入本提交。
 
 失败或未验证：无模拟器或真机，七步排序交互、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。
+
+---
+
+## 2026-07-17 [WS03] MLFQ 周期提升时点唯一化
+
+背景：`cs102-CPU调度算法-2` 的 priority boost 是周期事件，旧题面未限定本轮触发时点，D 可在进程进入 Q2 前后发生，却要求学习者给出唯一线性顺序。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS102.md`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_lesson_content_facts.py`。
+
+行为变化：题面明确本轮提升发生在进程已进入 Q2 并执行之后；子 agent 新增选项/索引还原、`B→C→E→A→D` 逐边执行和 `cs102_k09` 来源闭包。旧题面与提前 D fixtures 分别精准红灯。
+
+验证：生成器退出码 0，33 Topic/59 活动；目标 22 项、关系校验、WS03 54 项回归均通过（1 项既有 expected failure）；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 16 s 122 ms`。
+
+失败或未验证：无模拟器或真机，五步排序交互及题面长文本在手机/平板的显示未验证；HAP 未配置 `signingConfigs`。

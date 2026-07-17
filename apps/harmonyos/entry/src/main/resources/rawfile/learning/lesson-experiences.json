@@ -907,7 +907,7 @@
         "type": "step_order",
         "title": "步骤排序",
         "focusTag": "调度策略",
-        "prompt": "在多级反馈队列（MLFQ）调度中，一个 CPU 密集型进程从进入系统到被定期提升优先级的完整流程。请将以下步骤排列为正确顺序",
+        "prompt": "在多级反馈队列（MLFQ）调度中，一个 CPU 密集型进程从进入系统到被定期提升优先级的完整流程。假设本轮优先级提升发生在该进程已进入 Q2 并执行之后，请将以下步骤排列为正确顺序",
         "content": "",
         "language": "步骤卡片",
         "interactionMode": "ordered_choice",
