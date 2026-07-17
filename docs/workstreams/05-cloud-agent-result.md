@@ -294,7 +294,7 @@
 
 ### 14.1 源码确认与行为
 
-- Chat 的 Tutor、Planner、Evaluator 分支至多执行一次模型调用；Quiz 意图会进入批次生成与修复，在当前边界下最多 8 次调用。旧 Chat 路由只有单次模型 timeout、客户端断连和输出上限控制，没有覆盖整段编排的总 deadline。
+- Chat 的 Tutor、Planner、Evaluator 分支至多执行一次模型调用；Quiz 意图固定请求 5 题，在当前完整批次边界下最多执行一次生成和一次修复，即 2 次模型调用。旧 Chat 路由只有单次模型 timeout、客户端断连和输出上限控制，没有覆盖整段编排的总 deadline。
 - Chat 路由现在使用 100000ms 总预算包裹完整 `orchestrateStream`。超时前已建立 HTTP 200 时，流只追加一次 `error(code=MODEL_TIMEOUT) -> done`；首事件前超时仍由既有 JSON 错误路径返回 504。
 - 模型预算 helper 新增独立 `abortSignal`，用于组合 Chat 已有的输出上限/reader 取消控制器。内部 route abort 的 Error reason 原样保留，因此 `OUTPUT_LIMIT_EXCEEDED` 不会被误映射为 `MODEL_CANCELLED`。
 - 外部 Request abort 仍标记 clientCancelled，不向已断开的流补写 error/done；成功、超时和内部 abort 都清理 deadline timer、Request signal listener 与内部 abortSignal listener。
@@ -317,3 +317,24 @@
 
 - **未验证**：真实模型编排在 100 秒时的网络级取消、已建立线上 SSE 的 timeout 事件、线上平台 120 秒回收、当前分支线上部署、真实浏览器断连、HarmonyOS 模拟器与真机。
 - 本批未修改 DEVLOG、HarmonyOS、Quiz 生成实现、Chat SSE 单终态、RAG、缓存策略、生产模型 ID 或秘密。
+
+## 15. 全局单次模型超时配置上限
+
+### 15.1 源码确认与行为
+
+- `MODEL_TIMEOUT_MS` 原先只拒绝非有限数和小于 1000ms 的值，没有上限。部署误配为数分钟时，未经过路由总预算包装的模型调用会长期占用连接；`maxDuration` 也不是模型客户端内部取消机制。
+- 模型运行时现在把单次调用 timeout 封顶为 100000ms；缺失、非法或低于 1000ms 的配置继续使用既有 45000ms 默认值，合法范围内的配置保持不变。
+- OpenAI 兼容客户端缓存键继续包含最终 timeout，配置变化时仍会重建客户端；生产模型 ID、base URL、重试次数和输出 token 上限没有改变。
+
+### 15.2 验证
+
+- 新增模型运行时边界测试：缺失配置为 45000ms，`999` 回退 45000ms，`120000` 精确封顶为 100000ms。
+- 定向联合：`pnpm exec vitest run src/lib/agents/model-runtime.test.ts src/lib/agents/model-budget.test.ts src/app/api/chat/request-budget.test.ts src/app/api/plan/request-budget.test.ts src/app/api/quiz/request-budget.test.ts` exit 0，5 个测试文件、11 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，31 个测试文件、371 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成生产构建，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- 本地 production 黑盒：`127.0.0.1:4324`，显式 `MODEL_TIMEOUT_MS=120000` 且不配置模型秘密；`/api/model/status` 为 HTTP 200、`timeoutMs=100000`、`configured=false`、`mode=unavailable`。实例 PID 56996 已停止，端口已关闭。
+
+### 15.3 未验证
+
+- **未验证**：线上部署环境当前 `MODEL_TIMEOUT_MS` 的实际值、真实上游在 100 秒时的网络级取消、当前分支线上发布。
+- 本批未修改 DEVLOG、HarmonyOS、任何生产模型 ID、API Key、RAG、缓存或端侧状态。
