@@ -7023,3 +7023,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 本批只修改文档，没有新的模拟器、真机、通知或服务卡片桌面证据。
 - HAP 未配置签名；安装、横屏、平板、读屏和字体放大仍未验证。
+
+---
+
+## 2026-07-17 [MAIN+WS05] Chat SSE 单一终态边界
+
+背景：编排已经发送 `done` 后若清理阶段迟到抛错，Chat 路由仍会追加补偿 `error -> done`，客户端可观察到 `done -> error -> done` 非法序列；编排也可能在首个 `done` 后继续发 delta 或重复 done。本批逐行复核并采用 WS05 提交 `cc2a97c` 的三文件增量。
+
+文件：
+- `apps/web/src/app/api/chat/route.ts`
+- `apps/web/src/app/api/chat/terminal-boundary.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 首个 `done` 成功进入缓冲区或流控制器后记录终态；后续 delta、重复 done 和其他编排事件不再进入响应。
+- `done` 后的迟到异常不再触发路由补偿。`error` 本身不锁定终态，规范的 `error -> done` 仍可完成协议收束。
+- 请求取消、单事件 64 KiB、总流 512 KiB 与 128 事件上限保持既有语义；`done` 尚未成功时的输出超限仍由一次 `OUTPUT_LIMIT_EXCEEDED -> done` 收束。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/app/api/chat/terminal-boundary.test.ts src/app/api/chat/stream-limits.test.ts`：exit 0，2 个文件、10/10 通过；覆盖 `done -> throw`、`done -> late delta -> duplicate done` 和 `error -> done -> throw`。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，28 个测试文件、409/409 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面，middleware 26.8 kB。
+
+失败或未验证：
+- 来源分支的本地 production 无模型黑盒未在主线重跑，不提升为本批新验证。
+- 真实模型在 done 后迟到抛错、真实浏览器断连与线上 SSE 顺序未验证。
+- 本批未修改 HarmonyOS、RAG、缓存策略、生产模型 ID 或秘密。

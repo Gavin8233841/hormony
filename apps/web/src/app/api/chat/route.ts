@@ -142,6 +142,7 @@ export async function POST(req: NextRequest) {
   let clientCancelled = false;
   let emittedEventCount = 0;
   let emittedBytes = 0;
+  let terminalEventEmitted = false;
 
   // definite assignment：在 new Promise 构造器内同步赋值
   let resolveFirst!: (chunk: Uint8Array) => void;
@@ -166,7 +167,12 @@ export async function POST(req: NextRequest) {
   else req.signal.addEventListener("abort", handleRequestAbort, { once: true });
 
   const emit = (event: StreamEvent) => {
-    if (orchestrateError || clientCancelled || abortController.signal.aborted) return;
+    if (
+      orchestrateError ||
+      clientCancelled ||
+      abortController.signal.aborted ||
+      terminalEventEmitted
+    ) return;
     const chunk = sse(event);
     const terminalEventReserve = event.type === "done" ? 0 : 2;
     const terminalByteReserve = event.type === "done" ? 0 : outputLimitTerminalBytes;
@@ -191,6 +197,7 @@ export async function POST(req: NextRequest) {
       // 首个事件已产出但流尚未就绪，先缓冲
       buffered.push(chunk);
     }
+    if (event.type === "done") terminalEventEmitted = true;
   };
 
   // 后台启动编排（不阻塞当前函数；错误在 catch 中捕获并触发 500 或流中错误事件）
@@ -255,7 +262,7 @@ export async function POST(req: NextRequest) {
         // 等待编排完成，期间 emit 会直接写入 controller
         await orchestratePromise;
 
-        if (orchestrateError && !clientCancelled) {
+        if (orchestrateError && !clientCancelled && !terminalEventEmitted) {
           // 流中错误：HTTP 状态已固化为 200，通过 SSE 事件通知客户端
           const errDetail = orchestrateError instanceof Error
             ? orchestrateError.message
