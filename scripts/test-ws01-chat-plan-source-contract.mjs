@@ -391,6 +391,101 @@ test('Plan generation preserves the last saved plan and isolates stale reads', (
   assert.doesNotMatch(retrySave, /HttpClient\.post/);
 });
 
+test('Plan preserves a failed pending save across re-entry and rejects stale generation callbacks', () => {
+  const requestState = section(plan, '  private activeRequest:', '  private durationOptions:',
+    'Plan lifecycle request state');
+  assertOrder(requestState, [
+    'private activeRequest: HttpRequestCancellation | null = null;',
+    'private generationRunId: number = 0;',
+    'private planReadRunId: number = 0;',
+    'private lifecycleRunId: number = 0;',
+    'private pageActive: boolean = false;',
+    'private hasLoadedPlanOnce: boolean = false;',
+    'private pendingPlan: AgentStudyPlan | null = null;'
+  ], 'Plan lifecycle request fields');
+
+  const lifecycle = section(plan, '  aboutToAppear(): void {', '  get canGenerate(): boolean {',
+    'Plan page lifecycle');
+  const appear = section(lifecycle, '  aboutToAppear(): void {', '  aboutToDisappear(): void {',
+    'Plan page re-entry');
+  assertOrder(appear, [
+    'this.lifecycleRunId += 1;',
+    'this.pageActive = true;',
+    'this.loadPlan();'
+  ], 'Plan activates a new lifecycle before local restore');
+  const disappear = section(plan, '  aboutToDisappear(): void {', '  get canGenerate(): boolean {',
+    'Plan page leave');
+  assertOrder(disappear, [
+    'this.pageActive = false;',
+    'this.lifecycleRunId += 1;',
+    'this.planReadRunId += 1;',
+    'this.planLoading = false;',
+    'if (this.loading && this.progressStep >= 3) return;',
+    'this.cancelPlanGeneration(false);'
+  ], 'Plan invalidates network callbacks but lets an entered local save settle');
+
+  const load = section(plan, '  private async loadPlan(): Promise<void> {', '  private async toggleTask(',
+    'Plan pending-save restore');
+  assertOrder(load, [
+    "if (this.pendingPlan !== null && this.retryAction === 'save') {",
+    'this.planLoading = false;',
+    'return;',
+    'if (this.loading) {',
+    'const readRunId = this.planReadRunId + 1;',
+    "this.retryAction = 'none';",
+    'const plan = await LocalLearningRepository.getPlan();'
+  ], 'Plan keeps pending save recovery before resetting load state');
+  assert.doesNotMatch(load, /this\.pendingPlan\s*=/);
+  assertOrder(load, [
+    'if (plan !== null) {',
+    'if (!this.hasLoadedPlanOnce) {',
+    'this.goal = plan.goal;',
+    'this.savedPlanGoal = plan.goal;',
+    'this.tasks = plan.tasks;',
+    'this.hasLoadedPlanOnce = true;'
+  ], 'Plan retains the saved task list without overwriting a later goal on re-entry');
+
+  const persist = section(plan, '  private async persistGeneratedPlan(',
+    '  private async retryPendingPlanSave(', 'Plan pending save failure');
+  const persistFailure = section(persist, '    } catch (_) {', '\n    }\n\n    this.tasks = plan.tasks;',
+    'Plan pending save failure branch');
+  assertOrder(persistFailure, [
+    "this.retryAction = 'save';",
+    'return false;'
+  ], 'Plan exposes save-only retry after ArkData failure');
+  assert.doesNotMatch(persistFailure, /this\.pendingPlan\s*=|this\.tasks\s*=/);
+
+  const activeGeneration = section(plan, '  private isActiveGeneration(',
+    '  private cancelPlanGeneration(', 'Plan active lifecycle generation');
+  assert.match(activeGeneration,
+    /private isActiveGeneration\(runId: number, lifecycleRunId: number,\s*request: HttpRequestCancellation\): boolean \{/);
+  assert.match(activeGeneration,
+    /return this\.pageActive && this\.lifecycleRunId === lifecycleRunId && this\.loading &&\s*this\.generationRunId === runId && this\.activeRequest === request && !request\.isCancelled\(\);/);
+
+  const generate = section(plan, '  async generate(): Promise<void> {', '  pageTransition() {',
+    'Plan lifecycle generation');
+  assertOrder(generate, [
+    'if (requestedGoal.length === 0 || this.loading || this.planLoading || !this.pageActive) return;',
+    'const lifecycleRunId = this.lifecycleRunId;',
+    'const runId = this.generationRunId + 1;',
+    'const profile = await LocalLearningRepository.getProfile();',
+    'if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;',
+    'const response = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req), request);',
+    'if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;',
+    'const validation = this.validatePlanResponse(response);',
+    'this.pendingPlan = plan;',
+    'await this.persistGeneratedPlan(plan);'
+  ], 'Plan checks the page lifecycle before a network result can enter persistence');
+  assert.equal(occurrences(generate,
+    'if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;'), 3);
+  const generationFailure = section(generate, '    } catch (e) {', '    } finally {',
+    'Plan stale generation failure');
+  assertOrder(generationFailure, [
+    'if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;',
+    "this.retryAction = 'generate';"
+  ], 'Plan ignores stale failures after leave and re-entry');
+});
+
 test('Plan exposes cancellable wait stages, keyboard dismissal, and safe-area spacing', () => {
   const cancel = section(plan, '  private cancelPlanGeneration(', '  private planSavedMessage(', 'Plan cancellation');
   assertOrder(cancel, [

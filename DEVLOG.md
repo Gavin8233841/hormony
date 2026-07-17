@@ -6237,3 +6237,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前 PowerShell PATH 中直接执行 `hdc` 失败；读取 DevEco 安装目录中的精确工具路径后重试成功，该首次失败未作为设备状态证据。
 - 无 HDC 运行目标，页面离开/重进、慢历史读取、慢 Health、SSE 取消和 ArkData 重启恢复均为模拟器未验证；真机未验证。
 - 本批未修改 Web、API、Agent、模型或安全实现，未重复运行 Web `pnpm lint/typecheck/test/build`，未重新调用线上 Chat/Plan。
+
+---
+
+## 2026-07-17 [WS01] Plan 页面生命周期与保存恢复
+
+背景：续接已推送的 WS01 `79b420a`，先拉取并比较 `origin/codex/harmony-integration-20260717`；远端主线已到 `2e0168d`，其中已包含 Plan 原生输入同步和 `startDate`，本批不重复这些主线变化。当前缺口是已校验计划进入 ArkData 保存后离页，保存失败再重进时，`loadPlan()` 会清空 `retryAction='save'`，使仍保留的 `pendingPlan` 失去仅重试本机保存的入口；网络阶段也缺少显式页面代次约束。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- Plan 每次页面出现分配新的 `lifecycleRunId` 并标记页面活跃；离开时先失活并使页面代次、计划读取代次失效。
+- 画像读取和在线 Plan 请求的成功、失败回调必须同时匹配生成代次、页面代次、活动请求与取消状态；离页后旧请求不能在重进页面回写或进入 ArkData 保存。
+- 网络阶段离页继续取消请求；计划已通过校验并进入 ArkData 保存后仍允许本机写入完成，不把不可中断保存误当成网络请求取消。
+- ArkData 保存失败继续保留 `pendingPlan`、上一版任务和 `retryAction='save'`；页面重进时不再由 `loadPlan()` 清空恢复入口，重试只调用 `persistGeneratedPlan(pendingPlan)`，不再次请求模型。
+- 本机计划只在当前页面实例首次成功读取时填充目标输入；取消生成或离页前已输入的新目标不会在重进时被上一版计划目标覆盖。
+- 独立子 agent 仅修改源契约测试；主代理复核并采用，新增用例可拦截重进清空保存恢复、旧网络回写、保存失败替换旧任务和旧目标覆盖新输入。
+
+验证：
+- `git fetch origin codex/harmony-integration-20260717`：exit 0；远端精确提交 `2e0168d74cc2b8acd4bab816c3177bb4e1adf83f`，相对当前 WS01 分支为远端独有 30、当前独有 3。
+- `node --check scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，10/10 通过。
+- `git diff --check -- apps/harmonyos/entry/src/main/ets/pages/Plan.ets scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0；仅保留 Git 的 LF/CRLF 工作区提示。
+- 已读取当前 Hvigor 帮助与 `build-profile.json5`，确认 `entry@default`、debug、`compatibleSdkVersion=5.0.0(12)`、`targetSdkVersion=5.0.0(12)`。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --no-daemon`：exit 0，`CompileArkTS`、`PackageHap` 成功，`BUILD SUCCESSFUL in 40 s 204 ms`；既有 `signingConfigs` 未配置警告保留。
+- 使用仓库已核实的 DevEco `hdc.exe` 绝对路径执行 `list targets`：exit 0，返回 `[Empty]`。
+
+失败或未验证：
+- 无 HDC 运行目标，Plan 长请求离页/重进、旧请求晚到、ArkData 保存失败注入、保存后重启恢复均为模拟器未验证；真机未验证。
+- 本批未修改 Web、API、Agent、模型或安全实现，未重复运行 Web `pnpm lint/typecheck/test/build`，未重新调用线上 Plan。
+- HAP 未配置签名；构建通过不等于安装运行通过。
