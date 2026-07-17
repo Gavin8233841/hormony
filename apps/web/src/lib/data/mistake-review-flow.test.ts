@@ -18,7 +18,7 @@ const practiceSource = harmonyPageSource("Practice.ets");
 
 describe("HarmonyOS 错题复习入口契约", () => {
   it("页面重启后应从 ArkData 仓库重建到期优先的复习队列", () => {
-    expect(mistakeBookSource).toContain("aboutToAppear(): void");
+    expect(mistakeBookSource).toContain("onPageShow(): void");
     expect(mistakeBookSource).toContain("this.loadItems()");
 
     const dueRead = mistakeBookSource.indexOf(
@@ -42,6 +42,95 @@ describe("HarmonyOS 错题复习入口契约", () => {
     );
     expect(mistakeBookSource).toContain("'现在复习'");
     expect(mistakeBookSource).toContain("'重新读取'");
+  });
+
+  it("从练习返回或跨日再次显示时应刷新当前时间与 ArkData 队列", () => {
+    const pageShowStart = mistakeBookSource.indexOf("onPageShow(): void");
+    const loadItemsStart = mistakeBookSource.indexOf(
+      "\n  private async loadItems(): Promise<void>",
+      pageShowStart
+    );
+    const pageShowSource = mistakeBookSource.slice(pageShowStart, loadItemsStart);
+
+    expect(pageShowStart).toBeGreaterThan(-1);
+    expect(loadItemsStart).toBeGreaterThan(pageShowStart);
+    expect(pageShowSource).toContain("this.loadItems()");
+
+    const loadItemsEnd = mistakeBookSource.indexOf(
+      "\n  private courseTitle",
+      loadItemsStart
+    );
+    const loadItemsSource = mistakeBookSource.slice(loadItemsStart, loadItemsEnd);
+    const refreshNow = loadItemsSource.indexOf("const now = new Date()");
+    const captureTimestamp = loadItemsSource.indexOf(
+      "const nowTimestamp = now.getTime()",
+      refreshNow
+    );
+    const dueRead = loadItemsSource.indexOf(
+      "await LocalLearningRepository.getDueReviewItems(now)",
+      captureTimestamp
+    );
+    const activeRead = loadItemsSource.indexOf(
+      "await LocalLearningRepository.getReviewItems()",
+      dueRead
+    );
+    const staleGuard = loadItemsSource.indexOf(
+      "if (this.loadRunId !== runId) return",
+      activeRead
+    );
+    const publishTimestamp = loadItemsSource.indexOf(
+      "this.nowTimestamp = nowTimestamp",
+      staleGuard
+    );
+
+    expect(loadItemsEnd).toBeGreaterThan(loadItemsStart);
+    expect(refreshNow).toBeGreaterThan(-1);
+    expect(captureTimestamp).toBeGreaterThan(refreshNow);
+    expect(dueRead).toBeGreaterThan(captureTimestamp);
+    expect(activeRead).toBeGreaterThan(dueRead);
+    expect(staleGuard).toBeGreaterThan(activeRead);
+    expect(publishTimestamp).toBeGreaterThan(staleGuard);
+  });
+
+  it("连续显示触发的旧读取不得覆盖较新的复习快照", () => {
+    const loadItemsStart = mistakeBookSource.indexOf(
+      "private async loadItems(): Promise<void>"
+    );
+    const loadItemsEnd = mistakeBookSource.indexOf(
+      "\n  private courseTitle",
+      loadItemsStart
+    );
+    const loadItemsSource = mistakeBookSource.slice(loadItemsStart, loadItemsEnd);
+    expect(loadItemsStart).toBeGreaterThan(-1);
+    expect(loadItemsEnd).toBeGreaterThan(loadItemsStart);
+    const nextRun = loadItemsSource.indexOf(
+      "const runId = this.loadRunId + 1"
+    );
+    const activateRun = loadItemsSource.indexOf(
+      "this.loadRunId = runId",
+      nextRun
+    );
+    const activeRead = loadItemsSource.indexOf(
+      "await LocalLearningRepository.getReviewItems()"
+    );
+    const catchStart = loadItemsSource.indexOf("} catch (error)", activeRead);
+    const finallyStart = loadItemsSource.indexOf("} finally {", catchStart);
+    const successSource = loadItemsSource.slice(activeRead, catchStart);
+    const catchSource = loadItemsSource.slice(catchStart, finallyStart);
+    const finallySource = loadItemsSource.slice(finallyStart);
+
+    expect(nextRun).toBeGreaterThan(-1);
+    expect(activateRun).toBeGreaterThan(nextRun);
+    expect(activeRead).toBeGreaterThan(-1);
+    expect(catchStart).toBeGreaterThan(activeRead);
+    expect(finallyStart).toBeGreaterThan(catchStart);
+    expect(successSource.indexOf("if (this.loadRunId !== runId) return"))
+      .toBeLessThan(successSource.indexOf("this.items ="));
+    expect(catchSource.indexOf("if (this.loadRunId !== runId) return"))
+      .toBeLessThan(catchSource.indexOf("this.items = []"));
+    expect(finallySource).toContain(
+      "if (this.loadRunId === runId) this.loading = false"
+    );
   });
 
   it("未到期项应继续显示但不能写入复习 ID 或进入练习", () => {
@@ -220,5 +309,58 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(loadSource).toContain(
       "this.reviewItemIds = selectedItems.map((item: PracticeQuestionItem): string => item.reviewItemId)"
     );
+  });
+
+  it("练习加载失败后应保留精确错题 ID 并在空题错误态原地重试", () => {
+    const appearStart = practiceSource.indexOf("aboutToAppear(): void");
+    const resetStart = practiceSource.indexOf(
+      "\n  private resetPageState(): void",
+      appearStart
+    );
+    const appearSource = practiceSource.slice(appearStart, resetStart);
+    expect(appearStart).toBeGreaterThan(-1);
+    expect(resetStart).toBeGreaterThan(appearStart);
+    const retainAt = appearSource.indexOf(
+      "this.selectedReviewItemId = (AppStorage.get<string>('selectedReviewItemId') ?? '').trim()"
+    );
+    const clearAt = appearSource.indexOf(
+      "AppStorage.setOrCreate<string>('selectedReviewItemId', '')"
+    );
+
+    expect(retainAt).toBeGreaterThan(-1);
+    expect(clearAt).toBeGreaterThan(retainAt);
+    expect(practiceSource).toContain(
+      "private selectedReviewItemId: string = ''"
+    );
+    expect(appearSource).toContain("this.reloadQuestions()");
+
+    const reloadStart = practiceSource.indexOf(
+      "private async reloadQuestions(): Promise<void>"
+    );
+    const reloadEnd = practiceSource.indexOf(
+      "\n  private async loadQuestions",
+      reloadStart
+    );
+    const reloadSource = practiceSource.slice(reloadStart, reloadEnd);
+    expect(reloadStart).toBeGreaterThan(-1);
+    expect(reloadEnd).toBeGreaterThan(reloadStart);
+    expect(reloadSource).toContain(
+      "await this.loadQuestions(this.selectedReviewItemId)"
+    );
+    expect(reloadSource).toContain(
+      "this.message = '本地练习加载失败，请重试'"
+    );
+    expect(reloadSource).toContain("this.loadRetryAvailable = true");
+    expect(reloadSource).not.toContain("请重新进入");
+
+    const retryButtonStart = practiceSource.indexOf("Button('重新加载')");
+    const retryButtonEnd = practiceSource.indexOf(
+      ".onClick((): void => { this.reloadQuestions(); })",
+      retryButtonStart
+    );
+    expect(retryButtonStart).toBeGreaterThan(-1);
+    expect(retryButtonEnd).toBeGreaterThan(retryButtonStart);
+    expect(practiceSource.slice(retryButtonStart - 500, retryButtonStart))
+      .toContain("this.loadRetryAvailable");
   });
 });

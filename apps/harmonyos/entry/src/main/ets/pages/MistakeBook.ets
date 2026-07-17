@@ -15,34 +15,40 @@ struct MistakeBookPage {
   @State loading: boolean = true;
   @State message: string = '';
   @State nowTimestamp: number = Date.now();
+  private loadRunId: number = 0;
 
-  aboutToAppear(): void {
+  onPageShow(): void {
     this.loadItems();
   }
 
   private async loadItems(): Promise<void> {
+    const runId = this.loadRunId + 1;
+    this.loadRunId = runId;
     this.loading = true;
     this.message = '';
     try {
       const now = new Date();
-      this.nowTimestamp = now.getTime();
+      const nowTimestamp = now.getTime();
       const dueItems = await LocalLearningRepository.getDueReviewItems(now);
       const activeItems = await LocalLearningRepository.getReviewItems();
+      if (this.loadRunId !== runId) return;
       const dueIds = dueItems.map((item: ReviewItem): string => item.id);
       const pendingItems = activeItems.filter((item: ReviewItem): boolean => !dueIds.includes(item.id))
         .sort((left: ReviewItem, right: ReviewItem): number => {
           const timeGap = new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime();
           return timeGap !== 0 ? timeGap : right.attempts - left.attempts;
         });
+      this.nowTimestamp = nowTimestamp;
       this.items = dueItems.concat(pendingItems);
       this.reviewSummary = this.items.length.toString() + ' 道待巩固 · ' +
         dueItems.length.toString() + ' 道已到期';
     } catch (error) {
+      if (this.loadRunId !== runId) return;
       this.items = [];
       this.reviewSummary = '复习队列读取失败';
       this.message = '错题记录读取失败';
     } finally {
-      this.loading = false;
+      if (this.loadRunId === runId) this.loading = false;
     }
   }
 

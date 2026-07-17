@@ -6912,3 +6912,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - HAP 未配置 `signingConfigs`，构建明确跳过签名；不能据此声明安装通过。
 - 服务卡片由系统冷启动、真实 ArkData 升级、模拟器、真机和多设备行为未验证。
 - 本批未调用线上 API 或真实模型，不声明线上通过。
+
+---
+
+## 2026-07-17 [WS02] 到期错题跨日刷新与原题加载失败恢复
+
+背景：集成基线 `17530d0` 已包含 schema 12、完成 outbox、累计 mastery、同 Topic 错题降级和结果页下一步，但错题本只在组件创建时读取队列。从 Practice 返回、应用回到前台或跨日后再次显示页面时，`nowTimestamp` 和到期按钮可能保持旧快照。Practice 又会在首次读取后立即清空入口复习项 ID，ArkData 读取失败只提示退出重进，无法原地重试同一道错题。已比较主线 `2e0168d`，目标三个文件相对 `17530d0` 无差异；本批不修改 RAG、缓存、schema、复习间隔或题库。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/mistake-review-flow.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- MistakeBook 使用本机 API 12 SDK 已声明的 `onPageShow`，每次页面显示或应用回到前台都重新读取 ArkData 队列并捕获新的本地时间；递增 `loadRunId` 在成功、失败和 loading 收尾三条路径阻止旧读取覆盖较新快照。
+- Practice 在页面实例中保留精确 `selectedReviewItemId`，清空跨页 AppStorage 后仍可用同一 ID 重试；读取失败清理半成品题组、显示稳定错误态和“重新加载”动作，不再要求退出页面重进。
+- 首轮子 agent 只修改独立契约测试；主线程逐行复核并将其反例收紧为“读取后先校验运行号再发布 UI 状态”和“同一 async try/catch 复用原复习 ID”，未采用会提前写入旧时间状态的测试假设。
+- 既有精确课程/Topic 校验、到期门控、原题/同 Topic 降级、复习项 ID 写回和 1/3/7/14 天间隔保持不变。
+
+验证：
+- 本机 API 12 SDK `openharmony/ets/component/common.d.ts`：源码确认 `onPageShow` 仅用于 `@Entry`，并在页面每次显示及应用回到前台时触发。
+- `cd apps/web; pnpm exec vitest run src/lib/data/mistake-review-flow.test.ts`：exit 0，1 个文件、9/9 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error；`pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，25 个文件、399/399 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 47 s 846 ms`，`CompileArkTS` 与 `PackageHap` 通过。
+- 使用本机 SDK 精确路径执行 `hdc.exe list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；跨日停留、从 Practice 返回、App 前后台切换、ArkData 真实读取失败和点击“重新加载”的设备流程未验证。
+- HAP 未配置 `signingConfigs`，构建跳过签名；安装、真机和多设备行为未验证。
+- 本批未调用线上 API 或真实模型，不声明线上通过。
