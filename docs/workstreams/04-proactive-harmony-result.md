@@ -6,7 +6,7 @@
 
 本工作流围绕唯一闭环推进：真实学习事件 -> 到期错题或精确可执行的今日计划 -> next-best-action -> 首页、通知和服务卡片主动触达 -> 一键回到任务 -> 后续答题或完成事件继续更新本机状态。
 
-基线为 `dd2fe16 docs: 新增鸿蒙2.0接力文档`，工作分支为 `codex/ws04-proactive-harmony`。本工作流没有修改 Web API、模型、安全边界、ArkData schema、第三方依赖或产品资产，也没有把 OCR、TTS、Lottie 或分布式能力写成已通过。
+原始工作分支为 `codex/ws04-proactive-harmony`，当前成果已逐批融合到 `codex/harmony-integration-20260717`。本工作流没有修改 Web API、模型、安全边界、第三方依赖或产品资产，也没有把 OCR、TTS、Lottie 或分布式能力写成已通过。
 
 ## 交付结果
 
@@ -29,20 +29,26 @@
 - `Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动；嵌套页上的课程入口使用 API 12 `Router.back({ url: 'pages/Index' })` 返回根页，其他目标按当前路由栈执行 `pushUrl/replaceUrl`，只在导航确认成功后消费目标。
 - `EntryAbility.ets` 先完成内容仓库与 ArkData 课程目录同步，再校验来源、128 字符长度上限、动作/页面映射、课程和精确 Topic；外部 `courseTitle` 被忽略，标题从本地目录推导，非法 Want 不写 `AppStorage`。
 - `LearningFormUpdater.ets` 与 `LearningPlanCard.ets` 展示同一行动、依据、进度和 CTA，`FormLink` 传递精确目标页面及学习上下文。
+- `LearningFormUpdater.refreshAll()` 每批只解析一次 next-best-action，再更新全部卡片；显式快照刷新不重复读取状态，单卡系统更新仍读取最新本机状态。
+- Form Ability 三条系统入口统一等待课程内容仓储，再初始化 ArkData，避免服务卡片冷启动在课程索引缺失时提前完成 schema 迁移。
+- 首页图标按钮、主动行动、任务行和服务卡片具有明确无障碍文本；关键操作和错误重试触控区至少 48 vp。
 
 ### 记录、画像与成就反馈
 
 - 学习事件按本地时区分组和显示，不再直接截取 UTC ISO 字符串。
 - 近 4 周学习节奏、连续天数、活跃天数、事件数和分类筛选全部由本机真实事件计算。
 - 每条计划、课程互动、课程完成、精选练习和 AI 测验记录按已有 AppStorage 契约回到真实页面；旧事件 Topic 不再属于当前课程时只回到课程详情。
+- `ActivityRecords.ets` 只在 Repository 全部读取成功后一次提交事件、课程、计划、节奏和连续天数快照；失败保留上一份一致状态，空态和已有记录错误态均提供 48 vp 重试入口。
+- 学习记录筛选、四周节奏和事件卡片具有明确屏幕阅读器名称；筛选等分窄屏宽度，日格和重试入口保留最小高度，事件时间与操作允许换行。
+- `Profile.ets` 读取 ArkData `TopicMastery`，与本地课程目录做精确 `courseId + topic` 校验后按未掌握、累计正确率和最近答题时间排序；不消费混合标签洞察或没有真实更新链路的静态画像字段。
+- 画像加载和导航失败均保留可见提示与 48 vp 重试入口；知识点练习只写入目录派生的课程标题和精确 Topic，并清空旧标签筛选。
 - `Achievements.ets` 展示每项里程碑的真实来源、剩余量和本地解锁日期；最接近解锁的目标使用本地课程目录、未计数互动和未掌握 Topic 提供可增长的精确动作。
 
-### WS02 标签洞察依赖
+### 标签洞察状态
 
-- 已读取 `codex/ws02-quiz-mastery` 工作树 HEAD `c9572d2` 上的未提交 `QuizLearningStateReducer.ets`、`LocalLearningRepository.ets` 差异与 `quiz-learning-state.test.ts`。
-- 源码确认 reducer 的 `tagInsightKey(courseId, topic, tag)` 使用三元组分组，其测试包含“相同标签在不同精确 Topic 下分别累计”用例。
-- 当前 WS04 基线 Repository 仍按 `tag` 跨课程/Topic 聚合，所以本批主动服务、记录页和成就页不读取标签洞察，也没有修改 `LocalLearningRepository.ets`。
-- WS02 reducer 提交并集成后，再用独立补丁恢复薄弱标签主动推荐；若需新增完整集合 Repository API，必须单独提交以便在 WS02 之后精确重放。
+- schema 12 已使用 `courseId + topic + tag` 三元组累计标签洞察，并提供不截断的全量读取契约；跨课程和跨 Topic 同名标签不会合并。
+- 主动行动仍以到期错题、合法今日计划和课程 Topic 事实为依据，不读取标签洞察；画像使用 `TopicMastery`，避免把标签级统计错误提升成 Topic 掌握度。
+- 后续若引入薄弱标签主动推荐，必须同时展示精确课程、Topic、标签、证据样本和可执行练习，不得恢复混合标签口径。
 
 ## 旧提交复核
 
@@ -59,12 +65,15 @@
 - `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Index.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
 - `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
 - `apps/harmonyos/entry/src/main/resources/base/element/string.json`
 - `scripts/test-proactive-delivery-contracts.mjs`
 - `scripts/test-proactive-learning-service.mjs`
+- `scripts/test-profile-accessibility-contracts.mjs`
+- `scripts/test-activity-records-accessibility-contracts.mjs`
 
 ## 验证证据
 
@@ -72,11 +81,9 @@
 |---|---|---|
 | **源码确认** | DevEco Studio API 12 SDK 类型声明 | 已确认 `NotificationRequest.wantAgent`、`wantAgent.getWantAgent()`、`UIAbility.onNewWant()`、`@Watch`、`FormLink` 的 `router/params` |
 | **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
-| **源码确认** | WS02 未提交 reducer 与测试 | 三元组分组与跨 Topic 隔离用例存在；本批未修改、未提交或运行 WS02 测试 |
-| **源码确认** | `node --test scripts/test-proactive-learning-service.mjs` | exit 0，21/21 通过；直接执行当前 `.ets` 服务并约束无关 Want、latest-wins、点击时重解析、根页回流、子页替换及失败保留重试 |
-| **源码确认** | `node --test scripts/test-proactive-delivery-contracts.mjs` | exit 0，12/12 通过；直接执行当前服务、提醒、卡片更新器、Form Ability 与 EntryAbility，另对 ArkUI 绑定做精确静态契约检查 |
-| **源码确认** | 两个主动学习脚本合并执行 | exit 0，33/33 通过；覆盖六项触达参数一致、授权后二次确认、点击时重算、latest-wins、前台周期幂等、根页回流及失败保留重试 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 24 s 131 ms` |
+| **源码确认** | schema 12 学习状态契约 | 标签洞察按 `courseId + topic + tag` 隔离；画像继续使用课程目录校验后的 `TopicMastery` |
+| **源码确认** | 四个 WS04 契约脚本合并执行 | exit 0，55/55 通过；覆盖主动行动、提醒/卡片、Form 冷启动、画像真实 Topic、记录一致快照、双错误态恢复、窄屏与无障碍 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 31 s 973 ms` |
 | **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
 | **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
@@ -86,8 +93,9 @@
 ## 未验证与后续
 
 - 首页、记录、成就、提醒和卡片已在源码中共享同一真实状态，但缺少设备上的“计划保存/答题事件 -> 首页和卡片刷新 -> 通知或卡片点击回流”证据。
-- 按课程/Topic/标签隔离的主动标签推荐依赖 WS02 reducer 先完成提交和集成，当前明确未启用。
+- 按课程/Topic/标签隔离的主动标签推荐当前明确未启用；schema 已具备精确数据，但产品还需补可解释证据和下一动作设计。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
+- Profile 与 ActivityRecords 的屏幕阅读器播报顺序、字体放大、窄屏排版、48 vp 实际触控和错误重试独立聚焦尚无设备证据。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
 - HAP 签名、安装、横屏、平板和真机均未验证。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。
@@ -95,3 +103,4 @@
 第一批提交：`a3d2ad4 feat: 统一主动学习触达`。
 第二批提交：`c6697ef fix: 修正主动学习状态与入口边界`。
 第三批提交：`17057cc fix: 强化主动触达幂等与失败恢复`，主线集成时保留最新行动重算与成功后消费状态机。
+第四批提交：`d54e2d5 feat: 强化真实画像与记录无障碍`；产品与契约文件已在集成主线保持字节级一致。

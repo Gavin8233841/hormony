@@ -6999,3 +6999,27 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前没有设备目标；页面离开时慢 ArkData/Health 回调、重进后的输入与真实 SSE 均未做模拟器或真机验证。
 - HAP 未配置 `signingConfigs`，构建跳过签名；安装、真机与多设备行为未验证。
 - 本批未调用线上 Chat 或真实模型，不声明线上通过。
+
+---
+
+## 2026-07-17 [MAIN+WS04] 主动服务工作流证据校准
+
+背景：逐文件复核 `d54e2d5` 时确认 `Profile.ets`、`ActivityRecords.ets` 与两套契约已经和来源提交字节级一致，DEVLOG 也已有产品行为记录；只有 WS04 结果文档仍保留旧基线、旧 WS02 依赖和旧测试计数。本批不重复提交代码，只校准交付证据。
+
+文件：
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `DEVLOG.md`
+
+变化：
+- 文档补齐真实 `TopicMastery` 画像、一致活动快照、双错误态恢复、无障碍、Form 冷启动仓储顺序与当前标签洞察边界。
+- 删除“WS02 尚未提交”的过时口径，明确 schema 12 已按 `courseId + topic + tag` 隔离，但主动标签推荐仍需独立的可解释产品设计。
+- 验证证据更新为当前四套契约 55/55、API 12 HAP 和设备未连接边界。
+
+验证：
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs scripts/test-profile-accessibility-contracts.mjs scripts/test-activity-records-accessibility-contracts.mjs`：exit 0，55/55 通过。
+- API 12 HAP 沿用紧邻批次同一主线工作树的构建证据：exit 0，`BUILD SUCCESSFUL in 31 s 973 ms`。
+- DevEco SDK `hdc.exe list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 本批只修改文档，没有新的模拟器、真机、通知或服务卡片桌面证据。
+- HAP 未配置签名；安装、横屏、平板、读屏和字体放大仍未验证。
