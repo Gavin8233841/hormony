@@ -3,7 +3,11 @@
 
 import { runPlannerAgent } from "@/lib/agents/planner-agent";
 import { store } from "@/lib/store/db";
-import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
+import {
+  getModelRuntimeInfo,
+  ModelUnavailableError,
+  withModelRequestBudget,
+} from "@/lib/agents/model";
 import { modelErrorResponse, SafetyBlockedError } from "@/lib/api-errors";
 import type { LearningProfileSnapshot, StudyPlan } from "@/lib/types";
 import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
@@ -18,6 +22,8 @@ import { isStatelessDeployment } from "@/lib/deployment";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+// 即使部署误配了更长的单次模型超时，也要在平台回收前结束请求。
+const PLAN_REQUEST_BUDGET_MS = 100_000;
 
 export async function GET(req: Request) {
   if (isStatelessDeployment()) {
@@ -110,14 +116,17 @@ export async function POST(req: Request) {
   }
 
   try {
-    const plan = await runPlannerAgent(
-      userId.value,
-      goal,
-      durationDays.value,
-      dailyMinutes.value,
-      startDate.value,
-      profile.value as LearningProfileSnapshot | undefined,
-      req.signal
+    const plan = await withModelRequestBudget(
+      (signal) => runPlannerAgent(
+        userId.value,
+        goal,
+        durationDays.value,
+        dailyMinutes.value,
+        startDate.value,
+        profile.value as LearningProfileSnapshot | undefined,
+        signal
+      ),
+      { timeoutMs: PLAN_REQUEST_BUDGET_MS, signal: req.signal }
     );
     await assertSafePlan(plan);
     return Response.json(plan);

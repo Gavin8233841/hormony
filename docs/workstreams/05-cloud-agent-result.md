@@ -263,3 +263,24 @@
 
 - 本批没有使用模型秘密，也没有调用真实模型或部署线上版本。
 - **未验证**：真实模型连接在 100 秒时的网络级取消、线上平台 120 秒回收、当前分支线上部署、浏览器、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS、题库内容、RAG、缓存策略、生产模型 ID 或秘密。
+
+## 13. Plan 请求总预算与资源清理
+
+### 13.1 源码确认与行为
+
+- Planner 当前只执行一次模型调用，默认单次超时为 45 秒；但部署环境可以把 `MODEL_TIMEOUT_MS` 配置得超过路由 `maxDuration=120`，旧路由自身没有更短的硬截止时间。
+- Plan 路由复用模型层 `withModelRequestBudget`，将整个 Planner 模型阶段限制为 100000ms，并把同一派生 signal 贯穿现有 Planner/model 调用。
+- 内部 deadline 映射为 `504/MODEL_TIMEOUT`；外部 Request 中止继续映射为 `499/MODEL_CANCELLED`。成功、失败和取消均由预算 helper 清理 timer 与父 Request signal listener。
+- 输出 Safety、计划结构校验、日期与本地优先边界保持不变；没有新增模型重试或静态降级。
+
+### 13.2 验证
+
+- 定向回归：`pnpm exec vitest run src/app/api/plan/request-budget.test.ts src/app/api/plan/request-cancellation.test.ts src/app/api/plan/plan-lifecycle.test.ts src/lib/agents/planner-agent.test.ts` exit 0，4 个测试文件、22/22 通过；覆盖 99999ms 未中止、100000ms 精确超时、成功后 timer/listener 清理和外部取消。
+- 静态诊断通过：`pnpm lint` exit 0，无 warning/error；`pnpm typecheck` exit 0。
+- 全量测试通过：`pnpm test` exit 0，30 个测试文件、422/422 通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面生成，全部 dynamic API route 与 26.8 kB middleware 进入生产产物。
+
+### 13.3 未验证
+
+- 本批未调用真实模型、没有重新运行本地 production 黑盒，也未部署当前分支。
+- **未验证**：真实模型连接在 100 秒时的网络级取消、线上平台 120 秒回收、浏览器、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS、Quiz、Chat、RAG、缓存策略、生产模型 ID 或秘密。

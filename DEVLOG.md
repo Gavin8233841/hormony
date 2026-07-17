@@ -7240,3 +7240,31 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 真实模型上游网络在 100 秒时的取消、线上 120 秒平台回收和当前分支部署未验证。
 - 浏览器、HarmonyOS 模拟器、真机均未验证；本批未修改 HarmonyOS、题库内容、RAG、缓存策略、生产模型 ID 或秘密。
+
+---
+
+## 2026-07-17 [MAIN+WS05] Plan 模型请求总预算
+
+背景：Plan 虽然当前只调用一次模型，但部署环境可把单次 `MODEL_TIMEOUT_MS` 配置到超过路由 120 秒平台时限。旧路由没有内部总截止时间，平台回收前无法保证主动取消上游请求。
+
+文件：
+- `apps/web/src/app/api/plan/route.ts`
+- `apps/web/src/app/api/plan/request-budget.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Plan 模型阶段复用统一预算 helper，限制为 100 秒并把派生 signal 传入 Planner；为输出 Safety、序列化和平台回收保留 20 秒。
+- 内部截止返回 `504/MODEL_TIMEOUT`，外部 Request 取消保持 `499/MODEL_CANCELLED`；成功、失败和取消均清理 timer 与父 signal listener。
+- 计划结构、日期、输入/输出 Safety 和本地优先边界不变，不添加重试、假数据或静态成功降级。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/app/api/plan/request-budget.test.ts src/app/api/plan/request-cancellation.test.ts src/app/api/plan/plan-lifecycle.test.ts src/lib/agents/planner-agent.test.ts`：exit 0，4 个测试文件、22/22 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，30 个测试文件、422/422 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+
+失败或未验证：
+- 真实模型 100 秒网络取消、线上平台 120 秒回收、当前分支部署未验证。
+- 浏览器、HarmonyOS 模拟器和真机未验证；本批未修改 HarmonyOS、Quiz、Chat、RAG、缓存策略、生产模型 ID 或秘密。
