@@ -7079,3 +7079,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前没有设备目标；保存阶段离页/重进、ArkData 写失败后同页重试和旧网络回调均未做模拟器或真机验证。
 - HAP 未配置 `signingConfigs`，构建跳过签名；安装和多设备行为未验证。
 - 本批未调用线上 Plan 或真实模型，不声明线上通过。
+
+---
+
+## 2026-07-17 [MAIN+WS02] 跨日错题刷新与练习加载恢复
+
+背景：MistakeBook 只在组件首次创建时读取复习队列，从 Practice 返回或应用跨日再次显示时仍保留旧时间快照；Practice 又会立即清空全局入口复习 ID，首次 ArkData 读取失败后只能退出重进，且原错题身份已经丢失。本批复核并融合 WS02 提交 `39a22e1`，主线补齐 48 vp 与读屏契约。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/mistake-review-flow.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- `MistakeBook` 使用 API 12 `@Entry` 页面支持的 `onPageShow`，每次首次显示、从子页返回或应用回前台都重新获取当前时间、到期项和全部有效复习项。
+- 错题本为每轮读取分配单调 run ID；旧成功、旧失败和旧 finally 都不能覆盖较新的队列、时间戳或 loading 状态。
+- `Practice` 在清空全局入口前把精确复习 ID 保存在页面实例中；加载失败清空半成品并显示原地重试，重试仍使用同一错题 ID，不需要再次调用模型或退出页面。
+- 重试按钮使用 48 vp 触控高度，并明确播报“重新加载本地练习”和再次读取的内容范围。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/lib/data/mistake-review-flow.test.ts src/lib/data/quiz-learning-state.test.ts`：exit 0，2 个文件、47/47 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error；`pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，28 个测试文件、412/412 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 26 s 594 ms`，`CompileArkTS` 与 `PackageHap` 通过。
+
+失败或未验证：
+- 当前无设备目标；跨日停留页面、前后台切换、从 Practice 返回后的排序和加载失败原地重试均未做模拟器或真机验证。
+- HAP 未配置签名；安装、读屏焦点和 48 vp 实际触控未验证。
+- 本批未调用线上 Quiz 或真实模型，不声明线上通过。

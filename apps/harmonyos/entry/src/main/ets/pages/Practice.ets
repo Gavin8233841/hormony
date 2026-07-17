@@ -45,12 +45,15 @@ struct PracticePage {
   @State expandedDetailId: string = '';
   @State message: string = '';
   @State hasError: boolean = false;
+  @State loading: boolean = false;
+  @State loadRetryAvailable: boolean = false;
   @State writeBackTotalQuestions: number = 0;
   @State writeBackActiveReviews: number = 0;
   @State writeBackTopicAccuracy: number = 0;
   @State writeBackActivityCount: number = 0;
   @State writeBackCourseProgress: number = 0;
   private reviewItemIds: string[] = [];
+  private selectedReviewItemId: string = '';
   private attemptId: string = '';
   private attemptSubmittedAt: string = '';
 
@@ -59,7 +62,7 @@ struct PracticePage {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     const selectedTopic = (AppStorage.get<string>('selectedPracticeTopic') ?? '').trim();
-    const selectedReviewItemId = (AppStorage.get<string>('selectedReviewItemId') ?? '').trim();
+    this.selectedReviewItemId = (AppStorage.get<string>('selectedReviewItemId') ?? '').trim();
     AppStorage.setOrCreate<string>('selectedReviewItemId', '');
     const courseTopics = LearningContentRepository.getTopics(this.courseId);
     this.topic = courseTopics.includes(selectedTopic) ? selectedTopic : '';
@@ -69,10 +72,7 @@ struct PracticePage {
       this.hasError = true;
       return;
     }
-    this.loadQuestions(selectedReviewItemId).catch((): void => {
-      this.message = '本地练习加载失败，请重新进入';
-      this.hasError = true;
-    });
+    this.reloadQuestions();
   }
 
   private resetPageState(): void {
@@ -88,7 +88,10 @@ struct PracticePage {
     this.expandedDetailId = '';
     this.message = '';
     this.hasError = false;
+    this.loading = false;
+    this.loadRetryAvailable = false;
     this.reviewItemIds = [];
+    this.selectedReviewItemId = '';
     this.attemptId = '';
     this.attemptSubmittedAt = '';
     this.writeBackTotalQuestions = 0;
@@ -96,6 +99,28 @@ struct PracticePage {
     this.writeBackTopicAccuracy = 0;
     this.writeBackActivityCount = 0;
     this.writeBackCourseProgress = 0;
+  }
+
+  private async reloadQuestions(): Promise<void> {
+    if (this.loading) return;
+    this.loading = true;
+    this.loadRetryAvailable = false;
+    this.message = '';
+    this.hasError = false;
+    try {
+      await this.loadQuestions(this.selectedReviewItemId);
+    } catch (error) {
+      this.questions = [];
+      this.activeQuestion = EMPTY_QUESTION;
+      this.answers = [];
+      this.activeAnswer = '';
+      this.reviewItemIds = [];
+      this.message = '本地练习加载失败，请重试';
+      this.hasError = true;
+      this.loadRetryAvailable = true;
+    } finally {
+      this.loading = false;
+    }
   }
 
   private async loadQuestions(selectedReviewItemId: string): Promise<void> {
@@ -579,7 +604,32 @@ struct PracticePage {
       }
       Scroll() {
         Column() {
-          if (this.questions.length === 0) {
+          if (this.loading) {
+            Column()
+              .width('100%')
+              .height(200)
+              .backgroundColor(Constants.COLOR_BG_SKELETON)
+              .borderRadius(Constants.RADIUS_LG)
+              .margin({ top: 24 })
+          } else if (this.questions.length === 0 && this.loadRetryAvailable) {
+            Column({ space: 12 }) {
+              SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+                .fontSize(40)
+                .fontColor([Constants.COLOR_ERROR])
+              Button('重新加载')
+                .height(48)
+                .fontSize(13)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .backgroundColor(Constants.COLOR_BRAND)
+                .borderRadius(Constants.RADIUS_MD)
+                .accessibilityText('重新加载本地练习')
+                .accessibilityDescription('再次读取原错题与同主题精选题')
+                .onClick((): void => { this.reloadQuestions(); })
+            }
+            .width('100%')
+            .height(220)
+            .justifyContent(FlexAlign.Center)
+          } else if (this.questions.length === 0) {
             Text('该主题暂无精选练习题')
               .fontSize(15)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
