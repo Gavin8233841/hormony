@@ -55,6 +55,12 @@ export interface StudyPlan {
   tasks: PlanTask[];
 }
 
+export interface PlanTaskUpdateReceipt {
+  plan: StudyPlan;
+  task: PlanTask;
+  changed: boolean;
+}
+
 export interface ChatMessage {
   role: string; // 'user' | 'assistant'
   content: string;

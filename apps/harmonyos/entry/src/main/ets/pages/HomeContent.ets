@@ -1,5 +1,5 @@
 import { Constants } from '../common/Constants';
-import { Course, PlanTask, StudyPlan } from '../model/DataModels';
+import { Course, PlanTask, PlanTaskUpdateReceipt } from '../model/DataModels';
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -7,10 +7,6 @@ import { LearningReminder } from '../common/LearningReminder';
 import { LearningFormRefreshResult, LearningFormUpdater } from '../common/LearningFormUpdater';
 import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
 import { common } from '@kit.AbilityKit';
-
-interface AgentPlanTask extends PlanTask {
-  reason?: string;
-}
 
 @Component
 export struct HomeContent {
@@ -28,6 +24,9 @@ export struct HomeContent {
   @State notificationOpen: boolean = false;
   @State notificationState: string = 'idle';
   @State pressedTask: number = -1;
+  @State updatingTaskId: string = '';
+  @State taskUpdateMessage: string = '';
+  @State taskUpdateFailed: boolean = false;
   @State notificationMessage: string = '学习计划已同步，完成任务会自动更新进度';
   @State nextActionKind: string = 'course';
   @State nextActionBadge: string = '继续';
@@ -93,48 +92,50 @@ export struct HomeContent {
   }
 
   private async toggleTask(task: PlanTask): Promise<void> {
+    if (this.updatingTaskId.length > 0) return;
+    const taskId = task.id;
+    const desiredDone = !Boolean(task.done);
+    let receipt: PlanTaskUpdateReceipt | null = null;
+    this.updatingTaskId = taskId;
+    this.taskUpdateMessage = '正在保存任务状态';
+    this.taskUpdateFailed = false;
     try {
-      const nextTasks: PlanTask[] = this.planTasks.map((item: PlanTask): PlanTask => {
-        if (item.id !== task.id) return item;
-        return {
-          id: item.id,
-          title: item.title,
-          date: item.date,
-          estimatedMin: item.estimatedMin,
-          type: item.type,
-          courseId: item.courseId,
-          topic: item.topic,
-          action: item.action,
-          reason: (item as AgentPlanTask).reason,
-          done: !Boolean(item.done)
-        } as AgentPlanTask;
-      });
-      const currentPlan = await LocalLearningRepository.getPlan();
-      const plan: StudyPlan = currentPlan ?? {
-        planId: 'local-plan',
-        userId: Constants.DEMO_USER_ID,
-        goal: '完成今日学习任务',
-        tasks: nextTasks
-      };
-      plan.tasks = nextTasks;
-      await LocalLearningRepository.savePlan(plan);
-      await LearningFormUpdater.refreshAll();
-      const changedTask = nextTasks.find((item: PlanTask): boolean => item.id === task.id);
-      if (changedTask?.done === true) {
-        const event: StudyEvent = {
-          id: 'event_' + Date.now().toString(),
-          type: 'task_completed',
-          timestamp: new Date().toISOString(),
-          taskId: task.id
-        };
-        await LocalLearningRepository.appendStudyEvent(event);
-      }
+      receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);
+      const nextTasks = receipt.plan.tasks;
       this.planTasks = nextTasks;
-      await this.loadNextAction();
+      this.taskUpdateMessage = receipt.task.done === true ? '任务已完成并保存到本机' : '任务已恢复为待完成';
     } catch (e) {
+      this.taskUpdateMessage = '任务状态保存失败，请重试';
+      this.taskUpdateFailed = true;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'HomeContent local task update failed');
+    } finally {
+      if (this.updatingTaskId === taskId) this.updatingTaskId = '';
     }
+    if (receipt === null) return;
+    try {
+      await LearningFormUpdater.refreshAll();
+    } catch (_) {
+    }
+    let studyEventSaved: boolean = true;
+    if (receipt.changed && receipt.task.done === true) {
+      const event: StudyEvent = {
+        id: 'event_' + Date.now().toString(),
+        type: 'task_completed',
+        timestamp: new Date().toISOString(),
+        taskId: taskId
+      };
+      try {
+        await LocalLearningRepository.appendStudyEvent(event);
+      } catch (_) {
+        studyEventSaved = false;
+      }
+    }
+    if (!studyEventSaved) {
+      this.taskUpdateMessage = '任务已完成并保存，学习记录暂未更新';
+      this.taskUpdateFailed = true;
+    }
+    await this.loadNextAction();
   }
 
   private async publishReminder(): Promise<void> {
@@ -561,7 +562,9 @@ export struct HomeContent {
     .padding({ top: 11, bottom: 11 })
     .scale({ x: this.pressedTask === index ? 0.98 : 1, y: this.pressedTask === index ? 0.98 : 1 })
     .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
-    .accessibilityText(task.title + '，' + this.taskStatus(task) + '，点击切换任务状态')
+    .enabled(this.updatingTaskId.length === 0)
+    .accessibilityText(task.title + '，' + this.taskStatus(task) +
+      (this.updatingTaskId === task.id ? '，正在保存到本机' : '，点击切换任务状态'))
     .onTouch((event?: TouchEvent) => {
       if (event) {
         if (event.type === TouchType.Down) {
@@ -655,6 +658,14 @@ export struct HomeContent {
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
       .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 3 })
+
+      if (this.taskUpdateMessage.length > 0) {
+        Text(this.taskUpdateMessage)
+          .fontSize(12)
+          .fontColor(this.taskUpdateFailed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+          .margin({ top: 8 })
+          .accessibilityText(this.taskUpdateMessage)
+      }
     }
     .width('100%')
   }

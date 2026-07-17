@@ -8,7 +8,7 @@ import { GradientHeader, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
-import { StudyPlan, PlanTask, PlanRequest } from '../model/DataModels';
+import { StudyPlan, PlanTask, PlanRequest, PlanTaskUpdateReceipt } from '../model/DataModels';
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
@@ -47,6 +47,7 @@ struct PlanPage {
   @State errorCode: string = '';
   @State errorExpanded: boolean = false;
   @State retryAction: string = 'none';
+  @State updatingTaskId: string = '';
   private activeRequest: HttpRequestCancellation | null = null;
   private generationRunId: number = 0;
   private planReadRunId: number = 0;
@@ -64,13 +65,13 @@ struct PlanPage {
     { title: '更新', description: '通知首页与服务卡片' }
   ];
 
-  aboutToAppear(): void {
+  onPageShow(): void {
     this.lifecycleRunId += 1;
     this.pageActive = true;
     this.loadPlan();
   }
 
-  aboutToDisappear(): void {
+  onPageHide(): void {
     this.pageActive = false;
     this.lifecycleRunId += 1;
     this.planReadRunId += 1;
@@ -79,8 +80,24 @@ struct PlanPage {
     this.cancelPlanGeneration(false);
   }
 
+  onBackPress(): boolean {
+    if (this.updatingTaskId.length > 0) {
+      this.message = '任务状态正在保存到本机，请稍候';
+      this.hasError = false;
+      return true;
+    }
+    if (this.loading && this.progressStep >= 3) {
+      this.message = '计划正在保存到本机，请稍候';
+      this.hasError = false;
+      return true;
+    }
+    this.cancelPlanGeneration(false);
+    return false;
+  }
+
   get canGenerate(): boolean {
-    return !this.loading && !this.planLoading && this.goal.trim().length > 0;
+    return !this.loading && !this.planLoading && this.updatingTaskId.length === 0 &&
+      this.goal.trim().length > 0;
   }
 
   private taskTypeLabel(type: string): string {
@@ -111,6 +128,11 @@ struct PlanPage {
   }
 
   private openTask(task: PlanTask): void {
+    if (this.updatingTaskId.length > 0) {
+      this.message = '任务状态正在保存到本机，请稍候';
+      this.hasError = false;
+      return;
+    }
     if (!this.hasTaskTarget(task)) {
       this.message = '旧计划缺少课程主题，请重新生成可执行计划';
       this.hasError = true;
@@ -154,6 +176,10 @@ struct PlanPage {
       this.planLoading = false;
       return;
     }
+    if (this.updatingTaskId.length > 0) {
+      this.planLoading = false;
+      return;
+    }
     const readRunId = this.planReadRunId + 1;
     this.planReadRunId = readRunId;
     this.planLoading = true;
@@ -188,55 +214,17 @@ struct PlanPage {
   }
 
   private async toggleTask(task: PlanTask): Promise<void> {
-    const nextDone = !Boolean(task.done);
+    if (this.updatingTaskId.length > 0 || this.loading || this.planLoading) return;
+    const taskId = task.id;
+    const desiredDone = !Boolean(task.done);
+    const feedbackLifecycleRunId = this.lifecycleRunId;
+    let receipt: PlanTaskUpdateReceipt | null = null;
+    this.updatingTaskId = taskId;
     try {
-      const nextTasks: PlanTask[] = [];
-      for (const item of this.tasks) {
-        if (item.id === task.id) {
-          const updated: PlanTask = {
-            id: item.id,
-            title: item.title,
-            date: item.date,
-            estimatedMin: item.estimatedMin,
-            type: item.type,
-            courseId: item.courseId,
-            topic: item.topic,
-            action: item.action,
-            reason: (item as AgentPlanTask).reason,
-            done: nextDone
-          } as AgentPlanTask;
-          nextTasks.push(updated);
-        } else {
-          nextTasks.push(item);
-        }
-      }
-      const current = await LocalLearningRepository.getPlan();
-      if (current === null) throw new Error('本地计划不存在');
-      current.tasks = nextTasks;
-      await LocalLearningRepository.savePlan(current);
-      this.tasks = nextTasks;
-      try {
-        await LearningFormUpdater.refreshAll();
-      } catch (_) {
-      }
-      let studyEventSaved: boolean = true;
-      if (nextDone) {
-        const event: StudyEvent = {
-          id: 'event_' + Date.now().toString(),
-          type: 'task_completed',
-          timestamp: new Date().toISOString(),
-          taskId: task.id
-        };
-        try {
-          await LocalLearningRepository.appendStudyEvent(event);
-        } catch (_) {
-          studyEventSaved = false;
-        }
-      }
-      this.message = studyEventSaved ?
-        (nextDone ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成') :
-        '任务已完成并保存，学习记录暂未更新';
-      this.hasError = !studyEventSaved;
+      receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);
+      this.tasks = receipt.plan.tasks;
+      this.message = receipt.task.done === true ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成';
+      this.hasError = false;
       this.retryAction = 'none';
       this.clearErrorEvidence();
     } catch (e) {
@@ -244,6 +232,34 @@ struct PlanPage {
       this.hasError = true;
       this.retryAction = 'none';
       this.clearErrorEvidence();
+    } finally {
+      if (this.updatingTaskId === taskId) {
+        this.updatingTaskId = '';
+      }
+    }
+    if (receipt === null) return;
+    try {
+      await LearningFormUpdater.refreshAll();
+    } catch (_) {
+    }
+    let studyEventSaved: boolean = true;
+    if (receipt.changed && receipt.task.done === true) {
+      const event: StudyEvent = {
+        id: 'event_' + Date.now().toString(),
+        type: 'task_completed',
+        timestamp: new Date().toISOString(),
+        taskId: taskId
+      };
+      try {
+        await LocalLearningRepository.appendStudyEvent(event);
+      } catch (_) {
+        studyEventSaved = false;
+      }
+    }
+    if (!this.pageActive || this.lifecycleRunId !== feedbackLifecycleRunId) return;
+    if (!studyEventSaved) {
+      this.message = '任务已完成并保存，学习记录暂未更新';
+      this.hasError = true;
     }
   }
 
@@ -322,6 +338,11 @@ struct PlanPage {
 
   private goBack(): void {
     this.dismissGoalInput();
+    if (this.updatingTaskId.length > 0) {
+      this.message = '任务状态正在保存到本机，请稍候';
+      this.hasError = false;
+      return;
+    }
     if (this.loading && this.progressStep >= 3) {
       this.message = '计划正在保存到本机，请稍候';
       this.hasError = false;
@@ -390,7 +411,7 @@ struct PlanPage {
   }
 
   private async retryPendingPlanSave(): Promise<void> {
-    if (this.loading || this.pendingPlan === null) return;
+    if (this.loading || this.updatingTaskId.length > 0 || this.pendingPlan === null) return;
     this.generationRunId += 1;
     this.activeRequest = null;
     this.loading = true;
@@ -826,7 +847,7 @@ struct PlanPage {
                 .fontColor(this.days === option ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
                 .backgroundColor(this.days === option ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
                 .borderRadius(Constants.RADIUS_MD)
-                .enabled(!this.loading && !this.planLoading)
+                .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0)
                 .onClick(() => {
                   this.days = option;
                 })
@@ -886,7 +907,7 @@ struct PlanPage {
                 .fontColor(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_SM)
-                .enabled(!this.loading && !this.planLoading)
+                .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0)
                 .onClick(() => {
                   if (this.retryAction === 'load') this.loadPlan();
                   else if (this.retryAction === 'save') this.retryPendingPlanSave();
@@ -1060,21 +1081,26 @@ struct PlanPage {
 
                 Column({ space: 6 }) {
                   Button(this.actionLabel(t))
-                    .width(58)
-                    .height(30)
-                    .fontSize(11)
+                    .width(64)
+                    .height(48)
+                    .fontSize(12)
                     .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
                     .backgroundColor(this.hasTaskTarget(t) ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
                     .borderRadius(Constants.RADIUS_SM)
-                    .enabled(this.hasTaskTarget(t))
+                    .enabled(this.hasTaskTarget(t) && this.updatingTaskId.length === 0)
+                    .accessibilityText(this.actionLabel(t) + '：' + t.title)
+                    .accessibilityDescription('打开该计划任务对应的真实学习环节')
                     .onClick(() => { this.openTask(t); })
-                  Button(t.done ? '恢复' : '完成')
-                    .width(58)
-                    .height(30)
-                    .fontSize(11)
+                  Button(this.updatingTaskId === t.id ? '保存中' : (t.done ? '恢复' : '完成'))
+                    .width(64)
+                    .height(48)
+                    .fontSize(12)
                     .fontColor(t.done ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
                     .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)
                     .borderRadius(Constants.RADIUS_SM)
+                    .enabled(this.updatingTaskId.length === 0)
+                    .accessibilityText((t.done ? '恢复待完成：' : '标记完成：') + t.title)
+                    .accessibilityDescription('将任务状态保存到本机学习计划')
                     .onClick(() => { this.toggleTask(t); })
                 }
               }
@@ -1119,7 +1145,8 @@ struct PlanPage {
   async generate(): Promise<void> {
     const requestedGoal = this.goal.trim();
     const requestedDays = this.days;
-    if (requestedGoal.length === 0 || this.loading || this.planLoading || !this.pageActive) return;
+    if (requestedGoal.length === 0 || this.loading || this.planLoading ||
+      this.updatingTaskId.length > 0 || !this.pageActive) return;
     const lifecycleRunId = this.lifecycleRunId;
     const runId = this.generationRunId + 1;
     this.generationRunId = runId;

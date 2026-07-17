@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,6 +44,51 @@ function occurrences(text, marker) {
 const httpClient = source('apps/harmonyos/entry/src/main/ets/common/HttpClient.ets');
 const chat = source('apps/harmonyos/entry/src/main/ets/pages/Chat.ets');
 const plan = source('apps/harmonyos/entry/src/main/ets/pages/Plan.ets');
+const home = source('apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets');
+const localRepository = source('apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets');
+
+function compileLocalLearningRepository() {
+  const imports = [
+    "import { relationalStore } from '@kit.ArkData';",
+    "import { common } from '@kit.AbilityKit';",
+    `import {
+  ChatMessage,
+  AchievementProgress,
+  Course,
+  LessonProgress,
+  PlanTaskUpdateReceipt,
+  StudyPlan,
+  TopicMastery,
+  UserProfile
+} from '../model/DataModels';`,
+    `import {
+  LearningQuizResult as QuizResult,
+  LearningQuizResultDetail as QuizResultDetail,
+  LearningReviewItem as ReviewItem,
+  LearningStudyEvent as StudyEvent,
+  LearningTagInsight as TagInsight,
+  QuizLearningState,
+  QuizWriteReceipt,
+  TopicMasteryMilestone
+} from '../model/LearningMetadataModels';`,
+    "import { LearningContentRepository } from './LearningContentRepository';",
+    "import { QuizLearningStateReducer } from './QuizLearningStateReducer';"
+  ];
+  let transformed = localRepository;
+  for (const expectedImport of imports) {
+    assert.equal(transformed.includes(expectedImport), true,
+      `LocalLearningRepository import changed: ${expectedImport}`);
+    transformed = transformed.replace(expectedImport, '');
+  }
+  assert.equal(transformed.includes('export class LocalLearningRepository'), true);
+  transformed = transformed.replace('export class LocalLearningRepository', 'class LocalLearningRepository');
+  transformed = `const LearningContentRepository = globalThis.__learningContentRepository;
+const QuizLearningStateReducer = globalThis.__quizLearningStateReducer;
+${transformed}
+globalThis.__LocalLearningRepository = LocalLearningRepository;
+`;
+  return stripTypeScriptTypes(transformed, { mode: 'transform', sourceMap: false });
+}
 
 test('Chat submits the native TextInput value to the real SSE endpoint', () => {
   const input = section(chat, '          TextInput({', '\n\n          Button() {', 'Chat input');
@@ -397,7 +444,8 @@ test('Plan generation preserves the last saved plan and isolates stale reads', (
   ], 'Plan replaces UI only after local save');
 
   const retrySave = section(plan, '  private async retryPendingPlanSave(): Promise<void> {', '  private cleanText(', 'Plan save retry');
-  assert.match(retrySave, /if \(this\.loading \|\| this\.pendingPlan === null\) return;/);
+  assert.match(retrySave,
+    /if \(this\.loading \|\| this\.updatingTaskId\.length > 0 \|\| this\.pendingPlan === null\) return;/);
   assert.match(retrySave, /await this\.persistGeneratedPlan\(this\.pendingPlan\);/);
   assert.doesNotMatch(retrySave, /HttpClient\.post/);
 });
@@ -415,16 +463,16 @@ test('Plan preserves a failed pending save across re-entry and rejects stale gen
     'private pendingPlan: AgentStudyPlan | null = null;'
   ], 'Plan lifecycle request fields');
 
-  const lifecycle = section(plan, '  aboutToAppear(): void {', '  get canGenerate(): boolean {',
+  const lifecycle = section(plan, '  onPageShow(): void {', '  get canGenerate(): boolean {',
     'Plan page lifecycle');
-  const appear = section(lifecycle, '  aboutToAppear(): void {', '  aboutToDisappear(): void {',
+  const appear = section(lifecycle, '  onPageShow(): void {', '  onPageHide(): void {',
     'Plan page re-entry');
   assertOrder(appear, [
     'this.lifecycleRunId += 1;',
     'this.pageActive = true;',
     'this.loadPlan();'
   ], 'Plan activates a new lifecycle before local restore');
-  const disappear = section(plan, '  aboutToDisappear(): void {', '  get canGenerate(): boolean {',
+  const disappear = section(plan, '  onPageHide(): void {', '  onBackPress(): boolean {',
     'Plan page leave');
   assertOrder(disappear, [
     'this.pageActive = false;',
@@ -434,6 +482,20 @@ test('Plan preserves a failed pending save across re-entry and rejects stale gen
     'if (this.loading && this.progressStep >= 3) return;',
     'this.cancelPlanGeneration(false);'
   ], 'Plan invalidates network callbacks but lets an entered local save settle');
+
+  const backPress = section(plan, '  onBackPress(): boolean {', '  get canGenerate(): boolean {',
+    'Plan system back');
+  assertOrder(backPress, [
+    'if (this.updatingTaskId.length > 0) {',
+    "this.message = '任务状态正在保存到本机，请稍候';",
+    'return true;',
+    'if (this.loading && this.progressStep >= 3) {',
+    "this.message = '计划正在保存到本机，请稍候';",
+    'return true;',
+    'this.cancelPlanGeneration(false);',
+    'return false;'
+  ], 'Plan consumes system back while local writes must stay mounted');
+  assert.doesNotMatch(plan, /aboutToDisappear\(\): void/);
 
   const load = section(plan, '  private async loadPlan(): Promise<void> {', '  private async toggleTask(',
     'Plan pending-save restore');
@@ -476,7 +538,8 @@ test('Plan preserves a failed pending save across re-entry and rejects stale gen
   const generate = section(plan, '  async generate(): Promise<void> {', '  pageTransition() {',
     'Plan lifecycle generation');
   assertOrder(generate, [
-    'if (requestedGoal.length === 0 || this.loading || this.planLoading || !this.pageActive) return;',
+    'if (requestedGoal.length === 0 || this.loading || this.planLoading ||\n' +
+      '      this.updatingTaskId.length > 0 || !this.pageActive) return;',
     'const lifecycleRunId = this.lifecycleRunId;',
     'const runId = this.generationRunId + 1;',
     'const profile = await LocalLearningRepository.getProfile();',
@@ -495,6 +558,184 @@ test('Plan preserves a failed pending save across re-entry and rejects stale gen
     'if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;',
     "this.retryAction = 'generate';"
   ], 'Plan ignores stale failures after leave and re-entry');
+});
+
+test('Plan serializes task writes against the latest persisted plan and conflicting actions', () => {
+  assert.match(plan, /@State updatingTaskId: string = '';/);
+
+  const canGenerate = section(plan, '  get canGenerate(): boolean {', '  private taskTypeLabel(',
+    'Plan generation availability');
+  assert.match(canGenerate,
+    /return !this\.loading && !this\.planLoading && this\.updatingTaskId\.length === 0 &&\s*this\.goal\.trim\(\)\.length > 0;/);
+
+  const openTask = section(plan, '  private openTask(', '  private pushPage(', 'Plan task navigation guard');
+  assertOrder(openTask, [
+    'if (this.updatingTaskId.length > 0) {',
+    "this.message = '任务状态正在保存到本机，请稍候';",
+    'return;',
+    'if (!this.hasTaskTarget(task)) {'
+  ], 'Plan blocks task navigation while a task write is pending');
+
+  const load = section(plan, '  private async loadPlan(): Promise<void> {', '  private async toggleTask(',
+    'Plan task-write load guard');
+  assertOrder(load, [
+    'if (this.updatingTaskId.length > 0) {',
+    'this.planLoading = false;',
+    'return;',
+    'const readRunId = this.planReadRunId + 1;'
+  ], 'Plan blocks a competing local plan read');
+
+  const toggle = section(plan, '  private async toggleTask(', '  @Builder\n  PlanSkeleton()',
+    'Plan serialized task write');
+  assertOrder(toggle, [
+    'if (this.updatingTaskId.length > 0 || this.loading || this.planLoading) return;',
+    'const taskId = task.id;',
+    'const desiredDone = !Boolean(task.done);',
+    'const feedbackLifecycleRunId = this.lifecycleRunId;',
+    'this.updatingTaskId = taskId;',
+    'receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);',
+    'this.tasks = receipt.plan.tasks;',
+    '} finally {',
+    'if (this.updatingTaskId === taskId) {',
+    "this.updatingTaskId = '';",
+    'if (receipt === null) return;',
+    'await LearningFormUpdater.refreshAll();',
+    'if (receipt.changed && receipt.task.done === true) {',
+    'if (!this.pageActive || this.lifecycleRunId !== feedbackLifecycleRunId) return;'
+  ], 'Plan locks before reading and publishes only a saved latest snapshot');
+  assert.doesNotMatch(toggle, /LocalLearningRepository\.(getPlan|savePlan)\(|for \(const item of this\.tasks\)/);
+
+  const goBack = section(plan, '  private goBack(): void {', '  private isActiveGeneration(',
+    'Plan task-write back guard');
+  assertOrder(goBack, [
+    'if (this.updatingTaskId.length > 0) {',
+    "this.message = '任务状态正在保存到本机，请稍候';",
+    'return;',
+    'if (this.loading && this.progressStep >= 3) {'
+  ], 'Plan keeps the page mounted until the task write settles');
+
+  const taskControls = section(plan, '                  Button(this.actionLabel(t))',
+    '                }\n              }\n              .width', 'Plan task write controls');
+  assert.match(taskControls,
+    /\.enabled\(this\.hasTaskTarget\(t\) && this\.updatingTaskId\.length === 0\)/);
+  assert.match(taskControls,
+    /Button\(this\.updatingTaskId === t\.id \? '保存中' : \(t\.done \? '恢复' : '完成'\)\)/);
+  assert.match(taskControls, /\.enabled\(this\.updatingTaskId\.length === 0\)/);
+  assert.equal(occurrences(taskControls, '.height(48)'), 2);
+  assert.match(taskControls, /\.accessibilityText\(this\.actionLabel\(t\) \+ '：' \+ t\.title\)/);
+  assert.match(taskControls, /\.accessibilityText\(\(t\.done \? '恢复待完成：' : '标记完成：'\) \+ t\.title\)/);
+
+  const retryControls = section(plan, "              Button(this.retryAction === 'load' ? '重新读取' :",
+    '            }\n          }', 'Plan retry control guard');
+  assert.match(retryControls,
+    /\.enabled\(!this\.loading && !this\.planLoading && this\.updatingTaskId\.length === 0\)/);
+});
+
+test('Plan writes are serialized in the repository across Plan and Home entry points', async () => {
+  const queues = section(localRepository, '  private static initializationTask:',
+    '  static async initialize(', 'Local repository queues');
+  assert.match(queues, /private static planQueue: Promise<void> = Promise\.resolve\(\);/);
+
+  const runPlanTask = section(localRepository, '  private static runPlanTask<T>(',
+    '  private static isExactCourseTopic(', 'Plan queue');
+  assertOrder(runPlanTask, [
+    'LocalLearningRepository.planQueue.then((): Promise<T> => task())',
+    'LocalLearningRepository.planQueue = running.then((): void => {}, (): void => {});',
+    'return running;'
+  ], 'Plan queue continues after both success and failure');
+
+  const planStore = section(localRepository, '  static async getPlan(): Promise<StudyPlan | null> {',
+    '  static async getFormIds(', 'Plan repository writes');
+  assertOrder(planStore, [
+    'static async getPlan(): Promise<StudyPlan | null> {',
+    'LocalLearningRepository.runPlanTask(',
+    'static async savePlan(plan: StudyPlan): Promise<void> {',
+    'LocalLearningRepository.runPlanTask(',
+    'static async updatePlanTask(taskId: string, done: boolean): Promise<PlanTaskUpdateReceipt> {',
+    'LocalLearningRepository.runPlanTask(',
+    'const plan = await LocalLearningRepository.getValue<StudyPlan>(KEY_PLAN);',
+    'const changed = Boolean(task.done) !== done;',
+    'task.done = done;',
+    'if (changed) await LocalLearningRepository.putValue<StudyPlan>(KEY_PLAN, plan);'
+  ], 'All plan reads and writers share one queue');
+
+  const homeToggle = section(home, '  private async toggleTask(task: PlanTask): Promise<void> {',
+    '  private async publishReminder(', 'Home plan task update');
+  assertOrder(homeToggle, [
+    'if (this.updatingTaskId.length > 0) return;',
+    'const desiredDone = !Boolean(task.done);',
+    'receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);',
+    'this.planTasks = nextTasks;',
+    '} finally {',
+    "if (this.updatingTaskId === taskId) this.updatingTaskId = '';",
+    'if (receipt === null) return;',
+    'await LearningFormUpdater.refreshAll();',
+    'if (receipt.changed && receipt.task.done === true) {',
+    'await LocalLearningRepository.appendStudyEvent(event);'
+  ], 'Home uses the same atomic plan writer');
+  assert.doesNotMatch(homeToggle, /LocalLearningRepository\.(getPlan|savePlan)\(/);
+
+  const context = {
+    __learningContentRepository: { getTopics: () => [] },
+    __quizLearningStateReducer: {}
+  };
+  vm.runInNewContext(compileLocalLearningRepository(), context);
+  const Repository = context.__LocalLearningRepository;
+  let storedPlan = {
+    planId: 'plan-1',
+    userId: 'user-1',
+    goal: '并发写入验证',
+    tasks: [
+      { id: 'task-a', title: 'A', date: '2026-07-17', estimatedMin: 10, type: 'reading', done: false },
+      { id: 'task-b', title: 'B', date: '2026-07-17', estimatedMin: 10, type: 'reading', done: false }
+    ]
+  };
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  let readCount = 0;
+  let writeCount = 0;
+  let failNextWrite = false;
+  let releaseFirstWrite;
+  let markFirstWriteStarted;
+  const firstWriteStarted = new Promise((resolveStarted) => { markFirstWriteStarted = resolveStarted; });
+  const firstWriteGate = new Promise((resolveWrite) => { releaseFirstWrite = resolveWrite; });
+  Repository.getValue = async (key) => {
+    assert.equal(key, 'plan');
+    readCount += 1;
+    return clone(storedPlan);
+  };
+  Repository.putValue = async (key, value) => {
+    assert.equal(key, 'plan');
+    writeCount += 1;
+    if (writeCount === 1) {
+      markFirstWriteStarted();
+      await firstWriteGate;
+    }
+    if (failNextWrite) {
+      failNextWrite = false;
+      throw new Error('fixed write failure');
+    }
+    storedPlan = clone(value);
+  };
+
+  const first = Repository.updatePlanTask('task-a', true);
+  await firstWriteStarted;
+  const duplicate = Repository.updatePlanTask('task-a', true);
+  const different = Repository.updatePlanTask('task-b', true);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(readCount, 1, 'later writers must not read while the first write is pending');
+  releaseFirstWrite();
+  const [firstReceipt, duplicateReceipt, differentReceipt] = await Promise.all([first, duplicate, different]);
+  assert.equal(firstReceipt.changed, true);
+  assert.equal(duplicateReceipt.changed, false, 'same desired state must be idempotent across pages');
+  assert.equal(differentReceipt.changed, true);
+  assert.deepEqual(storedPlan.tasks.map((task) => task.done), [true, true]);
+
+  failNextWrite = true;
+  await assert.rejects(Repository.savePlan(clone(storedPlan)), /fixed write failure/);
+  const recovered = await Repository.updatePlanTask('task-a', false);
+  assert.equal(recovered.task.done, false, 'a failed writer must not poison the plan queue');
+  assert.deepEqual(storedPlan.tasks.map((task) => task.done), [false, true]);
 });
 
 test('Plan submits the native TextInput value and preserves the local calendar date', () => {

@@ -6886,6 +6886,42 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-17 [MAIN+WS01] 计划任务跨页面原子写入与 API 12 页面生命周期
+
+背景：WS01 提交 `28ca10c` 发现 Plan 任务按钮会从页面旧快照覆盖 ArkData，但原补丁只在单个 `PlanPage` 实例加锁。主线复核确认首页还有第二个整份计划写入口，系统返回也能绕过自定义返回按钮；同时本机 API 12 SDK 明确禁止在 `aboutToDisappear` 修改状态。原补丁若直接采用，Plan 与首页仍可交错丢失任务状态。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- Repository 新增与现有 Quiz/Lesson 队列同构的 `planQueue`；`getPlan()`、`savePlan()` 和 `updatePlanTask()` 共享同一失败可恢复队列，所有计划写入口按调用顺序执行。
+- `updatePlanTask(taskId, done)` 从队列内最新计划设置明确目标状态并返回 `plan/task/changed` 回执；同一目标状态跨页面重复提交保持幂等，不重复追加完成事件。
+- Plan 与首页均移除页面旧数组的整份覆盖写法，统一消费仓储回执；计划保存成功后即发布新任务列表，服务卡片刷新或学习事件失败不会把已保存任务伪装成保存失败。
+- 页面写入锁只覆盖 ArkData 原子更新；任务落盘并发布后立即解锁，服务卡片与学习事件作为次要同步继续执行，慢同步不会继续禁用按钮或拦截系统返回。
+- Plan 使用 API 12 SDK 已确认的 `onPageShow/onPageHide` 管理跳转与前后台代次，不再在 `aboutToDisappear` 修改 `@State`；新增 `onBackPress(): boolean`，任务写入或生成计划保存阶段会消费系统返回。
+- Plan 任务入口和完成按钮提升至 48 vp，保存期间稳定显示“保存中”并补齐读屏文本；首页任务写入期间禁用重复点击，并显示保存成功、恢复或学习记录未更新的真实状态。
+- 可执行 VM 固定输入暂停第一笔 ArkData 写入，再并发触发同任务和不同任务更新；后续写入在首笔释放前不能读取，最终状态同时保留，失败写入后队列仍可继续。
+
+验证：
+- 本机 API 12 SDK `ets/component/common.d.ts` 源码确认：`onPageShow/onPageHide/onBackPress` 均支持 `@Entry` 页面，`aboutToDisappear` 明确禁止修改状态变量。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：最终 exit 0，13/13 通过；覆盖仓储真实 Promise 交错、同状态幂等、不同任务合并、失败后恢复、Plan/Home 单一写入口、系统返回和 48 vp/读屏契约。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，56/56 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon`：最终 exit 0，API 12 HAP `BUILD SUCCESSFUL in 22 s 541 ms`，`CompileArkTS` 与 `PackageHap` 通过。
+- DevEco SDK `hdc.exe list targets`：exit 0，输出 `[Empty]`。
+- `git diff --check`：exit 0；仅有工作区 LF/CRLF 提示。
+
+失败后纠正与未验证：
+- 首轮融合测试为 11/12：重试按钮仍保留旧 guard；修正明确控件后 12/12。独立审查随后证明页面锁无法覆盖首页写入口，主线继续下沉仓储队列并扩展到最终 13/13。代码质量复核又发现锁等待次要同步会过度拦截系统返回，收窄到 ArkData 临界区后重新通过 56/56 与 HAP 构建，而非把原提交直接标记通过。
+- 当前无 HDC 目标；跨页面快速点击、系统返回、前后台切换、读屏与 48 vp 实际触控均为模拟器/真机未验证。
+- HAP 未配置 `signingConfigs`，安装和多设备行为未验证；本批未调用线上 Plan 或真实模型。
+
+---
+
 ## 2026-07-17 [MAIN+WS04] 学习星图一致快照与真实前置行动
 
 背景：学习星图课程切换会并发读取 mastery 与 LessonProgress，较慢的旧课程请求可能覆盖新课程整页快照；锁定节点虽然显示先修关系，但主动作会回退到锁定节点本身，可能打开尚不可执行的内容。主线逐段融合 WS04 提交 `a306009`，保留既有前置/后继聚焦、箭头方向与节点视觉。

@@ -5,6 +5,7 @@ import {
   AchievementProgress,
   Course,
   LessonProgress,
+  PlanTaskUpdateReceipt,
   StudyPlan,
   TopicMastery,
   UserProfile
@@ -51,6 +52,7 @@ export class LocalLearningRepository {
   private static initializationTask: Promise<void> | null = null;
   private static quizStateQueue: Promise<void> = Promise.resolve();
   private static lessonProgressQueue: Promise<void> = Promise.resolve();
+  private static planQueue: Promise<void> = Promise.resolve();
 
   static async initialize(context: common.Context): Promise<void> {
     if (LocalLearningRepository.initializationTask !== null) {
@@ -410,6 +412,12 @@ export class LocalLearningRepository {
     return running;
   }
 
+  private static runPlanTask<T>(task: () => Promise<T>): Promise<T> {
+    const running: Promise<T> = LocalLearningRepository.planQueue.then((): Promise<T> => task());
+    LocalLearningRepository.planQueue = running.then((): void => {}, (): void => {});
+    return running;
+  }
+
   private static isExactCourseTopic(courseId: string, topic: string): boolean {
     return LearningContentRepository.getTopics(courseId).includes(topic);
   }
@@ -608,11 +616,28 @@ export class LocalLearningRepository {
   }
 
   static async getPlan(): Promise<StudyPlan | null> {
-    return LocalLearningRepository.getValue<StudyPlan>(KEY_PLAN);
+    return LocalLearningRepository.runPlanTask((): Promise<StudyPlan | null> =>
+      LocalLearningRepository.getValue<StudyPlan>(KEY_PLAN));
   }
 
   static async savePlan(plan: StudyPlan): Promise<void> {
-    await LocalLearningRepository.putValue<StudyPlan>(KEY_PLAN, plan);
+    return LocalLearningRepository.runPlanTask((): Promise<void> =>
+      LocalLearningRepository.putValue<StudyPlan>(KEY_PLAN, plan));
+  }
+
+  static async updatePlanTask(taskId: string, done: boolean): Promise<PlanTaskUpdateReceipt> {
+    const normalizedTaskId = taskId.trim();
+    if (normalizedTaskId.length === 0) throw new Error('计划任务标识无效');
+    return LocalLearningRepository.runPlanTask(async (): Promise<PlanTaskUpdateReceipt> => {
+      const plan = await LocalLearningRepository.getValue<StudyPlan>(KEY_PLAN);
+      if (plan === null) throw new Error('本地计划不存在');
+      const task = plan.tasks.find((item): boolean => item.id === normalizedTaskId);
+      if (task === undefined) throw new Error('本地计划任务不存在');
+      const changed = Boolean(task.done) !== done;
+      task.done = done;
+      if (changed) await LocalLearningRepository.putValue<StudyPlan>(KEY_PLAN, plan);
+      return { plan: plan, task: task, changed: changed };
+    });
   }
 
   static async getFormIds(): Promise<string[]> {
