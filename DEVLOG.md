@@ -7052,3 +7052,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 来源分支的本地 production 无模型黑盒未在主线重跑，不提升为本批新验证。
 - 真实模型在 done 后迟到抛错、真实浏览器断连与线上 SSE 顺序未验证。
 - 本批未修改 HarmonyOS、RAG、缓存策略、生产模型 ID 或秘密。
+
+---
+
+## 2026-07-17 [MAIN+WS01] Plan 跨重进保存恢复与旧回调隔离
+
+背景：Plan 在生成结果已校验并进入 ArkData 保存阶段后允许离页保存继续，但保存失败后重新进入会由 `loadPlan()` 清空 `retryAction=save`，使内存中的 `pendingPlan` 失去“只重试本机保存”入口；网络阶段的旧异步回调也只有请求身份，没有页面生命周期身份。本批复核并融合 WS01 提交 `f1be8ab`，手工保留主线已有日期和 history 契约。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- Plan 每次页面出现分配生命周期 ID；网络生成只允许当前可见页面、当前请求和当前 generation run 继续回写。
+- 离页时，尚处于本地状态读取或网络阶段的请求会取消；已经进入本机保存阶段的计划允许完成，不用重新调用模型。
+- `pendingPlan + retryAction=save` 在重进后优先保留，`loadPlan()` 不会清除保存重试；ArkData 保存成功后才替换任务与清空 pending。
+- 首次本地计划读取可以初始化目标，后续重进只刷新已保存任务与证据，不覆盖学生正在编辑的新目标。
+
+验证：
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，11/11 通过；新增覆盖保存失败重进、生命周期失效、旧网络成功/失败回调拒绝和仅本地保存重试。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 29 s 123 ms`，`CompileArkTS` 与 `PackageHap` 通过。
+- DevEco SDK `hdc.exe list targets` 紧邻验证输出 `[Empty]`。
+
+失败或未验证：
+- 当前没有设备目标；保存阶段离页/重进、ArkData 写失败后同页重试和旧网络回调均未做模拟器或真机验证。
+- HAP 未配置 `signingConfigs`，构建跳过签名；安装和多设备行为未验证。
+- 本批未调用线上 Plan 或真实模型，不声明线上通过。

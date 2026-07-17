@@ -50,6 +50,9 @@ struct PlanPage {
   private activeRequest: HttpRequestCancellation | null = null;
   private generationRunId: number = 0;
   private planReadRunId: number = 0;
+  private lifecycleRunId: number = 0;
+  private pageActive: boolean = false;
+  private hasLoadedPlanOnce: boolean = false;
   private pendingPlan: AgentStudyPlan | null = null;
   private durationOptions: number[] = [7, 14, 21];
   private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
@@ -62,10 +65,14 @@ struct PlanPage {
   ];
 
   aboutToAppear(): void {
+    this.lifecycleRunId += 1;
+    this.pageActive = true;
     this.loadPlan();
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false;
+    this.lifecycleRunId += 1;
     this.planReadRunId += 1;
     this.planLoading = false;
     if (this.loading && this.progressStep >= 3) return;
@@ -139,6 +146,10 @@ struct PlanPage {
   }
 
   private async loadPlan(): Promise<void> {
+    if (this.pendingPlan !== null && this.retryAction === 'save') {
+      this.planLoading = false;
+      return;
+    }
     if (this.loading) {
       this.planLoading = false;
       return;
@@ -154,11 +165,14 @@ struct PlanPage {
       const plan = await LocalLearningRepository.getPlan();
       if (this.planReadRunId !== readRunId || this.loading) return;
       if (plan !== null) {
-        this.goal = plan.goal;
+        if (!this.hasLoadedPlanOnce) {
+          this.goal = plan.goal;
+        }
         this.savedPlanGoal = plan.goal;
         this.tasks = plan.tasks;
         this.agentTrace = (plan as AgentStudyPlan).agentTrace ?? [];
       }
+      this.hasLoadedPlanOnce = true;
       this.message = '';
       this.hasError = false;
     } catch (e) {
@@ -317,9 +331,10 @@ struct PlanPage {
     this.getUIContext().getRouter().back();
   }
 
-  private isActiveGeneration(runId: number, request: HttpRequestCancellation): boolean {
-    return this.loading && this.generationRunId === runId && this.activeRequest === request &&
-      !request.isCancelled();
+  private isActiveGeneration(runId: number, lifecycleRunId: number,
+    request: HttpRequestCancellation): boolean {
+    return this.pageActive && this.lifecycleRunId === lifecycleRunId && this.loading &&
+      this.generationRunId === runId && this.activeRequest === request && !request.isCancelled();
   }
 
   private cancelPlanGeneration(showMessage: boolean = true): void {
@@ -1104,7 +1119,8 @@ struct PlanPage {
   async generate(): Promise<void> {
     const requestedGoal = this.goal.trim();
     const requestedDays = this.days;
-    if (requestedGoal.length === 0 || this.loading || this.planLoading) return;
+    if (requestedGoal.length === 0 || this.loading || this.planLoading || !this.pageActive) return;
+    const lifecycleRunId = this.lifecycleRunId;
     const runId = this.generationRunId + 1;
     this.generationRunId = runId;
     const request = new HttpRequestCancellation();
@@ -1119,7 +1135,7 @@ struct PlanPage {
     this.runWaitClock(runId);
     try {
       const profile = await LocalLearningRepository.getProfile();
-      if (!this.isActiveGeneration(runId, request)) return;
+      if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;
       this.progressStep = 1;
       const req: PlanRequest = {
         userId: Constants.DEMO_USER_ID,
@@ -1130,7 +1146,7 @@ struct PlanPage {
         profile: profile ?? undefined
       };
       const response = await HttpClient.post<AgentStudyPlan>(Constants.API_PLAN, JSON.stringify(req), request);
-      if (!this.isActiveGeneration(runId, request)) return;
+      if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;
       this.progressStep = 2;
       const validation = this.validatePlanResponse(response);
       if (!validation.valid || validation.plan === null) {
@@ -1145,7 +1161,7 @@ struct PlanPage {
       this.progressStep = 3;
       await this.persistGeneratedPlan(plan);
     } catch (e) {
-      if (this.generationRunId !== runId || request.isCancelled()) return;
+      if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;
       const error = e instanceof Error ? e : new Error('Network request failed');
       const retained = this.tasks.length > 0 ? '，上一版计划仍可继续执行' : '';
       this.message = this.progressStep === 0 ? '本机学习状态读取失败，请稍后重试' + retained :
