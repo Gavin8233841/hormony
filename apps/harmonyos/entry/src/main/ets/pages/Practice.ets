@@ -5,6 +5,7 @@ import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
+  CuratedPracticeDraft,
   LearningCuratedQuestion as CuratedQuestion,
   LearningQuizResult as QuizResult,
   LearningQuizResultDetail as QuizResultDetail,
@@ -52,12 +53,58 @@ struct PracticePage {
   @State writeBackTopicAccuracy: number = 0;
   @State writeBackActivityCount: number = 0;
   @State writeBackCourseProgress: number = 0;
+  @State draftLoading: boolean = false;
+  @State draftSaveFailed: boolean = false;
+  @State draftReadFailed: boolean = false;
   private reviewItemIds: string[] = [];
   private selectedReviewItemId: string = '';
   private attemptId: string = '';
   private attemptSubmittedAt: string = '';
+  private lifecycleRunId: number = 0;
+  private loadRunId: number = 0;
+  private draftReadRunId: number = 0;
+  private draftSaveRunId: number = 0;
+  private pageActive: boolean = false;
+  private contextInitialized: boolean = false;
 
-  aboutToAppear(): void {
+  onPageShow(): void {
+    this.lifecycleRunId += 1;
+    const lifecycleRunId = this.lifecycleRunId;
+    this.pageActive = true;
+    if (!this.contextInitialized) {
+      this.contextInitialized = true;
+      if (!this.initializeContext()) return;
+    }
+    if (!this.submitted && this.questions.length === 0 && !this.loading) {
+      this.restoreDraft(lifecycleRunId);
+    }
+  }
+
+  onPageHide(): void {
+    this.pageActive = false;
+    this.lifecycleRunId += 1;
+    this.loadRunId += 1;
+    this.draftReadRunId += 1;
+    this.loading = false;
+    this.draftLoading = false;
+    if (!this.submitted && this.questions.length > 0 && this.attemptId.length > 0) {
+      this.queueDraftSave(false);
+    }
+  }
+
+  onBackPress(): boolean {
+    if (this.saving) {
+      this.message = '答题结果正在写入本机，请稍候';
+      this.hasError = false;
+      return true;
+    }
+    if (!this.submitted && this.questions.length > 0 && this.attemptId.length > 0) {
+      this.queueDraftSave(false);
+    }
+    return false;
+  }
+
+  private initializeContext(): boolean {
     this.resetPageState();
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
@@ -70,9 +117,9 @@ struct PracticePage {
       this.message = selectedTopic.length > 0 ?
         '入口主题不属于当前课程，无法加载精选练习' : '请选择课程中的正式主题后再练习';
       this.hasError = true;
-      return;
+      return false;
     }
-    this.reloadQuestions();
+    return true;
   }
 
   private resetPageState(): void {
@@ -94,6 +141,8 @@ struct PracticePage {
     this.selectedReviewItemId = '';
     this.attemptId = '';
     this.attemptSubmittedAt = '';
+    this.draftSaveFailed = false;
+    this.draftReadFailed = false;
     this.writeBackTotalQuestions = 0;
     this.writeBackActiveReviews = 0;
     this.writeBackTopicAccuracy = 0;
@@ -101,15 +150,173 @@ struct PracticePage {
     this.writeBackCourseProgress = 0;
   }
 
+  private isActiveLifecycle(lifecycleRunId: number): boolean {
+    return this.pageActive && this.lifecycleRunId === lifecycleRunId;
+  }
+
+  private isActiveLoad(runId: number, lifecycleRunId: number): boolean {
+    return this.isActiveLifecycle(lifecycleRunId) && this.loadRunId === runId && this.loading;
+  }
+
+  private async restoreDraft(lifecycleRunId: number): Promise<void> {
+    const runId = this.draftReadRunId + 1;
+    this.draftReadRunId = runId;
+    this.draftLoading = true;
+    try {
+      const draft = await LocalLearningRepository.getCuratedPracticeDraft(
+        this.courseId, this.topic, this.selectedReviewItemId);
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.draftReadRunId !== runId) return;
+      this.draftReadFailed = false;
+      if (draft === null) {
+        this.draftLoading = false;
+        this.reloadQuestions();
+        return;
+      }
+      this.courseTitle = draft.courseTitle;
+      this.questions = draft.questions;
+      this.reviewItemIds = draft.reviewItemIds.slice();
+      this.answers = draft.answers.slice();
+      this.currentIndex = draft.currentIndex;
+      this.activeQuestion = draft.questions[draft.currentIndex];
+      this.activeAnswer = draft.answers[draft.currentIndex] ?? '';
+      this.attemptId = draft.attemptId;
+      this.attemptSubmittedAt = draft.attemptSubmittedAt ?? '';
+      this.message = this.attemptSubmittedAt.length > 0 ?
+        '已恢复待确认写回的练习草稿，请重试提交，不会重复累计' :
+        '已恢复上次未提交草稿，已答 ' + this.answeredCount().toString() + ' / ' +
+          this.questions.length.toString() + ' 题';
+      this.hasError = false;
+    } catch (error) {
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.draftReadRunId !== runId) return;
+      this.message = '本地练习草稿读取失败，请重试';
+      this.hasError = true;
+      this.loadRetryAvailable = true;
+      this.draftReadFailed = true;
+    } finally {
+      if (this.isActiveLifecycle(lifecycleRunId) && this.draftReadRunId === runId) {
+        this.draftLoading = false;
+      }
+    }
+  }
+
+  private answeredCount(): number {
+    return this.answers.filter((answer: string): boolean => answer.length > 0).length;
+  }
+
+  private buildDraft(): CuratedPracticeDraft {
+    return {
+      schemaVersion: 1,
+      attemptId: this.attemptId,
+      courseId: this.courseId,
+      courseTitle: this.courseTitle,
+      topic: this.topic,
+      selectedReviewItemId: this.selectedReviewItemId,
+      questions: this.questions,
+      reviewItemIds: this.reviewItemIds,
+      answers: this.answers,
+      currentIndex: this.currentIndex,
+      attemptSubmittedAt: this.attemptSubmittedAt.length > 0 ? this.attemptSubmittedAt : undefined,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  private async persistDraft(): Promise<void> {
+    if (this.submitted || this.questions.length === 0 || this.attemptId.length === 0) return;
+    await LocalLearningRepository.saveCuratedPracticeDraft(this.buildDraft());
+  }
+
+  private queueDraftSave(showFailure: boolean = true): void {
+    const runId = this.draftSaveRunId + 1;
+    this.draftSaveRunId = runId;
+    this.persistDraft().then((): void => {
+      if (this.draftSaveRunId !== runId) return;
+      if (this.draftSaveFailed) {
+        this.draftSaveFailed = false;
+        this.message = '草稿已保存到本机';
+        this.hasError = false;
+      }
+    }).catch((): void => {
+      if (!showFailure || this.draftSaveRunId !== runId) return;
+      this.draftSaveFailed = true;
+      this.message = '草稿保存失败，当前答案仍保留，请重试保存';
+      this.hasError = true;
+    });
+  }
+
+  private async discardCurrentDraft(): Promise<void> {
+    if (this.saving || this.attemptId.length === 0) return;
+    const attemptId = this.attemptId;
+    const selectedReviewItemId = this.selectedReviewItemId;
+    try {
+      await LocalLearningRepository.clearCuratedPracticeDraft(attemptId);
+      this.resetPageState();
+      this.selectedReviewItemId = selectedReviewItemId;
+      this.message = '已放弃本轮草稿，正在重新加载练习';
+      this.reloadQuestions();
+    } catch (error) {
+      this.message = '草稿清除失败，请重试';
+      this.hasError = true;
+    }
+  }
+
+  private goToPreviousQuestion(): void {
+    if (this.currentIndex <= 0) return;
+    this.currentIndex -= 1;
+    this.activeQuestion = this.questions[this.currentIndex];
+    this.activeAnswer = this.answers[this.currentIndex] ?? '';
+    this.queueDraftSave();
+  }
+
+  private goToNextQuestion(): void {
+    if (this.currentIndex >= this.questions.length - 1 || this.activeAnswer.length === 0) return;
+    this.currentIndex += 1;
+    this.activeQuestion = this.questions[this.currentIndex];
+    this.activeAnswer = this.answers[this.currentIndex] ?? '';
+    this.queueDraftSave();
+  }
+
+  private goBack(): void {
+    if (this.saving) {
+      this.message = '答题结果正在写入本机，请稍候';
+      this.hasError = false;
+      return;
+    }
+    if (!this.submitted && this.questions.length > 0 && this.attemptId.length > 0) {
+      this.queueDraftSave(false);
+    }
+    this.getUIContext().getRouter().back();
+  }
+
+  private retryLocalLoad(): void {
+    if (this.draftReadFailed) {
+      this.restoreDraft(this.lifecycleRunId);
+      return;
+    }
+    this.reloadQuestions();
+  }
+
   private async reloadQuestions(): Promise<void> {
     if (this.loading) return;
+    const runId = this.loadRunId + 1;
+    this.loadRunId = runId;
+    const lifecycleRunId = this.lifecycleRunId;
     this.loading = true;
     this.loadRetryAvailable = false;
     this.message = '';
     this.hasError = false;
     try {
-      await this.loadQuestions(this.selectedReviewItemId);
+      await this.loadQuestions(this.selectedReviewItemId, runId, lifecycleRunId);
+      if (!this.isActiveLoad(runId, lifecycleRunId)) return;
+      try {
+        await this.persistDraft();
+      } catch (error) {
+        if (!this.isActiveLoad(runId, lifecycleRunId)) return;
+        this.draftSaveFailed = true;
+        this.message = '练习已加载，但草稿创建失败；请重试保存';
+        this.hasError = true;
+      }
     } catch (error) {
+      if (!this.isActiveLoad(runId, lifecycleRunId)) return;
       this.questions = [];
       this.activeQuestion = EMPTY_QUESTION;
       this.answers = [];
@@ -119,16 +326,19 @@ struct PracticePage {
       this.hasError = true;
       this.loadRetryAvailable = true;
     } finally {
-      this.loading = false;
+      if (this.loadRunId === runId) this.loading = false;
     }
   }
 
-  private async loadQuestions(selectedReviewItemId: string): Promise<void> {
+  private async loadQuestions(selectedReviewItemId: string, runId: number,
+    lifecycleRunId: number): Promise<void> {
     const available = LearningContentRepository.getQuestions(this.courseId, this.topic);
     const reviewQueue = await LocalLearningRepository.getReviewQueue();
+    if (!this.isActiveLoad(runId, lifecycleRunId)) return;
     const reviews = reviewQueue.dueItems;
     const activeReviews = reviewQueue.activeItems;
     const results = await LocalLearningRepository.getQuizResults();
+    if (!this.isActiveLoad(runId, lifecycleRunId)) return;
     const attemptedIds: string[] = [];
     for (const result of results) {
       if (result.courseId !== this.courseId || result.topic !== this.topic) continue;
@@ -238,11 +448,12 @@ struct PracticePage {
   }
 
   private choose(option: string): void {
-    if (this.submitted) return;
+    if (this.submitted || this.attemptSubmittedAt.length > 0) return;
     const next = this.answers.slice();
     next[this.currentIndex] = option;
     this.answers = next;
     this.activeAnswer = option;
+    this.queueDraftSave();
   }
 
   private askTutor(detail: QuizResultDetail): void {
@@ -334,6 +545,8 @@ struct PracticePage {
       submittedAt: this.attemptSubmittedAt
     };
     try {
+      this.draftSaveRunId += 1;
+      await this.persistDraft();
       const receipt = await LocalLearningRepository.appendQuizResult(result);
       this.correctCount = totalCorrect;
       this.details = nextDetails;
@@ -342,8 +555,15 @@ struct PracticePage {
       this.message = '';
       this.hasError = false;
       this.submitted = true;
+      this.draftSaveFailed = false;
+      try {
+        await LocalLearningRepository.clearCuratedPracticeDraft(this.attemptId);
+      } catch (error) {
+        this.message = '答题已写回本机，但草稿清理失败；再次提交不会重复累计';
+        this.hasError = false;
+      }
     } catch (error) {
-      this.message = '答题记录保存失败，请重试';
+      this.message = '答题结果写回未确认，答案已冻结并保存，请重试提交';
       this.hasError = true;
     } finally {
       this.saving = false;
@@ -386,6 +606,32 @@ struct PracticePage {
   }
 
   @Builder
+  DraftLoadingState() {
+    Column({ space: 14 }) {
+      Row({ space: 10 }) {
+        LoadingProgress()
+          .width(20)
+          .height(20)
+          .color(Constants.COLOR_BRAND)
+        Text('正在恢复本机练习草稿')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      }
+      .width('100%')
+      Column().width('100%').height(54).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('100%').height(44).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('92%').height(44).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('86%').height(44).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
+    .accessibilityText('正在恢复本机练习草稿')
+  }
+
+  @Builder
   QuestionView() {
     Column({ space: 16 }) {
       Row() {
@@ -398,9 +644,26 @@ struct PracticePage {
         Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Button('放弃草稿')
+          .height(40)
+          .fontSize(11)
+          .fontColor(Constants.COLOR_ERROR)
+          .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.discardCurrentDraft(); })
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
+      if (this.attemptSubmittedAt.length > 0) {
+        Text('上次写回未确认，答案已冻结；重试只会确认同一次答题。')
+          .width('100%')
+          .fontSize(12)
+          .lineHeight(18)
+          .fontColor(Constants.COLOR_WARNING)
+          .padding(10)
+          .backgroundColor(Constants.COLOR_BG_TAG)
+          .borderRadius(Constants.RADIUS_SM)
+      }
       Progress({ value: this.currentIndex + 1, total: this.questions.length, type: ProgressType.Linear })
         .width('100%')
         .color(Constants.COLOR_BRAND)
@@ -446,11 +709,7 @@ struct PracticePage {
           .fontColor(this.currentIndex > 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
           .backgroundColor(Constants.COLOR_BG_TAG)
           .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => {
-            this.currentIndex -= 1;
-            this.activeQuestion = this.questions[this.currentIndex];
-            this.activeAnswer = this.answers[this.currentIndex] ?? '';
-          })
+          .onClick((): void => { this.goToPreviousQuestion(); })
         if (this.currentIndex < this.questions.length - 1) {
           Button('下一题')
             .layoutWeight(1)
@@ -459,13 +718,10 @@ struct PracticePage {
             .fontColor(this.activeAnswer.length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
             .backgroundColor(this.activeAnswer.length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
-            .onClick((): void => {
-              this.currentIndex += 1;
-              this.activeQuestion = this.questions[this.currentIndex];
-              this.activeAnswer = this.answers[this.currentIndex] ?? '';
-            })
+            .onClick((): void => { this.goToNextQuestion(); })
         } else {
-          Button(this.saving ? '保存中...' : '提交评分')
+          Button(this.saving ? '写入中...' :
+            (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分'))
             .layoutWeight(1)
             .height(46)
             .enabled(this.allAnswered() && !this.saving)
@@ -505,7 +761,8 @@ struct PracticePage {
           Text(this.correctCount.toString() + ' / ' + this.questions.length.toString() + ' 题正确')
             .fontSize(14)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text(this.correctCount === this.questions.length ? '已全部掌握，可以继续新主题' : '先复盘错题，再进入下一组')
+          Text(this.correctCount === this.questions.length ?
+            '本组已全部答对，可以进入同主题 AI 测验' : '先复盘错题，再进入下一组')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
@@ -570,13 +827,13 @@ struct PracticePage {
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
       Row({ space: 10 }) {
-        Button('返回课程')
+        Button('返回上页')
           .layoutWeight(1)
           .height(48)
           .fontColor(Constants.COLOR_BRAND)
           .backgroundColor(Constants.COLOR_BRAND_LIGHT)
           .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => { this.getUIContext().getRouter().back(); })
+          .onClick((): void => { this.goBack(); })
         Button(this.correctCount < this.questions.length ? '查看错题本' : '进入 AI 测验')
           .layoutWeight(1)
           .height(48)
@@ -596,16 +853,31 @@ struct PracticePage {
   build() {
     Column() {
       GradientHeader('精选练习', this.courseTitle + (this.topic.length > 0 ? ' · ' + this.topic : ''),
-        () => this.getUIContext().getRouter().back())
+        () => this.goBack())
       if (this.message.length > 0) {
-        Text(this.message)
-          .fontSize(12)
-          .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_WARNING)
-          .padding({ left: 16, right: 16, bottom: 8 })
+        Row({ space: 8 }) {
+          Text(this.message)
+            .layoutWeight(1)
+            .fontSize(12)
+            .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_WARNING)
+          if (this.draftSaveFailed) {
+            Button('保存草稿')
+              .height(40)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_SM)
+              .onClick((): void => { this.queueDraftSave(); })
+          }
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, bottom: 8 })
       }
       Scroll() {
         Column() {
-          if (this.loading) {
+          if (this.draftLoading) {
+            this.DraftLoadingState()
+          } else if (this.loading) {
             Column()
               .width('100%')
               .height(200)
@@ -625,7 +897,7 @@ struct PracticePage {
                 .borderRadius(Constants.RADIUS_MD)
                 .accessibilityText('重新加载本地练习')
                 .accessibilityDescription('再次读取原错题与同主题精选题')
-                .onClick((): void => { this.reloadQuestions(); })
+                .onClick((): void => { this.retryLocalLoad(); })
             }
             .width('100%')
             .height(220)

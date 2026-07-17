@@ -5,7 +5,7 @@
 import { AnswerOption, GradientHeader, ReviewDetailRow, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
-import { HttpClient } from '../common/HttpClient';
+import { HttpClient, HttpRequestCancellation } from '../common/HttpClient';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
@@ -13,6 +13,7 @@ import {
   QuizRequest,
 } from '../model/DataModels';
 import {
+  AiQuizDraft,
   LearningQuizGradingItem as QuizGradingItem,
   LearningQuizQuestionView as QuizQuestionView,
   LearningQuizResult as QuizResult,
@@ -85,10 +86,20 @@ struct QuizPage {
   @State writeBackCourseProgress: number = 0;
   @State progressStep: number = 0;
   @State progressTick: number = 0;
+  @State draftLoading: boolean = false;
+  @State draftSaveFailed: boolean = false;
+  @State draftReadFailed: boolean = false;
   private grading: QuizGradingItem[] = [];
   private attemptId: string = '';
   private attemptSubmittedAt: string = '';
   private attemptCounter: number = 0;
+  private activeRequest: HttpRequestCancellation | null = null;
+  private generationRunId: number = 0;
+  private lifecycleRunId: number = 0;
+  private draftReadRunId: number = 0;
+  private draftSaveRunId: number = 0;
+  private pageActive: boolean = false;
+  private contextInitialized: boolean = false;
   private answerLabels: string[] = ['A', 'B', 'C', 'D'];
   private suggestions: string[] = [];
   private difficultyOptions: DifficultyOption[] = [
@@ -113,7 +124,44 @@ struct QuizPage {
     { title: '记录', description: '写入本地画像' }
   ];
 
-  aboutToAppear(): void {
+  onPageShow(): void {
+    this.lifecycleRunId += 1;
+    const lifecycleRunId = this.lifecycleRunId;
+    this.pageActive = true;
+    if (!this.contextInitialized) {
+      this.contextInitialized = true;
+      if (!this.initializeContext()) return;
+    }
+    if (!this.resultReady && this.questions.length === 0 && !this.loading) {
+      this.restoreDraft(lifecycleRunId);
+    }
+  }
+
+  onPageHide(): void {
+    this.pageActive = false;
+    this.lifecycleRunId += 1;
+    this.draftReadRunId += 1;
+    this.draftLoading = false;
+    this.cancelQuizGeneration(false);
+    if (!this.resultReady && this.questions.length > 0 && this.attemptId.length > 0) {
+      this.queueDraftSave(false);
+    }
+  }
+
+  onBackPress(): boolean {
+    if (this.submitting) {
+      this.message = '答题结果正在写入本机，请稍候';
+      this.hasError = false;
+      return true;
+    }
+    this.cancelQuizGeneration(false);
+    if (!this.resultReady && this.questions.length > 0 && this.attemptId.length > 0) {
+      this.queueDraftSave(false);
+    }
+    return false;
+  }
+
+  private initializeContext(): boolean {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.suggestions = LearningContentRepository.getTopics(this.courseId);
@@ -134,6 +182,7 @@ struct QuizPage {
       this.focusTag = selectedFocusTag.trim().substring(0, 12);
       AppStorage.setOrCreate<string>('selectedQuizFocusTag', '');
     }
+    return normalizedTopic.length === 0 || this.suggestions.includes(normalizedTopic);
   }
 
   private currentAnswerText(): string {
@@ -172,16 +221,183 @@ struct QuizPage {
   }
 
   private chooseAnswer(answer: string): void {
-    if (!this.currentQuestionReady()) return;
+    if (!this.currentQuestionReady() || this.attemptSubmittedAt.length > 0) return;
     const nextAnswers = this.answers.slice();
     nextAnswers[this.currentIndex] = answer;
     this.answers = nextAnswers;
+    this.queueDraftSave();
   }
 
   private selectTopic(nextTopic: string): void {
     if (!this.suggestions.includes(nextTopic)) return;
     this.topic = nextTopic;
     this.focusTag = '';
+  }
+
+  private isActiveLifecycle(lifecycleRunId: number): boolean {
+    return this.pageActive && this.lifecycleRunId === lifecycleRunId;
+  }
+
+  private isActiveGeneration(runId: number, lifecycleRunId: number, request: HttpRequestCancellation): boolean {
+    return this.isActiveLifecycle(lifecycleRunId) && this.loading && this.generationRunId === runId &&
+      this.activeRequest === request && !request.isCancelled();
+  }
+
+  private async restoreDraft(lifecycleRunId: number): Promise<void> {
+    const runId = this.draftReadRunId + 1;
+    this.draftReadRunId = runId;
+    this.draftLoading = true;
+    try {
+      const draft = await LocalLearningRepository.getAiQuizDraft(this.courseId, this.topic, this.focusTag);
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.draftReadRunId !== runId) return;
+      this.draftReadFailed = false;
+      if (draft === null) return;
+      const response: QuizPackage = {
+        quizId: draft.sourceQuizId,
+        courseId: draft.courseId,
+        topic: draft.topic,
+        focusTag: draft.focusTag.length > 0 ? draft.focusTag : undefined,
+        questions: draft.questions,
+        grading: draft.grading
+      };
+      const previousDifficulty = this.difficulty;
+      const previousQuestionCount = this.questionCount;
+      this.difficulty = draft.difficulty;
+      this.questionCount = draft.questionCount;
+      const validation = this.validateQuizPackage(response);
+      if (!validation.valid) {
+        this.difficulty = previousDifficulty;
+        this.questionCount = previousQuestionCount;
+        await LocalLearningRepository.clearAiQuizDraft(draft.attemptId);
+        if (!this.isActiveLifecycle(lifecycleRunId) || this.draftReadRunId !== runId) return;
+        this.message = '上次测验草稿已损坏，已安全清除，请重新生成';
+        this.hasError = true;
+        return;
+      }
+      this.quizId = validation.quizId;
+      this.attemptId = draft.attemptId;
+      this.attemptSubmittedAt = draft.attemptSubmittedAt ?? '';
+      this.grading = validation.grading;
+      this.answers = draft.answers.slice();
+      this.questions = validation.questions;
+      this.currentIndex = draft.currentIndex;
+      this.courseTitle = draft.courseTitle;
+      this.message = this.attemptSubmittedAt.length > 0 ?
+        '已恢复待确认写回的答题草稿，请重试提交，不会重复累计' :
+        '已恢复上次未提交草稿，已答 ' + this.answeredCount().toString() + ' / ' +
+          this.questions.length.toString() + ' 题';
+      this.hasError = false;
+    } catch (error) {
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.draftReadRunId !== runId) return;
+      this.message = '本地测验草稿读取失败，请重试';
+      this.hasError = true;
+      this.draftReadFailed = true;
+    } finally {
+      if (this.isActiveLifecycle(lifecycleRunId) && this.draftReadRunId === runId) {
+        this.draftLoading = false;
+      }
+    }
+  }
+
+  private answeredCount(): number {
+    return this.answers.filter((answer: string): boolean => answer.length > 0).length;
+  }
+
+  private buildDraft(): AiQuizDraft {
+    return {
+      schemaVersion: 1,
+      attemptId: this.attemptId,
+      sourceQuizId: this.quizId,
+      courseId: this.courseId,
+      courseTitle: this.courseTitle,
+      topic: this.topic,
+      focusTag: this.focusTag,
+      difficulty: this.difficulty,
+      questionCount: this.questionCount,
+      questions: this.questions,
+      grading: this.grading,
+      answers: this.answers,
+      currentIndex: this.currentIndex,
+      attemptSubmittedAt: this.attemptSubmittedAt.length > 0 ? this.attemptSubmittedAt : undefined,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  private async persistDraft(): Promise<void> {
+    if (this.resultReady || this.questions.length === 0 || this.attemptId.length === 0) return;
+    await LocalLearningRepository.saveAiQuizDraft(this.buildDraft());
+  }
+
+  private queueDraftSave(showFailure: boolean = true): void {
+    const runId = this.draftSaveRunId + 1;
+    this.draftSaveRunId = runId;
+    this.persistDraft().then((): void => {
+      if (this.draftSaveRunId !== runId) return;
+      if (this.draftSaveFailed) {
+        this.draftSaveFailed = false;
+        this.message = '草稿已保存到本机';
+        this.hasError = false;
+      }
+    }).catch((): void => {
+      if (!showFailure || this.draftSaveRunId !== runId) return;
+      this.draftSaveFailed = true;
+      this.message = '草稿保存失败，当前答案仍保留，请重试保存';
+      this.hasError = true;
+    });
+  }
+
+  private async discardCurrentDraft(): Promise<void> {
+    if (this.submitting || this.attemptId.length === 0) return;
+    const attemptId = this.attemptId;
+    try {
+      await LocalLearningRepository.clearAiQuizDraft(attemptId);
+      this.resetQuiz();
+      this.message = '已放弃本轮草稿，设置已保留';
+      this.hasError = false;
+    } catch (error) {
+      this.message = '草稿清除失败，请重试';
+      this.hasError = true;
+    }
+  }
+
+  private goToPreviousQuestion(): void {
+    if (this.currentIndex <= 0) return;
+    this.currentIndex -= 1;
+    this.queueDraftSave();
+  }
+
+  private goToNextQuestion(): void {
+    if (this.currentIndex >= this.questions.length - 1 || this.currentAnswerText().length === 0) return;
+    this.currentIndex += 1;
+    this.queueDraftSave();
+  }
+
+  private goBack(): void {
+    if (this.submitting) {
+      this.message = '答题结果正在写入本机，请稍候';
+      this.hasError = false;
+      return;
+    }
+    this.cancelQuizGeneration(false);
+    if (!this.resultReady && this.questions.length > 0 && this.attemptId.length > 0) {
+      this.queueDraftSave(false);
+    }
+    this.getUIContext().getRouter().back();
+  }
+
+  private cancelQuizGeneration(showMessage: boolean = true): void {
+    if (!this.loading) return;
+    this.generationRunId += 1;
+    const request = this.activeRequest;
+    this.activeRequest = null;
+    if (request !== null) request.cancel();
+    this.loading = false;
+    this.progressStep = 0;
+    this.progressTick = 0;
+    if (showMessage) {
+      this.message = '已取消生成，课程主题、题量和难度仍然保留';
+      this.hasError = false;
+    }
   }
 
   private askTutor(detail: QuizResultDetail): void {
@@ -218,6 +434,8 @@ struct QuizPage {
     this.grading = [];
     this.attemptId = '';
     this.attemptSubmittedAt = '';
+    this.draftSaveFailed = false;
+    this.draftReadFailed = false;
   }
 
   private reviewTopic(topic: string): void {
@@ -264,15 +482,20 @@ struct QuizPage {
   }
 
   async generateQuiz(): Promise<void> {
-    if (this.loading) return;
+    if (this.loading || this.draftLoading || !this.pageActive) return;
     if (!this.suggestions.includes(this.topic)) {
       this.message = '请选择当前课程中的正式主题';
       this.hasError = true;
       return;
     }
     this.resetQuiz();
+    const lifecycleRunId = this.lifecycleRunId;
+    const runId = this.generationRunId + 1;
+    this.generationRunId = runId;
+    const requestCancellation = new HttpRequestCancellation();
+    this.activeRequest = requestCancellation;
     this.loading = true;
-    this.runGenerationProgress();
+    this.runGenerationProgress(runId, lifecycleRunId, requestCancellation);
     const request: QuizRequest = {
       userId: Constants.DEMO_USER_ID,
       courseId: this.courseId,
@@ -284,8 +507,10 @@ struct QuizPage {
     try {
       const response = await HttpClient.post<QuizPackage>(
         Constants.API_QUIZ,
-        JSON.stringify(request)
+        JSON.stringify(request),
+        requestCancellation
       );
+      if (!this.isActiveGeneration(runId, lifecycleRunId, requestCancellation)) return;
       this.progressStep = 2;
       const validation = this.validateQuizPackage(response);
       if (!validation.valid) {
@@ -294,10 +519,36 @@ struct QuizPage {
         return;
       }
       const nextAnswers = new Array<string>(validation.questions.length).fill('');
-      this.quizId = validation.quizId;
       this.attemptCounter += 1;
-      this.attemptId = 'quiz_attempt_' + validation.quizId + '_' + Date.now().toString() + '_' +
+      const attemptId = 'quiz_attempt_' + validation.quizId + '_' + Date.now().toString() + '_' +
         this.attemptCounter.toString();
+      const draft: AiQuizDraft = {
+        schemaVersion: 1,
+        attemptId: attemptId,
+        sourceQuizId: validation.quizId,
+        courseId: this.courseId,
+        courseTitle: this.courseTitle,
+        topic: this.topic,
+        focusTag: this.focusTag,
+        difficulty: this.difficulty,
+        questionCount: this.questionCount,
+        questions: validation.questions,
+        grading: validation.grading,
+        answers: nextAnswers,
+        currentIndex: 0,
+        updatedAt: new Date().toISOString()
+      };
+      try {
+        await LocalLearningRepository.saveAiQuizDraft(draft);
+      } catch (error) {
+        if (!this.isActiveGeneration(runId, lifecycleRunId, requestCancellation)) return;
+        this.message = '题组已生成，但本地草稿创建失败，请重试生成';
+        this.hasError = true;
+        return;
+      }
+      if (!this.isActiveGeneration(runId, lifecycleRunId, requestCancellation)) return;
+      this.quizId = validation.quizId;
+      this.attemptId = attemptId;
       this.grading = validation.grading;
       // 先提交答案槽位，最后提交题目，避免 ArkUI 在两次状态更新之间读取未初始化答案。
       this.answers = nextAnswers;
@@ -310,12 +561,16 @@ struct QuizPage {
         this.hasError = false;
       }
     } catch (e) {
+      if (!this.isActiveGeneration(runId, lifecycleRunId, requestCancellation)) return;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'QuizPage API failed: %{public}s', (e as Error).message);
       this.message = this.quizErrorMessage(e as Error);
       this.hasError = true;
     } finally {
-      this.loading = false;
+      if (this.generationRunId === runId) {
+        this.loading = false;
+        this.activeRequest = null;
+      }
     }
   }
 
@@ -380,6 +635,8 @@ struct QuizPage {
       submittedAt: this.attemptSubmittedAt
     };
     try {
+      this.draftSaveRunId += 1;
+      await this.persistDraft();
       const receipt = await LocalLearningRepository.appendQuizResult(result);
       this.progressStep = 2;
       this.resultAccuracy = result.accuracy;
@@ -394,8 +651,16 @@ struct QuizPage {
       this.resultTagSummaries = this.buildTagSummaries(result.details);
       this.applyWriteReceipt(receipt);
       this.resultReady = true;
+      this.draftSaveFailed = false;
+      try {
+        await LocalLearningRepository.clearAiQuizDraft(this.attemptId);
+      } catch (error) {
+        this.message = '答题已写回本机，但草稿清理失败；再次提交不会重复累计';
+        this.hasError = false;
+      }
     } catch (e) {
-      this.message = '答题结果保存失败，请稍后重试';
+      this.message = '答题结果写回未确认，答案已冻结并保存，请重试提交';
+      this.hasError = true;
     } finally {
       this.submitting = false;
     }
@@ -421,8 +686,10 @@ struct QuizPage {
     };
     if (response === null) return invalid;
     const quizId = this.cleanText(response.quizId);
-    if (quizId.length === 0 || !Array.isArray(response.questions) || !Array.isArray(response.grading) ||
-      response.questions.length === 0 || response.questions.length !== response.grading.length) {
+    const responseFocusTag = this.cleanText(response.focusTag);
+    if (quizId.length === 0 || response.courseId !== this.courseId || response.topic !== this.topic ||
+      responseFocusTag !== this.focusTag || !Array.isArray(response.questions) || !Array.isArray(response.grading) ||
+      response.questions.length !== this.questionCount || response.questions.length !== response.grading.length) {
       return invalid;
     }
 
@@ -668,29 +935,30 @@ struct QuizPage {
     this.generateQuiz();
   }
 
-  private runGenerationProgress(): void {
+  private runGenerationProgress(runId: number, lifecycleRunId: number,
+    request: HttpRequestCancellation): void {
     this.progressStep = 0;
     this.progressTick = 0;
     setTimeout((): void => {
-      if (this.loading) {
+      if (this.isActiveGeneration(runId, lifecycleRunId, request)) {
         this.progressStep = 1;
         this.progressTick = 1;
       }
     }, 700);
     setTimeout((): void => {
-      if (this.loading) {
+      if (this.isActiveGeneration(runId, lifecycleRunId, request)) {
         this.progressStep = 2;
         this.progressTick = 2;
       }
     }, 2200);
     setTimeout((): void => {
-      if (this.loading) {
+      if (this.isActiveGeneration(runId, lifecycleRunId, request)) {
         this.progressStep = 3;
         this.progressTick = 3;
       }
     }, 5200);
     setTimeout((): void => {
-      if (this.loading) {
+      if (this.isActiveGeneration(runId, lifecycleRunId, request)) {
         this.progressTick = 4;
       }
     }, 9800);
@@ -758,7 +1026,7 @@ struct QuizPage {
   }
 
   private generationWaitHint(): string {
-    if (this.progressTick >= 4) return '长题组仍在云端生成中：页面没有卡住，返回后会自动进入答题。';
+    if (this.progressTick >= 4) return '长题组仍在云端生成中；现在离开会取消请求，返回后可按原设置重新开始。';
     if (this.questionCount >= 10) return '题量越长，云端会分批生成并校验，等待时间会更久。';
     return '保持在当前页，题组生成后会直接展示第一题。';
   }
@@ -767,6 +1035,32 @@ struct QuizPage {
     const focus = this.focusTag.length > 0 ? ' · 标签 ' + this.focusTag : '';
     return this.courseTitle + ' · ' + this.topic + ' · ' + this.difficultyLabel() + ' · ' +
       this.questionCountLabel() + focus;
+  }
+
+  @Builder
+  DraftLoadingState() {
+    Column({ space: 14 }) {
+      Row({ space: 10 }) {
+        LoadingProgress()
+          .width(20)
+          .height(20)
+          .color(Constants.COLOR_BRAND)
+        Text('正在恢复本机答题草稿')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      }
+      .width('100%')
+      Column().width('100%').height(54).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('100%').height(44).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('92%').height(44).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+      Column().width('86%').height(44).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(12)
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
+    .accessibilityText('正在恢复本机答题草稿')
   }
 
   @Builder
@@ -824,6 +1118,17 @@ struct QuizPage {
       .padding({ left: 12, right: 12, top: 10, bottom: 10 })
       .backgroundColor(Constants.COLOR_BRAND_LIGHT)
       .borderRadius(Constants.RADIUS_MD)
+
+      Button('取消生成')
+        .width('100%')
+        .height(48)
+        .fontSize(13)
+        .fontColor(Constants.COLOR_BRAND)
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+        .accessibilityText('取消 AI 题组生成')
+        .accessibilityDescription('保留当前课程主题、题量和难度设置')
+        .onClick((): void => { this.cancelQuizGeneration(); })
 
       Column({ space: 8 }) {
         Row({ space: 8 }) {
@@ -1035,7 +1340,23 @@ struct QuizPage {
         .fontSize(12)
         .lineHeight(18)
         .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
-      if (this.hasError && !this.loading && this.questions.length === 0) {
+      if (this.draftReadFailed) {
+        Button('恢复草稿')
+          .height(40)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.restoreDraft(this.lifecycleRunId); })
+      } else if (this.draftSaveFailed) {
+        Button('保存草稿')
+          .height(40)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .onClick((): void => { this.queueDraftSave(); })
+      } else if (this.hasError && !this.loading && this.questions.length === 0) {
         Button('重试')
           .height(32)
           .fontSize(12)
@@ -1085,9 +1406,27 @@ struct QuizPage {
           Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Button('放弃草稿')
+            .height(40)
+            .fontSize(11)
+            .fontColor(Constants.COLOR_ERROR)
+            .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+            .borderRadius(Constants.RADIUS_SM)
+            .onClick((): void => { this.discardCurrentDraft(); })
         }
         .width('100%')
         .justifyContent(FlexAlign.SpaceBetween)
+
+        if (this.attemptSubmittedAt.length > 0) {
+          Text('上次写回未确认，答案已冻结；重试只会确认同一次答题。')
+            .width('100%')
+            .fontSize(12)
+            .lineHeight(18)
+            .fontColor(Constants.COLOR_WARNING)
+            .padding(10)
+            .backgroundColor(Constants.COLOR_BG_TAG)
+            .borderRadius(Constants.RADIUS_SM)
+        }
 
         Progress({ value: this.currentIndex + 1, total: this.questions.length, type: ProgressType.Linear })
           .width('100%')
@@ -1141,7 +1480,7 @@ struct QuizPage {
             .backgroundColor(Constants.COLOR_BG_TAG)
             .borderRadius(Constants.RADIUS_MD)
             .enabled(this.currentIndex > 0)
-            .onClick(() => { this.currentIndex -= 1; })
+            .onClick(() => { this.goToPreviousQuestion(); })
 
           if (this.currentIndex < this.questions.length - 1) {
             Button('下一题')
@@ -1152,9 +1491,10 @@ struct QuizPage {
               .backgroundColor(this.currentAnswerText().length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
               .borderRadius(Constants.RADIUS_MD)
               .enabled(this.currentAnswerText().length > 0)
-              .onClick(() => { this.currentIndex += 1; })
+              .onClick(() => { this.goToNextQuestion(); })
           } else {
-            Button(this.submitting ? '评分中...' : '提交评分')
+            Button(this.submitting ? '写入中...' :
+              (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分'))
               .layoutWeight(1)
               .height(48)
               .fontSize(14)
@@ -1196,7 +1536,7 @@ struct QuizPage {
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(this.resultAccuracy >= 0.8 ? '掌握得很好，可以进入下一主题' : '查看解析后，再练一组巩固薄弱点')
+          Text(this.resultAccuracy >= 0.8 ? '掌握得很好，可以挑战同主题更高难度' : '查看解析后，再练一组巩固薄弱点')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
           Text('本次难度：' + this.difficultyLabel())
@@ -1435,7 +1775,7 @@ struct QuizPage {
 
   build() {
     Column() {
-      GradientHeader('课程测验', this.courseTitle + ' · 即时评分', () => this.getUIContext().getRouter().back())
+      GradientHeader('课程测验', this.courseTitle + ' · 即时评分', () => this.goBack())
 
       if (this.message.length > 0) {
         this.MessageBanner()
@@ -1443,7 +1783,9 @@ struct QuizPage {
 
       Scroll() {
         Column() {
-          if (this.loading) {
+          if (this.draftLoading) {
+            this.DraftLoadingState()
+          } else if (this.loading) {
             this.LoadingState()
           } else if (this.resultReady) {
             this.ResultState()

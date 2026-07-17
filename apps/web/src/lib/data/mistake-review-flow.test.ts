@@ -276,7 +276,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(mistakeLoadSource).not.toContain("getReviewItems(");
 
     const practiceLoadStart = practiceSource.indexOf(
-      "private async loadQuestions(selectedReviewItemId: string)"
+      "private async loadQuestions(selectedReviewItemId: string, runId: number,"
     );
     const practiceLoadEnd = practiceSource.indexOf(
       "\n  private questionFromReview",
@@ -416,7 +416,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
 
   it("旧 AI 错题缺少选项时替代题仍应推进原复习项且不在题组重复", () => {
     const loadStart = practiceSource.indexOf(
-      "private async loadQuestions(selectedReviewItemId: string)"
+      "private async loadQuestions(selectedReviewItemId: string, runId: number,"
     );
     const loadEnd = practiceSource.indexOf(
       "\n  private questionFromReview",
@@ -472,18 +472,25 @@ describe("HarmonyOS 错题复习入口契约", () => {
   });
 
   it("练习加载失败后应保留精确错题 ID 并在空题错误态原地重试", () => {
-    const appearStart = practiceSource.indexOf("aboutToAppear(): void");
+    const pageShowStart = practiceSource.indexOf("onPageShow(): void");
+    const contextStart = practiceSource.indexOf(
+      "private initializeContext(): boolean",
+      pageShowStart
+    );
     const resetStart = practiceSource.indexOf(
       "\n  private resetPageState(): void",
-      appearStart
+      contextStart
     );
-    const appearSource = practiceSource.slice(appearStart, resetStart);
-    expect(appearStart).toBeGreaterThan(-1);
-    expect(resetStart).toBeGreaterThan(appearStart);
-    const retainAt = appearSource.indexOf(
+    const pageShowSource = practiceSource.slice(pageShowStart, contextStart);
+    const contextSource = practiceSource.slice(contextStart, resetStart);
+    expect(pageShowStart).toBeGreaterThan(-1);
+    expect(contextStart).toBeGreaterThan(pageShowStart);
+    expect(resetStart).toBeGreaterThan(contextStart);
+    expect(pageShowSource).toContain("this.restoreDraft(lifecycleRunId)");
+    const retainAt = contextSource.indexOf(
       "this.selectedReviewItemId = (AppStorage.get<string>('selectedReviewItemId') ?? '').trim()"
     );
-    const clearAt = appearSource.indexOf(
+    const clearAt = contextSource.indexOf(
       "AppStorage.setOrCreate<string>('selectedReviewItemId', '')"
     );
 
@@ -492,7 +499,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(practiceSource).toContain(
       "private selectedReviewItemId: string = ''"
     );
-    expect(appearSource).toContain("this.reloadQuestions()");
+    expect(pageShowSource).toContain("this.questions.length === 0");
 
     const reloadStart = practiceSource.indexOf(
       "private async reloadQuestions(): Promise<void>"
@@ -505,7 +512,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(reloadStart).toBeGreaterThan(-1);
     expect(reloadEnd).toBeGreaterThan(reloadStart);
     expect(reloadSource).toContain(
-      "await this.loadQuestions(this.selectedReviewItemId)"
+      "await this.loadQuestions(this.selectedReviewItemId, runId, lifecycleRunId)"
     );
     expect(reloadSource).toContain(
       "this.message = '本地练习加载失败，请重试'"
@@ -515,7 +522,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
 
     const retryButtonStart = practiceSource.indexOf("Button('重新加载')");
     const retryButtonEnd = practiceSource.indexOf(
-      ".onClick((): void => { this.reloadQuestions(); })",
+      ".onClick((): void => { this.retryLocalLoad(); })",
       retryButtonStart
     );
     expect(retryButtonStart).toBeGreaterThan(-1);
@@ -528,6 +535,12 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(retryButtonSource).toContain(
       ".accessibilityDescription('再次读取原错题与同主题精选题')"
     );
+    const retryMethodStart = practiceSource.indexOf("private retryLocalLoad(): void");
+    const retryMethodEnd = practiceSource.indexOf("\n  private async reloadQuestions", retryMethodStart);
+    const retryMethodSource = practiceSource.slice(retryMethodStart, retryMethodEnd);
+    expect(retryMethodSource).toContain("if (this.draftReadFailed)");
+    expect(retryMethodSource).toContain("this.restoreDraft(this.lifecycleRunId)");
+    expect(retryMethodSource).toContain("this.reloadQuestions()");
     expect(practiceSource.slice(retryButtonStart - 500, retryButtonStart))
       .toContain("this.loadRetryAvailable");
   });

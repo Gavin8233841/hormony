@@ -11,6 +11,8 @@ import {
   UserProfile
 } from '../model/DataModels';
 import {
+  AiQuizDraft,
+  CuratedPracticeDraft,
   LearningQuizResult as QuizResult,
   LearningQuizResultDetail as QuizResultDetail,
   LearningReviewItem as ReviewItem,
@@ -39,6 +41,11 @@ const KEY_TOPIC_MASTERY: string = 'topic_mastery';
 const KEY_QUIZ_STATS: string = 'quiz_stats';
 const KEY_QUIZ_LEARNING_STATE: string = 'quiz_learning_state';
 const KEY_FORM_IDS: string = 'form_ids';
+const KEY_AI_QUIZ_DRAFTS: string = 'ai_quiz_drafts';
+const KEY_CURATED_PRACTICE_DRAFTS: string = 'curated_practice_drafts';
+
+const ANSWER_DRAFT_SCHEMA_VERSION: number = 1;
+const ANSWER_DRAFT_LIMIT: number = 12;
 
 interface LegacyQuizStatsAggregate {
   totalQuestions: number;
@@ -58,6 +65,7 @@ export class LocalLearningRepository {
   private static quizStateQueue: Promise<void> = Promise.resolve();
   private static lessonProgressQueue: Promise<void> = Promise.resolve();
   private static planQueue: Promise<void> = Promise.resolve();
+  private static answerDraftQueue: Promise<void> = Promise.resolve();
 
   static async initialize(context: common.Context): Promise<void> {
     if (LocalLearningRepository.initializationTask !== null) {
@@ -423,6 +431,12 @@ export class LocalLearningRepository {
     return running;
   }
 
+  private static runAnswerDraftTask<T>(task: () => Promise<T>): Promise<T> {
+    const running: Promise<T> = LocalLearningRepository.answerDraftQueue.then((): Promise<T> => task());
+    LocalLearningRepository.answerDraftQueue = running.then((): void => {}, (): void => {});
+    return running;
+  }
+
   private static isExactCourseTopic(courseId: string, topic: string): boolean {
     return LearningContentRepository.getTopics(courseId).includes(topic);
   }
@@ -630,6 +644,148 @@ export class LocalLearningRepository {
       LocalLearningRepository.putValue<StudyPlan>(KEY_PLAN, plan));
   }
 
+  static async getAiQuizDraft(courseId: string, topic: string, focusTag: string): Promise<AiQuizDraft | null> {
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<AiQuizDraft | null> => {
+      const drafts = (await LocalLearningRepository.getValue<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS)) ?? [];
+      const draft = drafts.find((item: AiQuizDraft): boolean => item.courseId === courseId &&
+        item.topic === topic && item.focusTag === focusTag);
+      if (draft === undefined || !LocalLearningRepository.validAiQuizDraft(draft)) return null;
+      const cloned: AiQuizDraft = JSON.parse(JSON.stringify(draft));
+      return cloned;
+    });
+  }
+
+  static async saveAiQuizDraft(draft: AiQuizDraft): Promise<void> {
+    if (!LocalLearningRepository.validAiQuizDraft(draft)) throw new Error('AI 测验草稿结构无效');
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
+      const drafts = (await LocalLearningRepository.getValue<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS)) ?? [];
+      const retained = drafts.filter((item: AiQuizDraft): boolean =>
+        !(item.courseId === draft.courseId && item.topic === draft.topic && item.focusTag === draft.focusTag));
+      const cloned: AiQuizDraft = JSON.parse(JSON.stringify(draft));
+      retained.push(cloned);
+      await LocalLearningRepository.putValue<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS,
+        retained.slice(-ANSWER_DRAFT_LIMIT));
+    });
+  }
+
+  static async clearAiQuizDraft(attemptId: string): Promise<void> {
+    const normalizedAttemptId = attemptId.trim();
+    if (normalizedAttemptId.length === 0) throw new Error('AI 测验草稿标识无效');
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
+      const drafts = (await LocalLearningRepository.getValue<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS)) ?? [];
+      const retained = drafts.filter((item: AiQuizDraft): boolean => item.attemptId !== normalizedAttemptId);
+      if (retained.length !== drafts.length) {
+        await LocalLearningRepository.putValue<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS, retained);
+      }
+    });
+  }
+
+  static async getCuratedPracticeDraft(courseId: string, topic: string,
+    selectedReviewItemId: string): Promise<CuratedPracticeDraft | null> {
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<CuratedPracticeDraft | null> => {
+      const drafts = (await LocalLearningRepository.getValue<CuratedPracticeDraft[]>(
+        KEY_CURATED_PRACTICE_DRAFTS)) ?? [];
+      const draft = drafts.find((item: CuratedPracticeDraft): boolean => item.courseId === courseId &&
+        item.topic === topic && item.selectedReviewItemId === selectedReviewItemId);
+      if (draft === undefined || !LocalLearningRepository.validCuratedPracticeDraft(draft)) return null;
+      const cloned: CuratedPracticeDraft = JSON.parse(JSON.stringify(draft));
+      return cloned;
+    });
+  }
+
+  static async saveCuratedPracticeDraft(draft: CuratedPracticeDraft): Promise<void> {
+    if (!LocalLearningRepository.validCuratedPracticeDraft(draft)) {
+      throw new Error('精选练习草稿结构无效');
+    }
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
+      const drafts = (await LocalLearningRepository.getValue<CuratedPracticeDraft[]>(
+        KEY_CURATED_PRACTICE_DRAFTS)) ?? [];
+      const retained = drafts.filter((item: CuratedPracticeDraft): boolean =>
+        !(item.courseId === draft.courseId && item.topic === draft.topic &&
+          item.selectedReviewItemId === draft.selectedReviewItemId));
+      const cloned: CuratedPracticeDraft = JSON.parse(JSON.stringify(draft));
+      retained.push(cloned);
+      await LocalLearningRepository.putValue<CuratedPracticeDraft[]>(KEY_CURATED_PRACTICE_DRAFTS,
+        retained.slice(-ANSWER_DRAFT_LIMIT));
+    });
+  }
+
+  static async clearCuratedPracticeDraft(attemptId: string): Promise<void> {
+    const normalizedAttemptId = attemptId.trim();
+    if (normalizedAttemptId.length === 0) throw new Error('精选练习草稿标识无效');
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
+      const drafts = (await LocalLearningRepository.getValue<CuratedPracticeDraft[]>(
+        KEY_CURATED_PRACTICE_DRAFTS)) ?? [];
+      const retained = drafts.filter((item: CuratedPracticeDraft): boolean =>
+        item.attemptId !== normalizedAttemptId);
+      if (retained.length !== drafts.length) {
+        await LocalLearningRepository.putValue<CuratedPracticeDraft[]>(KEY_CURATED_PRACTICE_DRAFTS, retained);
+      }
+    });
+  }
+
+  private static validAiQuizDraft(draft: AiQuizDraft): boolean {
+    if (draft.schemaVersion !== ANSWER_DRAFT_SCHEMA_VERSION || draft.attemptId.trim().length === 0 ||
+      draft.sourceQuizId.trim().length === 0 || !LocalLearningRepository.isExactCourseTopic(
+        draft.courseId, draft.topic) || draft.courseTitle.trim().length === 0 ||
+      (draft.difficulty !== 'easy' && draft.difficulty !== 'medium' && draft.difficulty !== 'hard') ||
+      ![5, 10, 15].includes(draft.questionCount) || draft.focusTag.length > 12 ||
+      draft.questions.length !== draft.questionCount || draft.questions.length !== draft.grading.length ||
+      draft.answers.length !== draft.questions.length || draft.currentIndex < 0 ||
+      draft.currentIndex >= draft.questions.length || Number.isNaN(new Date(draft.updatedAt).getTime()) ||
+      (draft.attemptSubmittedAt !== undefined && Number.isNaN(new Date(draft.attemptSubmittedAt).getTime()))) {
+      return false;
+    }
+    const questionIds: string[] = [];
+    for (let index = 0; index < draft.questions.length; index += 1) {
+      const question = draft.questions[index];
+      const options = question.options ?? [];
+      const answer = draft.answers[index];
+      if (question.id.trim().length === 0 || questionIds.includes(question.id) || question.stem.trim().length === 0 ||
+        !LocalLearningRepository.validAnswerOptions(options) || (answer.length > 0 && !options.includes(answer))) {
+        return false;
+      }
+      questionIds.push(question.id);
+    }
+    const gradingIds: string[] = [];
+    for (const grading of draft.grading) {
+      if (!questionIds.includes(grading.questionId) || gradingIds.includes(grading.questionId) ||
+        !['A', 'B', 'C', 'D'].includes(
+        grading.answer.trim().toUpperCase()) || grading.explanation.trim().length === 0) {
+        return false;
+      }
+      gradingIds.push(grading.questionId);
+    }
+    return true;
+  }
+
+  private static validCuratedPracticeDraft(draft: CuratedPracticeDraft): boolean {
+    if (draft.schemaVersion !== ANSWER_DRAFT_SCHEMA_VERSION || draft.attemptId.trim().length === 0 ||
+      !LocalLearningRepository.isExactCourseTopic(draft.courseId, draft.topic) ||
+      draft.courseTitle.trim().length === 0 || draft.questions.length === 0 ||
+      draft.questions.length > 5 ||
+      draft.reviewItemIds.length !== draft.questions.length || draft.answers.length !== draft.questions.length ||
+      draft.currentIndex < 0 || draft.currentIndex >= draft.questions.length ||
+      Number.isNaN(new Date(draft.updatedAt).getTime()) ||
+      (draft.attemptSubmittedAt !== undefined && Number.isNaN(new Date(draft.attemptSubmittedAt).getTime()))) {
+      return false;
+    }
+    const questionIds: string[] = [];
+    for (let index = 0; index < draft.questions.length; index += 1) {
+      const question = draft.questions[index];
+      const answer = draft.answers[index];
+      if (question.id.trim().length === 0 || questionIds.includes(question.id) ||
+        question.courseId !== draft.courseId || question.topic !== draft.topic || question.question.trim().length === 0 ||
+        question.explanation.trim().length === 0 || !LocalLearningRepository.validAnswerOptions(question.options) ||
+        !['A', 'B', 'C', 'D'].includes(question.answer.trim().toUpperCase()) ||
+        (answer.length > 0 && !question.options.includes(answer))) {
+        return false;
+      }
+      questionIds.push(question.id);
+    }
+    return true;
+  }
+
   static async updatePlanTask(taskId: string, done: boolean): Promise<PlanTaskUpdateReceipt> {
     const normalizedTaskId = taskId.trim();
     if (normalizedTaskId.length === 0) throw new Error('计划任务标识无效');
@@ -677,6 +833,10 @@ export class LocalLearningRepository {
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       }
       if (state.appliedQuizIds.includes(result.quizId)) {
+        const persisted = state.recentResults.find((item: QuizResult): boolean => item.quizId === result.quizId);
+        if (persisted === undefined || !LocalLearningRepository.sameQuizResult(persisted, result)) {
+          throw new Error('答题记录 ID 与已保存内容冲突');
+        }
         const receipt = QuizLearningStateReducer.createReceipt(state, result, false);
         return LocalLearningRepository.withCourseProgress(receipt, state, result.courseId);
       }
@@ -751,6 +911,39 @@ export class LocalLearningRepository {
         throw new Error('答题记录题目内容不完整');
       }
     }
+  }
+
+  private static sameQuizResult(left: QuizResult, right: QuizResult): boolean {
+    if (left.quizId !== right.quizId || left.sourceQuizId !== right.sourceQuizId || left.userId !== right.userId ||
+      left.courseId !== right.courseId || left.topic !== right.topic || left.source !== right.source ||
+      left.difficulty !== right.difficulty || left.totalQuestions !== right.totalQuestions ||
+      left.correctCount !== right.correctCount || left.accuracy !== right.accuracy ||
+      left.evaluation !== right.evaluation || left.submittedAt !== right.submittedAt ||
+      !LocalLearningRepository.sameStringArray(left.weakTopics, right.weakTopics) ||
+      left.details.length !== right.details.length) {
+      return false;
+    }
+    for (let index = 0; index < left.details.length; index += 1) {
+      const leftDetail = left.details[index];
+      const rightDetail = right.details[index];
+      if (leftDetail.questionId !== rightDetail.questionId || leftDetail.stem !== rightDetail.stem ||
+        leftDetail.userAnswer !== rightDetail.userAnswer || leftDetail.correctAnswer !== rightDetail.correctAnswer ||
+        leftDetail.isCorrect !== rightDetail.isCorrect || leftDetail.explanation !== rightDetail.explanation ||
+        leftDetail.difficulty !== rightDetail.difficulty || leftDetail.reviewItemId !== rightDetail.reviewItemId ||
+        !LocalLearningRepository.sameStringArray(leftDetail.options ?? [], rightDetail.options ?? []) ||
+        !LocalLearningRepository.sameStringArray(leftDetail.tags ?? [], rightDetail.tags ?? [])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static sameStringArray(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index] !== right[index]) return false;
+    }
+    return true;
   }
 
   private static validAnswerOptions(options: string[]): boolean {

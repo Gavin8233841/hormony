@@ -56,6 +56,39 @@ export interface LearningCuratedQuestion extends CuratedQuestion {
   tags?: string[];
 }
 
+export interface AiQuizDraft {
+  schemaVersion: number;
+  attemptId: string;
+  sourceQuizId: string;
+  courseId: string;
+  courseTitle: string;
+  topic: string;
+  focusTag: string;
+  difficulty: string;
+  questionCount: number;
+  questions: LearningQuizQuestionView[];
+  grading: LearningQuizGradingItem[];
+  answers: string[];
+  currentIndex: number;
+  attemptSubmittedAt?: string;
+  updatedAt: string;
+}
+
+export interface CuratedPracticeDraft {
+  schemaVersion: number;
+  attemptId: string;
+  courseId: string;
+  courseTitle: string;
+  topic: string;
+  selectedReviewItemId: string;
+  questions: LearningCuratedQuestion[];
+  reviewItemIds: string[];
+  answers: string[];
+  currentIndex: number;
+  attemptSubmittedAt?: string;
+  updatedAt: string;
+}
+
 export interface QuizLearningStats {
   totalAttempts: number;
   totalQuestions: number;
