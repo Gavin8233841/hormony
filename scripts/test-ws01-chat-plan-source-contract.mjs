@@ -64,6 +64,92 @@ test('Chat submits the native TextInput value to the real SSE endpoint', () => {
   assert.match(startSse, /HttpClient\.postSSE\(Constants\.API_CHAT, JSON\.stringify\(req\)/);
 });
 
+test('Chat keeps request identity monotonic across page leave and re-entry', () => {
+  const requestState = section(chat, '  private currentRequest:', '  // 推荐问题', 'Chat request state');
+  assertOrder(requestState, [
+    'private currentRequest: http.HttpRequest | null = null;',
+    'private currentCancellation: HttpRequestCancellation | null = null;',
+    'private isCancelled: boolean = false;',
+    'private receivedDone: boolean = false;',
+    'private requestSequence: number = 0;',
+    'private activeRequestId: number = 0;',
+    'private historySaveQueued: boolean = false;',
+    'private lifecycleRunId: number = 0;',
+    'private pageActive: boolean = false;'
+  ], 'Chat request identity fields');
+
+  const lifecycle = section(chat, '  aboutToAppear(): void {', '  get canSend(): boolean {', 'Chat lifecycle');
+  const appear = section(lifecycle, '  aboutToAppear(): void {', '  aboutToDisappear(): void {', 'Chat appear');
+  assertOrder(appear, [
+    'this.lifecycleRunId += 1;',
+    'const lifecycleRunId = this.lifecycleRunId;',
+    'this.pageActive = true;',
+    'this.isCancelled = false;',
+    'this.currentRequest = null;',
+    'this.currentCancellation = null;',
+    'this.receivedDone = false;',
+    'this.activeRequestId = 0;',
+    'this.loadLocalHistory(lifecycleRunId);',
+    'this.probeCloudAgent(lifecycleRunId);'
+  ], 'Chat re-entry state');
+  assert.doesNotMatch(appear, /requestSequence/);
+  const disappear = section(chat, '  aboutToDisappear(): void {', '  private isActiveLifecycle(', 'Chat disappear');
+  assertOrder(disappear, [
+    'this.pageActive = false;',
+    'this.lifecycleRunId += 1;',
+    'this.cancelCurrentRequest(false);'
+  ], 'Chat leave lifecycle invalidation');
+  const activeLifecycle = section(chat, '  private isActiveLifecycle(', '  get canSend(): boolean {',
+    'Chat active lifecycle');
+  assert.match(activeLifecycle, /return this\.pageActive && this\.lifecycleRunId === lifecycleRunId;/);
+
+  const cancel = section(chat, '  private cancelCurrentRequest(', '  private retryMessage(', 'Chat request invalidation');
+  assertOrder(cancel, [
+    'this.isCancelled = true;',
+    'this.activeRequestId = 0;',
+    'const request = this.currentRequest;',
+    'const cancellation = this.currentCancellation;',
+    'this.currentRequest = null;',
+    'this.currentCancellation = null;',
+    'cancellation.cancel();',
+    'this.loading = false;',
+    'this.receivedDone = false;'
+  ], 'Chat leave invalidates the active request');
+
+  const send = section(chat, '  sendMessage(question?: string): void {', '  private isActiveRequest(', 'Chat request allocation');
+  assertOrder(send, [
+    'this.loading = true;',
+    'this.isCancelled = false;',
+    'this.receivedDone = false;',
+    'this.requestSequence += 1;',
+    'const requestId = this.requestSequence;',
+    'const cancellation = new HttpRequestCancellation();',
+    'this.activeRequestId = requestId;',
+    'this.currentCancellation = cancellation;',
+    'LocalLearningRepository.getProfile().then((profile): void => {',
+    'this.startSseRequest(req, requestId, cancellation);'
+  ], 'Chat request identity allocation');
+  assert.equal(occurrences(send, 'this.startSseRequest(req, requestId, cancellation);'), 2);
+
+  const active = section(chat, '  private isActiveRequest(', '  private startSseRequest(', 'Chat active request');
+  assert.match(active, /return requestId === this\.activeRequestId && !this\.isCancelled;/);
+  const startSse = section(chat, '  private startSseRequest(', '  private streamFailureMessage(', 'Chat SSE identity guards');
+  assert.match(startSse, /if \(!this\.isActiveRequest\(requestId\) \|\| !this\.loading\) return;/);
+  assert.equal(occurrences(startSse, 'if (!this.isActiveRequest(requestId))'), 4);
+  const created = section(startSse, '      (reqInstance: http.HttpRequest) => {', '      cancellation', 'Chat delayed request creation');
+  assertOrder(created, [
+    'if (!this.isActiveRequest(requestId)) {',
+    'reqInstance.destroy();',
+    'return;',
+    'this.currentRequest = reqInstance;'
+  ], 'Chat rejects stale created requests');
+
+  const probe = section(chat, '  private async probeCloudAgent(', '  private scrollToBottom(', 'Chat cloud probe');
+  assert.match(probe, /lifecycleRunId: number = this\.lifecycleRunId/);
+  assert.equal(occurrences(probe, 'if (!this.isActiveLifecycle(lifecycleRunId)) return;'), 3);
+  assert.match(probe, /finally \{\s*if \(this\.isActiveLifecycle\(lifecycleRunId\)\) \{\s*this\.probing = false;/);
+});
+
 test('HttpClient cancellation prevents POST and SSE fallback requests', () => {
   const cancellation = section(httpClient, 'export class HttpRequestCancellation {', 'export class HttpClient {', 'HTTP cancellation');
   assertOrder(cancellation, [
@@ -171,14 +257,20 @@ test('SSE done and error paths are exclusive and preserve structured failures', 
 });
 
 test('Chat restores and serializes only complete local conversation turns', () => {
-  const load = section(chat, '  private async loadLocalHistory(): Promise<void> {', '  private retryLocalHistoryLoad(', 'Chat history load');
+  const load = section(chat, '  private async loadLocalHistory(lifecycleRunId: number): Promise<void> {',
+    '  private retryLocalHistoryLoad(', 'Chat history load');
   assertOrder(load, [
     'await LocalLearningRepository.getChatHistory();',
+    'if (!this.isActiveLifecycle(lifecycleRunId)) return;',
     'const restored: DisplayMessage[] = [];',
     'this.messages = restored;',
     'this.historyLoadFailed = false;'
   ], 'Chat history restore');
-  assert.match(load, /catch \(error\) \{\s*this\.historyLoadFailed = true;/);
+  assert.match(load, /catch \(error\) \{\s*if \(!this\.isActiveLifecycle\(lifecycleRunId\)\) return;\s*this\.historyLoadFailed = true;/);
+  assert.match(load, /finally \{\s*if \(this\.isActiveLifecycle\(lifecycleRunId\)\) \{\s*this\.historyLoading = false;/);
+  const retryLoad = section(chat, '  private retryLocalHistoryLoad(): void {', '  private cancelCurrentRequest(',
+    'Chat history retry');
+  assert.match(retryLoad, /this\.loadLocalHistory\(this\.lifecycleRunId\);/);
 
   const completeHistory = section(chat, '  private completeChatHistory(', '  private async saveLocalHistory(', 'Complete chat history');
   assert.match(completeHistory, /assistantMessage\.role === 'assistant' && assistantMessage\.content\.length > 0 &&\s*!assistantMessage\.failed && !assistantMessage\.cancelled && !assistantMessage\.streaming/);
@@ -215,6 +307,30 @@ test('Chat restores and serializes only complete local conversation turns', () =
     "'已停止继续生成，上方内容不会保存到本机'"
   ], 'Chat cancellation state');
   assert.doesNotMatch(cancel, /saveLocalHistory/);
+});
+
+test('Chat retry replaces only the failed turn and preserves recovery input', () => {
+  const retry = section(chat, '  private retryMessage(', '  private async probeCloudAgent(', 'Chat message retry');
+  assertOrder(retry, [
+    'const question = msg.retryQuestion.trim();',
+    'if (question.length === 0 || this.loading || this.historyLoading || this.historySaving ||',
+    'this.historyLoadFailed) return;',
+    'if (!this.cloudAgentReady) {',
+    'this.inputText = question;',
+    'if (!this.probing) this.probeCloudAgent();',
+    'return;',
+    'const targetIndex = this.messages.indexOf(msg);',
+    'if (targetIndex < 0) return;',
+    'const next: DisplayMessage[] = [];',
+    'for (let index = 0; index < this.messages.length; index++) {',
+    'const item = this.messages[index];',
+    "const pairedUser = index === targetIndex - 1 && item.role === 'user' && item.content === question;",
+    'if (index !== targetIndex && !pairedUser) next.push(item);',
+    'this.messages = next;',
+    'this.sendMessage(question);'
+  ], 'Chat retry recovery');
+  assert.equal(occurrences(retry, 'this.messages = next;'), 1);
+  assert.equal(occurrences(retry, 'this.sendMessage(question);'), 1);
 });
 
 test('Chat keeps citations, code, and tables readable', () => {

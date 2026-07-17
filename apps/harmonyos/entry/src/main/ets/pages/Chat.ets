@@ -58,6 +58,8 @@ export struct ChatContent {
   private activeRequestId: number = 0;
   private scrollScheduled: boolean = false;
   private historySaveQueued: boolean = false;
+  private lifecycleRunId: number = 0;
+  private pageActive: boolean = false;
 
   // 推荐问题
   private suggestions: string[] = [
@@ -74,6 +76,9 @@ export struct ChatContent {
   ];
 
   aboutToAppear(): void {
+    this.lifecycleRunId += 1;
+    const lifecycleRunId = this.lifecycleRunId;
+    this.pageActive = true;
     this.isCancelled = false;
     this.loading = false;
     this.currentRequest = null;
@@ -81,15 +86,21 @@ export struct ChatContent {
     this.receivedDone = false;
     this.activeRequestId = 0;
     this.historyLoading = true;
-    this.loadLocalHistory();
-    this.probeCloudAgent();
+    this.loadLocalHistory(lifecycleRunId);
+    this.probeCloudAgent(lifecycleRunId);
     const pendingQuestion = AppStorage.get<string>('pendingChatQuestion') ?? '';
     this.inputText = this.quickQuestion.trim().length > 0 ? this.quickQuestion.trim() : pendingQuestion.trim();
     AppStorage.setOrCreate<string>('pendingChatQuestion', '');
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false;
+    this.lifecycleRunId += 1;
     this.cancelCurrentRequest(false);
+  }
+
+  private isActiveLifecycle(lifecycleRunId: number): boolean {
+    return this.pageActive && this.lifecycleRunId === lifecycleRunId;
   }
 
   get canSend(): boolean {
@@ -489,9 +500,10 @@ export struct ChatContent {
     return this.answerSteps[index].description;
   }
 
-  private async loadLocalHistory(): Promise<void> {
+  private async loadLocalHistory(lifecycleRunId: number): Promise<void> {
     try {
       const history = await LocalLearningRepository.getChatHistory();
+      if (!this.isActiveLifecycle(lifecycleRunId)) return;
       const restored: DisplayMessage[] = [];
       for (const item of history) {
         const message: DisplayMessage = {
@@ -519,10 +531,13 @@ export struct ChatContent {
       this.historyMessage = restored.length > 0 ?
         '已恢复最近 ' + restored.length.toString() + ' 条本机会话' : '';
     } catch (error) {
+      if (!this.isActiveLifecycle(lifecycleRunId)) return;
       this.historyLoadFailed = true;
       this.historyMessage = '本机会话暂时无法读取';
     } finally {
-      this.historyLoading = false;
+      if (this.isActiveLifecycle(lifecycleRunId)) {
+        this.historyLoading = false;
+      }
     }
   }
 
@@ -531,7 +546,7 @@ export struct ChatContent {
     this.historyLoading = true;
     this.historyLoadFailed = false;
     this.historyMessage = '正在恢复本机会话';
-    this.loadLocalHistory();
+    this.loadLocalHistory(this.lifecycleRunId);
   }
 
   private cancelCurrentRequest(showStatus: boolean): void {
@@ -594,18 +609,23 @@ export struct ChatContent {
     this.sendMessage(question);
   }
 
-  private async probeCloudAgent(): Promise<void> {
+  private async probeCloudAgent(lifecycleRunId: number = this.lifecycleRunId): Promise<void> {
+    if (!this.isActiveLifecycle(lifecycleRunId)) return;
     this.probing = true;
     this.serviceMessage = '正在连接云端学伴';
     try {
       const health = await HttpClient.get<HealthResponse>(Constants.API_HEALTH);
+      if (!this.isActiveLifecycle(lifecycleRunId)) return;
       this.cloudAgentReady = health.status === 'ready';
       this.serviceMessage = this.cloudAgentReady ? '' : '云端学伴尚未就绪';
     } catch (error) {
+      if (!this.isActiveLifecycle(lifecycleRunId)) return;
       this.cloudAgentReady = false;
       this.serviceMessage = '云端学伴暂不可用';
     } finally {
-      this.probing = false;
+      if (this.isActiveLifecycle(lifecycleRunId)) {
+        this.probing = false;
+      }
     }
   }
 
@@ -614,9 +634,10 @@ export struct ChatContent {
       return;
     }
     this.scrollScheduled = true;
+    const lifecycleRunId = this.lifecycleRunId;
     setTimeout(() => {
       this.scrollScheduled = false;
-      if (this.messages.length > 0) {
+      if (this.isActiveLifecycle(lifecycleRunId) && this.messages.length > 0) {
         this.scroller.scrollToIndex(this.messages.length - 1, true, ScrollAlign.END);
       }
     }, 50);

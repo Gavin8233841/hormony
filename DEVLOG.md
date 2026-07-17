@@ -6972,3 +6972,30 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 来源分支已有本地 production 响应头断言，主线本批未重新运行，不提升为本批新验证。
 - 线上 CDN/反向代理、真实模型 Chat SSE 响应头与浏览器缓存面板未验证；pass-through 的 `Vary: Origin` 仍受当前 Next 版本限制。
 - 本批未修改 HarmonyOS、生产模型 ID、题库或秘密。
+
+---
+
+## 2026-07-17 [MAIN+WS01] Chat 页面生命周期异步隔离
+
+背景：Chat 已用单调请求 ID 隔离 SSE 请求，但页面离开后仍在等待的 ArkData 历史读取、Health 探活和延迟滚动没有页面生命周期身份。旧页面回调可能在重新进入后覆盖新页面状态，或对已离开的组件执行滚动。本批逐行复核并采用 WS01 提交 `79b420a` 的两个文件增量，保留主线已有的本地日期、`12×1000` history、停止后重发和失败恢复实现。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- 每次页面出现分配新的 `lifecycleRunId` 并标记 active；离开时先使生命周期失效，再取消当前 SSE 请求。
+- 历史读取和云端 Health 探活只允许同一仍可见生命周期回写 loading、失败或成功状态；旧回调静默失效。
+- 延迟滚动捕获生命周期 ID，仅在原页面仍可见时操作 Scroller；SSE 继续由既有单调 `requestSequence/activeRequestId` 隔离，两类身份各自覆盖页面与请求边界。
+- 源契约新增离开/重进、旧请求拒绝、历史/探活回写守卫与失败回答精确替换断言，并保留主线输入、日期和 history 边界。
+
+验证：
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，10/10 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 31 s 973 ms`，`CompileArkTS` 与 `PackageHap` 通过。
+- `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前没有设备目标；页面离开时慢 ArkData/Health 回调、重进后的输入与真实 SSE 均未做模拟器或真机验证。
+- HAP 未配置 `signingConfigs`，构建跳过签名；安装、真机与多设备行为未验证。
+- 本批未调用线上 Chat 或真实模型，不声明线上通过。
