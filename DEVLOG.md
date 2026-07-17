@@ -6944,3 +6944,39 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前没有模拟器或真机目标；跨日停留、从 Practice 返回、App 前后台切换、ArkData 真实读取失败和点击“重新加载”的设备流程未验证。
 - HAP 未配置 `signingConfigs`，构建跳过签名；安装、真机和多设备行为未验证。
 - 本批未调用线上 API 或真实模型，不声明线上通过。
+
+---
+
+## 2026-07-17 [WS02] 损坏复习时间恢复与单快照队列
+
+背景：`39a22e1` 已补齐错题本每次显示刷新和 Practice 原页重试，但旧版或损坏的 active ReviewItem 若含无效 `nextReviewAt`，Reducer 在答题推进时将其视为到期，Repository、MistakeBook 按钮和写回回执却因 `NaN <= now` 将其视为未到期；该项会被永久锁在等待状态。MistakeBook 与 Practice 还分别读取到期项和全部活跃项，并非同一 ArkData 状态快照。本批统一这些边界，不修改 schema、题库、模型、RAG/cache 或 1/3/7/14 天间隔。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/mistake-review-flow.test.ts`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- Repository 新增 `ReviewQueueSnapshot` 与 `getReviewQueue(now)`，从一次 `quiz_learning_state` 读取同时派生活跃项和到期项；MistakeBook、Practice 均消费同一快照，不再连续读取两版状态。
+- 无效 `nextReviewAt` 与 Reducer 既有语义对齐为“立即到期”，并在排序中优先出现；用户答对后仍沿原复习项 ID 推进到 3 天并写回合法时间，不新增重复错题。
+- `getDueReviewItems(now)` 委托单快照接口，服务卡片/首页主动下一动作继续取得相同到期判定；MistakeBook 的按钮门控同步允许恢复损坏旧项。
+- `QuizLearningStateReducer.createReceipt()` 复用 `isReviewDue()`，`dueReviewCount` 与队列、页面和答题推进保持一致。
+- 子 agent 仅修改复习契约测试，新增三层到期判定和页面单快照反例；主线程逐行复核后补充服务卡片委托与损坏项优先排序断言，并增加可执行 Reducer 恢复测试。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/lib/data/mistake-review-flow.test.ts src/lib/data/quiz-learning-state.test.ts`：exit 0，2 个文件、50/50 通过；包含无效时间到期计数、答对后 3 天推进和单快照源码契约。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error；`pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，25 个文件、402/402 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，43/43 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 增量 HAP `BUILD SUCCESSFUL in 30 s 241 ms`，`CompileArkTS` 与 `PackageHap` 通过，多项任务为 `UP-TO-DATE`。
+- 使用本机 SDK 精确路径执行 `hdc.exe list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- 当前没有模拟器或真机目标；损坏旧记录在真实 ArkData 中进入到期首位、点击重练、答对后修复时间及服务卡片主动入口均未做设备验证。
+- HAP 未配置 `signingConfigs`，构建跳过签名；安装、真机和多设备行为未验证。
+- 本批未调用线上 API 或真实模型，不声明线上通过。

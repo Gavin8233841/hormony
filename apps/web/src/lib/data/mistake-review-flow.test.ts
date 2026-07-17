@@ -13,29 +13,52 @@ const harmonyPageSource = (fileName: string) =>
     "utf8"
   );
 
+const harmonyCommonSource = (fileName: string) =>
+  readFileSync(
+    fileURLToPath(
+      new URL(
+        `../../../../harmonyos/entry/src/main/ets/common/${fileName}`,
+        import.meta.url
+      )
+    ),
+    "utf8"
+  );
+
 const mistakeBookSource = harmonyPageSource("MistakeBook.ets");
 const practiceSource = harmonyPageSource("Practice.ets");
+const localLearningRepositorySource = harmonyCommonSource(
+  "LocalLearningRepository.ets"
+);
+const quizLearningStateReducerSource = harmonyCommonSource(
+  "QuizLearningStateReducer.ets"
+);
 
 describe("HarmonyOS 错题复习入口契约", () => {
   it("页面重启后应从 ArkData 仓库重建到期优先的复习队列", () => {
     expect(mistakeBookSource).toContain("onPageShow(): void");
     expect(mistakeBookSource).toContain("this.loadItems()");
 
-    const dueRead = mistakeBookSource.indexOf(
-      "await LocalLearningRepository.getDueReviewItems(now)"
+    const queueRead = mistakeBookSource.indexOf(
+      "await LocalLearningRepository.getReviewQueue(now)"
     );
-    const activeRead = mistakeBookSource.indexOf(
-      "await LocalLearningRepository.getReviewItems()"
+    const dueProjection = mistakeBookSource.indexOf(
+      "const dueItems = reviewQueue.dueItems",
+      queueRead
+    );
+    const activeProjection = mistakeBookSource.indexOf(
+      "const activeItems = reviewQueue.activeItems",
+      dueProjection
     );
     const dueFirstMerge = mistakeBookSource.indexOf(
       "this.items = dueItems.concat(pendingItems)"
     );
 
-    expect(dueRead).toBeGreaterThan(-1);
-    expect(activeRead).toBeGreaterThan(dueRead);
-    expect(dueFirstMerge).toBeGreaterThan(activeRead);
+    expect(queueRead).toBeGreaterThan(-1);
+    expect(dueProjection).toBeGreaterThan(queueRead);
+    expect(activeProjection).toBeGreaterThan(dueProjection);
+    expect(dueFirstMerge).toBeGreaterThan(activeProjection);
     expect(mistakeBookSource).toContain(
-      "new Date(item.nextReviewAt).getTime() <= this.nowTimestamp"
+      "return Number.isNaN(reviewTime) || reviewTime <= this.nowTimestamp"
     );
     expect(mistakeBookSource).toContain(
       "new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime()"
@@ -66,17 +89,13 @@ describe("HarmonyOS 错题复习入口契约", () => {
       "const nowTimestamp = now.getTime()",
       refreshNow
     );
-    const dueRead = loadItemsSource.indexOf(
-      "await LocalLearningRepository.getDueReviewItems(now)",
+    const queueRead = loadItemsSource.indexOf(
+      "await LocalLearningRepository.getReviewQueue(now)",
       captureTimestamp
-    );
-    const activeRead = loadItemsSource.indexOf(
-      "await LocalLearningRepository.getReviewItems()",
-      dueRead
     );
     const staleGuard = loadItemsSource.indexOf(
       "if (this.loadRunId !== runId) return",
-      activeRead
+      queueRead
     );
     const publishTimestamp = loadItemsSource.indexOf(
       "this.nowTimestamp = nowTimestamp",
@@ -86,9 +105,8 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(loadItemsEnd).toBeGreaterThan(loadItemsStart);
     expect(refreshNow).toBeGreaterThan(-1);
     expect(captureTimestamp).toBeGreaterThan(refreshNow);
-    expect(dueRead).toBeGreaterThan(captureTimestamp);
-    expect(activeRead).toBeGreaterThan(dueRead);
-    expect(staleGuard).toBeGreaterThan(activeRead);
+    expect(queueRead).toBeGreaterThan(captureTimestamp);
+    expect(staleGuard).toBeGreaterThan(queueRead);
     expect(publishTimestamp).toBeGreaterThan(staleGuard);
   });
 
@@ -110,19 +128,19 @@ describe("HarmonyOS 错题复习入口契约", () => {
       "this.loadRunId = runId",
       nextRun
     );
-    const activeRead = loadItemsSource.indexOf(
-      "await LocalLearningRepository.getReviewItems()"
+    const queueRead = loadItemsSource.indexOf(
+      "await LocalLearningRepository.getReviewQueue(now)"
     );
-    const catchStart = loadItemsSource.indexOf("} catch (error)", activeRead);
+    const catchStart = loadItemsSource.indexOf("} catch (error)", queueRead);
     const finallyStart = loadItemsSource.indexOf("} finally {", catchStart);
-    const successSource = loadItemsSource.slice(activeRead, catchStart);
+    const successSource = loadItemsSource.slice(queueRead, catchStart);
     const catchSource = loadItemsSource.slice(catchStart, finallyStart);
     const finallySource = loadItemsSource.slice(finallyStart);
 
     expect(nextRun).toBeGreaterThan(-1);
     expect(activateRun).toBeGreaterThan(nextRun);
-    expect(activeRead).toBeGreaterThan(-1);
-    expect(catchStart).toBeGreaterThan(activeRead);
+    expect(queueRead).toBeGreaterThan(-1);
+    expect(catchStart).toBeGreaterThan(queueRead);
     expect(finallyStart).toBeGreaterThan(catchStart);
     expect(successSource.indexOf("if (this.loadRunId !== runId) return"))
       .toBeLessThan(successSource.indexOf("this.items ="));
@@ -131,6 +149,148 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(finallySource).toContain(
       "if (this.loadRunId === runId) this.loading = false"
     );
+  });
+
+  it("损坏的 active ReviewItem 时间应在 Reducer、Repository 与页面一致视为到期", () => {
+    const reducerStart = quizLearningStateReducerSource.indexOf(
+      "private static isReviewDue(item: ReviewItem, submittedAt: string): boolean"
+    );
+    const reducerEnd = quizLearningStateReducerSource.indexOf(
+      "\n  private static applyTagInsights",
+      reducerStart
+    );
+    const reducerSource = quizLearningStateReducerSource.slice(
+      reducerStart,
+      reducerEnd
+    );
+    expect(reducerStart).toBeGreaterThan(-1);
+    expect(reducerEnd).toBeGreaterThan(reducerStart);
+    expect(reducerSource).toContain(
+      "if (Number.isNaN(nextReviewTime)) return true"
+    );
+
+    const repositoryStart = localLearningRepositorySource.indexOf(
+      "private static isReviewDueAt(item: ReviewItem, nowTime: number): boolean"
+    );
+    const repositoryEnd = localLearningRepositorySource.indexOf(
+      "\n  private static compareReviewSchedule",
+      repositoryStart
+    );
+    const repositorySource = localLearningRepositorySource.slice(
+      repositoryStart,
+      repositoryEnd
+    );
+    expect(repositoryStart).toBeGreaterThan(-1);
+    expect(repositoryEnd).toBeGreaterThan(repositoryStart);
+    expect(repositorySource).toContain(
+      "return Number.isNaN(reviewTime) || reviewTime <= nowTime"
+    );
+    const comparatorStart = localLearningRepositorySource.indexOf(
+      "private static compareReviewSchedule(left: ReviewItem, right: ReviewItem): number"
+    );
+    const comparatorEnd = localLearningRepositorySource.indexOf(
+      "\n  static async getLessonProgress",
+      comparatorStart
+    );
+    const comparatorSource = localLearningRepositorySource.slice(
+      comparatorStart,
+      comparatorEnd
+    );
+    expect(comparatorStart).toBeGreaterThan(-1);
+    expect(comparatorEnd).toBeGreaterThan(comparatorStart);
+    expect(comparatorSource).toContain("if (Number.isNaN(leftTime)) return -1");
+    expect(comparatorSource).toContain("if (Number.isNaN(rightTime)) return 1");
+
+    const pageStart = mistakeBookSource.indexOf(
+      "private isDue(item: ReviewItem): boolean"
+    );
+    const pageEnd = mistakeBookSource.indexOf(
+      "\n  private reviewTimeLabel",
+      pageStart
+    );
+    const pageSource = mistakeBookSource.slice(pageStart, pageEnd);
+    expect(pageStart).toBeGreaterThan(-1);
+    expect(pageEnd).toBeGreaterThan(pageStart);
+    expect(pageSource).toContain(
+      "return Number.isNaN(reviewTime) || reviewTime <= this.nowTimestamp"
+    );
+  });
+
+  it("错题本和练习页应从单次仓储读取取得同一版到期与活动队列", () => {
+    const repositoryStart = localLearningRepositorySource.indexOf(
+      "static async getReviewQueue(now: Date = new Date()): Promise<ReviewQueueSnapshot>"
+    );
+    const repositoryEnd = localLearningRepositorySource.indexOf(
+      "\n  static async getDueReviewItems",
+      repositoryStart
+    );
+    const repositorySource = localLearningRepositorySource.slice(
+      repositoryStart,
+      repositoryEnd
+    );
+    expect(repositoryStart).toBeGreaterThan(-1);
+    expect(repositoryEnd).toBeGreaterThan(repositoryStart);
+    expect(repositorySource).toContain(
+      "const state = await LocalLearningRepository.getQuizLearningState()"
+    );
+    expect(repositorySource).toContain(
+      "const activeItems = state.reviewItems.filter"
+    );
+    expect(repositorySource).toContain(
+      "const dueItems = activeItems.filter"
+    );
+    expect(repositorySource).not.toContain("getReviewItems(");
+
+    const dueReaderStart = localLearningRepositorySource.indexOf(
+      "static async getDueReviewItems(now: Date = new Date())"
+    );
+    const dueReaderEnd = localLearningRepositorySource.indexOf(
+      "\n  private static isReviewDueAt",
+      dueReaderStart
+    );
+    const dueReaderSource = localLearningRepositorySource.slice(
+      dueReaderStart,
+      dueReaderEnd
+    );
+    expect(dueReaderStart).toBeGreaterThan(-1);
+    expect(dueReaderEnd).toBeGreaterThan(dueReaderStart);
+    expect(dueReaderSource).toContain(
+      "await LocalLearningRepository.getReviewQueue(now)"
+    );
+
+    const mistakeLoadStart = mistakeBookSource.indexOf(
+      "private async loadItems(): Promise<void>"
+    );
+    const mistakeLoadEnd = mistakeBookSource.indexOf(
+      "\n  private courseTitle",
+      mistakeLoadStart
+    );
+    const mistakeLoadSource = mistakeBookSource.slice(
+      mistakeLoadStart,
+      mistakeLoadEnd
+    );
+    expect(mistakeLoadSource).toContain(
+      "await LocalLearningRepository.getReviewQueue(now)"
+    );
+    expect(mistakeLoadSource).not.toContain("getDueReviewItems(");
+    expect(mistakeLoadSource).not.toContain("getReviewItems(");
+
+    const practiceLoadStart = practiceSource.indexOf(
+      "private async loadQuestions(selectedReviewItemId: string)"
+    );
+    const practiceLoadEnd = practiceSource.indexOf(
+      "\n  private questionFromReview",
+      practiceLoadStart
+    );
+    const practiceLoadSource = practiceSource.slice(
+      practiceLoadStart,
+      practiceLoadEnd
+    );
+    expect(practiceLoadSource).toContain(
+      "await LocalLearningRepository.getReviewQueue()"
+    );
+    expect(practiceLoadSource).not.toContain("getDueReviewItems(");
+    expect(practiceLoadSource).not.toContain("getReviewItems(");
   });
 
   it("未到期项应继续显示但不能写入复习 ID 或进入练习", () => {

@@ -29,9 +29,10 @@ struct MistakeBookPage {
     try {
       const now = new Date();
       const nowTimestamp = now.getTime();
-      const dueItems = await LocalLearningRepository.getDueReviewItems(now);
-      const activeItems = await LocalLearningRepository.getReviewItems();
+      const reviewQueue = await LocalLearningRepository.getReviewQueue(now);
       if (this.loadRunId !== runId) return;
+      const dueItems = reviewQueue.dueItems;
+      const activeItems = reviewQueue.activeItems;
       const dueIds = dueItems.map((item: ReviewItem): string => item.id);
       const pendingItems = activeItems.filter((item: ReviewItem): boolean => !dueIds.includes(item.id))
         .sort((left: ReviewItem, right: ReviewItem): number => {
@@ -60,7 +61,8 @@ struct MistakeBookPage {
   }
 
   private isDue(item: ReviewItem): boolean {
-    return new Date(item.nextReviewAt).getTime() <= this.nowTimestamp;
+    const reviewTime = new Date(item.nextReviewAt).getTime();
+    return Number.isNaN(reviewTime) || reviewTime <= this.nowTimestamp;
   }
 
   private reviewTimeLabel(item: ReviewItem): string {
