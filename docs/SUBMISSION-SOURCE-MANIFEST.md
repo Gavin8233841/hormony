@@ -30,11 +30,13 @@
     "scripts/test_validate_competition_content.py",
     "scripts/test_validate_official_deliverables.py",
     "scripts/test_validate_release_bundle.py",
+    "scripts/test_validate_release_dependencies.py",
     "scripts/test_validate_release_evidence.py",
     "scripts/validate-competition-content.py",
     "scripts/validate-competition-evidence.py",
     "scripts/validate-official-deliverables.py",
     "scripts/validate-release-bundle.py",
+    "scripts/validate-release-dependencies.py",
     "scripts/validate-release-evidence.py",
     "scripts/validate-topic-relations.py"
   ],
@@ -133,18 +135,35 @@ Git tree 读取本清单展开的源码并逐字比较，同时要求声明提�
 
 ### 主线最小依赖与 manifest 校准
 
-`fbe0ad2` 的发布包脚本动态复用 `scripts/validate-competition-content.py` 的路径、
-manifest、NOTICE 与敏感信息合同。主线采用本门禁时只需要按文件合入当前版本的：
+当前正式交付链的运行时依赖闭包为：
 
-- `scripts/validate-competition-content.py` 及其测试
-- `docs/COMPETITION-NOTICE.md`
-- 本文件与发布包脚本/测试
+- 内容/源码：`scripts/validate-competition-content.py`、本文件和
+  `docs/COMPETITION-NOTICE.md`。
+- 评分/演示：`scripts/validate-competition-evidence.py` 和
+  `docs/COMPETITION-SCORE-FIRST-PLAN.md`。
+- 发布证据：`scripts/validate-release-evidence.py`。
+- 最终 ZIP：`scripts/validate-release-bundle.py`，运行时动态复用内容门禁和发布证据
+  门禁。
+- 正式媒体：`scripts/validate-official-deliverables.py`，运行时动态复用最终 ZIP
+  门禁。
+- 依赖闭包：`scripts/validate-release-dependencies.py`；上述六个门禁各自的
+  `scripts/test_validate_*.py` 固定输入测试必须一并采用。
+- 审计记录：`docs/workstreams/06-competition-release-result.md`。
+
+执行以下只读命令，核验这些直接包含项均在 manifest 与 Git 索引中，并确认六条
+运行时路径仍指向上述精确文件：
+
+```powershell
+python -B scripts/validate-release-dependencies.py
+```
 
 不得整提交采用 `5d1e75f`，也不得用该提交的
 `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
 覆盖主线文件。集成提交应让本文件 `include` 中的每个路径对应主线当前已跟踪文件，
-保留 `apps/harmonyos` 与 `apps/web` 两个完整源码根，并把新增发布门禁文件逐项加入
-清单；随后运行内容门禁和 manifest 展开测试。最终 `release-manifest.json` 的
+保留主线当前 `apps/harmonyos` 与 `apps/web` 两个完整源码根，并把新增发布门禁文件
+逐项加入清单；`lesson-experiences.json` 随主线当前 HarmonyOS 根进入包，不是需要从
+WS06 单独移植的文件。随后运行依赖闭包、内容门禁和 manifest 展开测试。最终
+`release-manifest.json` 的
 `sourceCommit` 必须填写完成上述校准后的主线完整 `HEAD`，不能沿用 WS06 分支哈希。
 
 ## 正式三文件门禁

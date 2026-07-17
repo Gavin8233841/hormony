@@ -676,3 +676,65 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
 - **未验证**：本批只修改文档和 Python 门禁，没有重复执行 Web/HAP 构建；批次 12
   的构建记录属于前一提交，不自动升级为本批提交证据。签名 HAP、PDF/ZIP、最终
   媒体完整播放和门户上传仍未验证。
+
+## 批次 14：评分、证据、发布包、媒体与源码 manifest 最小依赖闭包
+
+背景：`SUBMISSION-SOURCE-MANIFEST.md` 的“主线最小依赖”仍停留在早期发布包门禁，
+只列内容门禁、NOTICE 和发布包脚本；后续增加的评分矩阵、证据索引和正式媒体门禁
+及测试没有形成可执行闭包。单看文件存在不能证明动态导入、测试目标和操作手册命令
+仍指向同一组精确文件。
+
+文件：
+
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-release-dependencies.py`
+- `scripts/test_validate_release_dependencies.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 新增只读依赖门禁，要求 source manifest 直接收录 16 个运行时、测试和审计文件，
+  并保留 `apps/harmonyos`、`apps/web` 两个完整源码根；所有直接文件必须在 Git 索引。
+- 从实际模块属性读取 6 条运行时边：内容门禁到 source manifest/NOTICE、评分门禁到
+  评分计划、发布包到内容/证据门禁、正式媒体到发布包。另加载 6 个测试的
+  `SCRIPT_PATH`，证明每个固定输入仍指向对应验证脚本。
+- 评分计划必须保留内容、评分、证据索引、发布包、依赖闭包和正式三文件六个命令。
+  正式媒体清单补入 `validate-official-deliverables.py` 的完整参数；内容章节补入总内容
+  门禁，不再只列题库生成器和 Topic 关系检查。
+- 文档用当前运行时闭包替换 `fbe0ad2` 时代的最小依赖描述。主线采用时保留自己当前
+  的完整应用根；`lesson-experiences.json` 是内容门禁运行输入，但不是 WS06 独立
+  移植依赖，门禁会拒绝把该路径直接加入 include。不得整提交采用 `5d1e75f` 覆盖它。
+- 独立子 agent 只读确认既有闭包为 14 个文件、6 条运行时边，并核对五个既有测试
+  的相邻脚本导入；新门禁再把自身脚本/测试加入闭包，形成 16 个直接文件和六组测试。
+  `pdfinfo`、`ffprobe` 必须由调用者传入现有绝对普通文件路径，不是仓库文件依赖；
+  子 agent 未修改文件或 Git。
+
+验证：
+
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_release_dependencies.py -v`，
+  exit 0，6/6 通过；覆盖直接缺失、未跟踪文件、运行时/测试边漂移、文档命令缺失和
+  Lesson 内容被列为独立移植依赖。
+- **静态诊断通过**：`python -B scripts/validate-release-dependencies.py`，exit 0，
+  `directFiles=16; testFiles=6; runtimeEdges=6; testEdges=6; planCommands=6`。
+- **静态诊断通过**：评分/演示 8/8 与当前计划、证据索引 7/7、发布包 27/27、正式
+  PDF/MP4/ZIP 媒体 18/18、内容/manifest 29/29 及内容总门禁均 exit 0。
+- **源码确认**：依赖子 agent 逐文件读取动态导入和默认路径，结论与门禁采集的六条
+  运行时边一致；没有新增或读取伪证据 JSON，也没有创建正式媒体或发布包。
+
+失败后纠正：
+
+- 新脚本加入 manifest 但尚未暂存时，正式命令首次 exit 1，精确报告两个新增文件
+  “未被 Git 跟踪”；精确暂存脚本、测试与 manifest 后，同一命令 exit 0。没有放宽
+  Git 索引约束或把未跟踪文件写成通过。
+- 首轮固定输入示例把 `test_validate_release_evidence.py` 的下划线写成连字符；按当前
+  manifest 精确文件名修正后，依赖单测 6/6 和真实门禁均通过。
+
+未验证：
+
+- **未验证**：依赖闭包通过只证明当前 Git 索引、动态路径、测试目标和文档命令一致，
+  不证明最终 PDF/MP4/ZIP、证据索引或签名 HAP 已经生成和通过。
+- **未验证**：仓库没有最终媒体可供真实 `pdfinfo`/`ffprobe` 解析，也没有执行完整
+  人工播放、HAP 安装、模拟器、真机或门户上传。
+- **未验证**：本批没有修改应用源码，因此未重复 Web/HAP 构建；此前提交的构建记录
+  不自动升级为本批提交证据。NOTICE 人工处理、签署声明和线上业务流程仍未完成。

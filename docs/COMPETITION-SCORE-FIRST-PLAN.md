@@ -304,6 +304,7 @@ AI 使用说明是项目透明性材料，不把它写成两份 PDF 明示的独
 
 ```powershell
 python -B scripts/validate-competition-evidence.py
+python -B scripts/validate-release-dependencies.py
 ```
 
 - 五个官方评分维度必须使用精确的 50/20/20/10 + 应用价值 20，不拆分或预测
@@ -320,7 +321,8 @@ python -B scripts/validate-competition-evidence.py
 
 ```powershell
 node scripts/generate-quizzes-json.mjs
-python scripts/validate-topic-relations.py
+python -B scripts/validate-topic-relations.py
+python -B scripts/validate-competition-content.py
 ```
 
 - 生成器输出后，Web 单一源与 HarmonyOS JSON 必须完全一致，且没有意外文件 diff。
@@ -360,6 +362,17 @@ cd apps/harmonyos
 - 不在证据、日志、命令输出或材料中打印秘密值。认证失败只证明认证/权限失败，不证明模型或 API 不存在。
 
 ### 5. 材料与上传
+
+```powershell
+python -B scripts/validate-official-deliverables.py `
+  --pdf-path <正式 PDF 的明确路径> `
+  --video-path <正式 MP4 的明确路径> `
+  --bundle-path <正式 ZIP 的明确路径> `
+  --team-name <门户真实队名> `
+  --work-name <门户真实作品名> `
+  --pdfinfo-path <pdfinfo 现有绝对普通文件路径> `
+  --ffprobe-path <ffprobe 现有绝对普通文件路径>
+```
 
 - PDF：模板、总页数、字体、图片、链接、文件名、打开测试和 SHA-256。
 - MP4：时长、完整播放、字幕、音画、隐私、文件名和 SHA-256。
