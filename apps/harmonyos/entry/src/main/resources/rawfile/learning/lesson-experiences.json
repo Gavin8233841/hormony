@@ -1806,14 +1806,14 @@
         "title": "代码填空",
         "focusTag": "DNS解析",
         "prompt": "以下是example.com的DNS区域文件片段。www主机需要直接映射到IPv4地址，请填入正确的资源记录类型",
-        "content": "代码：\n; example.com 区域文件\nexample.com.    IN  SOA   ns1.example.com. admin.example.com. (\n                        2026010101 ; 序列号\n                        3600       ; 刷新间隔\n                        1800       ; 重试间隔\n                        604800     ; 过期时间\n                        86400 )    ; 默认TTL\n\nwww             IN  ____    93.184.216.34    ; 填入正确的记录类型\nmail            IN  MX      10 mail.example.com.\nns1             IN  A       192.168.1.1\nexample.com.    IN  NS      ns1.example.com.",
+        "content": "代码：\n; example.com 区域文件\n$TTL 3600\nexample.com.    IN  SOA   ns1.example.com. admin.example.com. (\n                        2026010101 ; 序列号\n                        3600       ; 刷新间隔\n                        1800       ; 重试间隔\n                        604800     ; 过期时间\n                        86400 )    ; 否定缓存TTL参数（MINIMUM）\n\nwww             IN  ____    93.184.216.34    ; 填入正确的记录类型\nmail            IN  MX      10 mail.example.com.\nns1             IN  A       192.168.1.1\nexample.com.    IN  NS      ns1.example.com.",
         "language": "代码阅读",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
         "answer": "A",
-        "feedback": "A记录将域名映射到IPv4地址。www主机需要直接映射到IPv4地址93.184.216.34，因此使用A记录。MX用于指定邮件交换服务器及优先级，SOA用于区域起始授权信息，NS用于指定权威域名服务器，CNAME用于设置域名别名（指向另一个域名而非IP）。若www需要映射IPv6地址则使用AAAA记录。这与知识切片 cs103_k39 所述\"A记录将域名映射到IPv4地址\"一致",
-        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 1035（DNS实现与规格）；知识切片 cs103_k39"
+        "feedback": "A记录将域名映射到IPv4地址，www主机需要直接映射到93.184.216.34，因此填A。$TTL 3600为本区域中未显式给出TTL的资源记录提供默认值；SOA最后一项是MINIMUM，RFC 2308将它限定为否定缓存参数，否定响应实际缓存TTL取SOA记录自身TTL与MINIMUM的较小值。MX用于指定邮件交换服务器，NS用于指定权威服务器，CNAME用于设置别名；IPv6地址使用AAAA记录",
+        "source": "计算机网络：自顶向下方法（Kurose & Ross）；RFC 1035第3.3.13节；RFC 2308第4节、第5节；知识切片 cs103_k39"
       }
     ]
   },

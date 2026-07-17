@@ -6814,3 +6814,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：修正前 HTTP 契约退出码 1，7 项失败精准覆盖旧内容；修正后目标 9 项通过。三个生成器退出码 0，147 条切片、165 道端侧选择题、33 Topic/60 活动一致；关系校验退出码 0；WS03 回归 103 项运行、102 项通过、1 项跨 WS02 reducer 契约为预期失败。Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 29 s 836 ms`。
 
 失败或未验证：`lesson_self_assessment` 仍不计入客观字段，但 WS02 `getTagInsights` 过滤完整客观证据的契约保持 1 项 expected failure；`hdc` 不在当前环境，未安装 HAP，HTTP 自由回答、状态推演、长反馈及手机/平板布局未验证；HAP 未配置 `signingConfigs`，未调用线上 API。
+
+---
+
+## 2026-07-17 [WS03] DNS SOA.MINIMUM 与否定缓存 TTL 语义
+
+背景：DNS 区域文件活动把 SOA 最后一项 `MINIMUM` 标成普通记录的“默认 TTL”，`cs103_k39` 也沿用该旧解释；RFC 2308 已废止这一用法，并为省略 TTL 的记录引入 `$TTL` 指令。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS103.md`、`apps/web/src/lib/data/cs103-knowledge.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/test_cs103_dns_lesson_facts.py`。
+
+行为变化：区域文件显式增加 `$TTL 3600`，SOA 最后一项改注为否定缓存参数 `MINIMUM`；反馈和 `cs103_k39` 明确否定响应 TTL 取 SOA 记录自身 TTL 与 MINIMUM 的较小值。子 agent 提供区域文件解析与 TTL 执行模型，主代理复核 RFC 后收紧了过宽的“默认 TTL”禁用断言，只拒绝 MINIMUM 作为普通默认 TTL 的旧语义。
+
+验证：RFC 2308 第 4/5 节官方文本 HTTP 200 且核对 `$TTL` 与 `min(SOA.MINIMUM, SOA TTL)` 原文；两个生成器退出码 0，147 条知识切片和 33 Topic/60 活动一致；DNS 目标 3 项通过；关系校验退出码 0；当前已跟踪 WS03 套件加 DNS 共 106 项运行、105 项通过、1 项跨 WS02 expected failure。Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 26 s 163 ms`。
+
+失败或未验证：旧内容首次目标测试退出码 1，精准缺少 `$TTL` 并命中 k39 旧语义；首次修正后测试仍以宽泛“默认 TTL”子串误报，收紧为来源主体后重跑通过。CS101/TLS 两个后续批次的未跟踪红灯测试未纳入本批通过数。无模拟器或真机，区域文件代码块、反馈滚动和手机/平板布局未验证；HAP 未配置 `signingConfigs`。

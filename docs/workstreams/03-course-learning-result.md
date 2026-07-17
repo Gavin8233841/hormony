@@ -837,3 +837,33 @@
 
 - 端侧 `cs103_q40` 第二标签从“状态推演”变为“协议机制”。追溯 `buildQuestionTags/abilityTag` 后确认旧解释因含“阻塞”被归入状态推演；修正后的持久连接解释按现有唯一源规则确定性归入协议机制，不是手工改写产物。
 - **未验证**：当前环境 `hdc` 不存在，未安装或启动 HAP；HTTP 自由回答、跨流状态推演、长反馈滚动和手机/平板布局均未验证。本批未调用线上 API，不构成线上检索或学伴回答证据。
+
+## 批次三十：DNS SOA.MINIMUM 与否定缓存 TTL 语义
+
+### 行为
+
+- `cs103-DNS系统-2` 的区域文件新增 `$TTL 3600`，为未显式给出 TTL 的资源记录提供默认值；SOA 最后一项 `86400` 明确标为否定缓存参数 `MINIMUM`，不再称为普通默认 TTL。
+- 活动反馈补齐 RFC 2308 规则：权威服务器为否定响应携带的 SOA 记录选择 TTL 时，取 SOA 记录自身 TTL 与 SOA.MINIMUM 的较小值。A/AAAA、MX、NS 和 CNAME 的原题答案保持不变。
+- `cs103_k39` 同步区分主文件 `$TTL`、SOA.MINIMUM 与否定缓存，Web 源和端侧离线切片逐字一致；来源从教材扩展到 RFC 1035 第 3.3.13 节及 RFC 2308 第 4/5 节。
+- 子 agent 新增 `scripts/test_cs103_dns_lesson_facts.py`，用区域文件解析器分别执行正确/旧式 fixture，并计算 `default_rr_ttl=3600`、`soa_minimum=86400`、`negative_cache_ttl=3600`。主代理复核后把“禁止所有默认 TTL 字样”收紧为只禁止 MINIMUM 承担普通默认 TTL 的旧断言。
+
+### 文件与生成边界
+
+- 活动唯一源：`docs/ACTIVE-LEARNING-SPEC-CS103.md`；现有生成器只更新 `lesson-experiences.json` 的 `$[30].activities[1].content`、`feedback` 和 `source`。
+- 知识唯一源：`apps/web/src/lib/data/cs103-knowledge.ts`；知识生成器只更新端侧 `knowledge-chunks.json` 的 `$[138]`（`cs103_k39`）`text/source`。
+- 契约：`scripts/test_cs103_dns_lesson_facts.py`；没有修改题库、页面、仓储、Web API 或 WS06 发布脚本。
+
+### 证据
+
+- **源码确认**：RFC 2308 第 4 节明确废止 SOA.MINIMUM 作为区域最小 TTL，并要求未显式给出 TTL 的记录使用不同机制，随后为 RFC 1035 master file 定义 `$TTL <TTL>` 指令；第 5 节明确否定响应中 SOA 记录的 TTL 取 SOA.MINIMUM 与 SOA 自身 TTL 的较小值。官方文本本轮读取返回 HTTP 200，并核对上述正文。
+- **静态诊断通过**：`node scripts/generate-knowledge-json.mjs`、`node scripts/generate-learning-activities.mjs` 均退出码 0；147 条 Web/端侧知识切片一致，33/33 Topic 共 60 个活动。
+- **静态诊断通过**：`python scripts/test_cs103_dns_lesson_facts.py` 最终退出码 0；3 项通过，覆盖正确/错误区域文件、规格/产物逐字段一致及 Web/raw `cs103_k39` 来源语义。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的关系、层级与 Lesson 闭环全部通过。
+- **静态诊断通过**：以 `git ls-files` 取得当前已跟踪测试模块并加入 DNS 新契约，退出码 0；106 项运行，105 项通过，1 项跨 WS02 reducer 契约为预期失败。CS101/TLS 两个后续批次的未跟踪红灯测试没有计入通过数。
+- **静态诊断通过**：Web lint/typecheck 与 13 文件/167 测试均退出码 0。
+- **构建通过**：Web 生产构建退出码 0，静态页面生成 10/10；HarmonyOS 增量 `assembleHap` 退出码 0，`BUILD SUCCESSFUL in 26 s 163 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- 旧内容目标测试退出码 1：规格/产物缺少 `$TTL`，`cs103_k39` 缺少 MINIMUM/否定缓存语义。首次修正后契约仍因正确的“`$TTL` 提供默认 TTL”和否定说明含“默认 TTL”而误报；改为按语义主体拒绝旧断言后 3 项通过。
+- **未验证**：当前无模拟器、手机、平板或真机；区域文件代码块、反馈滚动和布局未验证。本批未调用线上 API。
