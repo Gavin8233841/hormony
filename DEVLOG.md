@@ -6389,3 +6389,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 第一轮 production 脚本因缓存指令顺序从 `private, no-store` 被规范化为 `no-store, private` 而 exit 1；改为解析指令集合后 exit 0，失败未计作通过。
 - 线上 CDN/反向代理、真实模型 Chat SSE production 响应头与浏览器缓存面板未验证；pass-through 的 `Vary: Origin` 仍受当前 Next 版本限制。本批未修改 HarmonyOS、生产模型 ID 或秘密。
+
+---
+
+## [WS05] 2026-07-17：Chat SSE 单一终态边界
+
+背景：路由在编排已发出 `done` 后仍会接受后续事件；若编排随后抛错，还会再补写 `error -> done`，形成 `done -> error -> done`，违反客户端把首个 `done` 视为流终态的契约。
+
+文件：
+- `apps/web/src/app/api/chat/route.ts`
+- `apps/web/src/app/api/chat/terminal-boundary.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 路由在首个 `done` 成功写入或缓冲后锁定终态，忽略编排随后发出的 delta、重复 done 和其他事件。
+- `done` 后的迟到异常不再追加补偿 `error -> done`；终态前发生的异常仍沿用既有流内错误映射。
+- `error` 本身不锁定终态，既有 `error -> done` 协议、请求取消和输出上限收束保持不变。
+- 子 agent `chat_terminal_contract` 提供路由红测，修复前目标测试 exit 1 并复现 `done -> INTERNAL_ERROR -> done`；主线程逐行复核后采用，并补齐 done 后 delta/重复 done 与 `error -> done -> late throw` 反例。独立只读复核未发现取消、输出上限或 Safety 错误终态回归。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/app/api/chat/terminal-boundary.test.ts src/app/api/chat/stream-limits.test.ts`：exit 0，2 个测试文件、10 项通过。
+- `cd apps/web; pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，26 个测试文件、358 项通过。
+- `cd apps/web; pnpm build`：exit 0；Next.js 14.2.18 完成生产构建，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- 本地 production `127.0.0.1:4320` 显式清空模型测试响应并使用 stateless/off：有效请求返回 HTTP 503、`code=MODEL_UNAVAILABLE`、JSON `error` 字段存在且未建立 SSE；监听 PID 35452 已停止，端口已关闭。
+
+失败或未验证：
+- 首个 production 启动参数未形成监听，探针超时 exit 124；改用仓库实际 Next CLI 启动后成功。首个 HTTP 探针使用含连字符的 userId，按源码契约得到 `400/INVALID_USER_ID`；改为仅含字母和下划线的有效值后严格断言 exit 0，失败未计作通过。
+- 额外 Quiz 总预算子 agent 因账户并发额度未启动，未产生文件或结论；按主线程校准留到本批提交后由主代理评估。
+- **未验证**：线上部署、带真实模型的 Chat SSE terminal 行为、浏览器断连、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS、RAG、缓存策略、生产模型 ID 或秘密。

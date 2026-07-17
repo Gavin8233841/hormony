@@ -210,3 +210,30 @@
 - 第一轮 production 脚本按字符串顺序比较 `private, no-store`，而 Node 最终规范化为 `no-store, private`，因此 exit 1；改为解析指令集合并同时要求 `private`、`no-store` 后 exit 0。失败未计作通过。
 - pass-through API 的最终 `Vary` 仍由 Next 14 RSC 管理；本批通过禁止存储关闭跨 Origin 缓存风险，没有伪称框架 Vary 已修复。
 - **未验证**：线上 CDN/反向代理行为、真实模型 Chat SSE 的 production 响应头、浏览器缓存面板。未修改 HarmonyOS、生产模型 ID 或秘密。
+
+## 11. Chat SSE 单一终态边界
+
+### 11.1 源码确认与行为
+
+- Chat 路由在首个 `done` 成功进入响应后记录终态；编排随后发出的 delta、重复 done 或其他事件不再进入缓冲区或流控制器。
+- 编排在 `done` 后抛出的迟到异常不再触发路由补偿 `error -> done`，因此客户端只观察到首个终态。
+- `error` 仍需后接 `done` 才完成协议收束；现有流中错误映射、请求取消、单事件 64 KiB、总流 512 KiB 和 128 事件上限保持不变。
+- 路由回归覆盖 `done -> throw`、`done -> delta -> duplicate done` 和 `error -> done -> throw`。取消断开继续不补写终态；三类输出超限继续只以一次 `OUTPUT_LIMIT_EXCEEDED -> done` 收束。
+
+### 11.2 委派与复核
+
+- 子 agent `chat_terminal_contract` 新增 `done -> late throw` 路由红测，修复前 exit 1 并精确观察到 `done(session-complete) -> error(INTERNAL_ERROR) -> done(error)`；未修改生产源码、未暂存或提交。
+- 主线程采用该红测并补齐另外两个终态反例。独立只读威胁复核确认 `error` 不应单独锁定终态，且当前守卫未破坏取消、Safety 和输出上限路径。
+
+### 11.3 验证
+
+- 定向回归：`pnpm exec vitest run src/app/api/chat/terminal-boundary.test.ts src/app/api/chat/stream-limits.test.ts` exit 0，2 个测试文件、10 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，26 个测试文件、358 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成生产构建，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- 本地 production 黑盒：`127.0.0.1:4320`，显式无模型测试响应、stateless/off；有效 Chat 请求为 HTTP 503、`MODEL_UNAVAILABLE`、JSON `error` 字段存在且没有建立 SSE。实例 PID 35452 已停止，端口已关闭。
+
+### 11.4 失败与未验证
+
+- 首个 production 启动参数未建立监听，探针超时 exit 124；改用实际 Next CLI 后实例启动。首个业务请求因 userId 含连字符得到 `400/INVALID_USER_ID`；按已读取的精确契约改为字母和下划线后断言 exit 0，失败未计作通过。
+- 额外 Quiz 总预算子 agent 因账户并发额度未启动，没有修改文件；该风险留待本批提交后由主代理从源码与测试继续评估。
+- **未验证**：当前分支线上部署、带真实模型的 SSE 正文与迟到异常、真实浏览器断连、HarmonyOS 模拟器与真机。未修改 HarmonyOS、RAG、缓存策略、生产模型 ID 或秘密。
