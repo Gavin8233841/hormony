@@ -357,3 +357,149 @@
   已由真实团队审阅、权利已解决或声明已签署。
 - **未验证**：最终 PDF、MP4、门户实时字段、大小限制、上传结果和线上业务流程
   仍未验收。
+
+## 批次 9：ZIP 原始结构、名称一致性与读取资源边界
+
+背景：批次 8 只检查了 `ZipInfo.filename`。Windows Python 会把反斜杠规范化，
+并在 NUL 截断解析名称，同时把原始文本保留在 `ZipInfo.orig_filename`；因此原始
+名称与解析名称分叉时，旧门禁可把异常条目当作正常文件名。旧实现还接受 outer
+ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 outer 条目数、
+单项/总解压大小和压缩比上限。
+
+文件：
+
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-release-bundle.py`
+- `scripts/test_validate_release_bundle.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- outer ZIP 与 HAP 共用的 `_archive_infos` 同时检查 `orig_filename` 和
+  `filename`；原始名称单独进入敏感信息、控制字符、反斜杠、相对路径与 512
+  字节长度校验。两者不相等即失败，控制字符路径只显示固定安全标签。
+- outer ZIP 原始容器以固定块和重叠窗口只读扫描；需从 ZIP 结构开始并精确结束于
+  EOCD 及其声明注释。首个被中央目录引用的本地文件头还必须位于偏移 0，因此
+  普通前缀、ZIP 头样式伪装前缀和尾随数据都阻断。
+- outer/HAP 在读取条目正文前统一限制条目数不超过 10000、单项压缩比不超过
+  200:1。outer 单项/总解压上限为 512 MiB/1 GiB，HAP 为 64 MiB/256 MiB；
+  均为项目内部资源边界，不是官方门户限制。
+- UTF-8 标志与非法名称字节导致的 `UnicodeDecodeError` 转为只含异常类型的
+  结构化失败，不回显原始字节。正式命令改用 `python -B`，脚本在动态导入内容
+  门禁前设置 `sys.dont_write_bytecode`，不靠事后清理隐藏副作用。
+- 主线不得整提交采用 `5d1e75f`。发布门禁的最小前置文件是当前版本的
+  `scripts/validate-competition-content.py` 及其测试、`docs/COMPETITION-NOTICE.md`
+  和主线校准后的 `docs/SUBMISSION-SOURCE-MANIFEST.md`；主线自己的
+  `lesson-experiences.json` 必须保留。集成后逐项校准 manifest 存在性与跟踪状态，
+  并将 `sourceCommit` 绑定到校准完成后的主线 `HEAD`。
+
+验证：
+
+- **源码确认**：修复前真实 ZIP 字节固定输入显示 `orig_filename != filename`，
+  NUL、反斜杠在 outer/HAP 的错误数均为 0；修复后同一输入三类均被拒绝，控制
+  字符未进入错误正文。
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_release_bundle.py -v`，
+  exit 0，25/25 通过；覆盖真实 local/central 同长原位替换、outer/HAP 名称分叉、
+  长秘密跨流式块、普通/伪装前缀、尾随数据、资源上限读前阻断、非法 UTF-8 名称
+  和合法 ZIP/HAP 正向控制。
+- **静态诊断通过**：`python -B -m py_compile scripts/validate-release-bundle.py scripts/test_validate_release_bundle.py`，
+  exit 0。
+- **静态诊断通过**：内容门禁单测 29/29、Node 单一源测试 4/4、147/36 生成
+  一致性检查、165 题/33 Topic 内容门禁、Topic 关系门禁和冒烟自测 13/13 均
+  exit 0；未运行会写入 `lesson-experiences.json` 的活动生成器。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`、`pnpm test`
+  均 exit 0；13 个测试文件、169 项测试通过，无 ESLint 警告或错误。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建成功。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，
+  exit 0，`BUILD SUCCESSFUL in 5 s 858 ms`；仍有未配置 `signingConfigs` 的既有警告。
+
+失败后纠正：
+
+- 首轮新增名称分叉测试在旧实现上按预期失败；实现原始名称校验后，既有文件名
+  敏感信息断言需改为精确的“条目原始文件名”标签，再次运行通过。
+- 初版只检查容器首 4 字节，不能排除以 `PK` 本地头伪装的未引用前缀；增加中央
+  目录引用的最小本地头偏移必须为 0 后，固定输入从可读变为结构化失败。
+- 资源阻断首次把含秘密注释的 HAP 条目排除在内容扫描之外，导致既有深层内容
+  断言失败；保留元数据错误但只对路径/名称分叉和资源越界禁止读取，恢复深层扫描
+  后 25/25 通过。
+
+未验证：
+
+- **未验证**：本批未创建或修改最终 ZIP/HAP，未执行真实 `--bundle-path` 通过
+  记录；固定输入通过只证明门禁合同，不证明正式附件存在。
+- **未验证**：outer/HAP 上限是项目内部边界；官方门户的实时总大小、单文件大小、
+  上传次数和服务端解包规则尚未在线核验。
+- **未验证**：HAP 增量构建仍未签名；模拟器、真机、最终 PDF/MP4、完整播放和
+  门户上传均未验证。
+
+## 批次 10：官方 PDF、MP4 与 Demo/源码 ZIP 三文件解析门禁
+
+背景：最终材料此前只有文档清单，没有可执行工具证明文件名、PDF 页数、视频
+时长/容器和 ZIP 发布包同时满足合同。以扩展名或自报元数据替代实际解析会把错误
+格式误写成通过。
+
+文件：
+
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-official-deliverables.py`
+- `scripts/test_validate_official_deliverables.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 严格生成并逐字核对 `01-作品说明文档+队名.pdf`、`02-演示视频+队名.mp4`、
+  `03-作品名+队名.zip`。`+` 来自官方模板；PDF/MP4 后缀来自同段格式要求。
+- 要求调用者提供现有绝对普通文件形式的 `pdfinfo` 与 `ffprobe` 路径，拒绝符号
+  链接；使用参数数组、`shell=False`、有限超时和 C locale。工具缺失、超时、
+  非零退出、输出超限/无效时只返回结构化错误，不回显媒体路径或工具输出。
+- `pdfinfo` 必须解析唯一 `Pages`/`Encrypted`；整份 PDF 为 1..20 页且未加密。
+  官方口径是主体不超过 20 页、参考资料及附录不计；整份页数门禁与不得加密是
+  内部加严。
+- `ffprobe` 必须解析大于 0 且不超过 300 秒的有限时长、至少一个视频流和精确
+  `mp4` format token。证据记录实际 `format_names`；失败的 Matroska/WebM 不再
+  显示为 `format=mp4`。
+- ZIP 直接复用 `validate-release-bundle.py`；三文件只读流式计算 bytes/SHA-256。
+  媒体脚本在动态导入前禁用 bytecode，并纳入源码提交 manifest。
+
+官方材料核验：
+
+- **源码确认**：竞赛规程第 6 页与报名手册第 10 页给出三项命名/格式；规程第
+  6 页给出主体不超过 20 页及视频 5 分钟内；报名手册第 5 页要求团队名不得使用
+  符号，第 12 页限制整个上传更新流程最多 10 次。规程第 5 页将初赛 Demo 标为
+  可选，而报名手册上传须知列出三文件；鸿学伴按三文件全部准备的严格口径执行。
+- **源码确认**：绝对 `pdfinfo.exe` 路径只读解析两份官方 PDF，均 exit 0；竞赛
+  规程 11 页、报名手册 12 页，均 `Encrypted: no`。SHA-256 分别为
+  `E5093C61BED5A10C249E165095127AC1F03FD3CE5B8B993D3A8D6AE878BEC1A9` 与
+  `6034ACA8F908D76DEBD0EA1DC606C3F594DF8FE29310866F1E5EF91D170BD26E`。
+  这只证明官方依据文件，不是鸿学伴最终作品 PDF 通过。
+
+验证：
+
+- **静态诊断通过**：`python -B scripts/test_validate_official_deliverables.py`，
+  exit 0，18/18 通过；覆盖 1/20/21 页、加密/字段异常、0/300/300.001 秒、无
+  视频流、错误容器、非法 UTF-8、工具路径/符号链接/缺失/超时/非零/输出超限、
+  Windows 参数数组、C locale、秘密不回显、实际格式证据与 bytecode 兜底。
+- **静态诊断通过**：四个 Python 文件 `py_compile`、发布包固定输入 25/25、内容
+  门禁 29/29、Node 单一源 4/4、147/36 生成一致性、165 题/33 Topic 内容门禁、
+  Topic 关系门禁与冒烟自测 13/13 均 exit 0。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均 exit 0；
+  13 个测试文件、169 项测试通过，无 ESLint 警告或错误。
+- **构建通过**：Web `pnpm build` exit 0；HarmonyOS
+  `.\hvigorw.bat assembleHap --no-daemon` exit 0，`BUILD SUCCESSFUL in 4 s 961 ms`；
+  HAP 仍未配置 `signingConfigs`。
+
+失败后纠正：
+
+- 初次媒体单测 14 项中 1 项失败：Windows 将 `Path` 参数渲染为反斜杠，而测试
+  硬编码正斜杠；改为断言 `str(Path(...))` 后通过，没有放宽绝对工具路径合同。
+- 首次官方 PDF 汇总 PowerShell 在 `foreach` 后直接接管道，解析失败 exit 1；
+  改为先收集对象再输出后 exit 0，未修改任何 PDF 或产品文件。
+
+未验证：
+
+- **未验证**：仓库没有最终鸿学伴作品 PDF、PPT 源文件或 MP4，也没有正式三
+  文件 ZIP；因此没有运行真实 `validate-official-deliverables.py` 全通过流程。
+- **未验证**：没有最终 MP4 可供实际 `ffprobe` 与完整人工播放核验；固定输入不
+  等于成片编码、音画同步、字幕可读性或 5 分钟演示完成。
+- **未验证**：官方最新作品说明模板文件仍不在仓库；当前门禁不能证明最终 PDF
+  使用了门户当期模板。门户大小限制、10 次额度余量和实际上传结果未在线核验。

@@ -9,13 +9,16 @@ import importlib.util
 import io
 import json
 import re
+import struct
 import subprocess
 import sys
 import zipfile
 from collections import Counter
 from pathlib import Path, PurePosixPath
-from typing import NamedTuple
+from typing import BinaryIO, NamedTuple
 
+
+sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTENT_GATE_PATH = Path(__file__).with_name("validate-competition-content.py")
@@ -44,8 +47,33 @@ FULL_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 MAX_RELEASE_MANIFEST_BYTES = 64 * 1024
 MAX_ARCHIVE_PATH_BYTES = 512
+MAX_ARCHIVE_ENTRIES = 10_000
+MAX_ARCHIVE_COMPRESSION_RATIO = 200
+MAX_OUTER_ENTRY_BYTES = 512 * 1024 * 1024
+MAX_OUTER_TOTAL_BYTES = 1024 * 1024 * 1024
 MAX_HAP_ENTRY_BYTES = 64 * 1024 * 1024
 MAX_HAP_TOTAL_BYTES = 256 * 1024 * 1024
+RAW_SCAN_CHUNK_BYTES = 1024 * 1024
+RAW_SCAN_OVERLAP_BYTES = 4096
+ZIP_LOCAL_FILE_HEADER = b"PK\x03\x04"
+ZIP_END_OF_CENTRAL_DIRECTORY = b"PK\x05\x06"
+ZIP_END_OF_CENTRAL_DIRECTORY_BYTES = 22
+ZIP_MAX_COMMENT_BYTES = 65_535
+STREAM_SECRET_PREFIX_RULES = (
+    (
+        "literal-bearer-authorization",
+        re.compile(
+            rb"\bAuthorization\b\s*[:=]\s*[\"']Bearer [A-Za-z0-9._~+/-]{12}",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "literal-server-secret",
+        re.compile(
+            rb"\b(?:MODEL_API_KEY|VERCEL_TOKEN)\b\s*[:=]\s*[\"'](?!<)[^\"'\r\n]{16}"
+        ),
+    ),
+)
 REGULAR_GIT_MODES = frozenset({"100644", "100755"})
 
 
@@ -79,10 +107,95 @@ def _secret_hits(content: bytes) -> list[str]:
     ]
 
 
+def _stream_secret_hits(handle: BinaryIO) -> list[str]:
+    hits: set[str] = set()
+    overlap = b""
+    while True:
+        chunk = handle.read(RAW_SCAN_CHUNK_BYTES)
+        if not chunk:
+            break
+        window = overlap + chunk
+        hits.update(_secret_hits(window))
+        hits.update(
+            rule_name
+            for rule_name, rule in STREAM_SECRET_PREFIX_RULES
+            if rule.search(window)
+        )
+        overlap = window[-RAW_SCAN_OVERLAP_BYTES:]
+    return sorted(hits)
+
+
+def _outer_container_errors(
+    source: Path | io.BytesIO,
+    label: str,
+) -> list[str]:
+    errors: list[str] = []
+    handle: BinaryIO
+    should_close = False
+    original_position: int | None = None
+    try:
+        if isinstance(source, Path):
+            handle = source.open("rb")
+            should_close = True
+        else:
+            handle = source
+            original_position = handle.tell()
+
+        handle.seek(0, 2)
+        total_bytes = handle.tell()
+        handle.seek(0)
+        first_signature = handle.read(4)
+        if first_signature not in (
+            ZIP_LOCAL_FILE_HEADER,
+            ZIP_END_OF_CENTRAL_DIRECTORY,
+        ):
+            errors.append(f"{label} ZIP 在首个结构前包含额外前缀")
+
+        handle.seek(0)
+        for rule_name in _stream_secret_hits(handle):
+            errors.append(f"{label} ZIP 原始容器敏感信息命中 ({rule_name})")
+
+        tail_bytes = min(
+            total_bytes,
+            ZIP_END_OF_CENTRAL_DIRECTORY_BYTES + ZIP_MAX_COMMENT_BYTES,
+        )
+        handle.seek(total_bytes - tail_bytes)
+        tail = handle.read(tail_bytes)
+        relative_offset = tail.rfind(ZIP_END_OF_CENTRAL_DIRECTORY)
+        if relative_offset < 0:
+            errors.append(f"{label} ZIP 缺少末尾中央目录结束记录")
+        elif relative_offset + ZIP_END_OF_CENTRAL_DIRECTORY_BYTES > len(tail):
+            errors.append(f"{label} ZIP 中央目录结束记录不完整")
+        else:
+            comment_bytes = struct.unpack_from("<H", tail, relative_offset + 20)[0]
+            expected_end = (
+                total_bytes
+                - tail_bytes
+                + relative_offset
+                + ZIP_END_OF_CENTRAL_DIRECTORY_BYTES
+                + comment_bytes
+            )
+            if expected_end != total_bytes:
+                errors.append(f"{label} ZIP 在中央目录结束记录后包含尾随数据")
+    except (OSError, ValueError):
+        errors.append(f"{label} ZIP 原始容器无法只读检查")
+    finally:
+        if should_close:
+            handle.close()
+        elif original_position is not None:
+            try:
+                handle.seek(original_position)
+            except (OSError, ValueError):
+                pass
+    return errors
+
+
 def _path_display(name: str) -> str:
     encoded = name.encode("utf-8", errors="surrogatepass")
     if _secret_hits(encoded):
         return "<redacted-path>"
+    if any(ord(character) < 32 or ord(character) == 127 for character in name):
+        return "<path-with-control-character>"
     if len(encoded) > MAX_ARCHIVE_PATH_BYTES:
         return f"<path utf8-bytes={len(encoded)}>"
     return name
@@ -319,31 +432,88 @@ def parse_release_manifest(content: bytes) -> tuple[ReleaseManifest, list[str]]:
 def _archive_infos(
     archive: zipfile.ZipFile,
     label: str,
+    *,
+    max_entry_bytes: int,
+    max_total_bytes: int,
+    require_first_header_at_zero: bool,
 ) -> tuple[list[zipfile.ZipInfo], list[str]]:
     readable: list[zipfile.ZipInfo] = []
     errors: list[str] = []
     seen_exact: set[str] = set()
     seen_casefold: dict[str, str] = {}
+    infos = archive.infolist()
+    resource_blocked = False
+
+    if (
+        require_first_header_at_zero
+        and infos
+        and min(info.header_offset for info in infos) != 0
+    ):
+        errors.append(f"{label} ZIP 首个被引用的本地文件头不在偏移 0")
+        resource_blocked = True
+    if len(infos) > MAX_ARCHIVE_ENTRIES:
+        errors.append(
+            f"{label} 条目数超过内部上限: "
+            f"{len(infos)}>{MAX_ARCHIVE_ENTRIES}"
+        )
+        resource_blocked = True
+    total_bytes = sum(info.file_size for info in infos if not info.is_dir())
+    if total_bytes > max_total_bytes:
+        errors.append(
+            f"{label} 解压后总大小超过内部上限: "
+            f"{total_bytes}>{max_total_bytes}"
+        )
+        resource_blocked = True
 
     for rule_name in _secret_hits(archive.comment):
         errors.append(f"{label} ZIP 注释敏感信息命中 ({rule_name})")
 
-    for info in archive.infolist():
-        metadata = (
-            ("条目文件名", info.filename.encode("utf-8", errors="surrogatepass")),
+    for info in infos:
+        entry_blocked = False
+        original_name = info.orig_filename
+        metadata = [
+            ("条目原始文件名", original_name.encode("utf-8", errors="surrogatepass")),
             ("条目注释", info.comment),
             ("条目扩展字段", info.extra),
-        )
+        ]
+        if original_name != info.filename:
+            metadata.append(
+                (
+                    "条目解析文件名",
+                    info.filename.encode("utf-8", errors="surrogatepass"),
+                )
+            )
         for metadata_kind, metadata_content in metadata:
             for rule_name in _secret_hits(metadata_content):
                 errors.append(
                     f"{label} {metadata_kind}敏感信息命中 ({rule_name})"
                 )
+
+        original_display_name = _path_display(original_name)
+        original_reason = archive_path_reason(
+            original_name,
+            original_name.endswith("/"),
+        )
+        if original_reason is not None:
+            errors.append(
+                f"{label} ZIP 原始路径无效: {original_display_name} "
+                f"({original_reason})"
+            )
+            entry_blocked = True
+        if original_name != info.filename:
+            errors.append(
+                f"{label} ZIP 元数据 orig_filename（原始文件名）与 "
+                f"filename（解析文件名）不一致: "
+                f"{original_display_name}"
+            )
+            entry_blocked = True
+
         normalized = info.filename[:-1] if info.is_dir() and info.filename.endswith("/") else info.filename
         display_name = _path_display(info.filename)
         reason = archive_path_reason(info.filename, info.is_dir())
         if reason is not None:
             errors.append(f"{label} 路径无效: {display_name} ({reason})")
+            entry_blocked = True
 
         folded = normalized.casefold()
         if normalized in seen_exact:
@@ -368,8 +538,28 @@ def _archive_infos(
         if info.flag_bits & 0x1:
             errors.append(f"{label} 包含加密条目，无法审计: {display_name}")
             continue
-        if not info.is_dir():
+        if info.is_dir():
+            continue
+        if info.file_size > max_entry_bytes:
+            errors.append(
+                f"{label} 条目解压大小超过内部上限: {display_name} "
+                f"({info.file_size}>{max_entry_bytes})"
+            )
+            continue
+        if info.file_size > 0 and (
+            info.compress_size == 0
+            or info.file_size
+            > info.compress_size * MAX_ARCHIVE_COMPRESSION_RATIO
+        ):
+            errors.append(
+                f"{label} 条目压缩比超过内部上限: {display_name} "
+                f"(max={MAX_ARCHIVE_COMPRESSION_RATIO}:1)"
+            )
+            continue
+        if not entry_blocked:
             readable.append(info)
+    if resource_blocked:
+        readable.clear()
     return readable, errors
 
 
@@ -378,10 +568,16 @@ def collect_zip_entries(
     label: str,
 ) -> tuple[dict[str, bytes], list[str]]:
     entries: dict[str, bytes] = {}
-    errors: list[str] = []
+    errors = _outer_container_errors(source, label)
     try:
         with zipfile.ZipFile(source) as archive:
-            infos, info_errors = _archive_infos(archive, label)
+            infos, info_errors = _archive_infos(
+                archive,
+                label,
+                max_entry_bytes=MAX_OUTER_ENTRY_BYTES,
+                max_total_bytes=MAX_OUTER_TOTAL_BYTES,
+                require_first_header_at_zero=True,
+            )
             errors.extend(info_errors)
             for info in infos:
                 try:
@@ -391,7 +587,12 @@ def collect_zip_entries(
                         f"{label} 条目无法读取: {_path_display(info.filename)} "
                         f"({type(error).__name__})"
                     )
-    except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        zipfile.BadZipFile,
+        zipfile.LargeZipFile,
+    ) as error:
         errors.append(f"{label} 无法作为 ZIP 读取 ({type(error).__name__})")
     return entries, errors
 
@@ -414,25 +615,17 @@ def check_hap_content(path: str, content: bytes) -> list[str]:
         errors.append(f"HAP 容器敏感信息命中 ({rule_name})")
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
-            infos, info_errors = _archive_infos(archive, f"HAP {display_path}")
+            infos, info_errors = _archive_infos(
+                archive,
+                f"HAP {display_path}",
+                max_entry_bytes=MAX_HAP_ENTRY_BYTES,
+                max_total_bytes=MAX_HAP_TOTAL_BYTES,
+                require_first_header_at_zero=False,
+            )
             errors.extend(info_errors)
             if not any(not info.is_dir() for info in archive.infolist()):
                 errors.append(f"HAP 不含文件条目: {display_path}")
-            total_bytes = sum(info.file_size for info in infos)
-            if total_bytes > MAX_HAP_TOTAL_BYTES:
-                errors.append(
-                    f"HAP 解压后总大小超过内部扫描上限: {display_path} "
-                    f"({total_bytes}>{MAX_HAP_TOTAL_BYTES})"
-                )
-                return errors
             for info in infos:
-                if info.file_size > MAX_HAP_ENTRY_BYTES:
-                    errors.append(
-                        f"HAP 内部条目超过扫描上限: {display_path}!/"
-                        f"{_path_display(info.filename)} "
-                        f"({info.file_size}>{MAX_HAP_ENTRY_BYTES})"
-                    )
-                    continue
                 try:
                     entry_content = archive.read(info)
                 except (NotImplementedError, OSError, RuntimeError, zipfile.BadZipFile) as error:
@@ -444,7 +637,12 @@ def check_hap_content(path: str, content: bytes) -> list[str]:
                     continue
                 for rule_name in _secret_hits(entry_content):
                     errors.append(f"HAP 内部条目内容敏感信息命中 ({rule_name})")
-    except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        zipfile.BadZipFile,
+        zipfile.LargeZipFile,
+    ) as error:
         errors.append(
             f"HAP 无法作为 ZIP 读取: {display_path} ({type(error).__name__})"
         )

@@ -55,6 +55,55 @@ def zip_with_metadata(
     return output.getvalue()
 
 
+def zip_with_raw_filename(raw_name: bytes, content: bytes = b"fixture") -> bytes:
+    if not raw_name or not raw_name.isascii():
+        raise ValueError("raw_name must be non-empty ASCII bytes")
+
+    placeholder_seed = b"RAW_NAME_PLACEHOLDER_0123456789_"
+    placeholder = (placeholder_seed * (len(raw_name) // len(placeholder_seed) + 1))[
+        : len(raw_name)
+    ]
+    result = bytearray(zip_bytes([(placeholder.decode("ascii"), content)]))
+    local = result.find(b"PK\x03\x04")
+    central = result.find(b"PK\x01\x02")
+    assert local >= 0 and central >= 0
+
+    local_name_length = struct.unpack_from("<H", result, local + 26)[0]
+    central_name_length = struct.unpack_from("<H", result, central + 28)[0]
+    local_name_start = local + 30
+    central_name_start = central + 46
+    assert local_name_length == len(placeholder)
+    assert central_name_length == len(placeholder)
+    assert result[local_name_start : local_name_start + local_name_length] == placeholder
+    assert (
+        result[central_name_start : central_name_start + central_name_length]
+        == placeholder
+    )
+    assert bytes(result).count(placeholder) == 2
+
+    result[local_name_start : local_name_start + local_name_length] = raw_name
+    result[central_name_start : central_name_start + central_name_length] = raw_name
+    assert bytes(result).count(raw_name) == 2
+    return bytes(result)
+
+
+def zip_with_invalid_utf8_filename() -> bytes:
+    placeholder = b"invalid.bin"
+    raw_name = b"\xffnvalid.bin"
+    result = bytearray(zip_bytes([(placeholder.decode("ascii"), b"fixture")]))
+    local = result.find(b"PK\x03\x04")
+    central = result.find(b"PK\x01\x02")
+    assert local >= 0 and central >= 0
+    assert len(raw_name) == len(placeholder)
+    assert bytes(result).count(placeholder) == 2
+    result = bytearray(bytes(result).replace(placeholder, raw_name))
+    local_flags = struct.unpack_from("<H", result, local + 6)[0] | 0x800
+    central_flags = struct.unpack_from("<H", result, central + 8)[0] | 0x800
+    struct.pack_into("<H", result, local + 6, local_flags)
+    struct.pack_into("<H", result, central + 8, central_flags)
+    return bytes(result)
+
+
 def encrypted_first_entry(content: bytes) -> bytes:
     result = bytearray(content)
     local = result.find(b"PK\x03\x04")
@@ -372,8 +421,184 @@ class ReleaseBundleGateTests(unittest.TestCase):
         )
         output = "\n".join(errors)
 
-        self.assertIn("条目文件名敏感信息命中", output)
+        self.assertIn("条目原始文件名敏感信息命中", output)
         self.assertNotIn(secret_name, output)
+
+    def test_raw_filename_divergence_is_rejected_for_outer_zip_and_hap(self) -> None:
+        secret_value = b"ABCDEFGHIJKLMNOPQRSTUVWX"
+        secret = b'MODEL_API_KEY="' + secret_value + b'"'
+        raw_name = b"release\\README.md\x00" + secret
+        malicious_zip = zip_with_raw_filename(raw_name)
+
+        with zipfile.ZipFile(io.BytesIO(malicious_zip)) as archive:
+            info = archive.infolist()[0]
+            self.assertEqual(raw_name.decode("ascii"), info.orig_filename)
+            self.assertNotEqual(info.orig_filename, info.filename)
+            self.assertIn("\x00", info.orig_filename)
+            self.assertNotIn("\x00", info.filename)
+
+        _, outer_errors = MODULE.collect_zip_entries(
+            io.BytesIO(malicious_zip),
+            "最终 ZIP",
+        )
+        entries, sources, _ = complete_fixture(malicious_zip)
+        hap_errors = self.check(entries, sources)
+
+        for errors in (outer_errors, hap_errors):
+            output = "\n".join(errors)
+            self.assertIn("literal-server-secret", output)
+            self.assertTrue(
+                any(
+                    "原始文件名" in error
+                    and "解析文件名" in error
+                    and "不一致" in error
+                    for error in errors
+                )
+            )
+            self.assertNotIn(secret.decode("ascii"), output)
+            self.assertNotIn(secret_value.decode("ascii"), output)
+
+    def test_valid_raw_filename_identity_remains_accepted(self) -> None:
+        valid_zip = zip_bytes([("release/README.md", b"fixture")])
+        with zipfile.ZipFile(io.BytesIO(valid_zip)) as archive:
+            info = archive.infolist()[0]
+            self.assertEqual(info.orig_filename, info.filename)
+
+        entries, outer_errors = MODULE.collect_zip_entries(
+            io.BytesIO(valid_zip),
+            "最终 ZIP",
+        )
+        hap_errors = MODULE.check_hap_content("release/app.hap", valid_zip)
+
+        self.assertEqual({"release/README.md": b"fixture"}, entries)
+        self.assertEqual([], outer_errors)
+        self.assertEqual([], hap_errors)
+
+    def test_outer_zip_rejects_prefix_and_suffix_with_streamed_secret_scan(self) -> None:
+        expected_entries, sources, _ = complete_fixture()
+        valid_zip = zip_bytes(list(expected_entries.items()))
+        secret_value = b"A" * 512
+        secret = b"MODEL_" + b'API_KEY="' + secret_value + b'"'
+        fixtures = (
+            ("prefix", secret + valid_zip, "额外前缀"),
+            ("suffix", valid_zip + secret, "尾随数据"),
+        )
+
+        for label, content, structure_error in fixtures:
+            with self.subTest(label=label), mock.patch.object(
+                MODULE,
+                "RAW_SCAN_CHUNK_BYTES",
+                17,
+            ), mock.patch.object(MODULE, "RAW_SCAN_OVERLAP_BYTES", 64):
+                entries, container_errors = MODULE.collect_zip_entries(
+                    io.BytesIO(content),
+                    "最终 ZIP",
+                )
+            semantic_errors = self.check(entries, sources)
+            output = "\n".join(container_errors + semantic_errors)
+
+            if label == "prefix":
+                self.assertEqual({}, entries)
+            else:
+                self.assertEqual(expected_entries, entries)
+                self.assertEqual([], semantic_errors)
+            self.assertIn(structure_error, output)
+            self.assertIn("ZIP 原始容器敏感信息命中 (literal-server-secret)", output)
+            self.assertNotIn(secret.decode("ascii"), output)
+            self.assertNotIn(secret_value.decode("ascii"), output)
+
+        zip_header_prefix = MODULE.ZIP_LOCAL_FILE_HEADER + (b"\x00" * 26)
+        disguised_entries, disguised_errors = MODULE.collect_zip_entries(
+            io.BytesIO(zip_header_prefix + valid_zip),
+            "最终 ZIP",
+        )
+        self.assertEqual({}, disguised_entries)
+        self.assertTrue(
+            any("本地文件头不在偏移 0" in error for error in disguised_errors)
+        )
+
+    def test_outer_and_hap_resource_limits_block_reads(self) -> None:
+        two_entries = zip_bytes([("one.txt", b"1234"), ("two.txt", b"5678")])
+        with mock.patch.object(MODULE, "MAX_ARCHIVE_ENTRIES", 1), mock.patch.object(
+            MODULE.zipfile.ZipFile,
+            "read",
+            side_effect=AssertionError("read must not run after global limit failure"),
+        ) as reader:
+            entries, count_errors = MODULE.collect_zip_entries(
+                io.BytesIO(two_entries),
+                "最终 ZIP",
+            )
+        self.assertEqual({}, entries)
+        self.assertTrue(any("条目数超过内部上限" in error for error in count_errors))
+        reader.assert_not_called()
+
+        with mock.patch.object(MODULE, "MAX_OUTER_TOTAL_BYTES", 7), mock.patch.object(
+            MODULE.zipfile.ZipFile,
+            "read",
+            side_effect=AssertionError("read must not run after total limit failure"),
+        ) as reader:
+            entries, total_errors = MODULE.collect_zip_entries(
+                io.BytesIO(two_entries),
+                "最终 ZIP",
+            )
+        self.assertEqual({}, entries)
+        self.assertTrue(any("解压后总大小超过内部上限" in error for error in total_errors))
+        reader.assert_not_called()
+
+        one_entry = zip_bytes([("large.txt", b"1234")])
+        with mock.patch.object(MODULE, "MAX_OUTER_ENTRY_BYTES", 3), mock.patch.object(
+            MODULE.zipfile.ZipFile,
+            "read",
+            side_effect=AssertionError("read must not run after entry limit failure"),
+        ) as reader:
+            entries, entry_errors = MODULE.collect_zip_entries(
+                io.BytesIO(one_entry),
+                "最终 ZIP",
+            )
+        self.assertEqual({}, entries)
+        self.assertTrue(any("条目解压大小超过内部上限" in error for error in entry_errors))
+        reader.assert_not_called()
+
+        compressed = zip_bytes([("repeated.txt", b"A" * 4096)])
+        with mock.patch.object(MODULE, "MAX_ARCHIVE_COMPRESSION_RATIO", 2), mock.patch.object(
+            MODULE.zipfile.ZipFile,
+            "read",
+            side_effect=AssertionError("read must not run after ratio failure"),
+        ) as reader:
+            entries, ratio_errors = MODULE.collect_zip_entries(
+                io.BytesIO(compressed),
+                "最终 ZIP",
+            )
+        self.assertEqual({}, entries)
+        self.assertTrue(any("条目压缩比超过内部上限" in error for error in ratio_errors))
+        reader.assert_not_called()
+
+        with mock.patch.object(MODULE, "MAX_HAP_ENTRY_BYTES", 3), mock.patch.object(
+            MODULE.zipfile.ZipFile,
+            "read",
+            side_effect=AssertionError("HAP read must not run after entry limit failure"),
+        ) as reader:
+            hap_errors = MODULE.check_hap_content("release/app.hap", one_entry)
+        self.assertTrue(any("条目解压大小超过内部上限" in error for error in hap_errors))
+        reader.assert_not_called()
+
+    def test_invalid_utf8_filename_is_a_structured_outer_and_hap_failure(self) -> None:
+        malformed = zip_with_invalid_utf8_filename()
+
+        entries, outer_errors = MODULE.collect_zip_entries(
+            io.BytesIO(malformed),
+            "最终 ZIP",
+        )
+        hap_errors = MODULE.check_hap_content("release/app.hap", malformed)
+        output = "\n".join(outer_errors + hap_errors)
+
+        self.assertEqual({}, entries)
+        self.assertEqual(2, output.count("UnicodeDecodeError"))
+        self.assertNotIn("0xff", output.casefold())
+        self.assertNotIn("nvalid.bin", output)
+
+    def test_dynamic_import_disables_bytecode_writes(self) -> None:
+        self.assertTrue(MODULE.sys.dont_write_bytecode)
 
     def test_hap_rejects_encrypted_symlink_and_duplicate_entries(self) -> None:
         encrypted = encrypted_first_entry(zip_bytes([("secret.txt", b"content")]))
