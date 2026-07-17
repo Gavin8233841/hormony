@@ -6883,3 +6883,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前没有模拟器或真机目标；真实 ArkData 升级、进程终止后恢复、课程进度 UI、错题重练点击和跨日复习均未做设备验证。
 - HAP 未配置 `signingConfigs`，构建跳过签名；安装、真机与多设备行为未验证。
 - 本批未调用线上 Quiz 或真实模型，不声明线上通过。
+
+---
+
+## 2026-07-17 [MAIN] 服务卡片冷启动仓储顺序与内容初始化恢复
+
+背景：schema 12 迁移会读取课程索引，但服务卡片的 `onAddForm`、`onUpdateForm` 与 `onRemoveForm` 可在主 UI Ability 之前冷启动。原实现直接初始化 ArkData，可能在课程内容尚未加载时跳过旧 Lesson 完成项并提前完成 schema 迁移；课程内容仓储本身也没有并发共享或失败后的同进程恢复契约。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LearningContentRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/entryformability/EntryFormAbility.ets`
+- `scripts/test-proactive-delivery-contracts.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- 课程内容仓储以共享 `initializationTask` 串联并发调用；五项资产全部读入局部变量后才一次发布索引，任一读取失败会清空 manager、资产和派生索引并允许同进程重试。
+- Form Ability 三条系统入口统一等待 `LearningContentRepository -> LocalLearningRepository`，再执行刷新、注册或移除，确保 schema 迁移可读取精确课程与 Topic。
+- VM 契约以 deferred gate 证明第二个内容初始化不会提前完成、第三项资产失败不会暴露半成品且第二轮完整重读五项资产，并证明三条 Form 入口确实等待内容初始化完成而非只调用不等待。
+
+验证：
+- `node --check scripts/test-proactive-delivery-contracts.mjs`：exit 0。
+- `node --test scripts/test-proactive-delivery-contracts.mjs`：exit 0，22/22 通过。
+- `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，43/43 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 3 s 879 ms`；`CompileArkTS` 与 `PackageHap` 通过。
+- 两级独立只读审查复核仓储发布/复位、Form 三入口顺序和 VM 反例，未发现源码逻辑阻断项；审查提出的三类测试强度缺口已全部补齐。
+
+失败或未验证：
+- HAP 未配置 `signingConfigs`，构建明确跳过签名；不能据此声明安装通过。
+- 服务卡片由系统冷启动、真实 ArkData 升级、模拟器、真机和多设备行为未验证。
+- 本批未调用线上 API 或真实模型，不声明线上通过。

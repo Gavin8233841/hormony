@@ -1,6 +1,7 @@
 import { formBindingData, FormExtensionAbility, formInfo } from '@kit.FormKit';
 import { Want } from '@kit.AbilityKit';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 
 export default class EntryFormAbility extends FormExtensionAbility {
@@ -25,18 +26,23 @@ export default class EntryFormAbility extends FormExtensionAbility {
   }
 
   private async refreshForm(formId: string): Promise<void> {
-    await LocalLearningRepository.initialize(this.context);
+    await this.initializeRepositories();
     await LearningFormUpdater.refreshForm(formId);
   }
 
   private async registerAndRefresh(formId: string): Promise<void> {
-    await LocalLearningRepository.initialize(this.context);
+    await this.initializeRepositories();
     await LocalLearningRepository.registerFormId(formId);
     await LearningFormUpdater.refreshForm(formId);
   }
 
   private async removeForm(formId: string): Promise<void> {
-    await LocalLearningRepository.initialize(this.context);
+    await this.initializeRepositories();
     await LocalLearningRepository.removeFormId(formId);
+  }
+
+  private async initializeRepositories(): Promise<void> {
+    await LearningContentRepository.initialize(this.context.resourceManager);
+    await LocalLearningRepository.initialize(this.context);
   }
 }

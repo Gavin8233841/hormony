@@ -38,6 +38,7 @@ interface LessonExperienceIndex {
 
 export class LearningContentRepository {
   private static manager: resourceManager.ResourceManager | null = null;
+  private static initializationTask: Promise<void> | null = null;
   private static knowledge: CuratedKnowledgeChunk[] = [];
   private static questions: CuratedQuestion[] = [];
   private static resources: ExternalLearningResource[] = [];
@@ -53,16 +54,55 @@ export class LearningContentRepository {
   private static lessonExperienceByTopic: LessonExperienceIndex[] = [];
 
   static async initialize(manager: resourceManager.ResourceManager): Promise<void> {
+    if (LearningContentRepository.initializationTask !== null) {
+      return LearningContentRepository.initializationTask;
+    }
     if (LearningContentRepository.manager !== null) return;
+
+    const operation = LearningContentRepository.initializeContent(manager);
+    LearningContentRepository.initializationTask = operation;
+    try {
+      await operation;
+    } finally {
+      LearningContentRepository.initializationTask = null;
+    }
+  }
+
+  private static async initializeContent(manager: resourceManager.ResourceManager): Promise<void> {
     LearningContentRepository.manager = manager;
-    LearningContentRepository.knowledge = await LearningContentRepository.readJson<CuratedKnowledgeChunk[]>(KNOWLEDGE_PATH);
-    LearningContentRepository.questions = await LearningContentRepository.readJson<CuratedQuestion[]>(QUIZZES_PATH);
-    LearningContentRepository.resources = await LearningContentRepository.readJson<ExternalLearningResource[]>(RESOURCES_PATH);
-    LearningContentRepository.topicRelations =
-      await LearningContentRepository.readJson<TopicRelation[]>(TOPIC_RELATIONS_PATH);
-    LearningContentRepository.lessonExperiences =
-      await LearningContentRepository.readJson<LessonExperience[]>(LESSON_EXPERIENCES_PATH);
-    LearningContentRepository.buildIndexes();
+    try {
+      const knowledge = await LearningContentRepository.readJson<CuratedKnowledgeChunk[]>(KNOWLEDGE_PATH);
+      const questions = await LearningContentRepository.readJson<CuratedQuestion[]>(QUIZZES_PATH);
+      const resources = await LearningContentRepository.readJson<ExternalLearningResource[]>(RESOURCES_PATH);
+      const topicRelations = await LearningContentRepository.readJson<TopicRelation[]>(TOPIC_RELATIONS_PATH);
+      const lessonExperiences = await LearningContentRepository.readJson<LessonExperience[]>(LESSON_EXPERIENCES_PATH);
+      LearningContentRepository.knowledge = knowledge;
+      LearningContentRepository.questions = questions;
+      LearningContentRepository.resources = resources;
+      LearningContentRepository.topicRelations = topicRelations;
+      LearningContentRepository.lessonExperiences = lessonExperiences;
+      LearningContentRepository.buildIndexes();
+    } catch (error) {
+      LearningContentRepository.reset();
+      throw new Error('课程内容仓储初始化失败: ' + String(error));
+    }
+  }
+
+  private static reset(): void {
+    LearningContentRepository.manager = null;
+    LearningContentRepository.knowledge = [];
+    LearningContentRepository.questions = [];
+    LearningContentRepository.resources = [];
+    LearningContentRepository.topicRelations = [];
+    LearningContentRepository.lessonExperiences = [];
+    LearningContentRepository.knowledgeByCourse = [];
+    LearningContentRepository.knowledgeByTopic = [];
+    LearningContentRepository.questionsByCourse = [];
+    LearningContentRepository.questionsByTopic = [];
+    LearningContentRepository.resourcesByCourse = [];
+    LearningContentRepository.topicsByCourse = [];
+    LearningContentRepository.relationsByCourse = [];
+    LearningContentRepository.lessonExperienceByTopic = [];
   }
 
   private static async readJson<T>(path: string): Promise<T> {

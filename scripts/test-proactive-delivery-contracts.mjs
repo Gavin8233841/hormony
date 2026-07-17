@@ -11,6 +11,7 @@ const sourceRoot = path.resolve(scriptDirectory, '../apps/harmonyos/entry/src/ma
 const servicePath = path.join(sourceRoot, 'common/ProactiveLearningService.ets');
 const reminderPath = path.join(sourceRoot, 'common/LearningReminder.ets');
 const formUpdaterPath = path.join(sourceRoot, 'common/LearningFormUpdater.ets');
+const contentRepositoryPath = path.join(sourceRoot, 'common/LearningContentRepository.ets');
 const entryFormAbilityPath = path.join(sourceRoot, 'entryformability/EntryFormAbility.ets');
 const entryAbilityPath = path.join(sourceRoot, 'entryability/EntryAbility.ets');
 const homeContentPath = path.join(sourceRoot, 'pages/HomeContent.ets');
@@ -107,9 +108,11 @@ function compileEntryFormAbility() {
   const formImport = "import { formBindingData, FormExtensionAbility, formInfo } from '@kit.FormKit';";
   const abilityImport = "import { Want } from '@kit.AbilityKit';";
   const updaterImport = "import { LearningFormUpdater } from '../common/LearningFormUpdater';";
+  const contentRepositoryImport =
+    "import { LearningContentRepository } from '../common/LearningContentRepository';";
   const repositoryImport = "import { LocalLearningRepository } from '../common/LocalLearningRepository';";
   let source = removeImports(readSource(entryFormAbilityPath),
-    [formImport, abilityImport, updaterImport, repositoryImport], entryFormAbilityPath);
+    [formImport, abilityImport, updaterImport, contentRepositoryImport, repositoryImport], entryFormAbilityPath);
   assert.equal(source.includes('export default class EntryFormAbility extends FormExtensionAbility'), true,
     'EntryFormAbility export changed');
   source = source.replace('export default class EntryFormAbility extends FormExtensionAbility',
@@ -118,9 +121,33 @@ function compileEntryFormAbility() {
 const FormExtensionAbility = globalThis.__FormExtensionAbility;
 const formInfo = globalThis.__formInfo;
 const LearningFormUpdater = globalThis.__formUpdater;
+const LearningContentRepository = globalThis.__contentRepository;
 const LocalLearningRepository = globalThis.__repository;
 ${source}
 globalThis.__EntryFormAbility = EntryFormAbility;
+`;
+  return stripTypeScriptTypes(source, { mode: 'transform', sourceMap: false });
+}
+
+function compileLearningContentRepository() {
+  const localizationImport = "import { resourceManager } from '@kit.LocalizationKit';";
+  const arkTsImport = "import { util } from '@kit.ArkTS';";
+  const dataModelsImport = `import {
+  CuratedKnowledgeChunk,
+  ExternalLearningResource,
+  LessonExperience,
+  TopicRelation
+} from '../model/DataModels';`;
+  const metadataImport =
+    "import { LearningCuratedQuestion as CuratedQuestion } from '../model/LearningMetadataModels';";
+  let source = removeImports(readSource(contentRepositoryPath),
+    [localizationImport, arkTsImport, dataModelsImport, metadataImport], contentRepositoryPath);
+  assert.equal(source.includes('export class LearningContentRepository'), true,
+    'LearningContentRepository export changed');
+  source = source.replace('export class LearningContentRepository', 'class LearningContentRepository');
+  source = `const util = globalThis.__util;
+${source}
+globalThis.__LearningContentRepository = LearningContentRepository;
 `;
   return stripTypeScriptTypes(source, { mode: 'transform', sourceMap: false });
 }
@@ -162,6 +189,7 @@ globalThis.__EntryAbility = EntryAbility;
 const compiledService = compileService();
 const compiledReminder = compileReminder();
 const compiledFormUpdater = compileFormUpdater();
+const compiledLearningContentRepository = compileLearningContentRepository();
 const compiledEntryFormAbility = compileEntryFormAbility();
 const compiledEntryAbility = compileEntryAbility();
 
@@ -242,15 +270,17 @@ function loadFormUpdater(service, formProvider, repository = { getFormIds: async
   return context.__LearningFormUpdater;
 }
 
-function loadEntryFormAbility(formUpdater, repository) {
+function loadEntryFormAbility(formUpdater, repository,
+  contentRepository = { initialize: async () => {} }) {
   class FormExtensionAbility {
     constructor() {
-      this.context = { name: 'form-context' };
+      this.context = { name: 'form-context', resourceManager: { name: 'form-resource-manager' } };
     }
   }
   const context = vm.createContext({
     __FormExtensionAbility: FormExtensionAbility,
     __formUpdater: formUpdater,
+    __contentRepository: contentRepository,
     __repository: repository,
     __formBindingData: { createFormBindingData: (data) => data },
     __formInfo: {
@@ -260,6 +290,43 @@ function loadEntryFormAbility(formUpdater, repository) {
   });
   vm.runInContext(compiledEntryFormAbility, context, { filename: entryFormAbilityPath });
   return context.__EntryFormAbility;
+}
+
+function loadLearningContentRepository() {
+  const context = vm.createContext({
+    __util: {
+      TextDecoder: {
+        create: () => ({
+          decodeToString: (bytes) => new TextDecoder().decode(bytes)
+        })
+      }
+    }
+  });
+  vm.runInContext(compiledLearningContentRepository, context, { filename: contentRepositoryPath });
+  return context.__LearningContentRepository;
+}
+
+function contentFixture(pathName) {
+  const values = {
+    'learning/knowledge-chunks.json': [
+      { id: 'knowledge-1', courseId: 'cs101', topic: '二叉树' }
+    ],
+    'learning/quizzes.json': [
+      { id: 'question-1', courseId: 'cs101', topic: '二叉树' }
+    ],
+    'learning/external-resources.json': [
+      { id: 'resource-1', courseId: 'cs101' }
+    ],
+    'learning/topic-relations.json': [
+      { id: 'relation-1', courseId: 'cs101' }
+    ],
+    'learning/lesson-experiences.json': [
+      { id: 'lesson-1', courseId: 'cs101', topic: '二叉树' }
+    ]
+  };
+  const value = values[pathName];
+  if (value === undefined) throw new Error(`未知课程内容路径: ${pathName}`);
+  return new TextEncoder().encode(JSON.stringify(value));
 }
 
 function validWant() {
@@ -638,6 +705,130 @@ test('本地状态变化后单张服务卡片重新解析新的行动', async ()
     { title: firstAction.title, targetPage: firstAction.targetPage, taskAction: firstAction.taskAction },
     { title: latestAction.title, targetPage: 'pages/Plan', taskAction: 'plan' }
   ]);
+});
+
+test('课程内容仓储并发初始化共享同一任务且只读取一轮资产', async () => {
+  const repository = loadLearningContentRepository();
+  const reads = [];
+  let releaseFirstRead;
+  const firstReadGate = new Promise((resolve) => {
+    releaseFirstRead = resolve;
+  });
+  const manager = {
+    getRawFileContent: async (pathName) => {
+      reads.push(pathName);
+      if (reads.length === 1) await firstReadGate;
+      return contentFixture(pathName);
+    }
+  };
+
+  const first = repository.initialize(manager);
+  const second = repository.initialize(manager);
+  let secondSettled = false;
+  second.then(() => {
+    secondSettled = true;
+  }, () => {
+    secondSettled = true;
+  });
+  await Promise.resolve();
+  assert.equal(reads.length, 1);
+  assert.equal(secondSettled, false);
+  releaseFirstRead();
+  await Promise.all([first, second]);
+
+  assert.equal(reads.length, 5);
+  assert.equal(secondSettled, true);
+  assert.deepEqual(Array.from(repository.getTopics('cs101')), ['二叉树']);
+});
+
+test('课程内容仓储读取失败后清空半成品并允许同进程重试', async () => {
+  const repository = loadLearningContentRepository();
+  const expectedPaths = [
+    'learning/knowledge-chunks.json',
+    'learning/quizzes.json',
+    'learning/external-resources.json',
+    'learning/topic-relations.json',
+    'learning/lesson-experiences.json'
+  ];
+  const reads = [];
+  let failResourcesRead = true;
+  const manager = {
+    getRawFileContent: async (pathName) => {
+      reads.push(pathName);
+      if (pathName === 'learning/external-resources.json' && failResourcesRead) {
+        failResourcesRead = false;
+        throw new Error('fixture read failed');
+      }
+      return contentFixture(pathName);
+    }
+  };
+
+  await assert.rejects(repository.initialize(manager), /课程内容仓储初始化失败/);
+  assert.deepEqual(reads, expectedPaths.slice(0, 3));
+  assert.deepEqual(Array.from(repository.getKnowledge('cs101')), []);
+  assert.deepEqual(Array.from(repository.getQuestions('cs101')), []);
+  assert.deepEqual(Array.from(repository.getResources('cs101')), []);
+  assert.deepEqual(Array.from(repository.getTopics('cs101')), []);
+
+  await repository.initialize(manager);
+  assert.deepEqual(reads, [...expectedPaths.slice(0, 3), ...expectedPaths]);
+  assert.deepEqual(Array.from(repository.getTopics('cs101')), ['二叉树']);
+});
+
+test('Form Ability 三条系统入口均等待课程内容初始化完成后再访问 ArkData', async () => {
+  async function assertEntryOrder(trigger, expectedCalls) {
+    const calls = [];
+    let releaseContent;
+    const contentGate = new Promise((resolve) => {
+      releaseContent = resolve;
+    });
+    const EntryFormAbility = loadEntryFormAbility({
+      defaultData: () => ({}),
+      refreshForm: async (formId) => {
+        calls.push(`refresh:${formId}`);
+      }
+    }, {
+      initialize: async () => {
+        calls.push('local');
+      },
+      registerFormId: async (formId) => {
+        calls.push(`register:${formId}`);
+      },
+      removeFormId: async (formId) => {
+        calls.push(`remove:${formId}`);
+      }
+    }, {
+      initialize: async (manager) => {
+        assert.equal(manager.name, 'form-resource-manager');
+        calls.push('content:start');
+        await contentGate;
+        calls.push('content:done');
+      }
+    });
+    const ability = new EntryFormAbility();
+
+    trigger(ability);
+    await Promise.resolve();
+    assert.deepEqual(calls, ['content:start']);
+    releaseContent();
+    await settleAsyncWork();
+    assert.deepEqual(calls, ['content:start', 'content:done', ...expectedCalls]);
+  }
+
+  await assertEntryOrder(
+    (ability) => ability.onUpdateForm('form-update'),
+    ['local', 'refresh:form-update']
+  );
+  await assertEntryOrder(
+    (ability) => ability.onAddForm({
+      parameters: { 'ohos.extra.param.key.form_identity': 'form-add' }
+    }),
+    ['local', 'register:form-add', 'refresh:form-add']
+  );
+  await assertEntryOrder(
+    (ability) => ability.onRemoveForm('form-remove'),
+    ['local', 'remove:form-remove']
+  );
 });
 
 test('Form Ability 更新失败后系统再次更新仍会委托刷新', async () => {
