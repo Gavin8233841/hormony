@@ -47,6 +47,7 @@ struct PlanPage {
   @State errorCode: string = '';
   @State errorExpanded: boolean = false;
   @State retryAction: string = 'none';
+  @State updatingTaskId: string = '';
   private activeRequest: HttpRequestCancellation | null = null;
   private generationRunId: number = 0;
   private planReadRunId: number = 0;
@@ -80,7 +81,8 @@ struct PlanPage {
   }
 
   get canGenerate(): boolean {
-    return !this.loading && !this.planLoading && this.goal.trim().length > 0;
+    return !this.loading && !this.planLoading && this.updatingTaskId.length === 0 &&
+      this.goal.trim().length > 0;
   }
 
   private taskTypeLabel(type: string): string {
@@ -111,6 +113,11 @@ struct PlanPage {
   }
 
   private openTask(task: PlanTask): void {
+    if (this.updatingTaskId.length > 0) {
+      this.message = '任务状态正在保存到本机，请稍候';
+      this.hasError = false;
+      return;
+    }
     if (!this.hasTaskTarget(task)) {
       this.message = '旧计划缺少课程主题，请重新生成可执行计划';
       this.hasError = true;
@@ -154,6 +161,10 @@ struct PlanPage {
       this.planLoading = false;
       return;
     }
+    if (this.updatingTaskId.length > 0) {
+      this.planLoading = false;
+      return;
+    }
     const readRunId = this.planReadRunId + 1;
     this.planReadRunId = readRunId;
     this.planLoading = true;
@@ -188,11 +199,18 @@ struct PlanPage {
   }
 
   private async toggleTask(task: PlanTask): Promise<void> {
-    const nextDone = !Boolean(task.done);
+    if (this.updatingTaskId.length > 0 || this.loading || this.planLoading) return;
+    const taskId = task.id;
+    this.updatingTaskId = taskId;
     try {
+      const current = await LocalLearningRepository.getPlan();
+      if (current === null) throw new Error('本地计划不存在');
+      const currentTask = current.tasks.find((item: PlanTask): boolean => item.id === taskId);
+      if (currentTask === undefined) throw new Error('本地计划任务不存在');
+      const nextDone = !Boolean(currentTask.done);
       const nextTasks: PlanTask[] = [];
-      for (const item of this.tasks) {
-        if (item.id === task.id) {
+      for (const item of current.tasks) {
+        if (item.id === taskId) {
           const updated: PlanTask = {
             id: item.id,
             title: item.title,
@@ -210,8 +228,6 @@ struct PlanPage {
           nextTasks.push(item);
         }
       }
-      const current = await LocalLearningRepository.getPlan();
-      if (current === null) throw new Error('本地计划不存在');
       current.tasks = nextTasks;
       await LocalLearningRepository.savePlan(current);
       this.tasks = nextTasks;
@@ -225,7 +241,7 @@ struct PlanPage {
           id: 'event_' + Date.now().toString(),
           type: 'task_completed',
           timestamp: new Date().toISOString(),
-          taskId: task.id
+          taskId: taskId
         };
         try {
           await LocalLearningRepository.appendStudyEvent(event);
@@ -244,6 +260,10 @@ struct PlanPage {
       this.hasError = true;
       this.retryAction = 'none';
       this.clearErrorEvidence();
+    } finally {
+      if (this.updatingTaskId === taskId) {
+        this.updatingTaskId = '';
+      }
     }
   }
 
@@ -322,6 +342,11 @@ struct PlanPage {
 
   private goBack(): void {
     this.dismissGoalInput();
+    if (this.updatingTaskId.length > 0) {
+      this.message = '任务状态正在保存到本机，请稍候';
+      this.hasError = false;
+      return;
+    }
     if (this.loading && this.progressStep >= 3) {
       this.message = '计划正在保存到本机，请稍候';
       this.hasError = false;
@@ -390,7 +415,7 @@ struct PlanPage {
   }
 
   private async retryPendingPlanSave(): Promise<void> {
-    if (this.loading || this.pendingPlan === null) return;
+    if (this.loading || this.updatingTaskId.length > 0 || this.pendingPlan === null) return;
     this.generationRunId += 1;
     this.activeRequest = null;
     this.loading = true;
@@ -871,7 +896,7 @@ struct PlanPage {
                 .fontColor(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_SM)
-                .enabled(!this.loading && !this.planLoading)
+                .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0)
                 .onClick(() => {
                   if (this.retryAction === 'load') this.loadPlan();
                   else if (this.retryAction === 'save') this.retryPendingPlanSave();
@@ -1051,15 +1076,16 @@ struct PlanPage {
                     .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
                     .backgroundColor(this.hasTaskTarget(t) ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
                     .borderRadius(Constants.RADIUS_SM)
-                    .enabled(this.hasTaskTarget(t))
+                    .enabled(this.hasTaskTarget(t) && this.updatingTaskId.length === 0)
                     .onClick(() => { this.openTask(t); })
-                  Button(t.done ? '恢复' : '完成')
+                  Button(this.updatingTaskId === t.id ? '保存中' : (t.done ? '恢复' : '完成'))
                     .width(58)
                     .height(30)
                     .fontSize(11)
                     .fontColor(t.done ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
                     .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)
                     .borderRadius(Constants.RADIUS_SM)
+                    .enabled(this.updatingTaskId.length === 0)
                     .onClick(() => { this.toggleTask(t); })
                 }
               }
@@ -1104,7 +1130,8 @@ struct PlanPage {
   async generate(): Promise<void> {
     const requestedGoal = this.goal.trim();
     const requestedDays = this.days;
-    if (requestedGoal.length === 0 || this.loading || this.planLoading || !this.pageActive) return;
+    if (requestedGoal.length === 0 || this.loading || this.planLoading ||
+      this.updatingTaskId.length > 0 || !this.pageActive) return;
     const lifecycleRunId = this.lifecycleRunId;
     const runId = this.generationRunId + 1;
     this.generationRunId = runId;

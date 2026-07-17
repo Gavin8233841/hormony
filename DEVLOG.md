@@ -6270,3 +6270,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 无 HDC 运行目标，Plan 长请求离页/重进、旧请求晚到、ArkData 保存失败注入、保存后重启恢复均为模拟器未验证；真机未验证。
 - 本批未修改 Web、API、Agent、模型或安全实现，未重复运行 Web `pnpm lint/typecheck/test/build`，未重新调用线上 Plan。
 - HAP 未配置签名；构建通过不等于安装运行通过。
+
+---
+
+## 2026-07-17 [WS01] Plan 任务写入串行与最新快照保护
+
+背景：继续复核 Plan 端侧恢复闭环时确认，任务“完成/恢复”原实现先从页面 `this.tasks` 构造整份旧计划，再异步读取并写入 ArkData；同一页面连续点击不同任务、生成新计划或重试 pending 保存时没有互斥，晚完成的旧快照可能覆盖另一项完成状态或新计划。本批不改 Repository 和 API，只收紧 Plan 页面内所有会写入或切换计划的动作边界。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- 新增 `updatingTaskId` 单写状态；任务写入在首个异步读取前锁定任务 ID，并在 `finally` 中只释放同一任务锁。
+- `toggleTask()` 改为读取 ArkData 当前计划，从 `current.tasks` 的真实完成状态计算翻转，再保存整份最新快照；不再根据事件参数或页面旧任务数组计算。
+- 只有 `savePlan()` 成功后才发布 `this.tasks`；学习事件仍在计划保存成功后追加，事件失败不回滚已保存的任务状态。
+- 任务写入期间禁用其他任务按钮、任务入口、生成计划、错误重试和 pending 计划保存重试；自定义返回入口提示“任务状态正在保存到本机，请稍候”。
+- 当前任务按钮保持固定尺寸并显示“保存中”，避免重复点击和布局跳变。
+- 独立子 agent 仅修改源契约测试；主代理逐段复核后采用。新增用例禁止 `task.done`/`this.tasks` 旧快照实现，并约束锁定、最新读取、保存、UI 发布、解锁及冲突动作 guard 的顺序。
+
+验证：
+- `git fetch origin codex/harmony-integration-20260717`：exit 0；远端精确提交已到 `03ef458826f487c127bcad7da96c9831f5ef42f9`，其中融合 Chat 生命周期保护，未包含本分支 Plan 两批续作。
+- `node --check scripts/test-ws01-chat-plan-source-contract.mjs`：最终 exit 0。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：最终 exit 0，11/11 通过。
+- `git diff --check -- apps/harmonyos/entry/src/main/ets/pages/Plan.ets scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0；仅保留 Git 的 LF/CRLF 工作区提示。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon`：exit 0，多项任务为 `UP-TO-DATE`，`CompileArkTS`、`PackageHap` 成功，`BUILD SUCCESSFUL in 37 s 189 ms`；既有 `signingConfigs` 未配置警告保留。
+- 使用仓库已核实的 DevEco `hdc.exe` 绝对路径执行 `list targets`：exit 0，返回 `[Empty]`。
+
+失败或未验证：
+- 产品补丁落盘后的首次 Node 测试为 8/10：两项旧测试精确匹配了未含 `updatingTaskId` 的 guard 文本；同步收紧既有断言并新增并发写入反例后最终 11/11 通过。
+- 无 HDC 运行目标，快速连续点击、任务保存期间生成/返回、ArkData 写入失败和应用前后台切换均为模拟器未验证；真机未验证。
+- 系统级返回手势是否绕过页面自定义返回 guard 未取得运行态证据，仍未验证。
+- 本批未修改 Web、API、Agent、模型或安全实现，未运行 Web `pnpm lint/typecheck/test/build`，未调用线上 Plan。

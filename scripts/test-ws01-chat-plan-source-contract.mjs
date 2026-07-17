@@ -386,7 +386,8 @@ test('Plan generation preserves the last saved plan and isolates stale reads', (
   ], 'Plan replaces UI only after local save');
 
   const retrySave = section(plan, '  private async retryPendingPlanSave(): Promise<void> {', '  private cleanText(', 'Plan save retry');
-  assert.match(retrySave, /if \(this\.loading \|\| this\.pendingPlan === null\) return;/);
+  assert.match(retrySave,
+    /if \(this\.loading \|\| this\.updatingTaskId\.length > 0 \|\| this\.pendingPlan === null\) return;/);
   assert.match(retrySave, /await this\.persistGeneratedPlan\(this\.pendingPlan\);/);
   assert.doesNotMatch(retrySave, /HttpClient\.post/);
 });
@@ -465,7 +466,8 @@ test('Plan preserves a failed pending save across re-entry and rejects stale gen
   const generate = section(plan, '  async generate(): Promise<void> {', '  pageTransition() {',
     'Plan lifecycle generation');
   assertOrder(generate, [
-    'if (requestedGoal.length === 0 || this.loading || this.planLoading || !this.pageActive) return;',
+    'if (requestedGoal.length === 0 || this.loading || this.planLoading ||\n' +
+      '      this.updatingTaskId.length > 0 || !this.pageActive) return;',
     'const lifecycleRunId = this.lifecycleRunId;',
     'const runId = this.generationRunId + 1;',
     'const profile = await LocalLearningRepository.getProfile();',
@@ -484,6 +486,73 @@ test('Plan preserves a failed pending save across re-entry and rejects stale gen
     'if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;',
     "this.retryAction = 'generate';"
   ], 'Plan ignores stale failures after leave and re-entry');
+});
+
+test('Plan serializes task writes against the latest persisted plan and conflicting actions', () => {
+  assert.match(plan, /@State updatingTaskId: string = '';/);
+
+  const canGenerate = section(plan, '  get canGenerate(): boolean {', '  private taskTypeLabel(',
+    'Plan generation availability');
+  assert.match(canGenerate,
+    /return !this\.loading && !this\.planLoading && this\.updatingTaskId\.length === 0 &&\s*this\.goal\.trim\(\)\.length > 0;/);
+
+  const openTask = section(plan, '  private openTask(', '  private pushPage(', 'Plan task navigation guard');
+  assertOrder(openTask, [
+    'if (this.updatingTaskId.length > 0) {',
+    "this.message = '任务状态正在保存到本机，请稍候';",
+    'return;',
+    'if (!this.hasTaskTarget(task)) {'
+  ], 'Plan blocks task navigation while a task write is pending');
+
+  const load = section(plan, '  private async loadPlan(): Promise<void> {', '  private async toggleTask(',
+    'Plan task-write load guard');
+  assertOrder(load, [
+    'if (this.updatingTaskId.length > 0) {',
+    'this.planLoading = false;',
+    'return;',
+    'const readRunId = this.planReadRunId + 1;'
+  ], 'Plan blocks a competing local plan read');
+
+  const toggle = section(plan, '  private async toggleTask(', '  @Builder\n  PlanSkeleton()',
+    'Plan serialized task write');
+  assertOrder(toggle, [
+    'if (this.updatingTaskId.length > 0 || this.loading || this.planLoading) return;',
+    'const taskId = task.id;',
+    'this.updatingTaskId = taskId;',
+    'const current = await LocalLearningRepository.getPlan();',
+    'const currentTask = current.tasks.find((item: PlanTask): boolean => item.id === taskId);',
+    'const nextDone = !Boolean(currentTask.done);',
+    'for (const item of current.tasks) {',
+    'current.tasks = nextTasks;',
+    'await LocalLearningRepository.savePlan(current);',
+    'this.tasks = nextTasks;',
+    '} finally {',
+    'if (this.updatingTaskId === taskId) {',
+    "this.updatingTaskId = '';"
+  ], 'Plan locks before reading and publishes only a saved latest snapshot');
+  assert.doesNotMatch(toggle, /!Boolean\(task\.done\)|for \(const item of this\.tasks\)/);
+
+  const goBack = section(plan, '  private goBack(): void {', '  private isActiveGeneration(',
+    'Plan task-write back guard');
+  assertOrder(goBack, [
+    'if (this.updatingTaskId.length > 0) {',
+    "this.message = '任务状态正在保存到本机，请稍候';",
+    'return;',
+    'if (this.loading && this.progressStep >= 3) {'
+  ], 'Plan keeps the page mounted until the task write settles');
+
+  const taskControls = section(plan, '                  Button(this.actionLabel(t))',
+    '                }\n              }\n              .width', 'Plan task write controls');
+  assert.match(taskControls,
+    /\.enabled\(this\.hasTaskTarget\(t\) && this\.updatingTaskId\.length === 0\)/);
+  assert.match(taskControls,
+    /Button\(this\.updatingTaskId === t\.id \? '保存中' : \(t\.done \? '恢复' : '完成'\)\)/);
+  assert.match(taskControls, /\.enabled\(this\.updatingTaskId\.length === 0\)/);
+
+  const retryControls = section(plan, "              Button(this.retryAction === 'load' ? '重新读取' :",
+    '            }\n          }', 'Plan retry control guard');
+  assert.match(retryControls,
+    /\.enabled\(!this\.loading && !this\.planLoading && this\.updatingTaskId\.length === 0\)/);
 });
 
 test('Plan exposes cancellable wait stages, keyboard dismissal, and safe-area spacing', () => {
