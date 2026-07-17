@@ -125,8 +125,9 @@ struct PracticePage {
 
   private async loadQuestions(selectedReviewItemId: string): Promise<void> {
     const available = LearningContentRepository.getQuestions(this.courseId, this.topic);
-    const reviews = await LocalLearningRepository.getDueReviewItems();
-    const activeReviews = await LocalLearningRepository.getReviewItems();
+    const reviewQueue = await LocalLearningRepository.getReviewQueue();
+    const reviews = reviewQueue.dueItems;
+    const activeReviews = reviewQueue.activeItems;
     const results = await LocalLearningRepository.getQuizResults();
     const attemptedIds: string[] = [];
     for (const result of results) {

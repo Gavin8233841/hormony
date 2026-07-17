@@ -114,9 +114,8 @@ export class QuizLearningStateReducer {
     const mastery = state.topicMastery.find((item: TopicMastery): boolean =>
       item.courseId === result.courseId && item.topic === result.topic);
     const activeItems = state.reviewItems.filter((item: ReviewItem): boolean => !item.resolved);
-    const nowTime = new Date(now).getTime();
     const dueCount = activeItems.filter((item: ReviewItem): boolean =>
-      new Date(item.nextReviewAt).getTime() <= nowTime).length;
+      QuizLearningStateReducer.isReviewDue(item, now)).length;
     return {
       quizId: result.quizId,
       applied: applied,

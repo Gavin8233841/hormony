@@ -6922,6 +6922,42 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-17 [MAIN+WS02] 错题到期单一快照与损坏时间恢复
+
+背景：上一批已让错题本在每次页面显示时跨日刷新，但页面会分别读取“到期项”和“全部活动项”，两次 ArkData 状态可能不一致；旧版或损坏的 `nextReviewAt` 在 Reducer 中按到期恢复，Repository 和页面却会把它永久排除。主线逐段融合 WS02 提交 `75f21c6`，保留当前 Practice 原错题 ID 重试、48 vp 与读屏实现。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/mistake-review-flow.test.ts`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+- `DEVLOG.md`
+
+行为变化：
+- Repository 新增 `ReviewQueueSnapshot` 与 `getReviewQueue(now)`；一次 QuizLearningState 读取同时派生活动项和到期项，MistakeBook 与 Practice 不再组合两次不同状态读取。
+- 无效 `nextReviewAt` 与 Reducer 统一视为立即到期并排在合法未来时间之前；两个无效时间按尝试次数排序，不再让旧记录永久锁死。
+- `getDueReviewItems()` 复用同一到期判定；答题回执的 `dueReviewCount` 也调用 Reducer 既有恢复语义，服务卡片、页面和写回回执保持一致。
+- MistakeBook 的按钮判定与显示同步接受损坏时间并允许立即恢复；Practice 从同一快照取得到期项和原复习项身份。
+- 可执行 Reducer 反例把已有错题时间设为非法值，确认回执计为到期，答对后从 1 天推进到 3 天并写回合法 ISO 时间。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/lib/data/mistake-review-flow.test.ts src/lib/data/quiz-learning-state.test.ts`：exit 0，2 个文件、50/50 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，28 个测试文件、415/415 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面，middleware 26.8 kB。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 27 s 633 ms`。
+- DevEco SDK `hdc.exe list targets`：exit 0，输出 `[Empty]`。
+
+失败或未验证：
+- `git merge-tree --write-tree HEAD 75f21c6`：exit 1，精确报告 DEVLOG、MistakeBook、Practice 与 `mistake-review-flow.test.ts` 内容冲突；主线按行为逐段融合并重跑全套，不整提交覆盖现行页面与契约。
+- 当前无设备目标；真实 ArkData 损坏时间恢复、跨日前后台、错题排序、服务卡片数字、48 vp 与读屏焦点均为模拟器/真机未验证。
+- HAP 未配置签名；安装和多设备行为未验证。本批未调用线上 Quiz 或真实模型。
+
+---
+
 ## 2026-07-17 [MAIN+WS04] 学习星图一致快照与真实前置行动
 
 背景：学习星图课程切换会并发读取 mastery 与 LessonProgress，较慢的旧课程请求可能覆盖新课程整页快照；锁定节点虽然显示先修关系，但主动作会回退到锁定节点本身，可能打开尚不可执行的内容。主线逐段融合 WS04 提交 `a306009`，保留既有前置/后继聚焦、箭头方向与节点视觉。

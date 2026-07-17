@@ -1329,6 +1329,34 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     });
   });
 
+  it("无效旧复习时间应按已到期恢复并写回合法的下一次时间", () => {
+    const state = reducer.createEmptyState();
+    reducer.applyResult(state, result("quiz-invalid-schedule-wrong", "2026-07-01T08:00:00.000Z", false));
+    const reviewId = state.reviewItems[0].id;
+    state.reviewItems[0].nextReviewAt = "invalid-review-time";
+
+    const receipt = reducer.createReceipt(
+      state,
+      result("quiz-invalid-schedule-receipt", "2026-07-02T08:00:00.000Z", true),
+      false,
+      "2026-07-02T08:00:00.000Z"
+    );
+    expect(receipt.dueReviewCount).toBe(1);
+
+    reducer.applyResult(
+      state,
+      result("quiz-invalid-schedule-correct", "2026-07-02T08:00:00.000Z", true, "二叉树与BST", reviewId)
+    );
+
+    expect(state.reviewItems[0]).toMatchObject({
+      id: reviewId,
+      attempts: 2,
+      intervalDays: 3,
+      nextReviewAt: "2026-07-05T08:00:00.000Z",
+      resolved: false,
+    });
+  });
+
   it("旧 AI 错题使用精选替代题时保留复习项 ID 并同步真实题目身份", () => {
     const state = reducer.createEmptyState();
     const aiWrong = result("ai-wrong", "2026-07-01T08:00:00.000Z", false);

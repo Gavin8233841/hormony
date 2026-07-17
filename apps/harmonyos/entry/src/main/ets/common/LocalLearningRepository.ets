@@ -47,6 +47,11 @@ interface LegacyQuizStatsAggregate {
   updatedAt: string;
 }
 
+export interface ReviewQueueSnapshot {
+  activeItems: ReviewItem[];
+  dueItems: ReviewItem[];
+}
+
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
   private static initializationTask: Promise<void> | null = null;
@@ -764,11 +769,38 @@ export class LocalLearningRepository {
     return activeOnly ? items.filter((item: ReviewItem): boolean => !item.resolved) : items;
   }
 
+  static async getReviewQueue(now: Date = new Date()): Promise<ReviewQueueSnapshot> {
+    const state = await LocalLearningRepository.getQuizLearningState();
+    const activeItems = state.reviewItems.filter((item: ReviewItem): boolean => !item.resolved);
+    const nowTime = now.getTime();
+    const dueItems = activeItems.filter((item: ReviewItem): boolean =>
+      LocalLearningRepository.isReviewDueAt(item, nowTime));
+    dueItems.sort((left: ReviewItem, right: ReviewItem): number =>
+      LocalLearningRepository.compareReviewSchedule(left, right));
+    return {
+      activeItems: activeItems,
+      dueItems: dueItems
+    };
+  }
+
   static async getDueReviewItems(now: Date = new Date()): Promise<ReviewItem[]> {
-    const items = await LocalLearningRepository.getReviewItems(true);
-    const due = items.filter((item: ReviewItem): boolean => new Date(item.nextReviewAt).getTime() <= now.getTime());
-    return due.sort((left: ReviewItem, right: ReviewItem): number =>
-      new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime());
+    const queue = await LocalLearningRepository.getReviewQueue(now);
+    return queue.dueItems;
+  }
+
+  private static isReviewDueAt(item: ReviewItem, nowTime: number): boolean {
+    const reviewTime = new Date(item.nextReviewAt).getTime();
+    return Number.isNaN(reviewTime) || reviewTime <= nowTime;
+  }
+
+  private static compareReviewSchedule(left: ReviewItem, right: ReviewItem): number {
+    const leftTime = new Date(left.nextReviewAt).getTime();
+    const rightTime = new Date(right.nextReviewAt).getTime();
+    if (Number.isNaN(leftTime) && Number.isNaN(rightTime)) return right.attempts - left.attempts;
+    if (Number.isNaN(leftTime)) return -1;
+    if (Number.isNaN(rightTime)) return 1;
+    const timeGap = leftTime - rightTime;
+    return timeGap !== 0 ? timeGap : right.attempts - left.attempts;
   }
 
   static async getLessonProgress(courseId?: string): Promise<LessonProgress[]> {
