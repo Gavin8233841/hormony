@@ -100,7 +100,9 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
         usedStems
       );
     }
-    if (batch.length === 0) break;
+    if (batch.length !== batchSize) {
+      throw new ModelInvalidResponseError("题目批次数量或结构不符合要求");
+    }
     const beforeCount = questions.length;
     for (const question of batch) {
       if (questions.length >= input.count) break;
@@ -198,6 +200,7 @@ function parseQuestions(
     const arr = readQuestionArray(payload);
     if (arr.length > 0) {
       const parsed: QuizQuestion[] = [];
+      const parsedStems = new Set<string>();
       for (const item of arr) {
         if (!item || typeof item !== "object") continue;
         const q = item as Record<string, unknown>;
@@ -209,7 +212,7 @@ function parseQuestions(
           typeof q.explanation === "string" ? q.explanation.trim() : "";
         const tags = parseTags(q.tags, focusTag);
         const normalizedStem = normalizeStem(stem);
-        if (usedStems?.has(normalizedStem)) continue;
+        if (usedStems?.has(normalizedStem) || parsedStems.has(normalizedStem)) continue;
         const validOptions = options.length === 4 && options.every((option, index) =>
           option.length <= MAX_QUESTION_OPTION_LENGTH &&
           option.toUpperCase().startsWith(`${String.fromCharCode(65 + index)}.`)
@@ -233,6 +236,7 @@ function parseQuestions(
           difficulty,
           tags,
         });
+        parsedStems.add(normalizedStem);
         if (parsed.length > maxOutputCount) return [];
       }
       return parsed.slice(0, count);

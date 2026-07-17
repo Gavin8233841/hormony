@@ -237,3 +237,29 @@
 - 首个 production 启动参数未建立监听，探针超时 exit 124；改用实际 Next CLI 后实例启动。首个业务请求因 userId 含连字符得到 `400/INVALID_USER_ID`；按已读取的精确契约改为字母和下划线后断言 exit 0，失败未计作通过。
 - 额外 Quiz 总预算子 agent 因账户并发额度未启动，没有修改文件；该风险留待本批提交后由主代理从源码与测试继续评估。
 - **未验证**：当前分支线上部署、带真实模型的 SSE 正文与迟到异常、真实浏览器断连、HarmonyOS 模拟器与真机。未修改 HarmonyOS、RAG、缓存策略、生产模型 ID 或秘密。
+
+## 12. Quiz 模型调用总预算
+
+### 12.1 源码确认与行为
+
+- 旧 Quiz 循环会接受修复后仍不完整的部分批次。请求 20 题时，如果每轮只新增 1 道有效题，每轮又依次执行生成与修复，单请求最多触发 40 次模型调用；每次调用的 45 秒超时不能约束整条请求。
+- 模型层新增总预算执行器，统一组合内部 timeout 与外部 `AbortSignal`。Quiz 路由使用 100000ms 模型阶段预算，在 `maxDuration=120` 的平台时限前为输出 Safety、序列化和平台回收预留 20 秒。
+- 内部 deadline 会中止派生 signal 并映射为 `504/MODEL_TIMEOUT`；请求取消继续映射为 `499/MODEL_CANCELLED`。操作完成后统一清理 timer 与父 signal listener，不留下延迟取消。
+- Quiz Agent 在同一批内按规范化题干去重；每批最多执行一次修复，修复后仍不足完整批次立即返回 `MODEL_INVALID_RESPONSE`。合法 20 题最多 4 批、每批生成和修复各一次，调用上界收敛为 8。
+- 主线选择性融合 WS05 提交 `ae2d529`，保留现有 `parseQuestions(..., batchSize)` 单批输出上限，没有把单批解析上限放宽为总请求 `count`。
+
+### 12.2 委派与复核
+
+- WS05 独立完成总预算、路由取消和批次收束实现。主线逐文件融合后，由只读审查复核 route、model helper、Agent 与测试，确认总预算覆盖多批及修复调用、错误映射和资源清理，无阻断项；明确禁止整提交搬入旧基线。
+
+### 12.3 验证
+
+- 定向回归：`pnpm exec vitest run src/app/api/quiz/request-budget.test.ts src/app/api/quiz/request-cancellation.test.ts src/lib/agents/quiz-agent.test.ts src/app/api/quiz/quiz-flow.test.ts` exit 0，4 个测试文件、32/32 通过。
+- 静态诊断通过：`pnpm lint` exit 0，无 warning/error；`pnpm typecheck` exit 0。
+- 全量测试通过：`pnpm test` exit 0，29 个测试文件、420/420 通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面生成，全部 dynamic API route 与 26.8 kB middleware 进入生产产物。
+
+### 12.4 失败与未验证
+
+- 本批没有使用模型秘密，也没有调用真实模型或部署线上版本。
+- **未验证**：真实模型连接在 100 秒时的网络级取消、线上平台 120 秒回收、当前分支线上部署、浏览器、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS、题库内容、RAG、缓存策略、生产模型 ID 或秘密。

@@ -10,7 +10,11 @@ import {
   isCourseId,
   isCourseTopic,
 } from "@/lib/data";
-import { getModelRuntimeInfo, ModelUnavailableError } from "@/lib/agents/model";
+import {
+  getModelRuntimeInfo,
+  ModelUnavailableError,
+  withModelRequestBudget,
+} from "@/lib/agents/model";
 import { modelErrorResponse, SafetyBlockedError } from "@/lib/api-errors";
 import type { QuizPackage } from "@/lib/types";
 import { runSafetyAgent, validateUserInput } from "@/lib/agents/safety-agent";
@@ -23,6 +27,8 @@ export const maxDuration = 120;
 
 type QuizDifficulty = "easy" | "medium" | "hard";
 const QUIZ_DIFFICULTIES: QuizDifficulty[] = ["easy", "medium", "hard"];
+// 给输出 Safety、序列化和平台回收预留 20 秒，不依赖 maxDuration 强制中断进程。
+const QUIZ_REQUEST_BUDGET_MS = 100_000;
 
 export async function GET(req: Request) {
   try {
@@ -118,14 +124,17 @@ export async function POST(req: Request) {
   }
 
   try {
-    const quiz = await runQuizAgent(
-      userId.value,
-      courseId,
-      topic,
-      count.value,
-      difficulty,
-      focusTag.length > 0 ? focusTag : undefined,
-      req.signal
+    const quiz = await withModelRequestBudget(
+      (signal) => runQuizAgent(
+        userId.value,
+        courseId,
+        topic,
+        count.value,
+        difficulty,
+        focusTag.length > 0 ? focusTag : undefined,
+        signal
+      ),
+      { timeoutMs: QUIZ_REQUEST_BUDGET_MS, signal: req.signal }
     );
     await assertSafeQuiz(quiz);
     if (!isStatelessDeployment()) {

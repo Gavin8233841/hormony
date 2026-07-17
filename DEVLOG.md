@@ -7208,3 +7208,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 当前无设备目标；跨日停留页面、前后台切换、从 Practice 返回后的排序和加载失败原地重试均未做模拟器或真机验证。
 - HAP 未配置签名；安装、读屏焦点和 48 vp 实际触控未验证。
 - 本批未调用线上 Quiz 或真实模型，不声明线上通过。
+
+---
+
+## 2026-07-17 [MAIN+WS05] Quiz 模型调用总预算与批次收束
+
+背景：Quiz 原有模型调用只有单次 45 秒超时，修复后仍不完整的批次会被加入循环。请求 20 题时，极端情况下可形成 20 轮生成与修复、最多 40 次顺序模型调用，明显越过路由 120 秒平台时限。
+
+文件：
+- `apps/web/src/lib/agents/model.ts`
+- `apps/web/src/lib/agents/quiz-agent.ts`
+- `apps/web/src/lib/agents/quiz-agent.test.ts`
+- `apps/web/src/app/api/quiz/route.ts`
+- `apps/web/src/app/api/quiz/request-budget.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 模型层提供统一请求预算执行器；Quiz 的多批生成与每批一次修复共用同一派生 `AbortSignal` 和 100 秒截止时间。
+- 内部超时中止 Agent 并返回 `504/MODEL_TIMEOUT`，外部请求取消保持 `499/MODEL_CANCELLED`；成功、失败和取消均清理 timer 与父 signal listener。
+- 同批重复题按规范化题干拒绝；一次修复后仍不足完整批次立即 `MODEL_INVALID_RESPONSE`，不继续放大模型调用。20 题调用上界从 40 收敛到 8。
+- 主线逐文件采用 WS05 `ae2d529`，同时保留现有 `batchSize` 单批解析上限；只读复核确认不能整提交覆盖主线更严格边界。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/app/api/quiz/request-budget.test.ts src/app/api/quiz/request-cancellation.test.ts src/lib/agents/quiz-agent.test.ts src/app/api/quiz/quiz-flow.test.ts`：exit 0，4 个测试文件、32/32 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，29 个测试文件、420/420 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+
+失败或未验证：
+- 真实模型上游网络在 100 秒时的取消、线上 120 秒平台回收和当前分支部署未验证。
+- 浏览器、HarmonyOS 模拟器、真机均未验证；本批未修改 HarmonyOS、题库内容、RAG、缓存策略、生产模型 ID 或秘密。
