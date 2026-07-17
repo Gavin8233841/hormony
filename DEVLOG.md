@@ -6886,6 +6886,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-17 [MAIN+WS04] 学习星图一致快照与真实前置行动
+
+背景：学习星图课程切换会并发读取 mastery 与 LessonProgress，较慢的旧课程请求可能覆盖新课程整页快照；锁定节点虽然显示先修关系，但主动作会回退到锁定节点本身，可能打开尚不可执行的内容。主线逐段融合 WS04 提交 `a306009`，保留既有前置/后继聚焦、箭头方向与节点视觉。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+- `scripts/test-learning-map-contracts.mjs`
+- `DEVLOG.md`
+
+行为变化：
+- 每次初始加载和课程切换分配单调 request version；课程、节点、边、推荐、尺寸和选中 Topic 只在 mastery、LessonProgress 与关系数据全部完成且仍为最新请求时一次提交。
+- 课程切换失败保留上一份一致星图并提供精确课程重试；首次加载失败清空半成品并提供重新读取，旧成功/失败/finally 不覆盖新状态。
+- 锁定节点沿真实 DAG 回溯到最近“未掌握且已解锁”的前置 Topic；已学习或已有掌握证据时进入精选练习，否则进入 Lesson。关系异常时禁用动作并明确说明，不打开锁定节点。
+- 课程切换、节点、摘要、图例、恢复入口与主动作补齐 48 vp、响应式换行和读屏说明；导航失败保留可见错误。
+
+验证：
+- `node --test scripts/test-learning-map-contracts.mjs`：exit 0，4/4 通过；测试对真实 33 Topic、三门课程的全部掌握组合做穷举，验证每个锁定状态都解析到未掌握且已解锁的前置动作。
+- 同一测试约束课程快照 latest-wins、精确 AppStorage 路由、双错误重试、48 vp 和读屏证据。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 22 s 115 ms`，`CompileArkTS` 与 `PackageHap` 通过。
+
+失败或未验证：
+- 当前无设备目标；快速切换课程、横向星图滚动、锁定节点跳前置、字体放大与屏幕阅读器播报未做模拟器或真机验证。
+- HAP 未配置签名，安装、平板与多设备行为未验证。
+- 本批只使用本机 ArkData 事实，不调用线上 API 或模型。
+
+---
+
 ## 2026-07-17 [MAIN] 服务卡片冷启动仓储顺序与内容初始化恢复
 
 背景：schema 12 迁移会读取课程索引，但服务卡片的 `onAddForm`、`onUpdateForm` 与 `onRemoveForm` 可在主 UI Ability 之前冷启动。原实现直接初始化 ArkData，可能在课程内容尚未加载时跳过旧 Lesson 完成项并提前完成 schema 迁移；课程内容仓储本身也没有并发共享或失败后的同进程恢复契约。
