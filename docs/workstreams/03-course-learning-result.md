@@ -803,3 +803,37 @@
 - 新知识测试最初把否定说明中的“等待数据库完整同步后才泛洪”当禁用子串，产生 1 项误报；已改为只拒绝明确的 Full 后才泛洪断言，错误顺序由结构化选项和答案执行验证。
 - 目标交叉回归曾因旧测试要求连续出现 `RFC 5681第3.2节` 而失败 1 项；来源合法扩展为第 3.1/3.2/4.2 节后，将契约收紧为精确章节片段并同步真实旧状态 fixture，重跑 28 项通过。
 - **未验证**：当前无模拟器、手机、平板或真机；长题面、五步排序拖动、同标签题跳转和反馈滚动的实际布局未验证。本批未调用线上 API。
+
+## 批次二十九：HTTP 持久连接与跨流队头阻塞边界
+
+### 行为
+
+- `cs103_k28` 区分 HTTP 语义与承载：HTTP/1.1、HTTP/2 通常运行在 TCP 之上，HTTP/3 运行在 QUIC 之上，不再用“HTTP 运行在 TCP 之上”覆盖所有版本。
+- `cs103_k29` 按 RFC 9110 区分安全与幂等。安全只表示客户端没有请求、也不期望目标资源状态改变，不排除日志或计费等附带副作用；幂等比较多个相同请求与单个请求的预期效果，不要求响应内容完全相同。
+- `cs103_k31` 与 `cs103_q40` 明确 HTTP/1.1 默认使用持久连接，无需发送 `Connection: keep-alive`，关闭时使用 `Connection: close`。`cs103_q09` 明确 DELETE 幂等但不安全；Web 简答题 `cs103_q11` 不再称 HTTP/2 消除所有队头阻塞。
+- HTTP Topic 从既有单活动迁移数据进入主动学习规格：第一个活动保留 Accept/Content-Type 辨析，第二个活动固定三个等长连续 TCP 字节范围，真实执行“序号 2 丢失、另一流的序号 3 先到只能缓存、序号 2 重传后按序交付 2 和 3”。反馈区分 HTTP/1.1 应用层队头阻塞和 HTTP/2 仍存在的 TCP 队头阻塞。
+- 子 agent 独立交付 `scripts/test_cs103_http_facts.py` 初稿，包含连续交付执行器和“仅丢失帧所属 stream 阻塞”的错误 fixture；主代理逐段复核后补齐 Web/raw 一致性、`cs103_q11` 旧文案反例与 RFC 来源约束。
+
+### 文件与生成边界
+
+- 活动唯一源：`docs/ACTIVE-LEARNING-SPEC-CS103.md`；`scripts/generate-learning-activities.mjs` 将规格覆盖从 26 Topic/52 活动提升为 27 Topic/54 活动，并按既有 Topic 键原位生成，避免 JSON 全量重排。
+- `lesson-experiences.json` 仅原位更新 `$[6]`（`cs103/HTTP协议`）：活动数由 1 增为 2，总活动数由 59 增加到 60；其他 32 个 Topic 顺序与内容保持不变。
+- 知识唯一源：三门课程的 `apps/web/src/lib/data/cs*-knowledge.ts`。新增 `scripts/generate-knowledge-json.mjs` 校验字段、courseId、147 条总数和全局唯一 id，再生成端侧 JSON。本批产物只变化 `$[127]`（`cs103_k28`）、`$[128]`（`cs103_k29`）、`$[130]`（`cs103_k31`）的 `text/source`。
+- 题库唯一源：`apps/web/src/lib/data/quizzes.ts`；现有生成器更新端侧 `$[130].explanation`（`cs103_q09`）、`$[132].explanation`（`cs103_q40`）及由修正文案重新计算的 `$[132].tags[1]`（`协议机制`）。`cs103_q11` 是 Web 简答题，不进入只包含选择题的端侧 JSON。
+
+### 证据
+
+- **源码确认**：RFC 9110 第 9.2.1 节明确安全方法只要求客户端不请求状态改变，并列举访问日志和广告计费等允许的附带副作用；第 9.2.2 节以多个相同请求与单个请求的预期效果定义幂等。
+- **源码确认**：RFC 9112 第 9.3 节明确 HTTP/1.1 默认使用持久连接；`close` connection option 表示当前响应后关闭。RFC 9113 第 1 节明确 HTTP/2 处理 HTTP/1.1 的 application-layer head-of-line blocking，但不处理 TCP head-of-line blocking。三份 RFC 官方文本本轮读取均返回 HTTP 200，并核对上述正文。
+- **静态诊断通过**：修正前 `python scripts/test_cs103_http_facts.py` 退出码 1，7 项中 7 项失败，分别命中缺少第二活动、三条知识语义、两道选择题解释和生成活动；修正后退出码 0，9 项通过。固定错误输入明确拒绝“序号 3 可跨缺口交付”和“只有丢失帧所属 stream 阻塞”。
+- **静态诊断通过**：`node scripts/generate-knowledge-json.mjs`、`node scripts/generate-quizzes-json.mjs`、`node scripts/generate-learning-activities.mjs` 均退出码 0；Web/端侧 147 条知识切片完全一致，165 道端侧选择题完全一致，33/33 Topic 共 60 个活动。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题、33 experience 的 schema、唯一性、引用、DAG、连通性、层级、Topic 和 Lesson 闭环全部通过。
+- **静态诊断通过**：`python -m unittest discover -s scripts -p "test_*.py"` 退出码 0；103 项运行，102 项通过，1 项跨 WS02 `getTagInsights` reducer 契约为预期失败。`lesson_self_assessment` 页面事件没有 `accuracy/totalQuestions/correctCount`，未被包装成客观掌握度。
+- **静态诊断通过**：`cd apps/web; pnpm lint; pnpm typecheck; pnpm test` 均退出码 0；13 个测试文件、167 项通过。
+- **构建通过**：`cd apps/web; pnpm build` 退出码 0；Next.js 生产构建成功，静态页面生成 10/10。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` 最终退出码 0；ArkTS 与资源重新编译，`BUILD SUCCESSFUL in 29 s 836 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- 端侧 `cs103_q40` 第二标签从“状态推演”变为“协议机制”。追溯 `buildQuestionTags/abilityTag` 后确认旧解释因含“阻塞”被归入状态推演；修正后的持久连接解释按现有唯一源规则确定性归入协议机制，不是手工改写产物。
+- **未验证**：当前环境 `hdc` 不存在，未安装或启动 HAP；HTTP 自由回答、跨流状态推演、长反馈滚动和手机/平板布局均未验证。本批未调用线上 API，不构成线上检索或学伴回答证据。

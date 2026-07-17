@@ -282,14 +282,36 @@ const knowledge = JSON.parse(readFileSync(knowledgePath, 'utf8'));
 const quizzes = JSON.parse(readFileSync(quizzesPath, 'utf8'));
 const focusTags = buildTopicFocusTags(quizzes);
 const generated = specFiles.flatMap(([courseId, relativePath]) => parseSpec(courseId, relativePath));
-const generatedKeys = new Set(generated.map((item) => `${item.courseId}\u0000${item.topic}`));
+const generatedKeys = new Set(generated.map((item) => topicKey(item.courseId, item.topic)));
 const existing = current
-  .filter((item) => !generatedKeys.has(`${item.courseId}\u0000${item.topic}`))
+  .filter((item) => !generatedKeys.has(topicKey(item.courseId, item.topic)))
   .map((item) => item.schemaVersion === 2 ? item : migrateExistingExperience(item));
-if (existing.length !== 7) {
-  throw new Error(`预期迁移 7 个既有体验，实际 ${existing.length} 个；请检查源数据状态`);
+if (existing.length !== 6) {
+  throw new Error(`预期迁移 6 个既有体验，实际 ${existing.length} 个；请检查源数据状态`);
 }
-const all = [...existing, ...generated].map((item) => normalizeExperience(item, focusTags, knowledge));
+const sourceExperiences = [...existing, ...generated];
+const sourceByTopic = new Map();
+for (const item of sourceExperiences) {
+  const key = topicKey(item.courseId, item.topic);
+  if (sourceByTopic.has(key)) {
+    throw new Error(`主动学习规格包含重复 Topic: ${item.courseId}/${item.topic}`);
+  }
+  sourceByTopic.set(key, item);
+}
+const currentKeys = current.map((item) => topicKey(item.courseId, item.topic));
+if (new Set(currentKeys).size !== currentKeys.length) {
+  throw new Error('现有 lesson-experiences.json 包含重复 Topic，无法保持稳定顺序');
+}
+const all = currentKeys.map((key) => {
+  const item = sourceByTopic.get(key);
+  if (item === undefined) {
+    throw new Error(`主动学习规格缺少现有 Topic: ${key.replace('\u0000', '/')}`);
+  }
+  return normalizeExperience(item, focusTags, knowledge);
+});
+if (all.length !== sourceExperiences.length) {
+  throw new Error('主动学习规格与现有 Topic 集合不一致，无法保持稳定顺序');
+}
 const expectedTopics = new Set(knowledge.map((item) => `${item.courseId}\u0000${item.topic}`));
 const actualTopics = new Set(all.map((item) => `${item.courseId}\u0000${item.topic}`));
 const activityCounts = { code_fill: 0, step_order: 0, state_trace: 0, output_predict: 0 };
@@ -302,11 +324,11 @@ for (const experience of all) {
 if (actualTopics.size !== expectedTopics.size || actualTopics.size !== 33) {
   throw new Error(`Topic 覆盖不完整: ${actualTopics.size}/${expectedTopics.size}`);
 }
-if (generated.length !== 26 || generated.reduce((sum, item) => sum + item.activities.length, 0) !== 52) {
-  throw new Error('Trae 规格应转换为 26 个 Topic、52 个活动');
+if (generated.length !== 27 || generated.reduce((sum, item) => sum + item.activities.length, 0) !== 54) {
+  throw new Error('主动学习规格应转换为 27 个 Topic、54 个活动');
 }
 
 writeFileSync(outputPath, `${JSON.stringify(all, null, 2)}\n`, 'utf8');
 console.log(`[PASS] LearningActivity v2: ${all.length}/33 Topic，${all.reduce((sum, item) => sum + item.activities.length, 0)} 个活动`);
-console.log('[PASS] Trae 52 个活动实际分布: code_fill=13, step_order=16, state_trace=17, output_predict=6');
-console.log(`[INFO] 全量分布（含 7 个既有 output_predict）: ${JSON.stringify(activityCounts)}`);
+console.log('[PASS] 规格 54 个活动实际分布: code_fill=13, step_order=16, state_trace=18, output_predict=7');
+console.log(`[INFO] 全量分布（含 6 个既有 output_predict）: ${JSON.stringify(activityCounts)}`);

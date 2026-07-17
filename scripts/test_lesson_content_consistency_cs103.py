@@ -310,8 +310,8 @@ class Cs103LessonContentConsistencyTest(unittest.TestCase):
             for index, match in enumerate(topics)
         )
 
-        self.assertEqual(9, len(topics))
-        self.assertEqual(18, activity_count)
+        self.assertEqual(10, len(topics))
+        self.assertEqual(20, activity_count)
 
     def test_udp_pdu_and_dns_transport_contract_accepts_current_source(self):
         topic = extract_topic(self.source, "OSI与TCP/IP模型")

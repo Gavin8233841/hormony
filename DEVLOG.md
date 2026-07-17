@@ -6800,3 +6800,17 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：RFC 5681/2328 官方文本 HTTP 200 且核对对应正文；两个生成器退出码 0，33 Topic/59 活动、165 题逐字段一致；目标 28 项通过；关系校验通过；WS03 回归 94 项运行、93 项通过、1 项既有 expected failure；Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 26 s 122 ms`。
 
 失败或未验证：修正前 3 个真实活动子项红灯；一次否定说明子串误报和一次旧来源精确片段不匹配均已收紧契约后重跑通过。无模拟器、手机、平板或真机，长题面、排序拖动、同标签题跳转与反馈滚动未验证；HAP 未配置 `signingConfigs`，未调用线上 API。
+
+---
+
+## 2026-07-17 [WS03] HTTP 持久连接与跨流队头阻塞边界
+
+背景：HTTP 知识与同标签题把安全方法简化为“无副作用”，把 HTTP/1.1 默认持久连接绑定到 `Connection: keep-alive`，并称 HTTP/2 彻底消除队头阻塞；HTTP Topic 仍是单活动迁移数据，没有可执行的 TCP 字节缺口推演。
+
+文件：`DEVLOG.md`、`docs/workstreams/03-course-learning-result.md`、`docs/ACTIVE-LEARNING-SPEC-CS103.md`、`apps/web/src/lib/data/cs103-knowledge.ts`、`apps/web/src/lib/data/quizzes.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`、`scripts/generate-knowledge-json.mjs`、`scripts/generate-learning-activities.mjs`、`scripts/test_cs103_http_facts.py`、`scripts/test_lesson_content_consistency_cs103.py`。
+
+行为变化：HTTP 被纳入 CS103 主动学习规格，保留 Accept/Content-Type 辨析并新增 HTTP/2 跨流 TCP 缺口状态推演；安全与幂等、HTTP/1.1 持久连接和 HTTP/2 应用层/TCP 两层队头阻塞边界按 RFC 9110/9112/9113 修正。新增知识切片生成器，以三门 Web 知识数组生成并校验端侧 147 条 JSON；活动生成器原位保持 Topic 顺序，HTTP 从迁移数据变为规格生成的 2 个活动。子 agent 提供可执行 TCP 连续交付模型与错误 fixture，主代理复核并补齐 Web 简答题和 RFC 来源约束。
+
+验证：修正前 HTTP 契约退出码 1，7 项失败精准覆盖旧内容；修正后目标 9 项通过。三个生成器退出码 0，147 条切片、165 道端侧选择题、33 Topic/60 活动一致；关系校验退出码 0；WS03 回归 103 项运行、102 项通过、1 项跨 WS02 reducer 契约为预期失败。Web lint/typecheck、13 文件/167 测试和生产构建退出码 0；增量 HAP 退出码 0，`BUILD SUCCESSFUL in 29 s 836 ms`。
+
+失败或未验证：`lesson_self_assessment` 仍不计入客观字段，但 WS02 `getTagInsights` 过滤完整客观证据的契约保持 1 项 expected failure；`hdc` 不在当前环境，未安装 HAP，HTTP 自由回答、状态推演、长反馈及手机/平板布局未验证；HAP 未配置 `signingConfigs`，未调用线上 API。

@@ -212,15 +212,15 @@ export const cs103KnowledgeChunks: KnowledgeChunk[] = [
   // ========== HTTP协议 ==========
   {
     id: "cs103_k28",
-    text: "HTTP（超文本传输协议）是基于请求-响应模型的应用层协议，运行在TCP之上。客户端发送HTTP请求，服务器返回HTTP响应。HTTP请求由请求行（方法+URL+版本号）、请求首部字段和可选的请求体组成。HTTP响应由状态行（版本号+状态码+原因短语）、响应首部字段和可选的响应体组成。HTTP是无状态协议，服务器不保留客户端的状态信息，通过Cookie和Session机制实现状态保持。HTTP/1.0默认非持久连接（每次请求建立新TCP连接），HTTP/1.1默认持久连接（Keep-Alive），HTTP/2支持多路复用和头部压缩，HTTP/3基于QUIC协议实现。",
-    source: "计算机网络：自顶向下方法",
+    text: "HTTP（超文本传输协议）采用请求-响应模型，是应用层协议。HTTP/1.1和HTTP/2通常运行在TCP之上，HTTP/3运行在QUIC之上。客户端发送HTTP请求，服务器返回HTTP响应。HTTP/1.1请求由请求行、字段和可选内容组成，响应由状态行、字段和可选内容组成；HTTP/2和HTTP/3使用各自的二进制映射承载相同的HTTP语义。HTTP的无状态语义不要求服务器在相邻请求间保留客户端上下文，Cookie和服务器端会话可按应用需要关联请求。",
+    source: "计算机网络：自顶向下方法；RFC 9110；RFC 9112；RFC 9113；RFC 9114",
     courseId: "cs103",
     topic: "HTTP协议",
   },
   {
     id: "cs103_k29",
-    text: "HTTP方法定义了对资源的操作语义。GET方法请求获取资源，应为幂等且无副作用，参数附加在URL查询字符串中。POST方法向服务器提交数据，请求体承载提交内容，非幂等。PUT方法用于创建或完整替换资源，幂等。DELETE方法删除指定资源，幂等。PATCH方法对资源进行部分修改。HEAD方法只请求响应首部不返回响应体。OPTIONS方法查询服务器支持的方法（用于CORS预检请求）。安全方法指不修改服务器状态的方法（GET、HEAD、OPTIONS），幂等方法指多次执行效果相同的方法（GET、PUT、DELETE）。RESTful API设计遵循这些语义约定。",
-    source: "计算机网络：自顶向下方法",
+    text: "HTTP方法定义针对目标资源的请求语义。GET和HEAD用于获取表示或其元数据，PUT用于创建或完整替换目标资源的状态，DELETE请求删除目标资源，POST按资源自身语义处理提交内容，PATCH请求部分修改。GET、HEAD、OPTIONS和TRACE被定义为安全方法；安全方法的定义只表示客户端没有请求、也不期望目标资源状态改变，不排除服务器记录日志、计费等附带副作用。PUT、DELETE和所有安全方法被定义为幂等；幂等只比较多个相同请求与单个请求的预期效果，响应内容仍可不同。POST和PATCH不由HTTP标准普遍定义为幂等。",
+    source: "计算机网络：自顶向下方法；RFC 9110第9.2.1节、第9.2.2节；RFC 5789第2节",
     courseId: "cs103",
     topic: "HTTP协议",
   },
@@ -233,8 +233,8 @@ export const cs103KnowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "cs103_k31",
-    text: "HTTP首部字段分为通用首部、请求首部、响应首部和实体首部四类。通用首部如Cache-Control、Connection适用于请求和响应。请求首部如Host、User-Agent、Accept、Authorization、Cookie描述客户端信息和偏好。响应首部如Server、Set-Cookie、Location描述服务器信息。实体首部如Content-Type、Content-Length、Content-Encoding描述消息体属性。Keep-Alive机制允许同一TCP连接上发送多个HTTP请求，避免每次请求都重新建立连接的开销。HTTP/1.1默认启用持久连接，通过Connection: close首部关闭。HTTP/2进一步采用多路复用，在一个连接上并行处理多个请求，彻底解决了队头阻塞问题。",
-    source: "计算机网络：自顶向下方法",
+    text: "HTTP字段为请求或响应传递元数据，例如Host标识目标主机，Accept表达可接受的响应媒体类型，Content-Type描述消息内容的媒体类型。HTTP/1.1默认使用持久连接，无需发送Connection: keep-alive；任一端准备关闭连接时发送Connection: close。HTTP/2采用二进制分帧和多路复用，让不同请求响应使用独立流并交错传输。HTTP/2解决HTTP/1.1的应用层队头阻塞，但没有解决TCP队头阻塞：位于TCP字节缺口之后的HTTP/2帧无论属于哪条流都要等待缺口重传。",
+    source: "计算机网络：自顶向下方法；RFC 9110；RFC 9112第9.3节；RFC 9113第1节、第5节",
     courseId: "cs103",
     topic: "HTTP协议",
   },
