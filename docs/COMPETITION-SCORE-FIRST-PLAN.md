@@ -358,7 +358,9 @@ cd apps/harmonyos
 - Health：记录端点、HTTP 状态、`status`、精确模型字段、部署版本和北京时间。
 - Chat SSE：校验正文非空、事件顺序、真实引用和 `done`；错误流不得变成成功正文。
 - Plan：校验日期、任务数量、任务字段和安全结果。
-- Quiz：校验展示题不泄露答案/解析，`grading` 独立存在，提交评分结构正确。
+- Quiz：在线 `POST /api/quiz` 校验展示题不泄露答案/解析，`grading` 独立存在且结构
+  正确；生产无状态部署的 `/api/quiz/submit` 应返回 `404 ENDPOINT_DISABLED`，提交
+  评分与 ArkData 写回由 HarmonyOS 黄金演示单独取证，不伪造线上评分通过。
 - 不在证据、日志、命令输出或材料中打印秘密值。认证失败只证明认证/权限失败，不证明模型或 API 不存在。
 
 ### 5. 材料与上传

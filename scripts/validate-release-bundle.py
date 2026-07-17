@@ -781,6 +781,7 @@ def check_release_bundle_entries(
                     evidence_content,
                     manifest.source_commit,
                     hashlib.sha256(hap_content).hexdigest(),
+                    entries,
                 )
                 errors.extend(evidence_errors)
 

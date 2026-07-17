@@ -77,8 +77,9 @@
 
 `release-evidence-index` 对应的 UTF-8 JSON 是项目内部证据合同。顶层必须且只能包含
 `schemaVersion`、`sourceCommit`、`hapSha256`、`records`、`limitations`；
-`schemaVersion` 固定为 `1`，提交与 HAP 哈希分别绑定 `release-manifest.json` 和包内
-唯一 HAP 的实际字节，`limitations` 至少保留一项真实边界。
+`schemaVersion` 固定为 `2`，不兼容接受旧自由文本 v1；提交与 HAP 哈希分别绑定
+`release-manifest.json` 和包内唯一 HAP 的实际字节，`limitations` 至少保留一项真实
+边界。
 
 `records` 必须恰好覆盖以下七个发布面各一次，不接受缺失、重复、大小写变体或额外
 标识：
@@ -94,10 +95,38 @@
 每条记录必须且只能包含 `id`、`claim`、`level`、`recordedAt`、`command`、
 `exitCode`、`environment`、`artifacts`、`businessChecks`、`notes`。`level` 只接受
 仓库定义的七种精确证据等级；`recordedAt` 必须是含时区的 RFC 3339 秒级时间。
-静态诊断和构建通过必须记录命令与 `exitCode=0`，构建通过还必须记录产物；模拟器、
-真机和线上通过还必须同时记录成功命令、明确环境、证据文件与业务检查。`未验证`
-必须说明真实缺口，且不得夹带命令、退出码、环境、产物或业务通过字段。结构通过
-只证明索引完整且如实绑定，不会把任一记录自动升级为产品通过。
+`command` 只能是 1..32 项 argv 字符串数组或 `null`，与 `exitCode` 同时存在或同时
+为空；通过等级必须为 `exitCode=0`。`environment` 使用按等级区分的精确对象：
+
+- 源码确认和未验证：空对象 `{}`。
+- 静态诊断/构建：`{os,tool,toolVersion}`。
+- 模拟器/真机：`{device,systemVersion,orientation,resolution}`；方向只接受
+  `portrait|landscape`，分辨率为 `{widthPx,heightPx}` 正整数对象。
+- 线上：`{deploymentVersion,requests}`。`web-validation` 的 requests 必须恰好覆盖
+  同一 HTTPS origin 上的 `GET /api/health`、`POST /api/chat`、`POST /api/plan`、
+  `POST /api/quiz`，四项 HTTP 状态均精确为 200；URL 不得含凭证、query 或 fragment。
+
+`artifacts` 每项必须且只能含 `{path,kind,bytes,sha256}`。完整发布包门禁会按 path
+读取实际 ZIP 条目并逐项核对 bytes/SHA-256；找不到条目或哈希不一致即失败。独立
+evidence CLI 没有 artifact resolver，因此只能验收全部保持未验证的索引，不能单靠
+自报 metadata 产生正向等级。
+
+`businessChecks` 每项必须且只能含 `{id,passed,actual}`，`passed` 必须为 `true`。
+Web 线上通过必须恰好覆盖以下 16 项，且 actual 使用对应类型/值，不接受统一 `ok`：
+
+- Health：`health.status=ready`、非空 `health.model`、与 deploymentVersion 相同的
+  `health.deployment`。
+- Chat：正整数 `chat.body`，布尔 `chat.event-order`、`chat.no-error-event`、
+  `chat.done`，非负整数 `chat.citations-as-returned`。
+- Plan：布尔 `plan.date`、正整数 `plan.task-count`、布尔 `plan.task-shape`、
+  `plan.safety`。
+- Quiz：布尔 `quiz.no-answer-leak`、`quiz.no-explanation-leak`、
+  `quiz.grading-separated`、`quiz.grading-shape`。生产无状态部署不把
+  `/api/quiz/submit` 写成线上评分通过，本地评分/回写归黄金演示设备证据。
+
+静态诊断、构建、模拟器、真机和线上通过还须分别提供对应类型的实际 artifact。
+`未验证` 必须说明真实缺口，且不得夹带命令、退出码、环境、产物或业务通过字段。
+结构通过只证明索引合同和实际包内字节绑定，不会把任一记录自动升级为产品通过。
 
 独立检查命令如下；最终包检查会自动用 manifest 提交和包内 HAP 实际哈希执行同一
 校验，因此最终以完整发布包门禁为准：

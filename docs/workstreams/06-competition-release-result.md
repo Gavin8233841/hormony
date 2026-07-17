@@ -738,3 +738,75 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
   人工播放、HAP 安装、模拟器、真机或门户上传。
 - **未验证**：本批没有修改应用源码，因此未重复 Web/HAP 构建；此前提交的构建记录
   不自动升级为本批提交证据。NOTICE 人工处理、签署声明和线上业务流程仍未完成。
+
+## 批次 15：发布证据 schema v2、线上业务谓词与实际 artifact 绑定
+
+背景：批次 12 的证据索引已绑定提交和 HAP，但运行证据字段仍是自由文本。纯内存
+固定输入把 `web-validation` 标为线上通过，只填写 `curl endpoint`、`HTTP 200`、
+`output`、`ok`，旧门禁仍返回 `GENERIC_ONLINE_EVIDENCE_FALSE_PASS=True`、
+`ERROR_COUNT=0`。HTTP 200 和泛化 `ok` 不能证明 Health、Chat、Plan、Quiz 的业务成功。
+
+文件：
+
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-release-evidence.py`
+- `scripts/test_validate_release_evidence.py`
+- `scripts/validate-release-bundle.py`
+- `scripts/test_validate_release_bundle.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 证据索引升级为不兼容的 `schemaVersion=2`，旧 v1 自由文本明确失败。命令必须是
+  1..32 项 argv 数组；环境、artifact 和业务检查改用精确对象，未知/缺失字段、错误
+  类型、重复 ID、非法路径和资源超限都会失败。
+- 静态/构建环境固定为 `os/tool/toolVersion`；模拟器/真机固定为设备、系统、方向及
+  `{widthPx,heightPx}` 分辨率。线上 Web 环境必须在同一无凭证 HTTPS origin 上恰好
+  记录 `GET /api/health`、`POST /api/chat`、`POST /api/plan`、`POST /api/quiz`，路径、
+  方法精确且四项状态均为 200，URL 不接受 query/fragment。
+- Web 线上记录必须恰好覆盖 16 个业务检查。Health 要求 `ready`、精确模型与部署；
+  Chat 要求正文长度、事件顺序、无 error 事件、有效 done 与真实引用数；Plan 要求
+  日期、任务数量/结构与安全；Quiz 要求展示题不泄露答案/解析且 grading 独立、结构
+  正确。每项 `actual` 按布尔、正整数、非负整数或精确字符串分别校验，统一 `ok`
+  不能通过。
+- 核对当前源码后修正线上口径：生产无状态中间件对 `/api/quiz/submit` 返回
+  `404 ENDPOINT_DISABLED`。Web 线上只验 `/api/quiz` 生成包；提交评分和 ArkData
+  写回属于 HarmonyOS 黄金演示设备证据，不再伪称线上评分通过。
+- Artifact 每项使用 `{path,kind,bytes,sha256}`。完整发布包把实际 ZIP entries 传给
+  证据门禁逐条核对；新增端到端固定输入证明真实 `README.md` bytes/hash 可通过，
+  即使同步重哈希 evidence 附件，篡改 artifact metadata 仍失败。独立 evidence CLI
+  没有 resolver，含正向等级时明确失败，只能验收全部未验证索引。
+- 独立子 agent 复现自由文本、单 endpoint 和未绑定 artifact 三类 false-pass，核对
+  无状态 Quiz 与 Chat 错误流源码，并提出四请求、actual 谓词、设备分辨率对象及
+  artifact 实际字节绑定。本批逐项采用；子 agent 未修改文件或 Git。
+
+验证：
+
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_release_evidence.py -v`，
+  exit 0，10/10 通过；覆盖 v1 拒绝、四请求、16 业务谓词、设备分辨率、argv、等级
+  互斥、artifact resolver、提交/HAP、重复键和资源上限。
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_release_bundle.py -v`，
+  exit 0，28/28 通过；新增 evidence artifact 与实际 ZIP 条目 bytes/hash 的正反控制。
+- **静态诊断通过**：正式媒体 18/18、最小依赖 6/6、评分/演示 8/8、内容/manifest
+  29/29 及对应总门禁均 exit 0。
+- **源码确认**：正向 online 固定输入使用 `.invalid` 域名和明确“只验证 schema”的
+  合成 artifact 字节；它只证明结构校验路径，不证明任何真实端点、模型或产品流程
+  通过，也没有生成正式 evidence JSON。
+
+失败后纠正：
+
+- 首轮 v2 单测 10 项中 1 项失败：`chat.body` 同时误入布尔集合，而合同要求正整数
+  正文长度；移出布尔集合并保留固定检查全集后重跑 10/10 通过。
+- 第二轮门禁已正确拒绝字符串 `chat.done`，但错误只显示数组下标，单测无法定位
+  固定检查 ID；错误标签加入经过小写 ID 校验的 `chat.done`，仍不回显 actual 正文，
+  再次重跑通过。
+
+未验证：
+
+- **未验证**：当前没有正式 evidence JSON，也没有实际线上日志、UI 树、截图、视频
+  或门户回执可作为包内 artifact；七个发布面继续保持未验证。
+- **未验证**：结构化固定输入与 `.invalid` URL 不发起网络请求，不能证明 Health、
+  Chat、Plan、Quiz 当前在线、业务成功或错误边界通过。
+- **未验证**：本批没有修改应用源码，因此未重复 Web/HAP 构建；签名 HAP、模拟器、
+  真机、最终 PDF/MP4/ZIP、完整播放、NOTICE/签署声明和门户上传仍未验证。

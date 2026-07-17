@@ -134,7 +134,7 @@ def release_evidence_bytes(hap: bytes) -> bytes:
             "recordedAt": "2026-07-17T12:00:00+08:00",
             "command": None,
             "exitCode": None,
-            "environment": None,
+            "environment": {},
             "artifacts": [],
             "businessChecks": [],
             "notes": "固定输入只证明门禁合同，不代表产品流程通过",
@@ -143,7 +143,7 @@ def release_evidence_bytes(hap: bytes) -> bytes:
     ]
     return json.dumps(
         {
-            "schemaVersion": 1,
+            "schemaVersion": MODULE.EVIDENCE_GATE.SCHEMA_VERSION,
             "sourceCommit": SOURCE_COMMIT,
             "hapSha256": hashlib.sha256(hap).hexdigest(),
             "records": records,
@@ -327,6 +327,56 @@ class ReleaseBundleGateTests(unittest.TestCase):
 
         self.assertIn("sourceCommit 与 release-manifest.json 不一致", output)
         self.assertIn("hapSha256 与实际 HAP 字节不一致", output)
+
+    def test_release_evidence_artifact_binds_actual_bundle_entry_bytes(self) -> None:
+        entries, sources, document = complete_fixture()
+        evidence_document = json.loads(entries["release/evidence.json"])
+        source_record = next(
+            item
+            for item in evidence_document["records"]
+            if item["id"] == "source-package"
+        )
+        source_content = entries["README.md"]
+        source_record["level"] = "源码确认"
+        source_record["artifacts"] = [
+            {
+                "path": "README.md",
+                "kind": "source",
+                "bytes": len(source_content),
+                "sha256": hashlib.sha256(source_content).hexdigest(),
+            }
+        ]
+        evidence_content = json.dumps(
+            evidence_document,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        valid_entries = with_attachment(
+            entries,
+            document,
+            "release/evidence.json",
+            evidence_content,
+        )
+
+        self.assertEqual([], self.check(valid_entries, sources))
+
+        source_record["artifacts"][0]["bytes"] += 1
+        source_record["artifacts"][0]["sha256"] = "0" * 64
+        invalid_content = json.dumps(
+            evidence_document,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        invalid_entries = with_attachment(
+            valid_entries,
+            document,
+            "release/evidence.json",
+            invalid_content,
+        )
+        output = "\n".join(self.check(invalid_entries, sources))
+
+        self.assertIn("bytes 与实际发布包条目不一致", output)
+        self.assertIn("sha256 与实际发布包条目不一致", output)
 
     def test_source_commit_must_match_current_git_commit_and_resolve(self) -> None:
         entries, sources, _ = complete_fixture()
