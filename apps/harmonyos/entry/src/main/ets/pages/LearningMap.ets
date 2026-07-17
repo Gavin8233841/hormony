@@ -69,33 +69,63 @@ struct LearningMapPage {
   @State selectedTopic: string = '';
   @State loading: boolean = true;
   @State message: string = '';
+  @State mapLoadFailed: boolean = false;
+  @State failedCourseId: string = '';
+  private requestVersion: number = 0;
 
   aboutToAppear(): void {
     this.loadMap();
   }
 
   private async loadMap(): Promise<void> {
+    const requestVersion = ++this.requestVersion;
     this.loading = true;
+    this.message = '';
+    this.mapLoadFailed = false;
+    this.failedCourseId = '';
     try {
-      this.courses = await LocalLearningRepository.getCourses() ?? [];
+      const courses = await LocalLearningRepository.getCourses() ?? [];
+      if (requestVersion !== this.requestVersion) return;
+      this.courses = courses;
       const storedCourse = AppStorage.get<string>('selectedCourseId') ?? '';
-      const selected = this.courses.find((course: Course): boolean => course.id === storedCourse) ?? this.courses[0];
+      const selected = courses.find((course: Course): boolean => course.id === storedCourse) ?? courses[0];
       if (selected !== undefined) {
-        this.selectedCourseId = selected.id;
-        this.selectedCourseTitle = selected.title;
-        await this.selectCourse(selected);
+        await this.loadCourseSnapshot(selected, requestVersion);
+      } else {
+        this.clearMapSnapshot();
       }
     } catch (error) {
-      this.message = '本地学习星图加载失败';
+      if (requestVersion === this.requestVersion) {
+        this.clearMapSnapshot();
+        this.message = '本地学习星图加载失败，请重新读取';
+        this.mapLoadFailed = true;
+        this.failedCourseId = '';
+      }
     } finally {
-      this.loading = false;
+      if (requestVersion === this.requestVersion) this.loading = false;
     }
   }
 
   private async selectCourse(course: Course): Promise<void> {
-    this.selectedCourseId = course.id;
-    this.selectedCourseTitle = course.title;
-    this.selectedTopic = '';
+    const requestVersion = ++this.requestVersion;
+    this.loading = true;
+    this.message = '';
+    this.mapLoadFailed = false;
+    this.failedCourseId = '';
+    try {
+      await this.loadCourseSnapshot(course, requestVersion);
+    } catch (error) {
+      if (requestVersion === this.requestVersion) {
+        this.message = course.title + '的学习星图读取失败，请重试';
+        this.mapLoadFailed = true;
+        this.failedCourseId = course.id;
+      }
+    } finally {
+      if (requestVersion === this.requestVersion) this.loading = false;
+    }
+  }
+
+  private async loadCourseSnapshot(course: Course, requestVersion: number): Promise<void> {
     const mastery = await LocalLearningRepository.getTopicMastery(course.id);
     const lessonProgress = await LocalLearningRepository.getLessonProgress(course.id);
     const relations = LearningContentRepository.getTopicRelations(course.id);
@@ -137,8 +167,6 @@ struct LearningMapPage {
     for (const node of nextNodes) {
       node.recommended = recommended !== null && node.id === recommended.id;
     }
-    this.nodes = nextNodes;
-    this.selectedTopic = recommended?.topic ?? nextNodes[0]?.topic ?? '';
     const nextEdges: MapEdge[] = [];
     for (const node of nextNodes) {
       for (const prerequisiteId of node.prerequisiteIds) {
@@ -153,10 +181,33 @@ struct LearningMapPage {
         });
       }
     }
+    if (requestVersion !== this.requestVersion) return;
+    this.selectedCourseId = course.id;
+    this.selectedCourseTitle = course.title;
+    this.nodes = nextNodes;
+    this.selectedTopic = recommended?.topic ?? nextNodes[0]?.topic ?? '';
     this.edges = nextEdges;
     this.levelRows = levels.sort((left: number, right: number): number => left - right);
     this.canvasWidth = calculatedWidth;
     this.canvasHeight = Math.max(420, 30 + maxLevel * LEVEL_GAP + 92);
+    this.message = '';
+    this.mapLoadFailed = false;
+    this.failedCourseId = '';
+  }
+
+  private clearMapSnapshot(): void {
+    this.nodes = [];
+    this.edges = [];
+    this.levelRows = [];
+    this.selectedTopic = '';
+    this.canvasWidth = MAP_WIDTH;
+    this.canvasHeight = 420;
+  }
+
+  private retryMapLoad(): void {
+    const failedCourse = this.courses.find((course: Course): boolean => course.id === this.failedCourseId);
+    if (failedCourse !== undefined) this.selectCourse(failedCourse);
+    else this.loadMap();
   }
 
   private nodeColor(node: MapNode): ResourceColor {
@@ -242,21 +293,118 @@ struct LearningMapPage {
     return '可学习：按当前节奏安排到后续练习';
   }
 
+  private firstIncompletePrerequisite(node: MapNode): MapNode | null {
+    for (const prerequisiteId of node.prerequisiteIds) {
+      const prerequisite = this.nodes.find((item: MapNode): boolean => item.id === prerequisiteId);
+      if (prerequisite !== undefined && prerequisite.mastery?.mastered !== true) return prerequisite;
+    }
+    return null;
+  }
+
+  private firstActionablePrerequisite(node: MapNode): MapNode | null {
+    let target = this.firstIncompletePrerequisite(node);
+    const visitedIds: string[] = [];
+    while (target !== null && !target.unlocked && !visitedIds.includes(target.id)) {
+      visitedIds.push(target.id);
+      const earlier = this.firstIncompletePrerequisite(target);
+      if (earlier === null) return null;
+      target = earlier;
+    }
+    return target !== null && target.unlocked ? target : null;
+  }
+
+  private firstIncompleteSuccessor(node: MapNode): MapNode | null {
+    return this.nodes.find((item: MapNode): boolean =>
+      item.prerequisiteIds.includes(node.id) && item.mastery?.mastered !== true) ?? null;
+  }
+
+  private nextActionTarget(node: MapNode): MapNode | null {
+    if (!node.unlocked) return this.firstActionablePrerequisite(node);
+    if (node.mastery?.mastered === true) {
+      const successor = this.firstIncompleteSuccessor(node);
+      if (successor === null) return node;
+      if (successor.unlocked) return successor;
+      return this.firstActionablePrerequisite(successor) ?? node;
+    }
+    return node;
+  }
+
+  private nextActionUsesPractice(node: MapNode): boolean {
+    const target = this.nextActionTarget(node);
+    return target !== null && (target.lessonCompleted || target.mastery !== null);
+  }
+
+  private nextActionLabel(node: MapNode): string {
+    const target = this.nextActionTarget(node);
+    if (target === null) return '暂无可执行前置主题';
+    if (target.id !== node.id) {
+      const relation = target.prerequisiteIds.includes(node.id) ? '后继主题' : '前置主题';
+      return (this.nextActionUsesPractice(node) ? '练习' : '学习') + relation;
+    }
+    if (node.mastery?.mastered === true) return '复习主题练习';
+    if (node.mastery !== null) return '继续主题练习';
+    if (node.lessonCompleted) return '开始主题练习';
+    return '学习主题';
+  }
+
+  private nextActionDescription(node: MapNode): string {
+    const target = this.nextActionTarget(node);
+    if (target === null) return '当前课程关系数据无法解析出可执行前置主题';
+    if (target.id !== node.id) {
+      const action = this.nextActionUsesPractice(node) ? '练习' : '学习';
+      return target.prerequisiteIds.includes(node.id) ? '下一步：' + action + '后继「' + target.topic + '」' :
+        '下一步：先' + action + '前置「' + target.topic + '」';
+    }
+    if (node.mastery?.mastered === true) return '下一步：复习当前主题，保留新的客观答题记录';
+    if (node.mastery !== null) return '下一步：继续练习，新的累计正确率会更新星图';
+    if (node.lessonCompleted) return '下一步：完成精选练习，生成第一份掌握证据';
+    return '下一步：先学习本机课程内容，再通过练习验证掌握';
+  }
+
+  private runNextAction(node: MapNode): void {
+    const target = this.nextActionTarget(node);
+    if (target === null) {
+      this.message = '当前课程关系数据无法解析出可执行前置主题';
+      return;
+    }
+    if (this.nextActionUsesPractice(node)) this.openPractice(target.topic);
+    else this.openLesson(target.topic);
+  }
+
+  private nodeAccessibilityText(node: MapNode): string {
+    const selected = this.selectedTopic === node.topic ? '，已选择' : '';
+    const recommended = node.recommended ? '，当前推荐' : '';
+    return node.topic + '，' + this.masteryLabel(node) + recommended + selected;
+  }
+
+  private actionAccessibilityText(node: MapNode): string {
+    const target = this.nextActionTarget(node);
+    return target === null ? this.nextActionLabel(node) : this.nextActionLabel(node) + '，' + target.topic;
+  }
+
   private openPractice(topic: string): void {
+    this.message = '';
+    this.mapLoadFailed = false;
+    this.failedCourseId = '';
     AppStorage.setOrCreate<string>('selectedCourseId', this.selectedCourseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.selectedCourseTitle);
     AppStorage.setOrCreate<string>('selectedPracticeTopic', topic);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((error: Error): void => {
+      this.message = '精选练习打开失败，请重试';
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'LearningMapPage Practice navigation failed: %{public}s', error.message);
     });
   }
 
   private openLesson(topic: string): void {
+    this.message = '';
+    this.mapLoadFailed = false;
+    this.failedCourseId = '';
     AppStorage.setOrCreate<string>('selectedCourseId', this.selectedCourseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.selectedCourseTitle);
     AppStorage.setOrCreate<string>('selectedContentTopic', topic);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Lesson' }).catch((error: Error): void => {
+      this.message = '课程内容打开失败，请重试';
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'LearningMapPage Lesson navigation failed: %{public}s', error.message);
     });
@@ -268,12 +416,14 @@ struct LearningMapPage {
       ForEach(this.courses, (course: Course): void => {
         Button(course.title)
           .layoutWeight(1)
-          .height(40)
+          .constraintSize({ minHeight: 48 })
           .fontSize(12)
           .fontColor(this.selectedCourseId === course.id ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
           .backgroundColor(this.selectedCourseId === course.id ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BG_TAG)
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => { this.selectCourse(course); })
+          .accessibilityText(course.title + (this.selectedCourseId === course.id ? '，已选择' : '，未选择'))
+          .accessibilityDescription('切换后读取该课程的本机掌握状态与先修关系')
       })
     }
     .width('100%')
@@ -403,6 +553,9 @@ struct LearningMapPage {
           y: this.selectedTopic === node.topic ? 1.08 : (node.recommended ? 1.04 : 1) })
         .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
         .onClick((): void => { this.selectedTopic = node.topic; })
+        .accessibilityGroup(true)
+        .accessibilityText(this.nodeAccessibilityText(node))
+        .accessibilityDescription('选择后查看真实掌握依据与下一步动作')
       })
     }
     .width(this.canvasWidth)
@@ -441,6 +594,10 @@ struct LearningMapPage {
     .padding(16)
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
+    .accessibilityGroup(true)
+    .accessibilityText(this.selectedCourseTitle + '学习星图，已掌握' + this.masteredCount().toString() +
+      '个，共' + this.nodes.length.toString() + '个主题，当前推荐' + this.nextTopicLabel())
+    .accessibilityDescription('数据来自本机测验掌握记录、课程学习进度与课程先修关系')
   }
 
   build() {
@@ -453,13 +610,53 @@ struct LearningMapPage {
             this.CourseSelector()
           }
 
+          if (!this.loading && this.mapLoadFailed && this.nodes.length > 0) {
+            Column({ space: 10 }) {
+              Text(this.message)
+                .width('100%')
+                .fontSize(13)
+                .lineHeight(20)
+                .fontColor(Constants.COLOR_ERROR)
+              Button('重新读取失败课程')
+                .width('100%')
+                .constraintSize({ minHeight: 48 })
+                .fontSize(14)
+                .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                .backgroundColor(Constants.COLOR_ERROR)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.retryMapLoad(); })
+                .accessibilityText('重新读取失败课程的学习星图')
+            }
+            .width('100%')
+            .padding(14)
+            .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+            .borderRadius(Constants.RADIUS_MD)
+          }
+
           if (this.loading) {
-            Column().width(MAP_WIDTH).height(420).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
+            Column()
+              .width(MAP_WIDTH)
+              .height(420)
+              .backgroundColor(Constants.COLOR_BG_SKELETON)
+              .borderRadius(Constants.RADIUS_LG)
+              .accessibilityGroup(true)
+              .accessibilityText('正在读取本机学习星图')
           } else if (this.nodes.length === 0) {
-            Column({ space: 8 }) {
+            Column({ space: 14 }) {
               Text(this.message.length > 0 ? this.message : '还没有可展示的课程主题')
                 .fontSize(14)
                 .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+                .textAlign(TextAlign.Center)
+              if (this.mapLoadFailed) {
+                Button('重新读取星图')
+                  .constraintSize({ minHeight: 48 })
+                  .fontSize(14)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .backgroundColor(Constants.COLOR_BRAND)
+                  .borderRadius(Constants.RADIUS_MD)
+                  .onClick((): void => { this.retryMapLoad(); })
+                  .accessibilityText('重新读取本机学习星图')
+              }
             }
             .width('100%')
             .height(260)
@@ -475,26 +672,31 @@ struct LearningMapPage {
             .scrollBar(BarState.Off)
           }
 
-          Row({ space: 18 }) {
+          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
             Row({ space: 6 }) {
               Column().width(9).height(9).backgroundColor(Constants.COLOR_MAP_NODE_IDLE).borderRadius(5)
               Text('可开始').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
             }
+            .margin({ left: 8, right: 8, top: 4, bottom: 4 })
             Row({ space: 6 }) {
               Column().width(9).height(9).backgroundColor(Constants.COLOR_BRAND).borderRadius(5)
               Text('已学习').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
             }
+            .margin({ left: 8, right: 8, top: 4, bottom: 4 })
             Row({ space: 6 }) {
               Column().width(9).height(9).backgroundColor(Constants.COLOR_WARNING).borderRadius(5)
               Text('学习中').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
             }
+            .margin({ left: 8, right: 8, top: 4, bottom: 4 })
             Row({ space: 6 }) {
               Column().width(9).height(9).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(5)
               Text('已掌握').fontSize(11).fontColor(Constants.COLOR_TEXT_SECONDARY)
             }
+            .margin({ left: 8, right: 8, top: 4, bottom: 4 })
           }
           .width('100%')
-          .justifyContent(FlexAlign.Center)
+          .accessibilityGroup(true)
+          .accessibilityText('星图状态图例：可开始、已学习、学习中、已掌握')
 
           if (this.selectedTopic.length > 0) {
             Column({ space: 12 }) {
@@ -525,36 +727,33 @@ struct LearningMapPage {
                     .lineHeight(19)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(node.recommended ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_TERTIARY)
-                  if (!node.unlocked) {
-                    Text('完成前置主题并达到 80% 正确率后，该节点会进入推荐路径')
+                  Text(this.nextActionDescription(node))
+                    .width('100%')
+                    .fontSize(13)
+                    .lineHeight(21)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  Button(this.nextActionLabel(node))
+                    .width('100%')
+                    .constraintSize({ minHeight: 48 })
+                    .enabled(this.nextActionTarget(node) !== null)
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(this.nextActionTarget(node) !== null ? Constants.COLOR_TEXT_ON_GRADIENT :
+                      Constants.COLOR_BUTTON_DISABLED_TEXT)
+                    .backgroundColor(this.nextActionTarget(node) !== null ? Constants.COLOR_BRAND :
+                      Constants.COLOR_BUTTON_DISABLED_BG)
+                    .borderRadius(Constants.RADIUS_MD)
+                    .onClick((): void => { this.runNextAction(node); })
+                    .accessibilityText(this.actionAccessibilityText(node))
+                    .accessibilityDescription(this.nextActionDescription(node))
+                  if (this.message.length > 0 && !this.mapLoadFailed) {
+                    Text(this.message)
                       .width('100%')
-                      .fontSize(11)
-                      .lineHeight(18)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .fontSize(12)
+                      .lineHeight(19)
+                      .fontColor(Constants.COLOR_ERROR)
                   }
-                  Row({ space: 10 }) {
-                    Button({ type: ButtonType.Normal }) {
-                      Text('学习主题').fontSize(14).fontColor(node.unlocked ? Constants.COLOR_TEXT_ON_GRADIENT :
-                        Constants.COLOR_BUTTON_DISABLED_TEXT)
-                    }
-                      .layoutWeight(1)
-                      .height(48)
-                      .enabled(node.unlocked)
-                      .backgroundColor(node.unlocked ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
-                      .borderRadius(Constants.RADIUS_MD)
-                      .onClick((): void => { this.openLesson(this.selectedTopic); })
-                    Button({ type: ButtonType.Normal }) {
-                      Text('主题练习').fontSize(14).fontColor(node.unlocked ? Constants.COLOR_BRAND :
-                        Constants.COLOR_BUTTON_DISABLED_TEXT)
-                    }
-                      .layoutWeight(1)
-                      .height(48)
-                      .enabled(node.unlocked)
-                      .backgroundColor(node.unlocked ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BUTTON_DISABLED_BG)
-                      .borderRadius(Constants.RADIUS_MD)
-                      .onClick((): void => { this.openPractice(this.selectedTopic); })
-                  }
-                  .width('100%')
                 })
             }
             .width('100%')
