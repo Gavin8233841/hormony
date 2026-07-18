@@ -1,6 +1,5 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
-import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { CuratedKnowledgeChunk, LearningActivity, LessonExperience, LessonProgress } from '../model/DataModels';
@@ -40,6 +39,9 @@ struct LessonPage {
   @State conceptStepIndex: number = 0;
   @State codeRunStepIndex: number = -1;
   @State activityEvidenceMessage: string = '';
+  @State loading: boolean = true;
+  @StorageProp('safeAreaBottomVp') safeAreaBottomVpValue: number = 0;
+  private loadRunId: number = 0;
 
   aboutToAppear(): void {
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
@@ -64,8 +66,13 @@ struct LessonPage {
   }
 
   private async loadProgress(): Promise<void> {
+    const runId = this.loadRunId + 1;
+    this.loadRunId = runId;
+    this.loading = true;
+    this.message = '';
     try {
       const progress = await LocalLearningRepository.getLessonProgress(this.courseId);
+      if (this.loadRunId !== runId) return;
       const item = progress.find((value: LessonProgress): boolean => value.topic === this.topic);
       this.completedChunkIds = item?.completedChunkIds ?? [];
       if (this.chunks.length > 0) {
@@ -75,16 +82,19 @@ struct LessonPage {
         this.activeChunk = this.chunks[this.currentIndex];
       }
     } catch (error) {
+      if (this.loadRunId !== runId) return;
       this.message = '学习进度读取失败，但课程内容仍可查看';
     }
-    await this.restoreActivityProgress();
+    await this.restoreActivityProgress(runId);
+    if (this.loadRunId === runId) this.loading = false;
   }
 
-  private async restoreActivityProgress(): Promise<void> {
+  private async restoreActivityProgress(runId: number = this.loadRunId): Promise<void> {
     if (this.experience === null || this.experience.activities.length === 0) return;
     try {
       const activityIds = this.experience.activities.map((activity: LearningActivity): string => activity.id);
       const events = await LocalLearningRepository.getStudyEvents();
+      if (this.loadRunId !== runId) return;
       const attemptedIds: string[] = [];
       for (const event of events) {
         if (event.type !== 'lesson_activity' || event.courseId !== this.courseId || event.topic !== this.topic ||
@@ -99,6 +109,7 @@ struct LessonPage {
       this.activeActivityIndex = nextIndex >= 0 ? nextIndex : this.experience.activities.length - 1;
       this.resetActivityInput();
     } catch (error) {
+      if (this.loadRunId !== runId) return;
       if (this.message.length === 0) this.message = '互动断点读取失败，可继续当前练习';
     }
   }
@@ -145,6 +156,11 @@ struct LessonPage {
     const activity = this.activeActivity();
     if (activity === null || this.feedbackVisible) return;
     this.selectedIndexes = [index];
+  }
+
+  private submitSingle(): void {
+    const activity = this.activeActivity();
+    if (activity === null || this.selectedIndexes.length !== 1 || this.feedbackVisible) return;
     this.feedbackVisible = true;
     this.markActivityAttempted(activity, this.activityIsCorrect());
   }
@@ -290,6 +306,12 @@ struct LessonPage {
       this.attemptedActivityIds.includes(activity.id));
   }
 
+  private nextPendingActivityIndex(): number {
+    if (this.experience === null) return -1;
+    return this.experience.activities.findIndex((activity: LearningActivity): boolean =>
+      !this.attemptedActivityIds.includes(activity.id));
+  }
+
   private showIntroExperience(): boolean {
     return this.experience !== null && this.currentIndex === 0;
   }
@@ -310,7 +332,8 @@ struct LessonPage {
     if (this.saving) return '保存中...';
     if (this.currentIndex < this.chunks.length - 1) return '学完本节，继续';
     if (this.needsActivityResume() && this.experience !== null) {
-      return '继续互动 ' + (this.activeActivityIndex + 1).toString() + '/' +
+      const nextIndex = this.nextPendingActivityIndex();
+      return '继续互动 ' + (nextIndex + 1).toString() + '/' +
         this.experience.activities.length.toString();
     }
     return '完成主题并练习';
@@ -323,6 +346,10 @@ struct LessonPage {
 
   private focusActiveActivity(): void {
     if (!this.needsActivityResume()) return;
+    const nextIndex = this.nextPendingActivityIndex();
+    if (nextIndex >= 0 && nextIndex !== this.activeActivityIndex) {
+      this.goToActivity(nextIndex);
+    }
     this.message = '';
     setTimeout((): void => {
       if (this.activityOffset > 0) {
@@ -343,6 +370,10 @@ struct LessonPage {
       return;
     }
     this.completeCurrent();
+  }
+
+  private safeAreaBottomVp(): number {
+    return Math.max(0, this.safeAreaBottomVpValue);
   }
 
   private contentBeats(): string[] {
@@ -520,7 +551,7 @@ struct LessonPage {
         .lineHeight(28)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
-      Row({ space: 8 }) {
+      Column({ space: 8 }) {
         this.MasterySignal('目标', this.topic.length > 0 ? this.topic : this.courseTitle)
         this.MasterySignal('方法', this.currentLearningFocus())
         this.MasterySignal('反馈', this.showPracticeExperience() ? '做完练习后进题组' : '完成本节后继续')
@@ -535,24 +566,21 @@ struct LessonPage {
 
   @Builder
   private MasterySignal(label: string, value: string) {
-    Column({ space: 4 }) {
+    Row({ space: 10 }) {
       Text(label)
-        .fontSize(10)
+        .width(38)
+        .fontSize(11)
+        .fontWeight(FontWeight.Medium)
         .fontColor(Constants.COLOR_TEXT_SECONDARY)
       Text(value)
+        .layoutWeight(1)
         .fontSize(12)
         .fontWeight(FontWeight.Medium)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
         .lineHeight(18)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
-    .layoutWeight(1)
-    .constraintSize({ minHeight: 62 })
-    .padding({ left: 10, right: 10, top: 9, bottom: 9 })
-    .backgroundColor(Constants.COLOR_SURFACE_TINT)
-    .borderRadius(Constants.RADIUS_SM)
-    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
   }
 
   @Builder
@@ -646,7 +674,7 @@ struct LessonPage {
       Row({ space: 10 }) {
         Button('重来')
           .layoutWeight(1)
-          .height(40)
+          .constraintSize({ minHeight: 48 })
           .fontSize(12)
           .enabled(this.codeRunStepIndex >= 0)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -655,7 +683,7 @@ struct LessonPage {
           .onClick((): void => { this.codeRunStepIndex = -1; })
         Button(this.codeRunButtonLabel(activity))
           .layoutWeight(1)
-          .height(40)
+          .constraintSize({ minHeight: 48 })
           .fontSize(12)
           .enabled(this.codeRunStepIndex < this.codeRunSteps(activity).length - 1)
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
@@ -690,14 +718,13 @@ struct LessonPage {
         .fontColor(this.selectedIndexes.includes(index) ?
           Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
         .textAlign(TextAlign.Start)
-        .maxLines(4)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .width('100%')
     .constraintSize({ minHeight: 48 })
     .padding({ left: 12, right: 12, top: 10, bottom: 10 })
     .backgroundColor(this.selectedIndexes.includes(index) ?
-      (ordered ? Constants.COLOR_BRAND : (this.activityIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)) :
+      (ordered || !this.feedbackVisible ? Constants.COLOR_BRAND :
+        (this.activityIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_ERROR)) :
       Constants.COLOR_BG_TAG)
     .borderRadius(Constants.RADIUS_MD)
     .onClick((): void => {
@@ -785,7 +812,7 @@ struct LessonPage {
 
         Button(this.conceptStepButtonLabel())
           .width('100%')
-          .height(44)
+          .constraintSize({ minHeight: 48 })
           .enabled(this.conceptStepCount() > 0)
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
@@ -910,6 +937,14 @@ struct LessonPage {
             ForEach(this.activeActivity()!.options, (option: string, index: number): void => {
               this.ActivityOption(option, index, false)
             })
+            Button(this.feedbackVisible ? '答案已提交' : '提交答案')
+              .width('100%')
+              .constraintSize({ minHeight: 48 })
+              .enabled(this.selectedIndexes.length === 1 && !this.feedbackVisible)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.submitSingle(); })
           } else if (this.activeActivity()!.interactionMode === 'ordered_choice') {
             ForEach(this.activeActivity()!.options, (option: string, index: number): void => {
               this.ActivityOption(option, index, true)
@@ -917,7 +952,7 @@ struct LessonPage {
             Row({ space: 10 }) {
               Button('重置顺序')
                 .layoutWeight(1)
-                .height(44)
+                .constraintSize({ minHeight: 48 })
                 .enabled(!this.feedbackVisible)
                 .fontColor(Constants.COLOR_TEXT_PRIMARY)
                 .backgroundColor(Constants.COLOR_BG_TAG)
@@ -925,7 +960,7 @@ struct LessonPage {
                 .onClick((): void => { this.resetActivityInput(); })
               Button('提交顺序')
                 .layoutWeight(1)
-                .height(44)
+                .constraintSize({ minHeight: 48 })
                 .enabled(this.selectedIndexes.length === this.activeActivity()!.options.length &&
                   !this.feedbackVisible)
                 .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
@@ -946,7 +981,7 @@ struct LessonPage {
               .onChange((value: string): void => { this.responseText = value; })
             Button(this.feedbackVisible ? '已提交，向下对照答案' : '提交并对照答案')
               .width('100%')
-              .height(46)
+              .constraintSize({ minHeight: 48 })
               .enabled(!this.feedbackVisible)
               .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
               .backgroundColor(Constants.COLOR_BRAND)
@@ -961,7 +996,7 @@ struct LessonPage {
                 .fontSize(13)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
-                  Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
+                  Constants.COLOR_SUCCESS : Constants.COLOR_ERROR)
               this.FeedbackSection('你的回答', this.activityAnswerText(this.activeActivity()!))
               this.FeedbackSection('参考答案', this.activeActivity()!.answer)
               this.FeedbackSection('对照重点', this.activeActivity()!.feedback)
@@ -983,7 +1018,7 @@ struct LessonPage {
             .width('100%')
             .padding(14)
             .backgroundColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
-              Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_SURFACE_TINT)
+              Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_ERROR_LIGHT)
             .borderRadius(Constants.RADIUS_SM)
 
             if (this.activeActivity()!.interactionMode === 'free_response' &&
@@ -991,7 +1026,7 @@ struct LessonPage {
               Row({ space: 10 }) {
                 Button('关键点有遗漏')
                   .layoutWeight(1)
-                  .height(44)
+                  .constraintSize({ minHeight: 48 })
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   .backgroundColor(Constants.COLOR_BG_TAG)
                   .borderRadius(Constants.RADIUS_MD)
@@ -999,7 +1034,7 @@ struct LessonPage {
                   .onClick((): void => { this.selfAssess(this.activeActivity()!, false); })
                 Button('关键点已覆盖')
                   .layoutWeight(1)
-                  .height(44)
+                  .constraintSize({ minHeight: 48 })
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   .backgroundColor(Constants.COLOR_SUCCESS)
                   .borderRadius(Constants.RADIUS_MD)
@@ -1015,7 +1050,7 @@ struct LessonPage {
               this.activityEvidenceMessage.includes('保存失败')) {
               Button('重试保存记录')
                 .width('100%')
-                .height(42)
+                .constraintSize({ minHeight: 48 })
                 .fontSize(12)
                 .fontColor(Constants.COLOR_ERROR)
                 .backgroundColor(Constants.COLOR_BG_TAG)
@@ -1028,7 +1063,7 @@ struct LessonPage {
             Row({ space: 10 }) {
               Button('问学伴讲解')
                 .layoutWeight(1)
-                .height(42)
+                .constraintSize({ minHeight: 48 })
                 .fontSize(12)
                 .fontColor(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
@@ -1036,7 +1071,7 @@ struct LessonPage {
                 .onClick((): void => { this.askTutorForActivity(this.activeActivity()!); })
               Button('同标签测验')
                 .layoutWeight(1)
-                .height(42)
+                .constraintSize({ minHeight: 48 })
                 .fontSize(12)
                 .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                 .backgroundColor(Constants.COLOR_BRAND)
@@ -1054,7 +1089,7 @@ struct LessonPage {
                 .fontColor(Constants.COLOR_SUCCESS)
               if (this.activeActivityIndex < this.experience.activities.length - 1) {
                 Button('下一练习')
-                  .height(40)
+                  .constraintSize({ minHeight: 48 })
                   .fontSize(12)
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   .backgroundColor(Constants.COLOR_BRAND)
@@ -1079,12 +1114,46 @@ struct LessonPage {
     }
   }
 
+  @Builder
+  private LessonSkeleton() {
+    Column({ space: 18 }) {
+      Row() {
+        Column().width(96).height(20).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(6)
+        Column().width(42).height(16).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      Column().width('100%').height(8).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(4)
+      Column().width('100%').height(132).backgroundColor(Constants.COLOR_BG_SKELETON)
+        .borderRadius(Constants.RADIUS_LG)
+      Column({ space: 12 }) {
+        Column().width('86%').height(22).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(6)
+        Column().width('100%').height(16).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+        Column().width('94%').height(16).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+        Column().width('78%').height(16).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+      }
+      .width('100%')
+      .padding(18)
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .borderRadius(Constants.RADIUS_LG)
+    }
+    .width('100%')
+  }
+
   build() {
     Column() {
       TitleBar(this.topic.length > 0 ? this.topic : '课程内容', this.courseTitle,
         () => this.getUIContext().getRouter().back())
 
-      if (this.chunks.length === 0) {
+      if (this.loading) {
+        Column() {
+          this.LessonSkeleton()
+        }
+        .width('100%')
+        .constraintSize({ maxWidth: 760 })
+        .layoutWeight(1)
+        .padding({ left: 18, right: 18, top: 4, bottom: 24 + this.safeAreaBottomVp() })
+      } else if (this.chunks.length === 0) {
         Column({ space: 10 }) {
           SymbolGlyph($r('sys.symbol.book_open_fill'))
             .fontSize(38)
@@ -1213,9 +1282,9 @@ struct LessonPage {
             .border({ width: { top: 1 }, color: Constants.COLOR_BORDER })
           }
           .width('100%')
-          .constraintSize({ minHeight: '100%' })
+          .constraintSize({ minHeight: '100%', maxWidth: 720 })
           .justifyContent(FlexAlign.Start)
-          .padding({ left: 18, right: 18, top: 4, bottom: 24 + SafeAreaInsets.bottomVp() })
+          .padding({ left: 18, right: 18, top: 4, bottom: 24 + this.safeAreaBottomVp() })
         }
         .width('100%')
         .layoutWeight(1)
@@ -1223,10 +1292,25 @@ struct LessonPage {
         .padding({ left: 16, right: 16 })
 
         if (this.message.length > 0) {
-          Text(this.message)
+          Row({ space: 10 }) {
+            Text(this.message)
+              .layoutWeight(1)
+              .fontSize(12)
+              .lineHeight(19)
+              .fontColor(this.message.includes('失败') ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+            if (this.message.includes('进度读取失败') || this.message.includes('断点读取失败')) {
+              Button('重试')
+                .constraintSize({ minHeight: 48 })
+                .padding({ left: 14, right: 14 })
+                .fontSize(12)
+                .fontColor(Constants.COLOR_BRAND)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(Constants.RADIUS_MD)
+                .accessibilityText('重新读取当前主题学习进度')
+                .onClick((): void => { this.loadProgress(); })
+            }
+          }
             .width('100%')
-            .fontSize(12)
-            .fontColor(this.message.includes('失败') ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
             .padding({ left: 18, right: 18, top: 8 })
         }
 
@@ -1251,7 +1335,7 @@ struct LessonPage {
             .onClick((): void => { this.handlePrimaryAction(); })
         }
         .width('100%')
-        .padding({ left: 16, right: 16, top: 12, bottom: 20 + SafeAreaInsets.bottomVp() })
+        .padding({ left: 16, right: 16, top: 12, bottom: 20 + this.safeAreaBottomVp() })
       }
     }
     .width('100%')

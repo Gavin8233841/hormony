@@ -20,11 +20,16 @@ export interface WorkStep {
 @Builder
 export function TitleBar(title: string, subtitle: string, onBack: () => void) {
   Row() {
-    SymbolGlyph($r('sys.symbol.chevron_left'))
-      .fontSize(22)
-      .fontColor([Constants.COLOR_TEXT_PRIMARY])
-      .width(40)
-      .height(40)
+    Button({ type: ButtonType.Normal }) {
+      SymbolGlyph($r('sys.symbol.chevron_left'))
+        .fontSize(22)
+        .fontColor([Constants.COLOR_TEXT_PRIMARY])
+    }
+      .width(48)
+      .height(48)
+      .backgroundColor(Constants.COLOR_BG_PAGE)
+      .borderRadius(24)
+      .accessibilityText('返回上一页')
       .onClick(() => {
         onBack();
       })
@@ -58,11 +63,16 @@ export function TitleBar(title: string, subtitle: string, onBack: () => void) {
 @Builder
 export function GradientHeader(title: string, subtitle: string, onBack: () => void) {
   Row() {
-    SymbolGlyph($r('sys.symbol.chevron_left'))
-      .fontSize(22)
-      .fontColor([Constants.COLOR_TEXT_PRIMARY])
-      .width(40)
-      .height(40)
+    Button({ type: ButtonType.Normal }) {
+      SymbolGlyph($r('sys.symbol.chevron_left'))
+        .fontSize(22)
+        .fontColor([Constants.COLOR_TEXT_PRIMARY])
+    }
+      .width(48)
+      .height(48)
+      .backgroundColor(Constants.COLOR_BG_PAGE)
+      .borderRadius(24)
+      .accessibilityText('返回上一页')
       .onClick(() => {
         onBack();
       })

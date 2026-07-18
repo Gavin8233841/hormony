@@ -867,7 +867,7 @@ test('冷启动期间同一有效 Want 重复到达只写入一次跳转', async
   await ability.startMainPage(harness.windowStage);
 
   assert.equal(harness.storage.get('proactiveLaunchVersion'), 1);
-  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/Index');
+  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/CourseDetail');
   assert.equal(harness.storage.get('selectedCourseTitle'), '数据结构');
 });
 
@@ -882,7 +882,7 @@ test('热启动前台周期内同一有效 Want 顺序到达只写入一次跳�
   await settleAsyncWork();
 
   assert.equal(harness.storage.get('proactiveLaunchVersion'), 1);
-  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/Index');
+  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/CourseDetail');
 });
 
 test('同一 Want 在进入后台后可于新前台周期再次触发跳转', async () => {
@@ -1004,8 +1004,8 @@ test('首页提醒和卡片同步入口具备动态播报与 48vp 触控区', ()
   const header = source.slice(headerStart, headerEnd);
 
   const bellIconIndex = header.indexOf("SymbolGlyph($r('sys.symbol.bell_fill'))");
-  const bellStart = header.lastIndexOf('          Button() {', bellIconIndex);
-  const bellEnd = header.indexOf('\n\n          Column()', bellIconIndex);
+  const bellStart = header.lastIndexOf('        Button() {', bellIconIndex);
+  const bellEnd = header.indexOf('\n      if (this.notificationOpen)', bellIconIndex);
   const bell = header.slice(bellStart, bellEnd);
   assert.notEqual(bellIconIndex, -1);
   assert.notEqual(bellStart, -1);

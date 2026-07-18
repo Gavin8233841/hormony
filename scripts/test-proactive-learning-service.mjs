@@ -261,6 +261,7 @@ test('混合标签洞察不被主动行动读取或推荐', async () => {
   assert.equal(action.kind, 'course');
   assert.equal(action.courseId, 'cs101');
   assert.equal(action.focusTag, '');
+  assert.equal(action.targetPage, 'pages/CourseDetail');
   assert.equal(repository.getTagInsightReadCount(), 0);
 });
 
@@ -539,6 +540,21 @@ test('validateLaunch 接受无课程参数的合法计划回流', () => {
   assert.equal(launch.topic, '');
   assert.equal(launch.focusTag, '');
   assert.equal(launch.taskAction, 'plan');
+});
+
+test('validateLaunch 接受课程详情直达并保留旧课程 Tab 回流', () => {
+  const service = loadService(repositoryFor({ courses }));
+  const detailLaunch = service.validateLaunch(
+    courses, 'proactive_learning_card', 'pages/CourseDetail', 'cs101', '', '', 'course');
+  const legacyLaunch = service.validateLaunch(
+    courses, 'proactive_learning_reminder', 'pages/Index', 'cs101', '', '', 'course');
+
+  assert.notEqual(detailLaunch, undefined);
+  assert.equal(detailLaunch.targetPage, 'pages/CourseDetail');
+  assert.equal(detailLaunch.courseId, 'cs101');
+  assert.equal(detailLaunch.courseTitle, '数据结构');
+  assert.notEqual(legacyLaunch, undefined);
+  assert.equal(legacyLaunch.targetPage, 'pages/Index');
 });
 
 test('EntryAbility 忽略无关 Want 且保留已排队的合法回流', () => {

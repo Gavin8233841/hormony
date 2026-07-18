@@ -36,14 +36,14 @@ export class Constants {
   // 颜色常量（统一收口，禁止页面内硬编码颜色）
   // 文字色
   static readonly COLOR_TEXT_PRIMARY: string = '#111827';
-  static readonly COLOR_TEXT_SECONDARY: string = '#6f7a8f';
-  static readonly COLOR_TEXT_PLACEHOLDER: string = '#a7b0c2';
+  static readonly COLOR_TEXT_SECONDARY: string = '#606b80';
+  static readonly COLOR_TEXT_PLACEHOLDER: string = '#606b80';
   static readonly COLOR_TEXT_TERTIARY: string = '#526078';
   // 品牌与功能色
   static readonly COLOR_BRAND: string = '#176bff';
-  static readonly COLOR_SUCCESS: string = '#2fb86b';
-  static readonly COLOR_WARNING: string = '#f59e0b';
-  static readonly COLOR_ERROR: string = '#e5484d';
+  static readonly COLOR_SUCCESS: string = '#18794e';
+  static readonly COLOR_WARNING: string = '#9a5b00';
+  static readonly COLOR_ERROR: string = '#b42318';
   // 背景色
   static readonly COLOR_BG_CARD: string = '#ffffff';
   static readonly COLOR_BG_PAGE: string = '#f4f7fc';
@@ -53,7 +53,7 @@ export class Constants {
   static readonly COLOR_BORDER: string = '#e5ebf4';
   static readonly COLOR_SURFACE_TINT: string = '#f8fbff';
   static readonly COLOR_NAV_SURFACE: string = '#f2ffffff';
-  static readonly COLOR_NAV_INACTIVE: string = '#778197';
+  static readonly COLOR_NAV_INACTIVE: string = '#667085';
   // 浅色背景（带透明度，用于标签底色）
   static readonly COLOR_BRAND_LIGHT: string = '#eaf2ff';
   static readonly COLOR_ERROR_LIGHT: string = '#fff0f1';

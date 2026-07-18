@@ -93,7 +93,7 @@ export class ProactiveLearningService {
       topic: '',
       focusTag: '',
       taskAction: 'course',
-      targetPage: 'pages/Index',
+      targetPage: 'pages/CourseDetail',
       evidence: '当前没有到期复习或今日待办',
       progressText: percent.toString() + '% 课程进度'
     };
@@ -178,7 +178,8 @@ export class ProactiveLearningService {
 
   static isTargetPage(page: string): boolean {
     return page === 'pages/Index' || page === 'pages/Plan' || page === 'pages/MistakeBook' ||
-      page === 'pages/Quiz' || page === 'pages/Practice' || page === 'pages/Lesson';
+      page === 'pages/Quiz' || page === 'pages/Practice' || page === 'pages/Lesson' ||
+      page === 'pages/CourseDetail';
   }
 
   static isLaunchSource(source: string): boolean {
@@ -296,7 +297,7 @@ export class ProactiveLearningService {
 
   private static isActionTarget(action: string, targetPage: string): boolean {
     if (action === 'plan') return targetPage === 'pages/Plan';
-    if (action === 'course') return targetPage === 'pages/Index';
+    if (action === 'course') return targetPage === 'pages/CourseDetail' || targetPage === 'pages/Index';
     if (action === 'lesson') return targetPage === 'pages/Lesson';
     if (action === 'quiz') return targetPage === 'pages/Quiz';
     if (action === 'practice') return targetPage === 'pages/Practice';

@@ -1,5 +1,5 @@
 import { Constants } from '../common/Constants';
-import { Course, PlanTask, PlanTaskUpdateReceipt } from '../model/DataModels';
+import { PlanTask, PlanTaskUpdateReceipt } from '../model/DataModels';
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -13,13 +13,6 @@ export struct HomeContent {
   @Link selectedTab: number;
   @Link quickQuestion: string;
 
-  @State currentCourse: Course = {
-    id: 'cs101',
-    title: '数据结构',
-    progress: 0,
-    docCount: 52,
-    topics: ['数组', '链表', '树', '图'],
-  };
   @State quickAsk: string = '';
   @State notificationOpen: boolean = false;
   @State notificationState: string = 'idle';
@@ -27,6 +20,8 @@ export struct HomeContent {
   @State updatingTaskId: string = '';
   @State taskUpdateMessage: string = '';
   @State taskUpdateFailed: boolean = false;
+  @State planLoading: boolean = true;
+  @State planError: boolean = false;
   @State notificationMessage: string = '学习计划已同步，完成任务会自动更新进度';
   @State nextActionKind: string = 'course';
   @State nextActionBadge: string = '继续';
@@ -41,34 +36,29 @@ export struct HomeContent {
   @State nextActionTargetPage: string = 'pages/Index';
   @State nextActionEvidence: string = '正在读取本机学习状态';
   @State nextActionProgressText: string = '等待同步';
+  @State nextActionLoading: boolean = true;
+  @State nextActionReady: boolean = false;
+  @State nextActionError: boolean = false;
+  @State nextActionNavigationMessage: string = '';
   @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [];
   private reminderAction: ProactiveLearningAction | null = null;
+  private nextActionRunId: number = 0;
 
   aboutToAppear(): void {
-    this.loadCourses();
     this.loadPlan();
     this.loadNextAction();
   }
 
-  private async loadCourses(): Promise<void> {
-    try {
-      const courses = await LocalLearningRepository.getCourses();
-      if (courses !== null && courses.length > 0) {
-        this.currentCourse = courses[0];
-      }
-      await this.loadNextAction();
-    } catch (e) {
-      // 保留首屏默认课程，等待下次本地读取。
-    }
-  }
-
   private async loadPlan(): Promise<void> {
+    this.planLoading = true;
+    this.planError = false;
     try {
       const plan = await LocalLearningRepository.getPlan();
       if (plan !== null) this.planTasks = plan.tasks;
-      await this.loadNextAction();
     } catch (e) {
-      // 保留首屏默认任务，等待下次本地读取。
+      this.planError = true;
+    } finally {
+      this.planLoading = false;
     }
   }
 
@@ -148,6 +138,9 @@ export struct HomeContent {
       const action = await LearningReminder.publishNextTask(hostContext);
       this.reminderAction = action;
       this.applyNextAction(action);
+      this.nextActionReady = true;
+      this.nextActionError = false;
+      this.nextActionLoading = false;
       if (!(await this.syncReminderCards(action))) return;
       this.notificationState = 'success';
       this.notificationMessage = '系统提醒已创建：' + action.title;
@@ -195,10 +188,22 @@ export struct HomeContent {
   }
 
   private async loadNextAction(): Promise<void> {
+    const runId = this.nextActionRunId + 1;
+    this.nextActionRunId = runId;
+    this.nextActionLoading = true;
+    this.nextActionError = false;
+    this.nextActionNavigationMessage = '';
     try {
-      this.applyNextAction(await ProactiveLearningService.resolve());
+      const action = await ProactiveLearningService.resolve();
+      if (this.nextActionRunId !== runId) return;
+      this.applyNextAction(action);
+      this.nextActionReady = true;
     } catch (e) {
-      this.applyNextAction(ProactiveLearningService.fallback(this.currentCourse));
+      if (this.nextActionRunId !== runId) return;
+      this.nextActionReady = false;
+      this.nextActionError = true;
+    } finally {
+      if (this.nextActionRunId === runId) this.nextActionLoading = false;
     }
   }
 
@@ -242,6 +247,7 @@ export struct HomeContent {
     this.getUIContext().getRouter().pushUrl({ url: this.nextActionTargetPage }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'HomeContent proactive action navigation failed: %{public}s', err.message);
+      this.nextActionNavigationMessage = '暂时无法打开下一步，请重试';
     });
   }
 
@@ -284,32 +290,23 @@ export struct HomeContent {
           this.selectedTab = 3;
         })
 
-        Stack({ alignContent: Alignment.TopEnd }) {
-          Button() {
-            SymbolGlyph($r('sys.symbol.bell_fill'))
-              .fontSize(23)
-              .fontColor([Constants.COLOR_TEXT_PRIMARY])
-          }
-          .width(48)
-          .height(48)
-          .backgroundColor(Constants.COLOR_BG_CARD)
-          .borderRadius(24)
-          .enabled(this.notificationState !== 'loading')
-          .opacity(this.notificationState === 'loading' ? 0.56 : 1)
-          .accessibilityText(this.notificationState === 'loading' ? '正在创建当前学习提醒' :
-            '创建当前学习任务提醒')
-          .onClick(() => {
-            this.publishReminder();
-          })
-
-          Column()
-            .width(7)
-            .height(7)
-            .backgroundColor(Constants.COLOR_BRAND)
-            .borderRadius(4)
-            .margin({ top: 4, right: 4 })
+        Button() {
+          SymbolGlyph($r('sys.symbol.bell_fill'))
+            .fontSize(23)
+            .fontColor([Constants.COLOR_TEXT_PRIMARY])
         }
+        .width(48)
+        .height(48)
+        .backgroundColor(Constants.COLOR_BG_CARD)
+        .borderRadius(24)
+        .enabled(this.notificationState !== 'loading')
+        .opacity(this.notificationState === 'loading' ? 0.56 : 1)
+        .accessibilityText(this.notificationState === 'loading' ? '正在创建当前学习提醒' :
+          '创建当前学习任务提醒')
         .margin({ left: 8 })
+        .onClick(() => {
+          this.publishReminder();
+        })
       }
       .width('100%')
 
@@ -380,104 +377,120 @@ export struct HomeContent {
 
   @Builder
   ContinueCard() {
-    Column() {
-      Row() {
-        Column() {
-          Row({ space: 8 }) {
-            Stack({ alignContent: Alignment.Center }) {
-              Column()
-                .width(30)
-                .height(30)
-                .backgroundColor(Constants.COLOR_BRAND)
-                .borderRadius(9)
-              SymbolGlyph(this.nextActionIcon())
-                .fontSize(16)
-                .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
-            }
-            Text(this.nextActionBadge)
-              .fontSize(14)
-              .fontColor(Constants.COLOR_BRAND)
-          }
-
-          Text(this.nextActionTitle)
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            .margin({ top: 14 })
-            .maxLines(2)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-          Row({ space: 10 }) {
-            Stack({ alignContent: Alignment.Center }) {
-              Column()
-                .width(34)
-                .height(34)
-                .backgroundColor(Constants.COLOR_BG_CARD)
-                .borderRadius(10)
-              SymbolGlyph(this.nextActionIcon())
-                .fontSize(17)
-                .fontColor([Constants.COLOR_BRAND])
-            }
-            Column() {
-              Text('推荐依据')
-                .fontSize(12)
-                .fontColor(Constants.COLOR_TEXT_SECONDARY)
-              Text(this.nextActionEvidence)
-                .fontSize(13)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                .lineHeight(19)
-                .margin({ top: 3 })
-                .maxLines(2)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-            }
-            .alignItems(HorizontalAlign.Start)
-          }
-          .padding({ left: 10, right: 12, top: 9, bottom: 9 })
-          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-          .borderRadius(Constants.RADIUS_MD)
-          .margin({ top: 12 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-
-        Stack({ alignContent: Alignment.Center }) {
+    Column({ space: 14 }) {
+      if (this.nextActionLoading) {
+        Row({ space: 10 }) {
+          Column()
+            .width(32)
+            .height(32)
+            .backgroundColor(Constants.COLOR_BG_SKELETON)
+            .borderRadius(Constants.RADIUS_SM)
           Column()
             .width(92)
-            .height(92)
-            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-            .borderRadius(46)
-          Column()
-            .width(68)
-            .height(68)
-            .backgroundColor(Constants.COLOR_BG_CARD)
-            .borderRadius(34)
-          SymbolGlyph(this.nextActionIcon())
-            .fontSize(42)
-            .fontColor([Constants.COLOR_BRAND])
-            .renderingStrategy(SymbolRenderingStrategy.SINGLE)
+            .height(16)
+            .backgroundColor(Constants.COLOR_BG_SKELETON)
+            .borderRadius(5)
         }
-        .width(98)
-        .height(112)
-      }
-      .width('100%')
+        .width('100%')
+        Column()
+          .width('78%')
+          .height(26)
+          .backgroundColor(Constants.COLOR_BG_SKELETON)
+          .borderRadius(7)
+        Column()
+          .width('100%')
+          .height(62)
+          .backgroundColor(Constants.COLOR_BG_SKELETON)
+          .borderRadius(Constants.RADIUS_MD)
+        Column()
+          .width('100%')
+          .height(48)
+          .backgroundColor(Constants.COLOR_BG_SKELETON)
+          .borderRadius(Constants.RADIUS_MD)
+      } else if (this.nextActionError || !this.nextActionReady) {
+        Row({ space: 10 }) {
+          SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+            .fontSize(20)
+            .fontColor([Constants.COLOR_ERROR])
+          Column({ space: 4 }) {
+            Text('暂时无法读取学习下一步')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text('本机学习状态没有被替换，可原地重新读取')
+              .fontSize(12)
+              .lineHeight(19)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+        Button('重新读取下一步')
+          .width('100%')
+          .constraintSize({ minHeight: 48 })
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.loadNextAction(); })
+      } else {
+        Row({ space: 8 }) {
+          Stack({ alignContent: Alignment.Center }) {
+            Column()
+              .width(32)
+              .height(32)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(9)
+            SymbolGlyph(this.nextActionIcon())
+              .fontSize(17)
+              .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+          }
+          Text(this.nextActionBadge)
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_BRAND)
+        }
+        .width('100%')
 
-      Row({ space: 14 }) {
+        Text(this.nextActionTitle)
+          .width('100%')
+          .fontSize(24)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .maxLines(3)
+
         Column({ space: 4 }) {
-          Text(this.nextActionSubtitle)
+          Text('推荐依据')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(this.nextActionEvidence)
+            .width('100%')
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .lineHeight(20)
+            .maxLines(3)
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+
+        Column({ space: 4 }) {
+          Text(this.nextActionSubtitle)
+            .width('100%')
+            .fontSize(13)
+            .lineHeight(20)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
           Text(this.nextActionProgressText)
-            .fontSize(17)
+            .width('100%')
+            .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_BRAND)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
+        .width('100%')
         .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
 
         Button() {
           Row({ space: 6 }) {
@@ -490,18 +503,24 @@ export struct HomeContent {
               .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
           }
         }
+        .width('100%')
         .height(48)
-        .padding({ left: 18, right: 16 })
         .backgroundColor(Constants.COLOR_BRAND)
-        .borderRadius(24)
-        .shadow({ radius: 6, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 3 })
+        .borderRadius(Constants.RADIUS_MD)
         .accessibilityText(this.nextActionCta + '，' + this.nextActionTitle)
         .onClick(() => {
+          this.nextActionNavigationMessage = '';
           this.openNextAction();
         })
+
+        if (this.nextActionNavigationMessage.length > 0) {
+          Text(this.nextActionNavigationMessage)
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_ERROR)
+            .accessibilityText(this.nextActionNavigationMessage)
+        }
       }
-      .width('100%')
-      .margin({ top: 14 })
     }
     .width('100%')
     .padding(18)
@@ -605,7 +624,35 @@ export struct HomeContent {
       .margin({ bottom: 10 })
 
       Column() {
-        if (this.planTasks.length === 0) {
+        if (this.planLoading) {
+          Column({ space: 12 }) {
+            Column().width('72%').height(16).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+            Column().width('94%').height(14).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+            Column().width('58%').height(14).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(5)
+          }
+          .width('100%')
+          .padding({ top: 18, bottom: 18 })
+        } else if (this.planError) {
+          Column({ space: 8 }) {
+            Text('暂时无法读取今日计划')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text('已保存任务没有被替换，可原地重新读取')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Button('重新读取计划')
+              .constraintSize({ minHeight: 48 })
+              .padding({ left: 16, right: 16 })
+              .fontSize(13)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.loadPlan(); })
+          }
+          .width('100%')
+          .padding({ top: 18, bottom: 18 })
+        } else if (this.planTasks.length === 0) {
           Column({ space: 8 }) {
             Text('还没有学习计划')
               .fontSize(15)

@@ -14,27 +14,36 @@ export struct CourseContent {
   @State lessonProgress: LessonProgress[] = [];
   @State loading: boolean = false;
   @State message: string = '';
+  private loadRunId: number = 0;
 
   aboutToAppear() {
     this.loading = true;
     this.loadCourses();
   }
 
-  async loadCourses() {
+  async loadCourses(): Promise<void> {
+    const runId = this.loadRunId + 1;
+    this.loadRunId = runId;
     this.loading = true;
     this.message = '';
     try {
-      this.courses = (await LocalLearningRepository.getCourses()) ?? [];
+      const courses = (await LocalLearningRepository.getCourses()) ?? [];
+      let lessonProgress: LessonProgress[] = [];
+      let progressMessage: string = '';
       try {
-        this.lessonProgress = await LocalLearningRepository.getLessonProgress();
+        lessonProgress = await LocalLearningRepository.getLessonProgress();
       } catch (error) {
-        this.lessonProgress = [];
-        this.message = '课程已加载，续学位置读取失败';
+        progressMessage = '课程已加载，续学位置读取失败';
       }
+      if (this.loadRunId !== runId) return;
+      this.courses = courses;
+      this.lessonProgress = lessonProgress;
+      this.message = progressMessage;
     } catch (e) {
-      this.message = '本地课程加载失败，请重新打开应用';
+      if (this.loadRunId !== runId) return;
+      this.message = '本地课程加载失败，请重试';
     } finally {
-      this.loading = false;
+      if (this.loadRunId === runId) this.loading = false;
     }
   }
 
@@ -44,6 +53,7 @@ export struct CourseContent {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/CourseDetail' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'CourseContent router.pushUrl failed: %{public}s', err.message);
+      this.message = '暂时无法打开课程，请再次点击课程入口';
     });
   }
 
@@ -58,6 +68,26 @@ export struct CourseContent {
   private courseProgressLabel(course: Course): string {
     const recentTopic = this.resumeState(course).recentTopic;
     return recentTopic.length > 0 ? '上次学到 · ' + recentTopic : '学习进度';
+  }
+
+  private courseUpdatedAt(course: Course): string {
+    let updatedAt: string = '';
+    for (const item of this.lessonProgress) {
+      if (item.courseId !== course.id || item.completedChunkIds.length === 0) continue;
+      if (updatedAt.length === 0 || item.updatedAt > updatedAt) updatedAt = item.updatedAt;
+    }
+    return updatedAt;
+  }
+
+  private visibleCourses(): Course[] {
+    return this.courses.slice().sort((left: Course, right: Course): number => {
+      const leftStarted = left.progress > 0 || hasCourseStarted(this.resumeState(left));
+      const rightStarted = right.progress > 0 || hasCourseStarted(this.resumeState(right));
+      if (leftStarted !== rightStarted) return rightStarted ? 1 : -1;
+      const updatedOrder = this.courseUpdatedAt(right).localeCompare(this.courseUpdatedAt(left));
+      if (updatedOrder !== 0) return updatedOrder;
+      return this.courses.indexOf(left) - this.courses.indexOf(right);
+    });
   }
 
   @Builder
@@ -123,7 +153,7 @@ export struct CourseContent {
               .lineHeight(18)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Button('重试')
-              .height(36)
+              .constraintSize({ minHeight: 48 })
               .fontSize(12)
               .fontColor(Constants.COLOR_BRAND)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
@@ -138,7 +168,7 @@ export struct CourseContent {
           .borderRadius(Constants.RADIUS_MD)
         }
         List({ space: 10 }) {
-          ForEach(this.courses, (c: Course) => {
+          ForEach(this.visibleCourses(), (c: Course) => {
             ListItem() {
               Column() {
                 // 课程标题行
@@ -155,13 +185,17 @@ export struct CourseContent {
                         .fontColor([Constants.COLOR_BRAND])
                     }
                     Text(c.title)
+                      .layoutWeight(1)
                       .fontSize(18)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                      .maxLines(2)
                   }
+                  .layoutWeight(1)
                   Text(c.docCount.toString() + ' 份资料')
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    .margin({ left: 8 })
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
@@ -232,7 +266,7 @@ export struct CourseContent {
                   .width('100%')
                 }
                 .width('100%')
-                .height(44)
+                .constraintSize({ minHeight: 48 })
                 .margin({ top: 6 })
                 .padding({ left: 14, right: 14 })
                 .backgroundColor(Constants.COLOR_BRAND)
@@ -250,6 +284,7 @@ export struct CourseContent {
           })
         }
         .width('100%')
+        .constraintSize({ maxWidth: 720 })
         .height('100%')
         .layoutWeight(1)
         .cachedCount(3)
@@ -263,9 +298,18 @@ export struct CourseContent {
           Text(this.message.length > 0 ? this.message : '还没有课程')
             .fontSize(15)
             .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
-          Text(this.message.length > 0 ? '稍后可下拉或重新进入页面重试' : '课程加入后会在这里显示学习进度')
+          Text(this.message.length > 0 ? '重新读取不会修改已保存的学习记录' : '课程加入后会在这里显示学习进度')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          if (this.message.length > 0) {
+            Button('重新加载课程')
+              .constraintSize({ minHeight: 48 })
+              .padding({ left: 18, right: 18 })
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.loadCourses(); })
+          }
         }
         .width('100%')
         .layoutWeight(1)
