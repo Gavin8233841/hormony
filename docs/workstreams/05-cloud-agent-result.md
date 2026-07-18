@@ -284,3 +284,39 @@
 
 - 本批未调用真实模型、没有重新运行本地 production 黑盒，也未部署当前分支。
 - **未验证**：真实模型连接在 100 秒时的网络级取消、线上平台 120 秒回收、浏览器、HarmonyOS 模拟器与真机。本批未修改 HarmonyOS、Quiz、Chat、RAG、缓存策略、生产模型 ID 或秘密。
+
+## 14. Chat 编排总预算与中止原因隔离
+
+### 14.1 源码确认与行为
+
+- Chat 路由使用 100000ms 总预算包裹完整 `orchestrateStream`，不再只依赖编排内部每次模型调用的 timeout。
+- 首事件前超时返回 HTTP 504 与 `MODEL_TIMEOUT`；已经建立 SSE 后超时只追加一次 `error(code=MODEL_TIMEOUT) -> done`，继续服从现有单终态守卫。
+- 预算 helper 新增独立内部 `abortSignal`，组合 Chat 的输出上限和 reader 取消控制器；`OUTPUT_LIMIT_EXCEEDED` 的 Error reason 原样保留，不会被误映射为普通取消。
+- 外部 Request 中止仍标记客户端断连，不向已断开的流补写 error/done。成功、超时、外部取消和内部中止均清理 deadline timer 与两类 signal listener。
+- Safety 顺序、RAG 课程隔离、单事件 64 KiB、总流 512 KiB、128 事件上限和 no-store 响应头保持不变。
+
+### 14.2 验证
+
+- 定向回归：`pnpm exec vitest run src/lib/agents/model-runtime.test.ts src/lib/agents/model-budget.test.ts src/app/api/chat/request-budget.test.ts src/app/api/chat/stream-limits.test.ts src/app/api/chat/terminal-boundary.test.ts src/app/api/plan/request-budget.test.ts src/app/api/quiz/request-budget.test.ts` exit 0，7 个测试文件、23/23 通过。
+- 主线补充了首事件前 100000ms 超时的 HTTP 504 回归；同时覆盖中途 SSE timeout 单终态、客户端断连无补写、内部输出上限 reason、timer 与 listener 清理。
+- 静态诊断通过：`pnpm lint` exit 0，无 warning/error；`pnpm typecheck` exit 0。
+- 全量测试通过：`pnpm test` exit 0，33 个测试文件、430/430 通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面生成，全部 dynamic API route 与 26.8 kB middleware 进入生产产物。
+
+### 14.3 未验证
+
+- **未验证**：真实模型编排在 100 秒时的网络级取消、已建立线上 SSE 的 timeout 事件、线上平台 120 秒回收、当前分支部署、真实浏览器断连、HarmonyOS 模拟器与真机。
+
+## 15. 全局单次模型超时配置上限
+
+### 15.1 源码确认与行为
+
+- `MODEL_TIMEOUT_MS` 原先只拒绝非有限数和小于 1000ms 的值。部署误配为数分钟时，未经过路由总预算包装的模型调用仍会长期占用连接。
+- 模型运行时现在把单次调用 timeout 封顶为 100000ms；缺失、非法或低于 1000ms 的配置继续使用 45000ms 默认值，合法范围内的配置保持不变。
+- OpenAI 兼容客户端缓存键继续包含最终 timeout，配置变化仍会重建客户端；生产模型 ID、base URL、重试次数和输出 token 上限没有改变。
+
+### 15.2 验证与边界
+
+- 模型运行时测试覆盖缺失配置 45000ms、`999` 回退 45000ms、`120000` 封顶 100000ms；已包含在本批 23/23 定向与 430/430 全量证据中。
+- 本批没有使用模型秘密，没有运行本地 production 黑盒，也没有部署当前分支。
+- **未验证**：线上部署环境当前 `MODEL_TIMEOUT_MS` 的实际值、真实上游在 100 秒时的网络级取消和当前分支线上发布。本批未修改 HarmonyOS、生产模型 ID、API Key、RAG、缓存或端侧状态。

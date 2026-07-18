@@ -7268,3 +7268,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 真实模型 100 秒网络取消、线上平台 120 秒回收、当前分支部署未验证。
 - 浏览器、HarmonyOS 模拟器和真机未验证；本批未修改 HarmonyOS、Quiz、Chat、RAG、缓存策略、生产模型 ID 或秘密。
+
+---
+
+## 2026-07-18 [MAIN+WS05] Chat 编排总预算与模型超时上限
+
+背景：Chat 只有每次模型调用 timeout，没有覆盖整段 Agent 编排的总截止时间；部署环境又可把单次 `MODEL_TIMEOUT_MS` 配置到数分钟。已建立的 SSE、首事件前错误、客户端断连和内部输出上限需要在同一预算下保持各自精确语义。
+
+文件：
+- `apps/web/src/lib/agents/model.ts`
+- `apps/web/src/lib/agents/model-budget.test.ts`
+- `apps/web/src/lib/agents/model-runtime.test.ts`
+- `apps/web/src/app/api/chat/route.ts`
+- `apps/web/src/app/api/chat/request-budget.test.ts`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 完整编排使用 100 秒总预算。首事件前超时返回 HTTP 504；SSE 建立后只发一次 `MODEL_TIMEOUT -> done`，不会突破单终态边界。
+- 预算 helper 同时组合 Request 取消与内部 route abort；输出上限 Error reason 原样保留，客户端断连不向流补写终态，所有路径清理 timer/listener。
+- 全局单次模型 timeout 封顶 100 秒；非法或小于 1000ms 继续回退 45 秒，合法范围配置保持不变。
+- 主线在 WS05 `e3fe8c7/fbee782` 基础上补充首事件前 timeout 的 HTTP 504 反例，没有照搬旧结果文档或旧测试计数。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/lib/agents/model-runtime.test.ts src/lib/agents/model-budget.test.ts src/app/api/chat/request-budget.test.ts src/app/api/chat/stream-limits.test.ts src/app/api/chat/terminal-boundary.test.ts src/app/api/plan/request-budget.test.ts src/app/api/quiz/request-budget.test.ts`：exit 0，7 个测试文件、23/23 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error。
+- `cd apps/web; pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，33 个测试文件、430/430 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+
+失败或未验证：
+- 真实模型编排/上游在 100 秒时的网络取消、线上 SSE timeout、平台 120 秒回收和当前分支部署未验证。
+- 浏览器、HarmonyOS 模拟器和真机未验证；本批未修改 HarmonyOS、生产模型 ID、API Key、RAG、缓存或端侧状态。
