@@ -61,6 +61,13 @@
 - 学习记录的 Plan、CourseDetail、Lesson、Practice 与 Quiz 动作分别保留精确 route、课程、Topic、标签和 `AppStorage` 写入；重试前重新核对当前课程 ID、标题和 Topic，导航恢复不再错误调用数据读取。
 - 四周图绿色明确表示“完成节点”，完成天数直接从 `recentDays.completed` 汇总并同时可见、可读；一次完成节点与三次普通活动的颜色反例已纳入契约。筛选选中态增加可见勾选，标签和图例允许窄屏换行，数据与导航恢复动作均保持至少 48 vp。
 
+### 学习星图可达行动
+
+- `LearningMap.ets` 的课程切换使用单调请求版本，只由最新课程请求整批提交课程目录、先修关系、学习进度和掌握状态；旧成功、旧失败和旧 `finally` 均不能覆盖新快照。
+- 已掌握节点不再只检查一层后继，而是遍历真实 Topic DAG 的全部可达后继，并复用现有层级、练习状态、正确率与目录顺序选择最近可执行行动。分支汇合处的后继仍锁定时，会解析到未掌握且已解锁的真实前置 Topic。
+- 独立答题可能形成“长期掌握事实存在、先修关系仍未满足”的状态。此时行动先沿可达后继继续，节点文字、读屏语义和可见度优先保留“已掌握”，同时明确显示“前置未完成”，不再把同一节点降级描述为单纯未解锁。
+- 多层后继行动统一解释为“后继主题”；锁定节点的主按钮解释并执行精确前置 Topic。课程切换、失败恢复和主动作保留至少 48 vp，动作读屏文本包含实际解析出的 Topic。
+
 ### 标签洞察状态
 
 - schema 12 已使用 `courseId + topic + tag` 三元组累计标签洞察，并提供不截断的全量读取契约；跨课程和跨 Topic 同名标签不会合并。
@@ -86,6 +93,7 @@
 - `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
 - `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
 - `apps/harmonyos/entry/src/main/resources/base/element/string.json`
 - `scripts/test-proactive-delivery-contracts.mjs`
@@ -94,6 +102,7 @@
 - `scripts/test-activity-records-accessibility-contracts.mjs`
 - `scripts/test-achievements-next-action.mjs`
 - `scripts/test-achievements-milestone-routing-contracts.mjs`
+- `scripts/test-learning-map-contracts.mjs`
 
 ## 验证证据
 
@@ -107,26 +116,26 @@
 | **源码确认** | 既有 WS04 契约脚本 | exit 0，59/59 通过；覆盖主动行动、触达、画像、记录和学习星图回归 |
 | **源码确认** | `pnpm test -- src/lib/data/quiz-learning-state.test.ts` | exit 0，39/39 通过；真实 reducer 证明第 501 条事件压缩后长期掌握里程碑仍保留 |
 | **源码确认** | `python scripts/validate-topic-relations.py` | exit 0；33 Topic、147 切片、165 道题与 33 份课程体验的 DAG、引用和 Topic 一致性全部通过 |
-| **源码确认** | WS04 Profile、ActivityRecords、Achievements、LearningMap 与主动触达相关契约 | 本轮 exit 0，73/73 通过；Profile 8/8、ActivityRecords 9/9，覆盖两阶段快照、旧回调隔离、精确恢复、500 条页面窗口、完成节点语义和分支级路由 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 31 s 973 ms` |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 本轮 exit 0，当前源码增量任务全部通过，`BUILD SUCCESSFUL in 10 s 13 ms` |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | Profile/ActivityRecords 最终源码 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 37 s 231 ms` |
-| **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
-| **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
-| **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
-| **未验证** | DevEco Agent 诊断、安装运行与 UI 验证 | 主线程现场状态为 `OpenAI invalid_api_key 401`，本轮按指令未等待或重试；没有取得 `check_ets_files`、`start_app`、UI 树或新截图证据 |
+| **源码确认** | `node --test scripts/test-learning-map-contracts.mjs` | 最终源码 exit 0，5/5 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，覆盖多层后继、分支汇合前置动作、独立掌握但关系锁定、旧课程回调隔离、精确路由、动态读屏与 48 vp |
+| **源码确认** | WS04 Profile、ActivityRecords、Achievements、LearningMap 与主动触达七个相关契约脚本 | 最终源码 exit 0，70/70 通过；覆盖两阶段快照、旧回调隔离、精确恢复、500 条页面窗口、完成节点语义、长期里程碑与分支级星图行动 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 最终源码 exit 0，API 12 `CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 21 s 706 ms` |
+| **静态诊断通过** | DevEco build agent `check_ets_files`，会话 `ses_08b973018ffe09UP9Ypjm6iO9d` | 显式使用 `alibaba-cn/qwen3-coder-plus` 对最终 `LearningMap.ets` 返回 `no diagnostics`；此前“诊断 + 启动”组合进程在 184.1 秒超时，不作为诊断结论 |
+| **模拟器通过** | `hdc list targets -v`、HAP 安装、`aa force-stop`、`aa start`、`aa dump` | 目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；最新 HAP 安装成功，旧进程强停成功，`entry/EntryAbility` 以新 PID 5344 前台启动 |
+| **模拟器通过** | `hdc uitest dumpLayout/uiInput` 与 `snapshot_display` | 1256 x 2760 竖屏：Profile bounds 导航成功；ActivityRecords 显示“本页近期 93 条 · 最多展示 500 条”、可见选中勾选、“4 天有完成节点”及完成节点图例；计算机网络星图从锁定“物理层与数据链路层”解析并实际进入精确前置 `OSI与TCP/IP模型` 的 `pages/Lesson`。证据位于 `screenshots/ws04-learning-map-20260718-165422/`，不纳入 Git |
+| **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前连接模拟器未执行这些系统流程 |
+| **未验证** | DevEco Agent `start_app` 最终调用 | 会话 `ses_08b9515ddffeBfIe2lRMHp5Or1` 在工具调用前返回 HTTP 403 `AllocationQuota.FreeTierOnly`；这不否定随后 HDC 安装启动成功。当前内置 `deveco/glm-5` 登录态为 401 `Token refresh failed`，未回落到 `openai/*` |
 
-构建仍提示仓库未配置 `signingConfigs`，所以只证明未签名 debug HAP 构建通过，不证明安装或提交包可用。
+构建仍提示仓库未配置 `signingConfigs`。未签名 debug HAP 已在当前模拟器安装运行，但这不证明正式签名包或真机安装可用。
 
 ## 未验证与后续
 
 - 首页、记录、成就、提醒和卡片已在源码中共享同一真实状态，但缺少设备上的“计划保存/答题事件 -> 首页和卡片刷新 -> 通知或卡片点击回流”证据。
 - 按课程/Topic/标签隔离的主动标签推荐当前明确未启用；schema 已具备精确数据，但产品还需补可解释证据和下一动作设计。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
-- Profile 与 ActivityRecords 的屏幕阅读器播报顺序、字体放大、窄屏排版、48 vp 实际触控和错误重试独立聚焦尚无设备证据。
-- Achievements 的动态屏幕阅读器播报、字体放大换行和 48 vp 实际触控尚无设备证据；`hdc 3.2.0e list targets` 本轮 exit 0，返回 `[Empty]`。
+- Profile、ActivityRecords 与 LearningMap 的 1256 x 2760 竖屏视觉和 bounds 导航已通过模拟器；屏幕阅读器实际播报顺序、系统字体放大、横屏、平板布局与失败恢复聚焦仍未验证。
+- Achievements 的动态屏幕阅读器播报、字体放大换行和 48 vp 实际触控尚无设备证据。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
-- HAP 签名、安装、横屏、平板和真机均未验证。
+- 正式签名 HAP、横屏、平板和真机仍未验证；当前只完成未签名 debug HAP 的模拟器安装运行。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。
 
 第一批提交：`a3d2ad4 feat: 统一主动学习触达`。
