@@ -1080,3 +1080,44 @@
 - 未跟踪后续研究文件 `scripts/test_cs102_filesystem_lesson_facts.py` 中另两个 ext4/k28 与受保护 Lesson 活动契约仍为独立红灯；本批不暂存该文件，也未把跨主题失败写成通过。
 - DevEco Agent 未重复调用：`alibaba-cn/qwen3-coder-plus` 当前返回 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 返回 `401 Token refresh failed`，需用户交互执行 `deveco providers login -p deveco` 后才能补专属工具证据；本批使用 Python/Web/Hvigor/HDC 完成分层验证。
 - 本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
+
+## 批次三十七：ext4 数据日志模式与崩溃保证边界
+
+### 行为
+
+- `cs102_k28` 不再把 ext4 三种数据模式只列名称，也不再把 XFS、ZFS、Btrfs 混成同一类“日志模式”。内容限定为 ext4/JBD2，并说明日志保护的是写入日志的更新原子性与文件系统元数据一致性。
+- `data=journal` 将文件数据和元数据先写入日志；默认 `data=ordered` 只记录元数据，并在提交相关元数据前把文件数据先强制写入主文件系统；`data=writeback` 不保留这项顺序，文件数据可在元数据提交后写入，崩溃后可能暴露旧数据。
+- 内容明确 journal commit 不等于所有模式下应用数据已经持久化。Btrfs 按官方 Introduction 定位为写时复制文件系统，并明确不属于 ext4 的三种日志模式。
+- 新增独立状态机：同一崩溃事件序列分别执行 journal/ordered/writeback，验证元数据重放与文件数据新/旧状态；无有效 commit 的事务不重放。固定反例拒绝合并三种模式、通用“commit 即数据持久化”和把 Btrfs/ZFS 归入 ext4 模式。
+
+### 文件与生成边界
+
+- 知识唯一源为 `apps/web/src/lib/data/cs102-knowledge.ts`；`scripts/generate-knowledge-json.mjs` 只同步端侧 `knowledge-chunks.json` 的 `$[79].text` 与 `$[79].source`（`id=cs102_k28`），147 条切片完成逐字段一致性校验。
+- `scripts/test_cs102_ext4_knowledge_facts.py` 只读取 Web/raw k28，不读取主动学习规格或 `lesson-experiences.json`。两份既有测试同步升级为锁定 k28 的三份官方来源和三种数据模式，不放宽文件系统活动的排序、崩溃、重放、checkpoint 与回收断言。
+- 本批未修改 `ACTIVE-LEARNING-SPEC-CS102.md`、受保护的 `lesson-experiences.json`、页面、仓储或 `DEVLOG.md`。
+
+### 受保护 Lesson 待同步字段
+
+- 当前 `$[19].activities[1]`（`id=cs102-文件系统-2`）仍是旧的泛化日志活动。本分支未修改该对象；主线程受控同步时建议只改以下三个叶字段，其他字段不变：
+  - `$[19].activities[1].prompt`：`ext4/JBD2 采用简化的元数据预写日志流程。假设一次写操作的日志已提交、尚未 checkpoint 时系统崩溃，请将从请求到重启恢复并回收日志的步骤排列为正确顺序`
+  - `$[19].activities[1].feedback`：`本题只推演 ext4/JBD2 已提交元数据日志事务的恢复顺序（知识切片 cs102_k28）：文件系统先将元数据修改记录写入日志并提交（D → E）；在 commit 后、checkpoint 前崩溃（C）时，重启只重放带有效 commit 记录的事务到实际位置（A），完成后才 checkpoint 并回收日志（F），未提交事务不重放。这里的 journal commit 只证明该事务已完整写入日志，不等于所有模式下应用文件数据已经持久化：data=journal、默认 data=ordered 与 data=writeback 的文件数据写入顺序不同。`
+  - `$[19].activities[1].source`：`Linux kernel ext4 Journal (JBD2)；Linux kernel ext4 administration guide；知识切片 cs102_k28`
+- 规格 `Topic 4 / 知识切片引用 / cs102_k28` 以及主动练习 2 的题目、反馈、来源也需与上述值同步后再生成受保护产物；本批不宣称 Lesson 已完成同步。
+
+### 证据
+
+- **源码确认**：Linux kernel `ext4 Journal (JBD2)`、`ext4 administration guide` 与 Btrfs 官方 `Introduction` 本轮均返回 HTTP 200，响应长度分别为 46,523、41,026、16,446 字节。正文明确默认 ordered 的 metadata-only 日志边界、journal/writeback 差异、ordered 的数据先于元数据提交、writeback 的数据可晚于元数据，以及 Btrfs 的 copy-on-write 定义。
+- **源码确认**：旧 k28 上独立目标 7 项中 6 项通过，唯一生产契约红灯并报告三种模式、commit/应用数据、Btrfs/ZFS 分类和三份来源共 10 个缺口；Web/raw 在红灯阶段逐字一致。
+- **源码确认**：只修 Web 源、尚未生成端侧 JSON 时，目标 7 项中唯一失败变为 Web/raw k28 不一致，证明测试没有绕过生成链。
+- **静态诊断通过**：`node scripts/generate-knowledge-json.mjs` 退出码 0，147 条 Web/端侧知识切片完全一致；最终 `python -m unittest scripts.test_cs102_ext4_knowledge_facts -v` 退出码 0，7 项通过。
+- **静态诊断通过**：首次完整 Python 回归退出码 1，140 项中精准暴露 2 个旧契约：k28 来源被硬编码为“操作系统概念”、旧泛化 WAL 句子被硬编码。升级为精确官方来源与三模式事实后，同一回归退出码 0；140 项运行，139 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的 schema、引用、DAG、层级与 Lesson 路由闭环通过。该命令不证明上述受保护活动文案已同步。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 生产构建成功并生成 10/10 静态页面；HarmonyOS API 12 增量 `assembleHap --no-daemon` 退出码 0，`BUILD SUCCESSFUL in 22 s 814 ms`，仍提示未配置 `signingConfigs`。
+- **模拟器通过**：`127.0.0.1:5555 / TCP / Connected / localhost / hdc` 安装最新 unsigned HAP 和启动 `EntryAbility` 均成功；UI 树为 `pages/Index`，root bounds `[0,0][1256,2760]`。
+
+### 失败与未验证
+
+- **未验证**：本批没有在模拟器打开 k28 长文本；受保护 Lesson 三字段和规格仍待主线程同步，不能把文件系统互动记为事实一致性通过。
+- **未验证**：手机、平板、真机、线上 API 与 DevEco Agent 专属工具未验证；模型状态沿用批次三十六记录，不重复消耗受阻模型。
+- 未跟踪混合研究文件 `scripts/test_cs102_filesystem_lesson_facts.py` 仍保留且不暂存。本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。

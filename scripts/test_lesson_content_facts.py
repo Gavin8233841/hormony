@@ -873,7 +873,14 @@ class LessonContentFactsTest(unittest.TestCase):
             for index in activity["answerIndexes"]
         ]
 
-        self.assertIn("元数据修改先写入日志区域再应用到实际位置", knowledge["text"])
+        for fact in (
+            "data=journal 将文件数据和元数据先写入日志",
+            "默认 data=ordered 只记录元数据",
+            "data=writeback 不保留这项顺序",
+            "日志提交不等于所有模式下应用数据已经持久化",
+        ):
+            self.assertIn(fact, knowledge["text"])
+        self.assertIn("Linux kernel ext4 Journal (JBD2)", knowledge["source"])
         self.assertIn("日志已提交、尚未 checkpoint 时系统崩溃", activity["prompt"])
         self.assertEqual("B → D → E → C → A → F", activity["answer"])
         self.assertIn("系统崩溃", ordered_steps[3])

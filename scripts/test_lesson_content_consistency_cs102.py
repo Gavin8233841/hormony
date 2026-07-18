@@ -17,6 +17,13 @@ ACTIVITY_PATTERN = re.compile(
 )
 FIELD_PATTERN = re.compile(r"^- \*\*([^*]+)\*\*：\s*(.*)$")
 CHUNK_PATTERN = re.compile(r"cs102_k\d{2}")
+EXPECTED_CHUNK_SOURCES = {
+    "cs102_k28": (
+        "Linux kernel ext4 Journal (JBD2)；"
+        "Linux kernel ext4 administration guide；"
+        "Btrfs documentation Introduction"
+    ),
+}
 
 
 def parse_fields(section: str) -> dict[str, str]:
@@ -180,7 +187,10 @@ class Cs102LessonContentConsistencyTest(unittest.TestCase):
                 for chunk_id in source_ids:
                     self.assertIn(chunk_id, self.chunks)
                     self.assertEqual("cs102", self.chunks[chunk_id]["courseId"])
-                    self.assertEqual("操作系统概念", self.chunks[chunk_id]["source"])
+                    self.assertEqual(
+                        EXPECTED_CHUNK_SOURCES.get(chunk_id, "操作系统概念"),
+                        self.chunks[chunk_id]["source"],
+                    )
 
     def test_step_orders_are_complete_permutations_with_exact_dependencies(self) -> None:
         for key, expected in EXPECTED_STEP_ORDERS.items():
