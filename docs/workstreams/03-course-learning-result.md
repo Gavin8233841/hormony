@@ -1043,3 +1043,40 @@
 - **未验证**：未进入同标签 Quiz，因此新 `cs101_q41` 的端侧实际题面、选择与反馈显示未验证；Course -> Topic -> Lesson -> 互动 -> 同标签练习的完整运行闭环本批未通过。运行态随后被切换到其他 Tab，且一次内联 PowerShell UI 辅助命令因 `throw` 后缺少空格产生错误，未将该失败计为产品通过。
 - DevEco 会话 `ses_08ba7c7b2ffeHBxmS1eMIZSuiB` 未设置 `DEVECO_HOME`，`check_ets_files/build_project` 均返回 `DEVECO_HOME environment variable is not configured`；校准后的 `ses_08ba6a8b9ffeEMtXoMllguKjxO` 显式设置 `DEVECO_HOME`、Alibaba 模型和授权参数，但约 70 秒无输出后被终止。两次均不构成 DevEco check/start 通过；本批静态、构建和 UI 证据分别来自 Web/Hvigor/HDC。
 - **未验证**：手机、平板、真机和线上 API 未验证。本批未创建或提交截图、HAP、日志及本地 IDE 文件。
+
+## 批次三十六：POSIX 文件身份与链接实现边界
+
+### 行为
+
+- `cs102_k26` 不再用“每个文件有唯一 inode 号”忽略设备边界，也不再把 ext 风格多级块索引写成通用 Unix/Linux inode 定义。内容明确 POSIX 文件身份由 `st_dev` 与 `st_ino` 共同确定，同一文件的硬链接共享身份与链接计数。
+- 知识切片补齐 `link()` 增加链接计数、`unlink()` 删除目录项并减少计数，以及最后链接删除且没有打开引用后才释放文件空间的生命周期。
+- Web-only 简答题 `cs102_q15` 区分硬链接、目录硬链接例外和符号链接：目录 `link()` 通常失败，但进程有适当权限且实现支持时可成功；`symlink()` 保存未经路径校验的字符串，创建时目标可不存在，也可跨文件系统；删除符号链接不影响目标。
+- 跨文件系统硬链接按 POSIX.1-2024 Issue 8 精确限定：可移植程序不得依赖；源文件与目标目录位于不同文件系统且实现不支持跨文件系统硬链接时返回 `EXDEV`。删除了“POSIX 无条件禁止跨文件系统硬链接”的过强断言。
+
+### 文件与生成边界
+
+- 知识唯一源为 `apps/web/src/lib/data/cs102-knowledge.ts`；`scripts/generate-knowledge-json.mjs` 只同步端侧 `knowledge-chunks.json` 的 `$[77].text` 与 `$[77].source`（`id=cs102_k26`），147 条切片完成逐字段一致性校验。
+- `cs102_q15` 只修改 `apps/web/src/lib/data/quizzes.ts` 的 `answer/explanation`；该题 `type=short`，题库生成器复核输出 165 道选择题且端侧索引为 `-1`，因此 `quizzes.json` 无对应对象、产物零差异。
+- `scripts/test_cs102_posix_link_facts.py` 独立承载 9 项 POSIX 执行与反例契约，不导入仍含其他事实红灯的混合研究文件。
+- 本批不修改主动学习规格、`lesson-experiences.json`、页面、仓储或 `DEVLOG.md`。POSIX 链接事实不产生待同步 Lesson JSON 路径。
+
+### 证据
+
+- **源码确认**：POSIX.1-2024 `<sys/stat.h>`、`link()`、`symlink()`、`unlink()` 官方页面本轮均返回 HTTP 200，响应长度分别为 26,577、18,557、14,142、20,383 字节。正文明确文件身份由 `st_dev+st_ino` 组合唯一确定、硬链接共享身份；`link()` 的目录权限/实现例外和条件式 `EXDEV`；`symlink()` 只保存不校验的字符串；`unlink()` 递减链接计数且删除符号链接不影响目标。
+- **源码确认**：旧生产内容上 POSIX 目标类 7 项中 6 项通过，唯一生产契约红灯并列出文件身份、同一身份、来源、跨文件系统、目录例外、路径字符串和 unlink 因果共 8 个缺口。
+- **源码确认**：只修 Web 源且尚未生成知识 JSON 时，目标类唯一失败为 `cs102_k26` Web/raw 不一致；生成后初版 7/7 通过。主代理随后按 Issue 8 原文发现“无条件不能跨文件系统”过强，契约扩展为实现支持/不支持双输入并让初版文案重新红灯，避免错误绿灯固化。
+- **静态诊断通过**：最终 `python -m unittest scripts.test_cs102_posix_link_facts -v` 退出码 0，9 项通过；覆盖相同 `st_ino` 不同 `st_dev`、条件式 `EXDEV`、目录权限与实现支持四状态、悬空/跨文件系统符号链接、unlink 因果，以及多组否定句固定反例。
+- **静态诊断通过**：`node scripts/generate-knowledge-json.mjs` 退出码 0，147 条 Web/端侧知识切片完全一致；`node scripts/generate-quizzes-json.mjs` 退出码 0，165 道选择题一致且不包含 Web-only q15；Python 编译退出码 0。
+- **静态诊断通过**：暂存后以 `git ls-files` 取得 19 个已跟踪脚本测试模块，退出码 0；133 项运行，132 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的 schema、引用、DAG、层级与 Lesson 路由闭环通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 生产构建成功并生成 10/10 静态页面；HarmonyOS API 12 增量 `assembleHap --no-daemon` 退出码 0，`BUILD SUCCESSFUL in 34 s 163 ms`，仍提示未配置 `signingConfigs`。
+- **模拟器通过**：`127.0.0.1:5555 / TCP / Connected / localhost / hdc` 安装最新 unsigned HAP 返回 `install bundle successfully`，启动 `EntryAbility` 返回 `start ability successfully`；UI 树为 `pages/Index`，root bounds `[0,0][1256,2760]`，品牌与今日/课程/学伴/我的四个 Tab 可见。
+
+### 失败与未验证
+
+- 第一次 HDC 安装辅助命令在 PowerShell 解析阶段因压缩后的 `foreach` 缺少空格失败，没有执行设备操作；修正语法后安装、启动与 UI 树读取全部通过。
+- **未验证**：本批没有在模拟器走到文件系统 Lesson 的 `cs102_k26` 长文本，也没有在 Web 实际打开简答题 `cs102_q15`；手机、平板、真机和线上 API 未验证。
+- 未跟踪后续研究文件 `scripts/test_cs102_filesystem_lesson_facts.py` 中另两个 ext4/k28 与受保护 Lesson 活动契约仍为独立红灯；本批不暂存该文件，也未把跨主题失败写成通过。
+- DevEco Agent 未重复调用：`alibaba-cn/qwen3-coder-plus` 当前返回 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 返回 `401 Token refresh failed`，需用户交互执行 `deveco providers login -p deveco` 后才能补专属工具证据；本批使用 Python/Web/Hvigor/HDC 完成分层验证。
+- 本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
