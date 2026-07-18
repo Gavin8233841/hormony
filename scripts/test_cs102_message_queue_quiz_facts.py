@@ -142,6 +142,36 @@ def strip_typescript_comments(source):
     return "".join(output)
 
 
+def extract_array_body(source, declaration):
+    stripped = strip_typescript_comments(source)
+    if stripped.count(declaration) != 1:
+        raise AssertionError(f"expected exactly one array declaration: {declaration}")
+    body_start = stripped.index(declaration) + len(declaration)
+    depth = 1
+    quote = None
+    index = body_start
+    while index < len(stripped):
+        current = stripped[index]
+        if quote is not None:
+            if current == "\\" and index + 1 < len(stripped):
+                index += 2
+                continue
+            if current == quote:
+                quote = None
+            index += 1
+            continue
+        if current in {'"', "'", "`"}:
+            quote = current
+        elif current == "[":
+            depth += 1
+        elif current == "]":
+            depth -= 1
+            if depth == 0:
+                return stripped[body_start:index]
+        index += 1
+    raise AssertionError(f"array declaration has no matching closing bracket: {declaration}")
+
+
 def find_unique(items, item_id):
     matches = [item for item in items if item.get("id") == item_id]
     if len(matches) != 1:
@@ -168,12 +198,7 @@ def raw_quiz_content(question):
 
 def extract_web_choice(source, question_id):
     declaration = "export const cs102Quizzes: Quiz[] = withQuizMetadata(["
-    next_declaration = "export const cs103Quizzes: Quiz[] = withQuizMetadata(["
-    if source.count(declaration) != 1 or source.count(next_declaration) != 1:
-        raise AssertionError("expected one CS102 and one CS103 quiz export")
-    section_start = source.index(declaration) + len(declaration)
-    section_end = source.index(next_declaration, section_start)
-    cs102_export = strip_typescript_comments(source[section_start:section_end])
+    cs102_export = extract_array_body(source, declaration)
     pattern = re.compile(
         r'\{\s*id:\s*"'
         + re.escape(question_id)
@@ -205,13 +230,7 @@ def extract_web_choice(source, question_id):
 
 def extract_web_chunk(source, chunk_id):
     declaration = "export const cs102KnowledgeChunks: KnowledgeChunk[] = ["
-    if source.count(declaration) != 1:
-        raise AssertionError("expected exactly one exported CS102 knowledge array")
-    array_start = source.index(declaration) + len(declaration)
-    array_end = source.find("\n];", array_start)
-    if array_end == -1:
-        raise AssertionError("CS102 knowledge array has no closing bracket")
-    exported_array = strip_typescript_comments(source[array_start:array_end])
+    exported_array = extract_array_body(source, declaration)
     pattern = re.compile(
         r'\{\s*id: "'
         + re.escape(chunk_id)
@@ -445,6 +464,10 @@ export const cs102Quizzes: Quiz[] = withQuizMetadata([
     ],
   },
 ]);
+const outsideAfterClosingBracket = {
+  id: "cs102_q54", type: "choice", stem: "fake after", options: ["A. fake"],
+  answer: "A", explanation: "fake after",
+};
 export const cs103Quizzes: Quiz[] = withQuizMetadata([
 ]);
 '''
@@ -458,6 +481,18 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
             },
             extract_web_choice(fixture, "cs102_q54"),
         )
+        no_exported_question = '''
+export const cs102Quizzes: Quiz[] = withQuizMetadata([
+]);
+const outsideAfterClosingBracket = {
+  id: "cs102_q54", type: "choice", stem: "fake after", options: ["A. fake"],
+  answer: "A", explanation: "fake after",
+};
+export const cs103Quizzes: Quiz[] = withQuizMetadata([
+]);
+'''
+        with self.assertRaises(AssertionError):
+            extract_web_choice(no_exported_question, "cs102_q54")
 
     def test_generic_type_claim_and_linked_list_implementation_are_rejected(self):
         legacy = {

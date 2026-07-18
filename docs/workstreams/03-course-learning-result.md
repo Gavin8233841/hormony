@@ -382,3 +382,51 @@
 - **未验证**：HDC 实测 `127.0.0.1:5555 / TCP / Connected / localhost`，但本批没有在该共享设备打开 q54/k45；端侧长文本换行、读屏、答题流程、手机/平板适配、真机和线上 API 均未验证。
 - `lesson-experiences.json` 的 `cs102-进程间通信` 现实案例仍含旧的统一“按类型筛选”比喻；该文件当前承载 WS09/用户保留的未提交改动，本批不覆盖也不暂存，已向 WS09 发出精确同步请求，待其独立提交后融合。
 - 本批未修改 Lesson 页面、Repository/schema、模型、安全边界、用户保留文件或秘密。
+
+## 主线集成：匿名管道描述符、容量与读取边界
+
+### 行为
+
+- `cs102_q53` 改为可审计的普通匿名管道题：一个管道提供单向、无消息边界的字节流；`fork()` 继承描述符是常见交接方式，但不是接口强制的进程亲缘限制。
+- 解释明确 Linux 可通过 UNIX 域套接字 `SCM_RIGHTS` 向其他进程传递打开文件描述的引用；管道容量有限但不是固定 64KB，可用 `F_GETPIPE_SZ` 查询并在权限与系统约束内用 `F_SETPIPE_SZ` 请求调整，内核返回实际容量。
+- 主线复核发现原提交遗漏的 `cs102_k44` 和主动学习规格仍传播绝对亲缘、固定容量与错误读取时序；现已同步 Web/端侧知识切片及规格源，补 `<stdio.h>`，并区分已有数据立即返回、读空但仍有写端等待、全部写端关闭后 `read()` 返回 0/EOF。
+- 目标契约剥离注释并用字符串感知的平衡方括号扫描精确截取 `cs102Quizzes` 和 `cs102KnowledgeChunks` 数组，固定 q53 完整文案、端侧 `courseId/topic/difficulty/tags`、k44 双端五字段和规格关键句；数组闭合前后或注释内对象不能冒充生产题。同源边界修正一并应用到上一批 q54 契约。
+
+### 来源
+
+- POSIX.1-2024 `pipe()`：`https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html`；2026-07-18 HTTP 200，12,561 bytes，SHA-256 `d8425cee340fdacb4f8b3db37a7ed1bced59e9b8227aed4a0cff387ced8d81f4`。
+- POSIX.1-2024 `read()`：`https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html`；HTTP 200，24,752 bytes，SHA-256 `af724071475054a17dde265a540bc39bd6e5d06da2373729141280adb8fdd744`。
+- POSIX.1-2024 `write()`：`https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html`；HTTP 200，31,921 bytes，SHA-256 `1b45e6a71f8bc9bff702da5633d42c88fd927c1d0efc5bafe7a939d23eb66e6a`。
+- Linux man-pages `unix(7)`：`https://man7.org/linux/man-pages/man7/unix.7.html`；HTTP 200，47,026 bytes，SHA-256 `52fb2d4fdeebc96d1f2689e2aa6699f3c081b2141b68098d3b058d738c258cfc`。
+- Linux man-pages `pipe(7)`：`https://man7.org/linux/man-pages/man7/pipe.7.html`；HTTP 200，21,870 bytes，SHA-256 `5485983943d2a7d8d94a47705b398ae373036b75a0ded5570f694f8039e19c23`。
+- Linux man-pages `F_GETPIPE_SZ(2const)`：`https://man7.org/linux/man-pages/man2/F_GETPIPE_SZ.2const.html`；HTTP 200，10,382 bytes，SHA-256 `4267eae9531d7fbdcbd437e21f3aa159fa9a811ba95ae37d0e70afec9ea6a06d`。
+
+### 文件
+
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `scripts/test_cs102_pipe_quiz_facts.py`
+- `scripts/test_cs102_message_queue_quiz_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+
+### 证据
+
+- **源码确认**：独立只读审查按 POSIX.1-2024 与 Linux man-pages 逐条核对，确认 q53 的单向字节流、描述符继承/传递、容量查询/调整与返回实际容量表述成立；同时定位并推动修复 k44、规格、测试导出范围和端侧元数据缺口。
+- **静态诊断通过**：`python -B scripts/test_cs102_pipe_quiz_facts.py` 退出码 0，11/11 通过；覆盖 `fork`/`SCM_RIGHTS` 描述符模型、容量取整/上限/`EBUSY`、旧绝对限制与否定句、数组前/后/注释对象、精确生产文案、端侧元数据、k44 双端字段和规格读取三阶段。
+- **静态诊断通过**：`python -B scripts/test_cs102_message_queue_quiz_facts.py` 退出码 0，11/11 通过；在原有 System V/POSIX 契约上补充数组闭合后同 ID 对象的固定误绿反例。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0；165 道端侧选择题与 Web 唯一源逐字段一致。
+- **静态诊断通过**：`python -B scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 知识切片、165 道题和 33 份学习体验的结构、引用、DAG、连通性、层级与 Lesson 路由门禁全部通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；36 个测试文件、437/437 通过。
+- **构建通过**：Web `pnpm build` 退出码 0；Next.js 14.2.18 生成 10/10 静态页面与 26.8 kB middleware。
+- **构建通过**：HarmonyOS API 12 增量 HAP 退出码 0；`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，最终复跑 `BUILD SUCCESSFUL in 55 s 920 ms`，仍未配置签名。
+
+### 失败与未验证
+
+- 新增来源固定断言首次运行退出码 1，准确发现测试文档头遗漏已使用的 POSIX `read()` URL；补齐来源后同一套 11 项契约退出码 0。
+- 独立复核先发现现实案例仍写“只能父子进程”，修正为“是否持有描述符，而不是亲缘关系”；随后复现数组闭合后对象仍会被旧提取器选中，改用匹配括号扫描后该固定输入按预期抛出断言。
+- **未验证**：HDC 仍连接 `127.0.0.1:5555 / TCP / Connected / localhost`，但本批未在共享设备打开 q53/k44；长文本换行、读屏、答题流程、横屏、平板、真机和线上 API 未验证。
+- `lesson-experiences.json` 当前承载 WS09/用户保留改动，主线未覆盖或暂存；其 IPC 活动仍是旧文案，已向 WS09 发出从规格源受控生成的精确请求，融合前不能宣称 Lesson 内容已同步。
+- 本批未修改 Lesson 页面、Repository/schema、模型、安全边界、用户保留文件或秘密；已知失败的 Alibaba/DevEco Provider 未重试，也未回落到 `openai/*`。
