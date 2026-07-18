@@ -269,3 +269,25 @@
 - **未验证**：本批不修改或清除模拟器用户数据库，首次 outbox 写失败后的跨页面乱序提交由可执行 ArkData 故障注入 fixture 验证，未在模拟器 UI 中并发操纵两个答题页面。
 - **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；按主线程约束未重试当前不可用的 DevEco Agent 模型。
 - **未验证**：项目未配置生产签名，真机与多设备未验证。
+
+## 批次 9：长期幂等 proof 权威性
+
+### 背景与行为变化
+
+- schema 3 已将 verified proof 作为与 `appliedQuizIds` 同保留期的长期幂等事实，但旧 loader 每次读取都优先用 `recentResults` 重算 proof。若最近明细与已验证摘要发生分叉，普通 `getQuizResults()` 读取就会静默改写 proof，使变更载荷被误认作原提交，原载荷反而被报冲突。
+- `upgradeAppliedQuizProofs()` 现在优先保留当前 fingerprint 版本且结构有效的 verified proof。只有 proof 缺失、无效或为 `legacy-unverifiable` 时，才从 recent window 重建摘要；schema 2 的最近 20 条升级能力和已截断历史 fail-closed 行为保持不变。
+- 动态 ArkData fixture 先正常写入载荷 A，再只将同 ID 的 recent 明细改成载荷 B。修复前公开读取会把 proof 从 A 的 SHA-256 静默改成 B；修复后读取不改变 proof，A 重试返回 `applied: false`，B 明确抛出载荷冲突，统计保持 1 次。
+
+### 验证
+
+- **静态诊断通过**：`cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`，exit 0，`62/62` 通过；覆盖普通读取、verified proof 保持、原载荷幂等、分叉载荷冲突及 schema 2 升级。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，exit 0；`pnpm test` 为 28 个文件、`439/439` 通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建完成。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，exit 0，CompileArkTS 与 PackageHap 完成，`BUILD SUCCESSFUL in 27 s 580 ms`；项目未配置 `signingConfigs`，构建跳过签名。
+- **模拟器通过**：目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。最新 `entry-default-unsigned.hap` 返回 `install bundle successfully`，`com.c4ai.hormony/EntryAbility` 返回 `start ability successfully`；重新启动并等待后的 UI 树为 `pages/Index`，可见“鸿学伴” bounds `[56,328][372,451]`。
+
+### 未验证
+
+- **未验证**：本批不修改或清除模拟器用户数据库，proof 与 recent 明细分叉由可执行 ArkData fixture 验证，未在模拟器内直接篡改真实状态行。
+- **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；按主线程约束未重试当前不可用的 DevEco Agent 模型。
+- **未验证**：项目未配置生产签名，真机与多设备未验证。

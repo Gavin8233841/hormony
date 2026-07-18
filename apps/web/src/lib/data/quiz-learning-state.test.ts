@@ -234,6 +234,7 @@ interface RepositoryRuntime {
   createAnswerDraftAttemptId(prefix: string): string;
   getProfile(): Promise<RuntimeProfile | null>;
   getCourses(): Promise<RuntimeCourse[] | null>;
+  getQuizResults(): Promise<RuntimeResult[]>;
   appendQuizResult(result: RuntimeResult): Promise<RuntimeReceipt>;
   getLessonProgress(courseId?: string): Promise<RuntimeLessonProgress[]>;
   completeLessonChunk(courseId: string, topic: string, chunkId: string, topicChunkCount: number): Promise<void>;
@@ -2150,6 +2151,31 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     expect(afterRetry.stats.totalAttempts).toBe(25);
     expect(afterRetry.appliedQuizProofs.find((proof) => proof.quizId === first.quizId))
       .toMatchObject({ verification: "verified", fingerprintVersion: 1 });
+  });
+
+  it("普通读取不以 recent 明细覆盖已验证的长期 proof", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const original = result("proof-authority", "2026-07-18T08:00:00.000Z", false);
+    await loaded.repository.appendQuizResult(original);
+    const beforeMutation = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    const originalProof = beforeMutation.appliedQuizProofs[0];
+
+    const changedRecent = result(original.quizId, original.submittedAt, true);
+    beforeMutation.recentResults[0] = changedRecent;
+    rows.set("quiz_learning_state", {
+      payload: JSON.stringify(beforeMutation),
+      updatedAt: rows.get("quiz_learning_state")?.updatedAt ?? 0,
+    });
+
+    await loaded.repository.getQuizResults();
+    const afterRead = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(afterRead.appliedQuizProofs[0]).toEqual(originalProof);
+    await expect(loaded.repository.appendQuizResult(original)).resolves.toMatchObject({ applied: false });
+    await expect(loaded.repository.appendQuizResult(changedRecent))
+      .rejects.toThrow("答题记录 ID 与已保存内容冲突");
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").stats.totalAttempts).toBe(1);
   });
 
   it("schema 2 迁移仅升级 recent 内 proof，已截断历史 ID 独立 fail-closed", async () => {

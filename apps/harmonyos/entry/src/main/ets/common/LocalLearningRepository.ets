@@ -545,12 +545,17 @@ export class LocalLearningRepository {
     const next: AppliedQuizProof[] = [];
     for (const quizId of state.appliedQuizIds) {
       if (next.some((item: AppliedQuizProof): boolean => item.quizId === quizId)) continue;
+      const existing = state.appliedQuizProofs.find((item: AppliedQuizProof): boolean => item.quizId === quizId);
+      if (existing !== undefined && existing.verification === 'verified' &&
+        LocalLearningRepository.validAppliedQuizProof(existing)) {
+        next.push(existing);
+        continue;
+      }
       const result = state.recentResults.find((item: QuizResult): boolean => item.quizId === quizId);
       if (result !== undefined) {
         next.push(LocalLearningRepository.createAppliedQuizProof(result));
         continue;
       }
-      const existing = state.appliedQuizProofs.find((item: AppliedQuizProof): boolean => item.quizId === quizId);
       if (existing !== undefined && LocalLearningRepository.validAppliedQuizProof(existing)) {
         next.push(existing);
       } else {
