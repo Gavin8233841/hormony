@@ -891,6 +891,17 @@ export class LocalLearningRepository {
     return mastery;
   }
 
+  static async getMasteryMilestones(): Promise<TopicMasteryMilestone[]> {
+    const state = await LocalLearningRepository.getQuizLearningState();
+    return state.masteryMilestones.map((item: TopicMasteryMilestone): TopicMasteryMilestone => {
+      return {
+        courseId: item.courseId,
+        topic: item.topic,
+        masteredAt: item.masteredAt
+      };
+    });
+  }
+
   static async getTagInsights(limit: number = 6): Promise<TagInsight[]> {
     const insights = await LocalLearningRepository.getAllTagInsights();
     return insights.slice(0, Math.max(0, limit));

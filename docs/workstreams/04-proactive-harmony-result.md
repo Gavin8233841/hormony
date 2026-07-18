@@ -44,6 +44,15 @@
 - 画像加载和导航失败均保留可见提示与 48 vp 重试入口；知识点练习只写入目录派生的课程标题和精确 Topic，并清空旧标签筛选。
 - `Achievements.ets` 展示每项里程碑的真实来源、剩余量和本地解锁日期；最接近解锁的目标使用本地课程目录、未计数互动和未掌握 Topic 提供可增长的精确动作。
 
+### 成就长期里程碑与主动行动
+
+- 掌握目标从 `QuizLearningState.masteryMilestones` 读取精确 `courseId + topic` 长期事实，不再依赖最多保留 500 条的 `quiz_mastered` 事件窗口。即使最早掌握事件被压缩淘汰，已掌握 Topic 也不会再次成为最近目标。
+- `LocalLearningRepository.getMasteryMilestones()` 只公开页面需要的三个字段并返回防御性拷贝；成就主事实与课程、事件、里程碑行动上下文分两阶段读取。
+- 成就主事实读取成功后立即展示。课程、事件或里程碑辅助读取失败时，只清空行动上下文并提供“重新准备学习入口”，不隐藏已显示的真实成就；任务成就仍可直接进入今日计划。
+- 主事实再次读取会先作废仍在飞行的旧辅助请求；课程、事件和长期里程碑仅由最新请求整批提交，旧成功或旧失败都不能覆盖新快照或提前结束加载状态。
+- 初次练习、课程互动、今日计划和长期掌握四类动作分别写入消费页已有的精确 `AppStorage` 键并进入唯一目标页；掌握动作只选择存在本机题目的未达里程碑 Topic，并清空旧测验标签。
+- 主动作及失败恢复入口最小高度为 48 vp；动作读屏文本随加载、恢复、四类目标和全部解锁状态变化，成就条目播报标题、说明、状态与事实来源。标题和状态允许换行，来源与长状态分行显示。
+
 ### 标签洞察状态
 
 - schema 12 已使用 `courseId + topic + tag` 三元组累计标签洞察，并提供不截断的全量读取契约；跨课程和跨 Topic 同名标签不会合并。
@@ -62,6 +71,7 @@
 - `apps/harmonyos/entry/src/main/ets/common/ProactiveLearningService.ets`
 - `apps/harmonyos/entry/src/main/ets/common/LearningFormUpdater.ets`
 - `apps/harmonyos/entry/src/main/ets/common/LearningReminder.ets`
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
 - `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Index.ets`
@@ -74,6 +84,8 @@
 - `scripts/test-proactive-learning-service.mjs`
 - `scripts/test-profile-accessibility-contracts.mjs`
 - `scripts/test-activity-records-accessibility-contracts.mjs`
+- `scripts/test-achievements-next-action.mjs`
+- `scripts/test-achievements-milestone-routing-contracts.mjs`
 
 ## 验证证据
 
@@ -83,7 +95,12 @@
 | **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
 | **源码确认** | schema 12 学习状态契约 | 标签洞察按 `courseId + topic + tag` 隔离；画像继续使用课程目录校验后的 `TopicMastery` |
 | **源码确认** | 四个 WS04 契约脚本合并执行 | exit 0，55/55 通过；覆盖主动行动、提醒/卡片、Form 冷启动、画像真实 Topic、记录一致快照、双错误态恢复、窄屏与无障碍 |
+| **源码确认** | 成就下一行动与长期里程碑路由契约 | exit 0，9/9 通过；覆盖 500 条事件淘汰反例、四类精确路由、两阶段辅助失败保留、旧辅助快照淘汰、动态读屏与 48 vp |
+| **源码确认** | 既有 WS04 契约脚本 | exit 0，59/59 通过；覆盖主动行动、触达、画像、记录和学习星图回归 |
+| **源码确认** | `pnpm test -- src/lib/data/quiz-learning-state.test.ts` | exit 0，39/39 通过；真实 reducer 证明第 501 条事件压缩后长期掌握里程碑仍保留 |
+| **源码确认** | `python scripts/validate-topic-relations.py` | exit 0；33 Topic、147 切片、165 道题与 33 份课程体验的 DAG、引用和 Topic 一致性全部通过 |
 | **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 31 s 973 ms` |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 本轮 exit 0，当前源码增量任务全部通过，`BUILD SUCCESSFUL in 10 s 13 ms` |
 | **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
 | **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
@@ -96,6 +113,7 @@
 - 按课程/Topic/标签隔离的主动标签推荐当前明确未启用；schema 已具备精确数据，但产品还需补可解释证据和下一动作设计。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
 - Profile 与 ActivityRecords 的屏幕阅读器播报顺序、字体放大、窄屏排版、48 vp 实际触控和错误重试独立聚焦尚无设备证据。
+- Achievements 的动态屏幕阅读器播报、字体放大换行和 48 vp 实际触控尚无设备证据；`hdc 3.2.0e list targets` 本轮 exit 0，返回 `[Empty]`。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
 - HAP 签名、安装、横屏、平板和真机均未验证。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。

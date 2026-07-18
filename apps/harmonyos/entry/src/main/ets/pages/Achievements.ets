@@ -4,6 +4,7 @@ import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { AchievementProgress, Course, LessonExperience, StudyEvent } from '../model/DataModels';
+import { TopicMasteryMilestone } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 interface AchievementActionTarget {
@@ -17,16 +18,22 @@ struct AchievementsPage {
   @State achievements: AchievementProgress[] = [];
   @State courses: Course[] = [];
   @State studyEvents: StudyEvent[] = [];
+  @State masteryMilestones: TopicMasteryMilestone[] = [];
   @State actionContextReady: boolean = false;
-  @State loading: boolean = true;
+  @State loading: boolean = false;
+  @State actionLoading: boolean = false;
   @State message: string = '';
+  private actionLoadSequence: number = 0;
 
   aboutToAppear(): void {
     this.loadAchievements();
   }
 
   private async loadAchievements(): Promise<void> {
+    if (this.loading) return;
+    this.actionLoadSequence += 1;
     this.loading = true;
+    this.actionLoading = false;
     this.message = '';
     this.actionContextReady = false;
     try {
@@ -35,24 +42,42 @@ struct AchievementsPage {
       this.achievements = [];
       this.courses = [];
       this.studyEvents = [];
+      this.masteryMilestones = [];
       this.message = '成就进度读取失败，请重新读取';
       this.loading = false;
       return;
     }
+    this.loading = false;
+    await this.loadActionContext();
+  }
+
+  private async loadActionContext(): Promise<void> {
+    const requestSequence = ++this.actionLoadSequence;
+    this.actionLoading = true;
+    this.message = '';
+    this.actionContextReady = false;
     try {
-      this.courses = await LocalLearningRepository.getCourses() ?? [];
-      this.studyEvents = await LocalLearningRepository.getStudyEvents();
-      if (this.courses.length === 0) {
+      const courses = await LocalLearningRepository.getCourses() ?? [];
+      const studyEvents = await LocalLearningRepository.getStudyEvents();
+      const masteryMilestones = await LocalLearningRepository.getMasteryMilestones();
+      if (requestSequence !== this.actionLoadSequence) return;
+      this.courses = courses;
+      this.studyEvents = studyEvents;
+      this.masteryMilestones = masteryMilestones;
+      if (courses.length === 0) {
         this.message = '本地课程目录为空，请重新读取';
       } else {
         this.actionContextReady = true;
       }
     } catch (error) {
+      if (requestSequence !== this.actionLoadSequence) return;
       this.courses = [];
       this.studyEvents = [];
+      this.masteryMilestones = [];
       this.message = '学习入口准备失败，请重新读取';
+    } finally {
+      if (requestSequence === this.actionLoadSequence) this.actionLoading = false;
     }
-    this.loading = false;
   }
 
   private isUnlocked(item: AchievementProgress): boolean {
@@ -163,14 +188,17 @@ struct AchievementsPage {
   }
 
   private topicMastered(courseId: string, topic: string): boolean {
-    return this.studyEvents.some((event: StudyEvent): boolean =>
-      event.type === 'quiz_mastered' && event.courseId === courseId && event.topic === topic);
+    return this.masteryMilestones.some((item: TopicMasteryMilestone): boolean =>
+      item.courseId === courseId && item.topic === topic);
   }
 
   private masteryTarget(): AchievementActionTarget | null {
     for (const course of this.orderedCourses()) {
       for (const topic of this.orderedTopics(course)) {
-        if (!this.topicMastered(course.id, topic)) return { course: course, topic: topic };
+        if (!this.topicMastered(course.id, topic) &&
+          LearningContentRepository.getQuestions(course.id, topic).length > 0) {
+          return { course: course, topic: topic };
+        }
       }
     }
     return null;
@@ -191,6 +219,7 @@ struct AchievementsPage {
   private nextActionLabel(): string {
     const item = this.nextAchievement();
     if (item === null) return '查看学习记录';
+    if (this.needsActionContext(item) && this.actionLoading) return '正在准备学习入口';
     if (this.needsActionContext(item) && !this.actionContextReady) return '重新准备学习入口';
     if (item.id === 'first_quiz') return '完成一次精选练习';
     if (item.id === 'active_learning_3') return '继续课程互动';
@@ -204,6 +233,7 @@ struct AchievementsPage {
     if (item === null) return '全部里程碑已点亮，学习记录仍会继续保存在本机。';
     const remaining = this.remainingCount(item).toString();
     if (item.id === 'task_5') return '还差 ' + remaining + ' 项任务，从今日计划继续推进。';
+    if (this.actionLoading) return '成就进度已读取，正在准备精确课程与 Topic 入口。';
     if (!this.actionContextReady) return '成就已读取，但学习入口尚未准备好。重新读取后可继续推进。';
     const target = this.actionTarget(item);
     if (target === null) return '暂无能推进该成就的本地学习内容，请重新读取课程资产。';
@@ -215,9 +245,31 @@ struct AchievementsPage {
       return '还差 ' + remaining + ' 个课程互动，下一步进入 ' + context + ' 的未计数互动。';
     }
     if (item.id === 'mastery_3') {
-      return '还差 ' + remaining + ' 个知识点，下一步验证尚未掌握的 ' + context + '。';
+      return '还差 ' + remaining + ' 个知识点，下一步验证长期掌握里程碑尚未包含的 ' + context + '。';
     }
     return '还差 ' + remaining + ' 项真实学习记录。';
+  }
+
+  private nextActionDisabled(): boolean {
+    return this.needsActionContext(this.nextAchievement()) && this.actionLoading;
+  }
+
+  private nextActionAccessibilityText(): string {
+    return this.nextActionLabel() + '。' + this.nextActionHint();
+  }
+
+  private nextActionAccessibilityDescription(): string {
+    const item = this.nextAchievement();
+    if (item === null) return '打开本机学习记录，回看已解锁里程碑的事实来源';
+    if (this.needsActionContext(item) && this.actionLoading) return '正在读取精确课程与 Topic，完成后才可执行';
+    if (this.needsActionContext(item) && !this.actionContextReady) {
+      return '重新读取学习入口，不影响当前已显示的真实成就进度';
+    }
+    if (item.id === 'first_quiz') return '打开存在本机题目的精确 Topic，提交后更新初次练习';
+    if (item.id === 'active_learning_3') return '打开尚未计数的课程互动，完成后更新主动学习';
+    if (item.id === 'task_5') return '打开今日计划，完成任务后更新稳步前进';
+    if (item.id === 'mastery_3') return '打开长期掌握里程碑尚未包含的精确 Topic 测验';
+    return '查看当前里程碑的真实学习入口';
   }
 
   private unlockedAtLabel(item: AchievementProgress): string {
@@ -233,8 +285,20 @@ struct AchievementsPage {
     if (item.id === 'first_quiz') return '来源：本机练习提交记录';
     if (item.id === 'active_learning_3') return '来源：课程互动完成记录';
     if (item.id === 'task_5') return '来源：学习计划任务完成记录';
-    if (item.id === 'mastery_3') return '来源：正确率达到 80% 的主题记录';
+    if (item.id === 'mastery_3') return '来源：本机长期掌握里程碑';
     return '来源：本机学习事件';
+  }
+
+  private achievementStatusText(item: AchievementProgress): string {
+    if (!this.isUnlocked(item)) return '还差 ' + this.remainingCount(item).toString();
+    const unlockedAt = this.unlockedAtLabel(item);
+    return unlockedAt.length > 0 ? '已解锁，解锁日期 ' + unlockedAt : '已解锁';
+  }
+
+  private achievementAccessibilityText(item: AchievementProgress): string {
+    const target = this.isNextAchievement(item) && !this.isUnlocked(item) ? '当前最近目标。' : '';
+    return item.title + '。' + target + item.description + '。' + this.achievementStatusText(item) + '。' +
+      this.achievementSource(item);
   }
 
   private achievementIcon(item: AchievementProgress): Resource {
@@ -270,7 +334,7 @@ struct AchievementsPage {
       return;
     }
     if (!this.actionContextReady) {
-      this.loadAchievements();
+      this.loadActionContext();
       return;
     }
     const target = this.actionTarget(item);
@@ -338,6 +402,8 @@ struct AchievementsPage {
     }
     .width('100%')
     .padding({ left: 16, right: 16, bottom: 24 + SafeAreaInsets.bottomVp() })
+    .accessibilityGroup(true)
+    .accessibilityText('正在读取本机成就进度')
   }
 
   build() {
@@ -355,12 +421,13 @@ struct AchievementsPage {
             .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
           if (this.message.length > 0) {
             Button('重新读取')
-              .height(42)
+              .constraintSize({ minHeight: 48 })
               .fontSize(14)
               .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
               .backgroundColor(Constants.COLOR_BRAND)
               .borderRadius(Constants.RADIUS_MD)
               .onClick((): void => { this.loadAchievements(); })
+              .accessibilityText('重新读取本机成就进度')
           }
         }
         .width('100%')
@@ -395,6 +462,8 @@ struct AchievementsPage {
                 .height(6)
                 .color(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+                .accessibilityText('已解锁 ' + this.unlockedCount().toString() + ' 项，共 ' +
+                  this.achievements.length.toString() + ' 项成就')
 
               if (this.nextAchievement() !== null) {
                 Row({ space: 7 }) {
@@ -426,18 +495,23 @@ struct AchievementsPage {
                   Text(this.nextActionLabel())
                     .fontSize(14)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                    .fontColor(this.nextActionDisabled() ? Constants.COLOR_BUTTON_DISABLED_TEXT :
+                      Constants.COLOR_TEXT_ON_GRADIENT)
                   SymbolGlyph($r('sys.symbol.arrow_right'))
                     .fontSize(15)
-                    .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                    .fontColor([this.nextActionDisabled() ? Constants.COLOR_BUTTON_DISABLED_TEXT :
+                      Constants.COLOR_TEXT_ON_GRADIENT])
                 }
                 .justifyContent(FlexAlign.Center)
               }
               .width('100%')
-              .height(44)
-              .backgroundColor(Constants.COLOR_BRAND)
+              .constraintSize({ minHeight: 48 })
+              .enabled(!this.nextActionDisabled())
+              .backgroundColor(this.nextActionDisabled() ? Constants.COLOR_BUTTON_DISABLED_BG : Constants.COLOR_BRAND)
               .borderRadius(Constants.RADIUS_MD)
               .onClick((): void => { this.openNextAchievement(); })
+              .accessibilityText(this.nextActionAccessibilityText())
+              .accessibilityDescription(this.nextActionAccessibilityDescription())
 
               if (this.message.length > 0) {
                 Row({ space: 7 }) {
@@ -488,11 +562,12 @@ struct AchievementsPage {
                           (this.isNextAchievement(item) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER)])
                     }
                     Column({ space: 6 }) {
-                      Row() {
+                      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
                         Text(item.title)
                           .fontSize(15)
                           .fontWeight(FontWeight.Bold)
                           .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                          .margin({ right: 8, bottom: 4 })
                         Text(this.isUnlocked(item) ? '已解锁' :
                           (this.isNextAchievement(item) ? '当前目标 · ' : '') +
                           item.current.toString() + '/' + item.target.toString())
@@ -500,21 +575,22 @@ struct AchievementsPage {
                           .fontWeight(FontWeight.Medium)
                           .fontColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS :
                             (this.isNextAchievement(item) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY))
+                          .margin({ bottom: 4 })
                       }
                       .width('100%')
-                      .justifyContent(FlexAlign.SpaceBetween)
                       Text(item.description)
+                        .width('100%')
                         .fontSize(12)
+                        .lineHeight(18)
                         .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      Row({ space: 8 }) {
+                      Column({ space: 3 }) {
                         Text(this.achievementSource(item))
-                          .layoutWeight(1)
+                          .width('100%')
                           .fontSize(11)
                           .lineHeight(17)
                           .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                          .maxLines(2)
-                        Text(this.isUnlocked(item) ? this.unlockedAtLabel(item) :
-                          '还差 ' + this.remainingCount(item).toString())
+                        Text(this.achievementStatusText(item))
+                          .width('100%')
                           .fontSize(11)
                           .fontWeight(FontWeight.Medium)
                           .fontColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
@@ -532,6 +608,9 @@ struct AchievementsPage {
                   }
                   .width('100%')
                   .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+                  .accessibilityGroup(true)
+                  .accessibilityText(this.achievementAccessibilityText(item))
+                  .accessibilityDescription('进度来自本机已保存的长期学习事实')
 
                   if (index < this.achievements.length - 1) {
                     Divider()

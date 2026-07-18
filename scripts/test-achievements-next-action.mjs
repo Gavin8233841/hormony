@@ -120,6 +120,16 @@ function extractAchievementBranch(methodBody, achievementId) {
   return extractDelimited(methodBody, openIndex, '{', '}').body;
 }
 
+function extractControlRegion(source, onClickMarker, buttonMarker, terminalMarker, label) {
+  const onClickIndex = source.indexOf(onClickMarker);
+  invariant(onClickIndex >= 0, `${label} onClick was not found`);
+  const startIndex = source.lastIndexOf(buttonMarker, onClickIndex);
+  invariant(startIndex >= 0, `${label} button start was not found`);
+  const terminalIndex = source.indexOf(terminalMarker, onClickIndex);
+  invariant(terminalIndex >= onClickIndex, `${label} terminal binding was not found`);
+  return source.slice(startIndex, terminalIndex + terminalMarker.length);
+}
+
 function splitTopLevelArguments(source) {
   const result = [];
   let start = 0;
@@ -388,10 +398,26 @@ check('33 topics provide practice questions and an unmastered quiz target', () =
     'practiceTarget must require questions for its course/topic');
   invariant(/!\s*this\.topicMastered\s*\(\s*course\.id\s*,\s*topic\s*\)/.test(masteryBody),
     'masteryTarget must skip mastered course/topic pairs');
-  invariant(/event\.type\s*===\s*['"]quiz_mastered['"]/.test(topicMasteredBody) &&
-    /event\.courseId\s*===\s*courseId/.test(topicMasteredBody) &&
-    /event\.topic\s*===\s*topic/.test(topicMasteredBody),
-  'topicMastered must use quiz_mastered with the exact course/topic pair');
+  invariant(/LearningContentRepository\.getQuestions\s*\(\s*course\.id\s*,\s*topic\s*\)\.length\s*>\s*0/.test(masteryBody),
+    'masteryTarget must require executable questions for its course/topic');
+  invariant(/this\.masteryMilestones\.some/.test(topicMasteredBody) &&
+    /item\.courseId\s*===\s*courseId/.test(topicMasteredBody) &&
+    /item\.topic\s*===\s*topic/.test(topicMasteredBody),
+  'topicMastered must use the long-lived mastery milestone course/topic pair');
+  invariant(!/quiz_mastered/.test(topicMasteredBody) && !/this\.studyEvents/.test(topicMasteredBody),
+    'topicMastered must not depend on the bounded study-event window');
+
+  const getMilestonesBody = extractMethodBody(localRepositorySource, 'getMasteryMilestones');
+  invariant(/LocalLearningRepository\.getQuizLearningState\s*\(\s*\)/.test(getMilestonesBody),
+    'getMasteryMilestones must read the persistent quiz learning state');
+  for (const field of ['courseId', 'topic', 'masteredAt']) {
+    invariant(new RegExp(`${field}:\\s*item\\.${field}`).test(getMilestonesBody),
+      `getMasteryMilestones must clone ${field}`);
+  }
+
+  const achievementsBody = extractMethodBody(localRepositorySource, 'getAchievements');
+  invariant(/state\.masteryMilestones\.slice\s*\(\s*\)/.test(achievementsBody),
+    'mastery achievement count must use persistent mastery milestones');
 
   const getQuestionsBody = extractMethodBody(contentRepositorySource, 'getQuestions');
   invariant(/questionsByTopic/.test(getQuestionsBody) && /courseId/.test(getQuestionsBody) && /topic/.test(getQuestionsBody),
@@ -513,6 +539,81 @@ check('four achievement routes preserve exact AppStorage contracts', () => {
   const masteryBranch = extractAchievementBranch(openBody, 'mastery_3');
   invariant(!hasAppStorageSet(masteryBranch, 'selectedContentTopic'),
     'mastery_3 must not overwrite selectedContentTopic with an already-mastered topic');
+});
+
+check('dynamic accessibility matches action state and enlarged-text layout', () => {
+  const accessibilityTextBody = extractMethodBody(achievementsSource, 'nextActionAccessibilityText');
+  invariant(accessibilityTextBody.includes('this.nextActionLabel()') &&
+    accessibilityTextBody.includes('this.nextActionHint()'),
+  'action announcement must combine the dynamic label and dynamic hint');
+
+  const hintBody = extractMethodBody(achievementsSource, 'nextActionHint');
+  for (const fact of [
+    'const remaining = this.remainingCount(item).toString();',
+    'const target = this.actionTarget(item);',
+    "const context = target.course.title + ' · ' + target.topic;",
+  ]) {
+    invariant(hintBody.includes(fact), `action hint missing data chain: ${fact}`);
+  }
+
+  const labelBody = extractMethodBody(achievementsSource, 'nextActionLabel');
+  const descriptionBody = extractMethodBody(achievementsSource, 'nextActionAccessibilityDescription');
+  for (const stateContract of [
+    'item === null',
+    'this.actionLoading',
+    '!this.actionContextReady',
+    "item.id === 'first_quiz'",
+    "item.id === 'active_learning_3'",
+    "item.id === 'task_5'",
+    "item.id === 'mastery_3'",
+  ]) {
+    invariant(descriptionBody.includes(stateContract),
+      `action accessibility description missing state: ${stateContract}`);
+  }
+  invariant(labelBody.includes(
+    "if (this.needsActionContext(item) && !this.actionContextReady) return '重新准备学习入口';"),
+  'auxiliary failure must expose a dynamic recovery label on the primary action');
+  invariant(descriptionBody.includes(
+    "return '重新读取学习入口，不影响当前已显示的真实成就进度';"),
+  'auxiliary failure must describe recovery without hiding rendered achievements');
+  const openBody = extractMethodBody(achievementsSource, 'openNextAchievement');
+  invariant(/if\s*\(\s*!this\.actionContextReady\s*\)\s*\{[\s\S]*this\.loadActionContext\s*\(\s*\)/
+    .test(openBody),
+  'the primary action must retry auxiliary context when it is unavailable');
+
+  const primaryAction = extractControlRegion(
+    achievementsSource,
+    '.onClick((): void => { this.openNextAchievement(); })',
+    'Button() {',
+    '.accessibilityDescription(this.nextActionAccessibilityDescription())',
+    'primary achievement action'
+  );
+  invariant(primaryAction.includes('.constraintSize({ minHeight: 48 })'),
+    'primary achievement action needs a 48vp minimum target');
+  invariant(primaryAction.includes('.accessibilityText(this.nextActionAccessibilityText())') &&
+    primaryAction.includes('.accessibilityDescription(this.nextActionAccessibilityDescription())'),
+  'primary achievement action must bind dynamic accessibility text and description');
+
+  const primaryFailureRecovery = extractControlRegion(
+    achievementsSource,
+    '.onClick((): void => { this.loadAchievements(); })',
+    "Button('重新读取')",
+    ".accessibilityText('重新读取本机成就进度')",
+    'primary achievement failure recovery'
+  );
+  invariant(primaryFailureRecovery.includes('.constraintSize({ minHeight: 48 })'),
+    'primary achievement failure recovery needs a 48vp minimum target');
+
+  const itemAccessibilityBody = extractMethodBody(achievementsSource, 'achievementAccessibilityText');
+  for (const evidence of ['item.title', 'item.description', 'this.achievementStatusText(item)',
+    'this.achievementSource(item)']) {
+    invariant(itemAccessibilityBody.includes(evidence), `achievement announcement missing ${evidence}`);
+  }
+  invariant(achievementsSource.includes('Flex({ wrap: FlexWrap.Wrap'),
+    'achievement title and state must wrap under enlarged text');
+  invariant(/Column\s*\(\s*\{\s*space:\s*3\s*\}\s*\)\s*\{[\s\S]*this\.achievementSource\(item\)[\s\S]*this\.achievementStatusText\(item\)/
+    .test(achievementsSource),
+  'achievement source and long status must occupy separate rows');
 });
 
 const passed = checks.length - failures;
