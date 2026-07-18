@@ -337,3 +337,48 @@
 - **构建通过**：Web `pnpm build` 退出码 0，Next.js 14.2.18 生成 10/10 静态页面和 26.8 kB middleware；HarmonyOS API 12 增量 HAP 退出码 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 通过，`BUILD SUCCESSFUL in 31 s 82 ms`，仍未配置签名。
 - **未验证**：本批尚未在模拟器打开 k28 长文本；屏幕阅读器、手机/平板排版、真机和线上 API 未验证。
 - **未验证**：主线没有 WS03 分支使用的 `generate-knowledge-json.mjs`，因此没有记录不存在的生成命令；本批以两个明确字段的受控同步和可执行逐字段一致性契约证明双端内容一致。
+
+## 主线集成：System V 与 POSIX 消息队列接收语义
+
+### 行为
+
+- `cs102_q54` 题面限定为 System V 消息队列，不再把所有“消息队列”笼统描述为按类型接收，也不再把标准未规定的“内核链表”当成统一实现事实。
+- 解释明确 System V `msgrcv()`：`msgtyp=0` 取队首，正值取该类型首条，负值取不大于绝对值的最低类型首条；同时区分 POSIX `mq_receive()` 的最高优先级优先、同优先级先进先出语义。
+- 正确选项继续为 B，但改为可审计的“保留消息边界，并可按消息类型选择性接收”；Web 与端侧只同步 q54 的题面、四个选项和解释，答案、难度、标签及其他题目不变。
+- 新契约执行 System V/POSIX 两套选择器、固定旧题反例、Web/raw 五个展示与评分字段一致性；TypeScript 提取只读取 `cs102Quizzes` 导出区间并先剥离注释，导出外或注释内同 ID 对象不能误绿。
+- 主线复核发现 `cs102_k45` 与主动学习规格仍混写两套接口；现已同步 Web/端侧知识切片，明确 System V `msgtyp` 三分支、POSIX 优先级/FIFO 规则和标准不限定内部链表实现，并更新规格中的现实案例。
+- 契约进一步固定 q54 的完整生产文案、端侧 `courseId/topic/difficulty/tags` 元数据、k45 双端五字段和规格关键句，不再仅依赖关键词存在性判定。
+
+### 来源
+
+- POSIX.1-2024 `msgsnd()`：`https://pubs.opengroup.org/onlinepubs/9799919799/functions/msgsnd.html`；2026-07-18 HTTP 200，11,430 bytes，SHA-256 `7485234efb4fb1046d74c6fe21a9b2a9e5fac75a161ea543877dc3e1d1768ab2`。
+- POSIX.1-2024 `msgrcv()`：`https://pubs.opengroup.org/onlinepubs/9799919799/functions/msgrcv.html`；HTTP 200，12,347 bytes，SHA-256 `e38afc7a56c683d335bc9eadae1c9c65116ee50cff112b9137a6b7af7e7551f6`。
+- POSIX.1-2024 `mq_receive()`：`https://pubs.opengroup.org/onlinepubs/9799919799/functions/mq_receive.html`；HTTP 200，11,838 bytes，SHA-256 `c79acf92b7a0ef1344e1e39da5ccc61e2e87c7f40a0df60e97513506258a6cbd`。
+- POSIX.1-2024 `mq_send()`：`https://pubs.opengroup.org/onlinepubs/9799919799/functions/mq_send.html`；HTTP 200，10,775 bytes，SHA-256 `6927afa42e01a021754bb610a32eb12318234bd2f4f78eeb392d8aebb7ca6fe9`。
+- POSIX.1-2024 Base Definitions 3.206：`https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap03.html#tag_03_206`；HTTP 200，182,262 bytes，SHA-256 `0037b423cc292c3cd7c55d347a2273407d156be2a161e56771b08c1c0d421d5a`。
+- Linux man-pages `pipe(7)`：`https://man7.org/linux/man-pages/man7/pipe.7.html`；2026-07-18 HTTP 200，解码后 UTF-8 内容 21,870 bytes，SHA-256 `5485983943d2a7d8d94a47705b398ae373036b75a0ded5570f694f8039e19c23`。
+
+### 文件
+
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `scripts/test_cs102_message_queue_quiz_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+
+### 证据
+
+- **源码确认**：只读审查逐页复核 POSIX.1-2024 Issue 8 的 `msgsnd()`、`msgrcv()`、`mq_send()`、`mq_receive()` 与 Base Definitions 3.206；q54 题面、选项和解释符合原文，审查发现并推动修正了原提交遗漏的 k45 与主动学习规格矛盾。
+- **静态诊断通过**：`python -B scripts/test_cs102_message_queue_quiz_facts.py` 退出码 0，11/11 通过；覆盖两套选择器、精确生产文案、三条 `msgtyp` 规则、POSIX 反向矛盾、注释/导出外对象误绿、q54 端侧元数据、k45 双端一致性和规格关键句。
+- **静态诊断通过**：`python -B scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 知识切片、165 道题和 33 份学习体验的结构、引用、DAG、连通性、层级与 Lesson 路由一致性全部通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；36 个测试文件、437/437 通过。
+- **构建通过**：Web `pnpm build` 退出码 0；Next.js 14.2.18 生成 10/10 静态页面与 26.8 kB middleware。
+- **构建通过**：HarmonyOS API 12 增量 HAP 退出码 0；`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，`BUILD SUCCESSFUL in 37 s 635 ms`，仍未配置签名。
+
+### 未验证
+
+- **未验证**：HDC 实测 `127.0.0.1:5555 / TCP / Connected / localhost`，但本批没有在该共享设备打开 q54/k45；端侧长文本换行、读屏、答题流程、手机/平板适配、真机和线上 API 均未验证。
+- `lesson-experiences.json` 的 `cs102-进程间通信` 现实案例仍含旧的统一“按类型筛选”比喻；该文件当前承载 WS09/用户保留的未提交改动，本批不覆盖也不暂存，已向 WS09 发出精确同步请求，待其独立提交后融合。
+- 本批未修改 Lesson 页面、Repository/schema、模型、安全边界、用户保留文件或秘密。
