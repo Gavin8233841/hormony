@@ -7436,3 +7436,32 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 主线没有 WS03 支线使用的 `generate-knowledge-json.mjs`，本批没有伪造生成命令；两个明确字段通过受控同步和可执行五字段一致性契约锁定。
 - 用户保留的 `lesson-experiences.json` 未修改、未暂存；`cs102-文件系统-2` 仍需受控同步后才能宣称 Lesson 互动事实一致。
 - k28 长文本的模拟器页面、读屏、手机/平板排版、真机、线上 API 与模型调用未验证。
+
+---
+
+## 2026-07-18 [MAIN+WS04] 返回时刷新学习星图
+
+背景：LearningMap 只在组件首次创建时读取本机课程和掌握状态；从 Lesson/Practice 返回同一页面实例时，刚写入 ArkData 的进度、正确率和下一行动不会刷新。页内切换课程也只更新页面状态，前后台恢复会重新读取旧 AppStorage 选择。WS04 `9c65367` 同时包含 Achievements 返回刷新，但该部分依赖主线尚未融合的长期里程碑与两阶段行动上下文，本批只选择性采用独立的 LearningMap 部分。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+- `scripts/test-learning-map-contracts.mjs`
+- `scripts/test_learning_map_navigation_contract.py`
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- LearningMap 改用 API 12 `@Entry` 页面支持的 `onPageShow`，首次显示、从学习/练习返回或应用再次显示时都重读当前课程目录、关系、进度和掌握事实；每轮继续由单调 `requestVersion` 隔离旧成功、旧失败和旧 `finally`。
+- 页内课程选择只有在完整快照读取成功并通过 latest-version 守卫后，才把精确 `selectedCourseId/selectedCourseTitle` 写入 AppStorage；失败或过期请求不能改写恢复选择。
+- Node 契约新增 Practice 写回、80% 掌握阈值、Router back、返回刷新和课程选择持久化反例；旧 Python 导航契约改为锁定空目标守卫、目标状态路由、跨节点文案和真实 Lesson/Practice 动作，不再依赖已内联的局部变量写法。
+- 主线提交为 `0030a3b`；WS04 的 Achievements 返回刷新及里程碑契约未丢弃，已在结果文档登记为等待前置提交独立验证后再融合。
+
+验证：
+- `node --test scripts/test-learning-map-contracts.mjs`：exit 0，6/6 通过；包含 7,168 个真实 DAG 掌握组合。
+- `python -m unittest scripts.test_learning_map_navigation_contract scripts.test_validate_topic_relations -v`：exit 0，13/13 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`：exit 0，API 12 `CompileArkTS`、HAP 打包与 `PackingCheck` 通过，`BUILD SUCCESSFUL in 5 s 488 ms`；仍未配置签名。
+
+失败或未验证：
+- 本轮未在模拟器执行“切换课程 -> 前后台 -> 返回保持”或“Practice 写回 -> 返回星图刷新”的完整流程；当前 HDC 连接不等于该业务流程通过。
+- Achievements 返回刷新、长期掌握里程碑前置、读屏实际播报、系统字体放大、横屏、平板、真机和正式签名 HAP 未验证。
+- 本批未修改 Repository/schema、课程事实、题库、用户保留的 `lesson-experiences.json`、模型或秘密。
