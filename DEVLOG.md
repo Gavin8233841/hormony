@@ -7339,3 +7339,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 最终 Home/Lesson DevEco 复检会话 `ses_08b962424ffeZxO9aSPgtKl4eU` 在工具调用前返回 Alibaba `403 AllocationQuota.FreeTierOnly`，未取得最终单文件诊断；最终 ArkTS 结论来自随后 API 12 HAP 编译。
 - DevEco `verify_ui` 未配置多模态模型，build agent 不提供 `get_app_ui_tree`；完整课程/Lesson 流程、读屏、最大字体、旋转、平板和动态安全区未验证。
 - 真机、线上 API、通知和服务卡片桌面刷新未验证；未修改课程事实、题库、Repository、模型、秘密或用户保留的 `lesson-experiences.json`。
+
+---
+
+## 2026-07-18 [MAIN+WS05] 无状态限流与模型信息脱敏
+
+背景：生产无状态模式先拦截禁用端点，导致这些请求绕过 API 限流；Model Status 又公开完整上游 URL，模型运行层还会把提供商异常原文带入服务端日志。主线逐提交复核并融合 WS05 的三个独立安全批次，没有覆盖现有模型预算、取消、Safety、SSE 或 API 错误契约。
+
+文件：
+- `apps/web/src/middleware.ts`
+- `apps/web/src/middleware-stateless-rate-limit.test.ts`
+- `apps/web/src/app/api/model/status/route.ts`
+- `apps/web/src/app/api/model/status/route.test.ts`
+- `apps/web/src/lib/agents/model.ts`
+- `apps/web/src/lib/agents/model-error-sanitization.test.ts`
+- `docs/API-REFERENCE.md`
+- `docs/api-spec.md`
+- `docs/workstreams/05-cloud-agent-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- OPTIONS 预检继续最先返回且不消耗额度；其他 API 请求先进入现有限流，再执行无状态禁用端点拦截。同一窗口前 30 次返回 `404/ENDPOINT_DISABLED`，第 31 次返回 `429/RATE_LIMITED`。
+- `/api/model/status` 只公开 `configured`、`mode`、`provider`、`modelName`、`timeoutMs`，不再返回可能携带 userinfo、查询凭据或片段的 `baseURL`；两份 API 文档同步实际字段。
+- 单轮和带历史模型调用不再把任意上游异常消息拼入内部错误；availability 与 timeout 保持既有稳定消息、错误码、HTTP/SSE、取消和总预算语义。
+- 主线对应融合提交为 `b79c2a9`、`a98a733`、`9c4465c`；结果文档保留各批红绿反例、production 黑盒边界和未验证项，并修正连续章节编号。
+
+验证：
+- `cd apps/web; pnpm exec vitest run src/middleware-stateless-rate-limit.test.ts src/middleware.test.ts src/app/api/model/status/route.test.ts src/lib/agents/model-error-sanitization.test.ts src/lib/agents/model-runtime.test.ts src/lib/agents/model-budget.test.ts src/app/api/chat/request-budget.test.ts src/app/api/stateless-agent.test.ts`：exit 0，8 个测试文件、62/62 通过。
+- `cd apps/web; pnpm lint`：exit 0，无 warning/error；`pnpm typecheck`：exit 0。
+- `cd apps/web; pnpm test`：exit 0，36 个测试文件、437/437 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10 个静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+
+失败或未验证：
+- 真实模型提供商错误的线上云日志格式、线上日志采集器脱敏、当前分支部署与已配置模型的线上 Model Status 未验证。
+- 多实例共享限流、CDN/WAF 联合限流与可信代理 IP 注入未验证；本地 production 黑盒不能替代线上证据。
+- 本批未修改 HarmonyOS、Agent 编排、Safety、RAG、生产模型 ID、模型请求预算、API Key 或端侧状态。

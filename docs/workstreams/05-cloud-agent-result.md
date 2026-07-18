@@ -349,15 +349,15 @@
 - **未验证**：多实例间全局限流一致性、线上代理的可信 IP 注入、真实 CDN/WAF 联合限流、已配置真实模型时的 SSE 正文与流中错误、`MODEL_BASE_URL` 包含 URL 凭据或查询参数时的公开响应、当前分支线上发布。
 - 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Safety、RAG、生产模型 ID、服务端秘密或端侧状态。
 
-## 19. Model Status 上游配置脱敏
+## 17. Model Status 上游配置脱敏
 
-### 19.1 源码确认与行为
+### 17.1 源码确认与行为
 
 - `/api/model/status` 旧实现直接序列化 `getModelRuntimeInfo()`。该内部对象包含完整 `MODEL_BASE_URL`；若部署把 Basic Auth userinfo、查询 token 或片段放入 URL，匿名状态请求会原样取得这些值。
 - 路由现在只选择 `configured`、`mode`、`provider`、`modelName`、`timeoutMs` 五个非敏感联调字段，不再返回 `baseURL`。模型内部仍使用原始配置建立客户端，本批没有修改 `model.ts`、默认或生产模型 ID、模型调用、超时、取消、Safety、orchestrator 或 SSE 行为。
 - `docs/api-spec.md` 与 `docs/API-REFERENCE.md` 已同步删除公开 `baseURL`，并把旧的 `mode: model | demo` 修正为源码中的精确 `model | unavailable`。
 
-### 19.2 反例与验证
+### 17.2 反例与验证
 
 - 路由级反例使用非真实 sentinel：`MODEL_BASE_URL` 同时包含 userinfo、password、query 和 fragment，`MODEL_API_KEY` 使用独立 sentinel。修复前 `pnpm exec vitest run src/app/api/model/status/route.test.ts` exit 1，响应的 `baseURL` 原样包含完整 URL；修复后响应键集合被锁定为五个允许字段，所有 sentinel 均不存在。
 - 定向联合：`pnpm exec vitest run src/app/api/model/status/route.test.ts src/lib/agents/model-runtime.test.ts src/app/api/stateless-agent.test.ts` exit 0，3 个测试文件、11 项通过。
@@ -365,22 +365,22 @@
 - 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面、全部 dynamic API route 与 26.9 kB middleware 的 production 构建。
 - 本地 production 黑盒通过：`127.0.0.1:4328`，显式 stateless 且空模型 Key；`/api/model/status` 为 HTTP 200、`configured=false`、`mode=unavailable`，响应字段精确为 `configured,mode,modelName,provider,timeoutMs`，`baseURL` 与 Key/Authorization 字段名均不存在，允许 Origin 与安全头通过。实例 PID 11428 已停止，端口监听已关闭。
 
-### 19.3 委派、失败与未验证
+### 17.3 委派、失败与未验证
 
 - 子 agent `model_status_secret_regression` 被限定为单个路由测试，但在约定时间内没有创建文件或返回阻塞，随后被中断；工作树保持干净，主线程独立完成红测、实现与复核。
 - 尝试用非真实 Key sentinel 启动 production 实例时，命令在执行前被终端策略拒绝，没有启动进程或发出请求；该次未计作通过。带 URL 凭据的泄露防护证据来自真实路由函数测试，production 黑盒只证明空 Key 部署的字段集合。
 - **未验证**：当前分支线上部署、线上已配置模型时的 Model Status 响应、多实例/CDN 缓存行为。没有把本地路由测试或 HTTP 200 单独标记为线上通过。
 - 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Safety、RAG、生产模型 ID、模型请求预算、服务端秘密或端侧状态。
 
-## 20. 模型上游错误日志脱敏
+## 18. 模型上游错误日志脱敏
 
-### 20.1 源码确认与行为
+### 18.1 源码确认与行为
 
 - `callModel` 与 `callModelWithHistory` 旧 catch 会把任意上游 `error.message` 拼入 `ModelUnavailableError`，timeout-like 错误也保留原始 message。Chat、Plan、Quiz 路由随后会把这些内部错误消息写入服务端日志，上游 URL、响应细节或提供商诊断内容因此可能进入云日志。
 - 两个模型入口现在仍按原规则识别 `ModelInvalidResponseError`、取消和 timeout-like 错误，但只抛出既有稳定默认消息。Availability 仍为 `MODEL_UNAVAILABLE`，timeout 仍为 `MODEL_TIMEOUT`；HTTP 状态、客户端摘要、请求预算、timer/listener 清理与取消传播均未改变。
 - 模型未配置时也改用稳定 `ModelUnavailableError` 默认消息，不再把服务端环境变量名放入内部日志载体。本批没有修改模型 ID、base URL、请求参数、token 上限、重试次数、Safety、orchestrator 或任何 API 响应结构。
 
-### 20.2 反例与验证
+### 18.2 反例与验证
 
 - 新增 mock OpenAI 兼容客户端反例，不发网络请求。普通上游异常和 `APIConnectionTimeoutError` 分别携带非真实秘密 sentinel，并覆盖单轮、带历史两个入口。修复前定向测试 exit 1，4/4 失败：availability 与 timeout message 均原样包含 sentinel；修复后四项均为稳定中文消息且不含 sentinel。
 - 定向联合：`pnpm exec vitest run src/lib/agents/model-error-sanitization.test.ts src/lib/agents/model-runtime.test.ts src/lib/agents/model-budget.test.ts src/app/api/chat/request-budget.test.ts src/app/api/plan/request-budget.test.ts src/app/api/quiz/request-budget.test.ts` exit 0，6 个测试文件、15 项通过。
@@ -388,7 +388,7 @@
 - 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面、全部 dynamic API route 与 26.9 kB middleware 的 production 构建。
 - 本地 production 黑盒通过：`127.0.0.1:4329`，显式 stateless 且空模型 Key；有效 Chat 请求为 JSON HTTP 503、`MODEL_UNAVAILABLE`，用户消息保持稳定，没有建立 SSE，响应不含环境变量名、base URL 或测试 sentinel。实例 PID 41880 已停止，端口监听已关闭。
 
-### 20.3 未验证
+### 18.3 未验证
 
 - **未验证**：真实模型提供商错误在当前分支线上云日志中的最终格式、线上日志采集器自身的字段脱敏、当前分支线上发布。mock 上游错误只证明模型层包装行为，不冒充真实模型或线上日志通过。
 - 本批未修改 DEVLOG、HarmonyOS、API 路由、Agent 编排、Safety、RAG、生产模型 ID、模型请求预算、服务端秘密或端侧状态。
