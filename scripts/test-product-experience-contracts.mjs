@@ -141,6 +141,21 @@ test('Lesson 单选先选择再由明确提交动作写入证据', () => {
   assert.match(practice, /this\.submitSingle\(\)/);
 });
 
+test('Lesson 分步示例默认折叠并只按学习者请求逐步揭示', () => {
+  const reset = methodBlock(lesson, 'resetActivityInput');
+  const count = methodBlock(lesson, 'visibleWorkedExampleStepCount');
+  const advance = methodBlock(lesson, 'advanceWorkedExample');
+  const practice = methodBlock(lesson, 'PracticeExperience');
+
+  assert.match(lesson, /@State workedExampleRevealCount: number = 0;/);
+  assert.match(reset, /this\.workedExampleRevealCount = 0;/);
+  assert.match(count, /Math\.min\(this\.workedExampleRevealCount, this\.experience\.workedExampleSteps\.length\)/);
+  assert.match(advance, /this\.workedExampleRevealCount >= total \? 0 : this\.workedExampleRevealCount \+ 1/);
+  assert.match(practice, /this\.experience\.workedExampleSteps\.slice\(0, this\.visibleWorkedExampleStepCount\(\)\)/);
+  assert.match(practice, /Button\(this\.workedExampleActionLabel\(\)\)/);
+  assert.doesNotMatch(practice, /ForEach\(this\.experience\.workedExampleSteps,/);
+});
+
 test('Lesson 长文本与关键触控不因固定行数和小高度截断', () => {
   const mastery = methodBlock(lesson, 'MasteryBrief');
   const signal = methodBlock(lesson, 'MasterySignal');

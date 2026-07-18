@@ -38,6 +38,7 @@ struct LessonPage {
   private pendingActivityEvents: LearningStudyEvent[] = [];
   @State conceptStepIndex: number = 0;
   @State codeRunStepIndex: number = -1;
+  @State workedExampleRevealCount: number = 0;
   @State activityEvidenceMessage: string = '';
   @State loading: boolean = true;
   @StorageProp('safeAreaBottomVp') safeAreaBottomVpValue: number = 0;
@@ -132,7 +133,27 @@ struct LessonPage {
     this.responseText = '';
     this.feedbackVisible = false;
     this.codeRunStepIndex = -1;
+    this.workedExampleRevealCount = 0;
     this.activityEvidenceMessage = '';
+  }
+
+  private visibleWorkedExampleStepCount(): number {
+    if (this.experience === null) return 0;
+    return Math.min(this.workedExampleRevealCount, this.experience.workedExampleSteps.length);
+  }
+
+  private workedExampleActionLabel(): string {
+    if (this.experience === null || this.experience.workedExampleSteps.length === 0) return '暂无分步提示';
+    if (this.visibleWorkedExampleStepCount() === 0) return '查看第 1 步';
+    if (this.visibleWorkedExampleStepCount() >= this.experience.workedExampleSteps.length) return '收起分步提示';
+    return '再看一步';
+  }
+
+  private advanceWorkedExample(): void {
+    if (this.experience === null) return;
+    const total = this.experience.workedExampleSteps.length;
+    if (total === 0) return;
+    this.workedExampleRevealCount = this.workedExampleRevealCount >= total ? 0 : this.workedExampleRevealCount + 1;
   }
 
   private conceptStepCount(): number {
@@ -856,7 +877,8 @@ struct LessonPage {
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_BRAND)
-          Text(this.experience.workedExampleSteps.length.toString() + ' 步')
+          Text(this.visibleWorkedExampleStepCount().toString() + ' / ' +
+            this.experience.workedExampleSteps.length.toString() + ' 步')
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
@@ -867,7 +889,8 @@ struct LessonPage {
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        ForEach(this.experience.workedExampleSteps, (step: string, index: number): void => {
+        ForEach(this.experience.workedExampleSteps.slice(0, this.visibleWorkedExampleStepCount()),
+          (step: string, index: number): void => {
           Row({ space: 10 }) {
             Text((index + 1).toString())
               .width(24)
@@ -887,6 +910,16 @@ struct LessonPage {
           .width('100%')
           .alignItems(VerticalAlign.Top)
         })
+        Button(this.workedExampleActionLabel())
+          .width('100%')
+          .constraintSize({ minHeight: 48 })
+          .enabled(this.experience.workedExampleSteps.length > 0)
+          .fontSize(13)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_MD)
+          .accessibilityText(this.workedExampleActionLabel())
+          .onClick((): void => { this.advanceWorkedExample(); })
       }
       .width('100%')
       .padding(16)

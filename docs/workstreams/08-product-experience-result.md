@@ -69,6 +69,12 @@
 - 错误答案统一使用错误语义色；可点击的返回、重试、推演、提交、追问和下一练习控件提升至至少 48 vp。
 - 辅助文字、占位文字、未选导航和成功/警告/错误小字调整到可在实际浅色表面通过 WCAG AA 的颜色；源契约计算对比度，不只断言十六进制字符串。
 
+### 批次 D：渐进分步提示
+
+- Lesson 复用现有 `workedExampleSteps`，默认不展开答案步骤；学习者每次只揭示一步，全部展开后可收起。
+- 活动切换、断点恢复和输入重置时同步收起提示，避免上一项练习的帮助状态污染下一项。
+- 揭示按钮保持 48 vp 和动态无障碍名称；未修改 `lesson-experiences.json`、答案、评分或学习事件结构。
+
 ## 四、文件
 
 - `apps/harmonyos/entry/src/main/ets/common/Builders.ets`
@@ -92,7 +98,7 @@
 node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs
 ```
 
-- exit 0，53/53 通过。
+- exit 0，54/54 通过。
 - 覆盖首页真实状态门禁、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、长文本、48 vp、返回语义和实际颜色对比度。
 
 ```powershell
@@ -111,7 +117,7 @@ cd apps/harmonyos
 .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon
 ```
 
-- exit 0，`BUILD SUCCESSFUL in 23 s 216 ms`。
+- 首批 exit 0，`BUILD SUCCESSFUL in 23 s 216 ms`；渐进提示批次重新构建 exit 0，`BUILD SUCCESSFUL in 25 s 664 ms`。
 - `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，多项任务显示 `UP-TO-DATE`。
 - 项目没有 `signingConfigs`，Hvigor 跳过签名；该结果只记为**构建通过**。
 - 早期通用 `assembleHap --no-daemon` 构建虽 exit 0，但日志内部出现 `:entry:clean`；最终证据以上述显式增量构建为准。
@@ -129,12 +135,11 @@ cd apps/harmonyos
 
 1. 仓库没有 API 12 系统“减少动效”信号的精确使用依据，本批未猜写接口；减少动效仍为**未验证**。
 2. `Index` 已响应式订阅安全区，但公共二级页标题仍通过静态 getter 读取顶部安全区；旋转时的即时重排需设备证据和统一 Builder 参数设计。
-3. Lesson 的固定分步示例仍一次性展开；下一独立体验批次可基于现有 `workedExampleSteps` 做“尝试后逐步揭示”，但必须保持事实源不变并先补状态契约。
-4. 课程路径仍使用现有 `router`。迁移到 `Navigation` 影响全部子页和回流契约，不属于本批安全范围。
-5. 本批未调用线上 API、模型、通知或服务卡片，不声明线上通过、模拟器通过或真机通过。
+3. 课程路径仍使用现有 `router`。迁移到 `Navigation` 影响全部子页和回流契约，不属于本批安全范围。
+4. 本批未调用线上 API、模型、通知或服务卡片，不声明线上通过、模拟器通过或真机通过。
 
 ## 七、审计说明
 
 - 三条只读委派分别完成成熟学习产品/开源实现基准、窄屏/字体/动效契约审计和首页-课程-Lesson 产品流程审计；委派代理未修改文件。
 - 独立 diff 审查尝试因本机没有 CodeRabbit CLI 和后续并发连接中断而未形成审查结论；未将其记为通过证据。
-- 交付结论以当前源码、53 项 Node 契约、16 项 Python 契约、API 12 显式增量构建和设备空列表为准。
+- 交付结论以当前源码、54 项 Node 契约、16 项 Python 契约、API 12 显式增量构建和设备空列表为准。
