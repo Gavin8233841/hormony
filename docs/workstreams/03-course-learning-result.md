@@ -1193,3 +1193,37 @@
 - **未验证**：为避免覆盖其他 worktree 的模拟器应用状态，本批没有安装或启动新 HAP，也未在端侧实际打开 `cs102_q53`；手机、平板、真机和线上 API 未验证。此前安装启动证据不证明本批新题面已渲染。
 - DevEco Agent 未重复调用：任何 `openai/*` 均被禁止，`alibaba-cn/qwen3-coder-plus` 已确认 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 已确认 `401 Token refresh failed`；本批使用 Python、Web、直接 Hvigor 与 HDC 只读设备检查完成分层验证。
 - 本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
+
+## 批次四十：单侧二次探测的可达槽位推演
+
+### 行为
+
+- `cs101_q53` 从识别二次探测公式改为可执行固定输入：给定单侧 `H_i=(H(key)+i²) mod M`、`M=7`、`H(key)=0`，要求判断 `i=0` 至 `6` 访问的不同槽位。
+- 正确答案仍为 B，但选项改为槽位集合；完整位置序列为 `0→1→4→2→2→4→1`，不同槽位只有 `{0,1,2,4}`，没有访问 `3、5、6`。
+- 解释删除“表长为 4k+3 型质数时保证探测所有位置”的错误断言。`M=7` 本身就是直接反例；质数表长配合单侧 `i²` 只保证至少访问半数槽位，表未满一半时可保证找到空槽，不等于全表覆盖。
+- 解释将全覆盖条件绑定到另一组经 OpenDSA 明确给出的组合：表长为 2 的幂，偏移为 `(i²+i)/2`；不再把单侧 `+i²` 与 `±i²` 混写成同一探测规则。
+- 新增固定探测函数与事实契约，逐次断言 7 次访问序列、4 个可达槽位和 3 个遗漏槽位；旧题面/选项/解释 fixture 被 7 个独立边界断言拒绝。
+
+### 文件与生成边界
+
+- 题库唯一源为 `apps/web/src/lib/data/quizzes.ts`；`scripts/generate-quizzes-json.mjs` 生成 HarmonyOS `quizzes.json` 并校验 165 道选择题逐字段一致。
+- 端侧精确变化仅为 `$[44].question`、`$[44].options[0]`、`$[44].options[1]`、`$[44].options[2]`、`$[44].options[3]` 与 `$[44].explanation`（`id=cs101_q53`）。`answer=B`、`difficulty=easy` 和标签 `散列冲突/数值计算/基础识别` 均不变。
+- `scripts/test_cs101_quadratic_probing_quiz_facts.py` 是本批独立契约；剩余未跟踪 `scripts/test_cs102_filesystem_lesson_facts.py` 继续保留但不纳入本批。
+- 本批不修改 CS101 主动学习规格、知识切片、受保护的 `lesson-experiences.json`、页面、仓储或 `DEVLOG.md`。哈希表 Lesson 当前独立使用线性探测，本题修订不产生待同步 Lesson JSON 路径。
+
+### 证据
+
+- **源码确认**：Virginia Tech OpenDSA《Improved Collision Resolution》官方课程源本轮读取 HTTP 200，响应长度 16,711 字节。第 216-231 行定义最简单二次探测为 `(h(K)+i²) mod M`；第 252-280 行明确其通常不访问全表、质数表长只保证至少半数；第 283-285 行把全覆盖绑定到 2 的幂表长与 `(i²+i)/2`。
+- **源码确认**：`M=7` 的固定执行模型得到完整列表 `[0,1,4,2,2,4,1]`、可达集合 `{0,1,2,4}` 和遗漏集合 `{3,5,6}`，直接否定旧 `4k+3` 全覆盖断言。
+- **源码确认**：修正 Web 源但尚未生成端侧 JSON 时，`python -m unittest scripts.test_cs101_quadratic_probing_quiz_facts -v` 退出码 1；4 项中固定执行、正确/旧 fixture 和生产语义契约 3 项通过，唯一失败为 Web/raw q53 不一致。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0，165 道端侧选择题与 Web 唯一源完全一致；最终目标测试与 Python 编译均退出码 0，4 项通过。
+- **静态诊断通过**：以 `git ls-files scripts` 取得全部已跟踪测试模块并显式加入本批契约，退出码 0；157 项运行，156 项通过，1 项跨 WS02 reducer 契约为预期失败。剩余未跟踪文件未计入通过数。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的 schema、引用、DAG、层级与 Lesson 路由闭环通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 生产构建成功并生成 10/10 静态页面；HarmonyOS API 12 增量 `assembleHap --no-daemon` 退出码 0，资源与 ArkTS 编译成功，`BUILD SUCCESSFUL in 42 s 69 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- **未验证**：本批未安装或启动新 HAP，也未在端侧打开 `cs101_q53`；手机、平板、真机和线上 API 未验证。此前安装启动证据不证明本批新题面已渲染。
+- DevEco Agent 未重复调用：任何 `openai/*` 均被禁止，`alibaba-cn/qwen3-coder-plus` 已确认 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 已确认 `401 Token refresh failed`；本批使用 Python、Web 与直接 Hvigor 完成静态和构建验证。
+- 本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
