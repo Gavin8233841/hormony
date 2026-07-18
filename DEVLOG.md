@@ -7374,3 +7374,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 真实模型提供商错误的线上云日志格式、线上日志采集器脱敏、当前分支部署与已配置模型的线上 Model Status 未验证。
 - 多实例共享限流、CDN/WAF 联合限流与可信代理 IP 注入未验证；本地 production 黑盒不能替代线上证据。
 - 本批未修改 HarmonyOS、Agent 编排、Safety、RAG、生产模型 ID、模型请求预算、API Key 或端侧状态。
+
+---
+
+## 2026-07-18 [MAIN+WS04] 学习星图可达后继行动
+
+背景：学习星图对已掌握节点只检查一层直接后继。真实 Topic DAG 存在多层路径与分支汇合时，仍有未完成的可达后继却会错误退回“复习当前主题”；独立答题还可能形成“已掌握但前置关系未完成”的合法本机事实，旧标签和透明度会把它降级成普通未解锁节点。主线逐文件复核并融合 WS04 `5fe90b7`，冲突时只采用该提交的 LearningMap、独立契约和对应结果，不带入父分支尚未融合的 Achievements/Profile/ActivityRecords 改动。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+- `scripts/test-learning-map-contracts.mjs`
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 已掌握节点遍历真实 DAG 的全部可达后继，复用现有层级、目录顺序、解锁状态与掌握事实选择下一项可执行学习或练习；只有全部可达后继均已掌握时才回到当前主题复习。
+- 分支汇合处的后继仍锁定时，继续解析到未掌握且已解锁的真实前置 Topic，不产生禁用死路；多层目标的按钮和读屏文本统一说明“后继主题”。
+- 独立答题形成的“已掌握但前置未完成”状态优先保留掌握率、可见度和本机测验事实，同时明确标注“前置未完成”，并先沿可达路径寻找下一行动。
+- 主线融合提交为 `498dffc`；结果文档冲突中未采用 WS04 父提交的成就长期里程碑和画像/记录精确恢复内容，待对应提交独立复核后再决定。
+
+验证：
+- `node --test scripts/test-learning-map-contracts.mjs`：exit 0，5/5 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，覆盖多层后继、分支汇合、独立掌握、旧课程回调、精确路由、动态读屏与 48 vp。
+- `python scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识切片、165 道题、33 份学习体验的 schema、唯一性、引用、DAG、连通性、单根、层级与 Topic/学习流一致性全部通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`：exit 0，API 12 `CompileArkTS`、`PackageHap`、`PackingCheck` 通过，`BUILD SUCCESSFUL in 20 s 517 ms`；项目仍未配置签名。
+- `hdc list targets -v`：exit 0，当前目标为 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+- WS04 支线模拟器证据：1256 x 2760 竖屏从锁定“物理层与数据链路层”解析并实际进入精确前置 `OSI与TCP/IP模型` 的 `pages/Lesson`；证据目录不纳入 Git。
+
+失败或未验证：
+- 本轮没有重新安装主线 HAP 或重走 LearningMap UI；模拟器流程证据来自代码字节一致的 WS04 提交，主线重新验证到 API 12 构建层级。
+- 屏幕阅读器实际播报、系统字体放大、横屏、平板、失败恢复聚焦、正式签名 HAP 和真机未验证。
+- Alibaba provider 当前为 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 当前为 `401 Token refresh failed`；本轮没有重复请求模型，也未回落到 `openai/*`。
