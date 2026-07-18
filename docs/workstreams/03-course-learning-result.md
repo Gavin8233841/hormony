@@ -976,3 +976,36 @@
 - 两阶段子 agent 审查先后发现摘要被误作 RFC 8017 外部输入、身份认证缺少可信公钥绑定前提、旧正确 fixture 自相矛盾，以及活动状态模型未消费真实 A-E 的四类问题；全部修正并重新复审。最终契约分别锁定知识与题库表面，结构化解析真实 prompt/选项/答案，并用摘要输入、未绑定攻击者公钥、重复验签和验签早于策略检查四类固定反例防止误绿。
 - **未验证**：受保护的 `lesson-experiences.json` 尚未同步上述 9 个叶字段；当前端侧 Lesson 仍显示旧签名活动文案，不能记为产品路径通过。
 - **未验证**：当前无模拟器、手机、平板或真机；长知识切片、五步排序和题库解释的实际显示未验证。本批未调用线上 API。
+
+## 批次三十四：分页与段页式物理碎片边界
+
+### 行为
+
+- `cs102_q35` 不再以“哪种存储管理方式”提问并把段页式列为错误干扰项；题面限定为分页存储管理中的物理内存碎片，四个选项直接比较碎片结论，唯一正确项 B 为“可能产生内部碎片，但不产生外部碎片”。
+- 解释补齐因果：逻辑页可映射到任意空闲且彼此不连续的固定大小物理页框，因此不要求连续大块、没有物理外部碎片；最后一页未填满时，页框内未使用字节构成内部碎片。
+- 删除“段页式结合两者，可能同时存在内部和外部碎片”的错误断言。既有 `cs102_k21`、`cs102_q50` 与主动学习规格都明确每段继续分页并保留分页消除物理外部碎片的性质，本批不改写这些已正确内容。
+- 采用子 agent 交付的 `scripts/test_cs102_memory_lesson_facts.py`：同一固定输入给出两个互不连续的 4 KiB 空闲区；连续 6 KiB 段无法装入，而分页后的两个页可映射到 frame 2/9，成功分配并产生 2 KiB 内部碎片、0 外部碎片。
+
+### 文件与生成边界
+
+- 题库唯一源：`apps/web/src/lib/data/quizzes.ts`；`scripts/generate-quizzes-json.mjs` 生成端侧 `quizzes.json` 并完成 165 道选择题全字段一致性校验。
+- 端侧精确变化仅为 `$[74].question`、`$[74].options[0]`、`$[74].options[1]`、`$[74].options[2]`、`$[74].options[3]` 与 `$[74].explanation`（`cs102_q35`）；`answer=B`、`difficulty=medium` 和标签 `内存分配/系统机制/应用推理` 均不变。
+- 本批不修改 CS102 主动学习规格、知识切片或 `lesson-experiences.json`。q35 是题库概念题，不是 Lesson 活动生成源，因此没有待同步 Lesson JSON 路径；`git diff --exit-code -- apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json` 退出码 0。
+
+### 证据
+
+- **源码确认**：本轮直接读取 Operating System Concepts 10th edition 官方 `ch9.pptx`，HTTP 200，响应长度 4,932,040 字节；全过程只在内存解压 slide XML，未写入工作区。slide 23 明确物理地址空间可以不连续、分页避免外部碎片但仍有内部碎片；slide 28 给出末页内部碎片计算；slide 59-60 明确 IA-32 支持 segmentation with paging，分段单元输出线性地址后由分页单元映射到物理内存。
+- **源码确认**：修正前 `python -m unittest scripts.test_cs102_memory_lesson_facts -v` 退出码 1；4 项中 3 项通过，生产 q35 契约唯一红灯并报告 6 个精确语义缺口。正确/旧 fixture、离散页框执行模型与既有支撑内容在红灯阶段均已通过。
+- **源码确认**：只修 Web 唯一源、尚未生成端侧题库时，同一目标测试仍退出码 1，唯一失败是 Web/raw q35 字段不一致，证明测试没有绕过生成链。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0；165 道端侧选择题与 Web 唯一源完全一致。
+- **静态诊断通过**：最终 `python -m unittest scripts.test_cs102_memory_lesson_facts -v` 退出码 0；4 项通过，覆盖正确/错误文案、连续段与离散页框分配模型、Web/raw 同步及 `cs102_k21/q50/spec` 支撑边界。
+- **静态诊断通过**：以 `git ls-files scripts` 取得全部已跟踪测试模块并加入本批新契约，退出码 0；120 项运行，119 项通过，1 项跨 WS02 reducer 契约为预期失败。文件系统与 AVL 的两个未跟踪后续红灯测试没有计入通过数。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的 schema、引用、DAG、层级与 Lesson 路由闭环通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 生产构建成功并生成 10/10 静态页面。
+- **构建通过**：HarmonyOS API 12 增量 `assembleHap --no-daemon` 退出码 0，`BUILD SUCCESSFUL in 54 s 447 ms`；仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- 初次新解释中的“剩余空间”触发通用标签器的复杂度规则，随后题面“以下说法正确”又触发概念辨析规则；改成“页框内未使用的字节”并直接询问碎片特征后重新生成，最终三个派生标签与 HEAD 完全相同。未修改共享标签器。
+- **未验证**：当前无模拟器、手机、平板或真机；新题面、四个选项和长解释的实际布局未验证。本批未调用线上 API。
