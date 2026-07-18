@@ -59,6 +59,12 @@ export interface ReviewQueueSnapshot {
   dueItems: ReviewItem[];
 }
 
+export class AnswerDraftClearedError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 export class LocalLearningRepository {
   private static store: relationalStore.RdbStore | null = null;
   private static initializationTask: Promise<void> | null = null;
@@ -66,6 +72,17 @@ export class LocalLearningRepository {
   private static lessonProgressQueue: Promise<void> = Promise.resolve();
   private static planQueue: Promise<void> = Promise.resolve();
   private static answerDraftQueue: Promise<void> = Promise.resolve();
+  private static answerDraftAttemptCounter: number = 0;
+
+  static createAnswerDraftAttemptId(prefix: string): string {
+    const normalizedPrefix = prefix.trim();
+    if (normalizedPrefix.length === 0 || prefix !== normalizedPrefix) {
+      throw new Error('草稿标识前缀无效');
+    }
+    LocalLearningRepository.answerDraftAttemptCounter += 1;
+    return normalizedPrefix + '-' + Date.now().toString() + '-' +
+      LocalLearningRepository.answerDraftAttemptCounter.toString();
+  }
 
   static async initialize(context: common.Context): Promise<void> {
     if (LocalLearningRepository.initializationTask !== null) {
@@ -525,6 +542,72 @@ export class LocalLearningRepository {
     }
   }
 
+  private static getValueSync<T>(key: string): T | null {
+    const store = LocalLearningRepository.requireStore();
+    let resultSet: relationalStore.ResultSet | null = null;
+    try {
+      resultSet = store.querySqlSync(
+        'SELECT payload FROM ' + TABLE_NAME + ' WHERE state_key = ?',
+        [key]
+      );
+      if (!resultSet.goToFirstRow()) return null;
+      const payload = resultSet.getString(0);
+      const value: T = JSON.parse(payload);
+      return value;
+    } catch (error) {
+      throw new Error('读取本地学习状态失败: ' + String(error));
+    } finally {
+      if (resultSet !== null) {
+        try {
+          resultSet.close();
+        } catch (_) {
+        }
+      }
+    }
+  }
+
+  private static putValueSync<T>(key: string, value: T): void {
+    const store = LocalLearningRepository.requireStore();
+    try {
+      store.executeSync(
+        'INSERT OR REPLACE INTO ' + TABLE_NAME +
+        ' (state_key, payload, updated_at) VALUES (?, ?, ?)',
+        [key, JSON.stringify(value), Date.now()]
+      );
+    } catch (error) {
+      throw new Error('保存本地学习状态失败: ' + String(error));
+    }
+  }
+
+  private static runAnswerDraftCreateTransaction(task: () => void, isCurrent: () => boolean): boolean {
+    if (!isCurrent()) return false;
+    const store = LocalLearningRepository.requireStore();
+    let transactionStarted = false;
+    try {
+      store.beginTransaction();
+      transactionStarted = true;
+      task();
+      if (!isCurrent()) {
+        store.rollBack();
+        transactionStarted = false;
+        return false;
+      }
+      store.commit();
+      transactionStarted = false;
+      return true;
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          store.rollBack();
+        } catch (rollbackError) {
+          throw new Error('本地草稿事务回滚失败: ' + String(rollbackError));
+        }
+      }
+      if (error instanceof Error) throw error;
+      throw new Error(String(error));
+    }
+  }
+
   private static async loadQuizLearningStateUnlocked(): Promise<QuizLearningState> {
     const state = (await LocalLearningRepository.getValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE)) ??
       QuizLearningStateReducer.createEmptyState();
@@ -655,10 +738,44 @@ export class LocalLearningRepository {
     });
   }
 
+  static async createAiQuizDraft(draft: AiQuizDraft, isCurrent: () => boolean): Promise<boolean> {
+    if (!LocalLearningRepository.validAiQuizDraft(draft)) throw new Error('AI 测验草稿结构无效');
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<boolean> =>
+      LocalLearningRepository.runAnswerDraftCreateTransaction((): void => {
+        const drafts = LocalLearningRepository.getValueSync<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS) ?? [];
+        const storedCurrent = drafts.find((item: AiQuizDraft): boolean => item.courseId === draft.courseId &&
+          item.topic === draft.topic && item.focusTag === draft.focusTag);
+        const current = storedCurrent !== undefined && LocalLearningRepository.validAiQuizDraft(storedCurrent) ?
+          storedCurrent : undefined;
+        if (current !== undefined) {
+          if (current.attemptId !== draft.attemptId) {
+            throw new AnswerDraftClearedError('AI 测验已有其他页面创建的草稿');
+          }
+          if (JSON.stringify(current) !== JSON.stringify(draft)) {
+            throw new AnswerDraftClearedError('AI 测验草稿创建载荷冲突');
+          }
+          return;
+        }
+        const retained = drafts.filter((item: AiQuizDraft): boolean =>
+          !(item.courseId === draft.courseId && item.topic === draft.topic && item.focusTag === draft.focusTag));
+        const cloned: AiQuizDraft = JSON.parse(JSON.stringify(draft));
+        retained.push(cloned);
+        LocalLearningRepository.putValueSync<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS,
+          retained.slice(-ANSWER_DRAFT_LIMIT));
+      }, isCurrent));
+  }
+
   static async saveAiQuizDraft(draft: AiQuizDraft): Promise<void> {
     if (!LocalLearningRepository.validAiQuizDraft(draft)) throw new Error('AI 测验草稿结构无效');
     return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
       const drafts = (await LocalLearningRepository.getValue<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS)) ?? [];
+      const storedCurrent = drafts.find((item: AiQuizDraft): boolean => item.courseId === draft.courseId &&
+        item.topic === draft.topic && item.focusTag === draft.focusTag);
+      const current = storedCurrent !== undefined && LocalLearningRepository.validAiQuizDraft(storedCurrent) ?
+        storedCurrent : undefined;
+      if (current === undefined || current.attemptId !== draft.attemptId) {
+        throw new AnswerDraftClearedError('AI 测验草稿已被其他页面结束');
+      }
       const retained = drafts.filter((item: AiQuizDraft): boolean =>
         !(item.courseId === draft.courseId && item.topic === draft.topic && item.focusTag === draft.focusTag));
       const cloned: AiQuizDraft = JSON.parse(JSON.stringify(draft));
@@ -670,7 +787,9 @@ export class LocalLearningRepository {
 
   static async clearAiQuizDraft(attemptId: string): Promise<void> {
     const normalizedAttemptId = attemptId.trim();
-    if (normalizedAttemptId.length === 0) throw new Error('AI 测验草稿标识无效');
+    if (normalizedAttemptId.length === 0 || attemptId !== normalizedAttemptId) {
+      throw new Error('AI 测验草稿标识无效');
+    }
     return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
       const drafts = (await LocalLearningRepository.getValue<AiQuizDraft[]>(KEY_AI_QUIZ_DRAFTS)) ?? [];
       const retained = drafts.filter((item: AiQuizDraft): boolean => item.attemptId !== normalizedAttemptId);
@@ -693,6 +812,39 @@ export class LocalLearningRepository {
     });
   }
 
+  static async createCuratedPracticeDraft(draft: CuratedPracticeDraft,
+    isCurrent: () => boolean): Promise<boolean> {
+    if (!LocalLearningRepository.validCuratedPracticeDraft(draft)) {
+      throw new Error('精选练习草稿结构无效');
+    }
+    return LocalLearningRepository.runAnswerDraftTask(async (): Promise<boolean> =>
+      LocalLearningRepository.runAnswerDraftCreateTransaction((): void => {
+        const drafts = LocalLearningRepository.getValueSync<CuratedPracticeDraft[]>(
+          KEY_CURATED_PRACTICE_DRAFTS) ?? [];
+        const storedCurrent = drafts.find((item: CuratedPracticeDraft): boolean =>
+          item.courseId === draft.courseId && item.topic === draft.topic &&
+            item.selectedReviewItemId === draft.selectedReviewItemId);
+        const current = storedCurrent !== undefined &&
+          LocalLearningRepository.validCuratedPracticeDraft(storedCurrent) ? storedCurrent : undefined;
+        if (current !== undefined) {
+          if (current.attemptId !== draft.attemptId) {
+            throw new AnswerDraftClearedError('精选练习已有其他页面创建的草稿');
+          }
+          if (JSON.stringify(current) !== JSON.stringify(draft)) {
+            throw new AnswerDraftClearedError('精选练习草稿创建载荷冲突');
+          }
+          return;
+        }
+        const retained = drafts.filter((item: CuratedPracticeDraft): boolean =>
+          !(item.courseId === draft.courseId && item.topic === draft.topic &&
+            item.selectedReviewItemId === draft.selectedReviewItemId));
+        const cloned: CuratedPracticeDraft = JSON.parse(JSON.stringify(draft));
+        retained.push(cloned);
+        LocalLearningRepository.putValueSync<CuratedPracticeDraft[]>(KEY_CURATED_PRACTICE_DRAFTS,
+          retained.slice(-ANSWER_DRAFT_LIMIT));
+      }, isCurrent));
+  }
+
   static async saveCuratedPracticeDraft(draft: CuratedPracticeDraft): Promise<void> {
     if (!LocalLearningRepository.validCuratedPracticeDraft(draft)) {
       throw new Error('精选练习草稿结构无效');
@@ -700,6 +852,14 @@ export class LocalLearningRepository {
     return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
       const drafts = (await LocalLearningRepository.getValue<CuratedPracticeDraft[]>(
         KEY_CURATED_PRACTICE_DRAFTS)) ?? [];
+      const storedCurrent = drafts.find((item: CuratedPracticeDraft): boolean =>
+        item.courseId === draft.courseId && item.topic === draft.topic &&
+          item.selectedReviewItemId === draft.selectedReviewItemId);
+      const current = storedCurrent !== undefined &&
+        LocalLearningRepository.validCuratedPracticeDraft(storedCurrent) ? storedCurrent : undefined;
+      if (current === undefined || current.attemptId !== draft.attemptId) {
+        throw new AnswerDraftClearedError('精选练习草稿已被其他页面结束');
+      }
       const retained = drafts.filter((item: CuratedPracticeDraft): boolean =>
         !(item.courseId === draft.courseId && item.topic === draft.topic &&
           item.selectedReviewItemId === draft.selectedReviewItemId));
@@ -712,7 +872,9 @@ export class LocalLearningRepository {
 
   static async clearCuratedPracticeDraft(attemptId: string): Promise<void> {
     const normalizedAttemptId = attemptId.trim();
-    if (normalizedAttemptId.length === 0) throw new Error('精选练习草稿标识无效');
+    if (normalizedAttemptId.length === 0 || attemptId !== normalizedAttemptId) {
+      throw new Error('精选练习草稿标识无效');
+    }
     return LocalLearningRepository.runAnswerDraftTask(async (): Promise<void> => {
       const drafts = (await LocalLearningRepository.getValue<CuratedPracticeDraft[]>(
         KEY_CURATED_PRACTICE_DRAFTS)) ?? [];
@@ -726,6 +888,7 @@ export class LocalLearningRepository {
 
   private static validAiQuizDraft(draft: AiQuizDraft): boolean {
     if (draft.schemaVersion !== ANSWER_DRAFT_SCHEMA_VERSION || draft.attemptId.trim().length === 0 ||
+      draft.attemptId !== draft.attemptId.trim() ||
       draft.sourceQuizId.trim().length === 0 || !LocalLearningRepository.isExactCourseTopic(
         draft.courseId, draft.topic) || draft.courseTitle.trim().length === 0 ||
       (draft.difficulty !== 'easy' && draft.difficulty !== 'medium' && draft.difficulty !== 'hard') ||
@@ -761,6 +924,7 @@ export class LocalLearningRepository {
 
   private static validCuratedPracticeDraft(draft: CuratedPracticeDraft): boolean {
     if (draft.schemaVersion !== ANSWER_DRAFT_SCHEMA_VERSION || draft.attemptId.trim().length === 0 ||
+      draft.attemptId !== draft.attemptId.trim() ||
       !LocalLearningRepository.isExactCourseTopic(draft.courseId, draft.topic) ||
       draft.courseTitle.trim().length === 0 || draft.questions.length === 0 ||
       draft.questions.length > 5 ||

@@ -20,7 +20,7 @@ import {
   LearningQuizResultDetail as QuizResultDetail,
   QuizWriteReceipt
 } from '../model/LearningMetadataModels';
-import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { AnswerDraftClearedError, LocalLearningRepository } from '../common/LocalLearningRepository';
 
 interface DifficultyOption {
   value: string;
@@ -89,10 +89,10 @@ struct QuizPage {
   @State draftLoading: boolean = false;
   @State draftSaveFailed: boolean = false;
   @State draftReadFailed: boolean = false;
+  @State discardingDraft: boolean = false;
   private grading: QuizGradingItem[] = [];
   private attemptId: string = '';
   private attemptSubmittedAt: string = '';
-  private attemptCounter: number = 0;
   private activeRequest: HttpRequestCancellation | null = null;
   private generationRunId: number = 0;
   private lifecycleRunId: number = 0;
@@ -132,6 +132,10 @@ struct QuizPage {
       this.contextInitialized = true;
       if (!this.initializeContext()) return;
     }
+    if (!this.resultReady && this.questions.length > 0 && this.attemptId.length > 0 && !this.loading) {
+      this.revalidateDraft(lifecycleRunId);
+      return;
+    }
     if (!this.resultReady && this.questions.length === 0 && !this.loading) {
       this.restoreDraft(lifecycleRunId);
     }
@@ -149,6 +153,11 @@ struct QuizPage {
   }
 
   onBackPress(): boolean {
+    if (this.discardingDraft) {
+      this.message = '正在放弃本轮草稿，请稍候';
+      this.hasError = false;
+      return true;
+    }
     if (this.submitting) {
       this.message = '答题结果正在写入本机，请稍候';
       this.hasError = false;
@@ -221,7 +230,7 @@ struct QuizPage {
   }
 
   private chooseAnswer(answer: string): void {
-    if (!this.currentQuestionReady() || this.attemptSubmittedAt.length > 0) return;
+    if (this.discardingDraft || !this.currentQuestionReady() || this.attemptSubmittedAt.length > 0) return;
     const nextAnswers = this.answers.slice();
     nextAnswers[this.currentIndex] = answer;
     this.answers = nextAnswers;
@@ -241,6 +250,19 @@ struct QuizPage {
   private isActiveGeneration(runId: number, lifecycleRunId: number, request: HttpRequestCancellation): boolean {
     return this.isActiveLifecycle(lifecycleRunId) && this.loading && this.generationRunId === runId &&
       this.activeRequest === request && !request.isCancelled();
+  }
+
+  private async revalidateDraft(lifecycleRunId: number): Promise<void> {
+    const attemptId = this.attemptId;
+    try {
+      const draft = await LocalLearningRepository.getAiQuizDraft(this.courseId, this.topic, this.focusTag);
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.attemptId !== attemptId) return;
+      if (draft === null || draft.attemptId !== attemptId) this.handleClearedDraft();
+    } catch (error) {
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.attemptId !== attemptId) return;
+      this.message = '本地测验草稿状态校验失败，请重试';
+      this.hasError = true;
+    }
   }
 
   private async restoreDraft(lifecycleRunId: number): Promise<void> {
@@ -329,6 +351,7 @@ struct QuizPage {
   }
 
   private queueDraftSave(showFailure: boolean = true): void {
+    if (this.discardingDraft) return;
     const runId = this.draftSaveRunId + 1;
     this.draftSaveRunId = runId;
     this.persistDraft().then((): void => {
@@ -338,17 +361,31 @@ struct QuizPage {
         this.message = '草稿已保存到本机';
         this.hasError = false;
       }
-    }).catch((): void => {
-      if (!showFailure || this.draftSaveRunId !== runId) return;
+    }).catch((error: Error): void => {
+      if (this.draftSaveRunId !== runId) return;
+      if (error instanceof AnswerDraftClearedError) {
+        this.handleClearedDraft();
+        return;
+      }
+      if (!showFailure) return;
       this.draftSaveFailed = true;
       this.message = '草稿保存失败，当前答案仍保留，请重试保存';
       this.hasError = true;
     });
   }
 
+  private handleClearedDraft(): void {
+    this.resetQuiz();
+    this.message = '本轮草稿已在其他页面结束，正在同步最新状态';
+    this.hasError = false;
+    if (this.pageActive) this.restoreDraft(this.lifecycleRunId);
+  }
+
   private async discardCurrentDraft(): Promise<void> {
-    if (this.submitting || this.attemptId.length === 0) return;
+    if (this.submitting || this.discardingDraft || this.attemptId.length === 0) return;
     const attemptId = this.attemptId;
+    this.discardingDraft = true;
+    this.draftSaveRunId += 1;
     try {
       await LocalLearningRepository.clearAiQuizDraft(attemptId);
       this.resetQuiz();
@@ -357,22 +394,30 @@ struct QuizPage {
     } catch (error) {
       this.message = '草稿清除失败，请重试';
       this.hasError = true;
+    } finally {
+      this.discardingDraft = false;
     }
   }
 
   private goToPreviousQuestion(): void {
-    if (this.currentIndex <= 0) return;
+    if (this.discardingDraft || this.currentIndex <= 0) return;
     this.currentIndex -= 1;
     this.queueDraftSave();
   }
 
   private goToNextQuestion(): void {
-    if (this.currentIndex >= this.questions.length - 1 || this.currentAnswerText().length === 0) return;
+    if (this.discardingDraft || this.currentIndex >= this.questions.length - 1 ||
+      this.currentAnswerText().length === 0) return;
     this.currentIndex += 1;
     this.queueDraftSave();
   }
 
   private goBack(): void {
+    if (this.discardingDraft) {
+      this.message = '正在放弃本轮草稿，请稍候';
+      this.hasError = false;
+      return;
+    }
     if (this.submitting) {
       this.message = '答题结果正在写入本机，请稍候';
       this.hasError = false;
@@ -482,7 +527,7 @@ struct QuizPage {
   }
 
   async generateQuiz(): Promise<void> {
-    if (this.loading || this.draftLoading || !this.pageActive) return;
+    if (this.loading || this.draftLoading || this.discardingDraft || !this.pageActive) return;
     if (!this.suggestions.includes(this.topic)) {
       this.message = '请选择当前课程中的正式主题';
       this.hasError = true;
@@ -519,9 +564,8 @@ struct QuizPage {
         return;
       }
       const nextAnswers = new Array<string>(validation.questions.length).fill('');
-      this.attemptCounter += 1;
-      const attemptId = 'quiz_attempt_' + validation.quizId + '_' + Date.now().toString() + '_' +
-        this.attemptCounter.toString();
+      const attemptId = LocalLearningRepository.createAnswerDraftAttemptId(
+        'quiz_attempt_' + validation.quizId);
       const draft: AiQuizDraft = {
         schemaVersion: 1,
         attemptId: attemptId,
@@ -539,9 +583,15 @@ struct QuizPage {
         updatedAt: new Date().toISOString()
       };
       try {
-        await LocalLearningRepository.saveAiQuizDraft(draft);
+        const created = await LocalLearningRepository.createAiQuizDraft(draft, (): boolean =>
+          this.isActiveGeneration(runId, lifecycleRunId, requestCancellation));
+        if (!created) return;
       } catch (error) {
         if (!this.isActiveGeneration(runId, lifecycleRunId, requestCancellation)) return;
+        if (error instanceof AnswerDraftClearedError) {
+          this.handleClearedDraft();
+          return;
+        }
         this.message = '题组已生成，但本地草稿创建失败，请重试生成';
         this.hasError = true;
         return;
@@ -575,7 +625,7 @@ struct QuizPage {
   }
 
   async submitQuiz(): Promise<void> {
-    if (this.submitting || this.quizId.length === 0 || this.attemptId.length === 0) return;
+    if (this.submitting || this.discardingDraft || this.quizId.length === 0 || this.attemptId.length === 0) return;
     if (!this.allQuestionsAnswered()) {
       this.message = '请先完成全部题目';
       return;
@@ -661,6 +711,10 @@ struct QuizPage {
         this.hasError = false;
       }
     } catch (e) {
+      if (e instanceof AnswerDraftClearedError) {
+        this.handleClearedDraft();
+        return;
+      }
       this.draftSaveFailed = !draftPersisted;
       this.message = draftPersisted ? '答题结果写回未确认，答案已冻结并保存，请重试提交' :
         '提交前草稿保存失败，本次尚未写回；答案已冻结，请重试保存并提交';
@@ -1410,12 +1464,13 @@ struct QuizPage {
           Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Button('放弃草稿')
+          Button(this.discardingDraft ? '正在放弃...' : '放弃草稿')
             .height(48)
             .fontSize(11)
             .fontColor(Constants.COLOR_ERROR)
             .backgroundColor(Constants.COLOR_ERROR_LIGHT)
             .borderRadius(Constants.RADIUS_SM)
+            .enabled(!this.discardingDraft)
             .onClick((): void => { this.discardCurrentDraft(); })
         }
         .width('100%')
@@ -1470,7 +1525,8 @@ struct QuizPage {
 
         Column({ space: 10 }) {
           ForEach(this.currentQuestionOptions(), (option: string): void => {
-            AnswerOption(option, this.currentAnswerText() === option, this.attemptSubmittedAt.length === 0,
+            AnswerOption(option, this.currentAnswerText() === option,
+              this.attemptSubmittedAt.length === 0 && !this.discardingDraft,
               (): void => { this.chooseAnswer(option); })
           })
         }
@@ -1481,10 +1537,11 @@ struct QuizPage {
             .layoutWeight(1)
             .height(48)
             .fontSize(14)
-            .fontColor(this.currentIndex > 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            .fontColor(this.currentIndex > 0 && !this.discardingDraft ?
+              Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
             .backgroundColor(Constants.COLOR_BG_TAG)
             .borderRadius(Constants.RADIUS_MD)
-            .enabled(this.currentIndex > 0)
+            .enabled(this.currentIndex > 0 && !this.discardingDraft)
             .onClick(() => { this.goToPreviousQuestion(); })
 
           if (this.currentIndex < this.questions.length - 1) {
@@ -1492,21 +1549,25 @@ struct QuizPage {
               .layoutWeight(1)
               .height(48)
               .fontSize(14)
-              .fontColor(this.currentAnswerText().length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-              .backgroundColor(this.currentAnswerText().length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+              .fontColor(this.currentAnswerText().length > 0 && !this.discardingDraft ?
+                Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .backgroundColor(this.currentAnswerText().length > 0 && !this.discardingDraft ?
+                Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
               .borderRadius(Constants.RADIUS_MD)
-              .enabled(this.currentAnswerText().length > 0)
+              .enabled(this.currentAnswerText().length > 0 && !this.discardingDraft)
               .onClick(() => { this.goToNextQuestion(); })
           } else {
-            Button(this.submitting ? '写入中...' :
-              (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分'))
+            Button(this.discardingDraft ? '正在放弃...' : (this.submitting ? '写入中...' :
+              (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分')))
               .layoutWeight(1)
               .height(48)
               .fontSize(14)
-              .fontColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-              .backgroundColor(this.currentAnswerText().length > 0 && !this.submitting ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+              .fontColor(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft ?
+                Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+              .backgroundColor(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft ?
+                Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
               .borderRadius(Constants.RADIUS_MD)
-              .enabled(this.currentAnswerText().length > 0 && !this.submitting)
+              .enabled(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft)
               .onClick(() => { this.submitQuiz(); })
           }
         }

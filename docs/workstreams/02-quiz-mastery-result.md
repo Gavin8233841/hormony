@@ -130,3 +130,67 @@
 - **未验证**：无模拟器或真机目标，未执行结果页点击、错题本跳转、难度递进和应用重启后的设备流程。
 - **未验证**：本批次未重新调用线上 Quiz，不声明线上题组生成或业务字段通过。
 - **未验证**：HAP 未签名，安装、真机和多设备行为未验证。
+
+## 批次 4：答题草稿恢复、冻结写回与读屏语义
+
+### 背景与行为变化
+
+- Quiz 与 Practice 将未提交答案、当前题号、精确课程、Topic、重点标签或错题入口、题组及独立 grading 保存到 ArkData；离页重进恢复同一 attempt，不跨上下文串草稿。
+- AI 长等待离页会取消精确请求并隔离旧生命周期回调。首次提交冻结答案和 `submittedAt`；写回重试复用同一 attempt，同 ID 异载荷明确拒绝。
+- 草稿创建、草稿保存和结果写回未确认使用不同错误层级，不再把内存答案误报为已落盘，也不把草稿保存失败误报为结果写回失败。
+- AnswerOption 提供已选择、未选择和冻结状态；逐题解析提供展开状态；MistakeBook 的解析与重练操作具有精确名称和不小于 48 vp 的操作区。
+
+### 对应提交
+
+- `67cdcdf fix: 恢复测验草稿并冻结写回`
+- `79bd393 fix: 补齐答题闭环读屏语义`
+- `7132eb4 fix: 区分草稿保存与结果写回失败`
+
+### 验证
+
+- **静态诊断通过**：定向 Quiz/Practice/错题契约累计 `57/57` 通过。
+- **静态诊断通过**：Web lint、typecheck、`422/422` 测试和生产构建均通过。
+- **构建通过**：API 12 增量 HAP 构建完成，`BUILD SUCCESSFUL in 21 s 951 ms`；项目未配置 `signingConfigs`。
+- **未验证**：当时 `hdc list targets` 输出 `[Empty]`，因此该批没有模拟器、真机或线上模型调用证据。
+
+## 批次 5：放弃草稿互斥、事务创建与重入幂等
+
+### 背景
+
+草稿 Repository 已串行化操作，但页面在 `clear*Draft()` 等待期间仍能排入新保存，形成“旧保存 -> 清除 -> 新保存”，使已放弃草稿复活。Quiz 与 Practice 首次 create 还存在“已写入 -> 页面生命周期失效 -> 事后清理”窗口，其他重入页面可能在清理前读到本应取消的 attempt；Practice 在首次 create 等待中离页还会再排一次 create。
+
+### 文件
+
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Quiz.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Practice.ets`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+
+### 行为变化
+
+- Quiz 与 Practice 新增 `discardingDraft` 互斥态。清除前先失效旧保存回调；等待期间冻结答案、翻题、保存、提交、页内返回和系统返回，按钮显示明确忙碌文案。
+- `queueDraftSave()` 在互斥态拒绝后排保存；clear 前递增保存 epoch，使已完成的旧回调失效。页面重新显示时按精确上下文和 attemptId 向 Repository 复核所有权，旧页面不会继续保存已被其他页面结束的 attempt。
+- Repository 将首次 create 与后续 save 分开：create 对精确上下文执行 CAS，不覆盖其他页面草稿；save 只更新同 attempt。相同 attempt 的同载荷 create 是幂等 no-op，异载荷明确冲突，迟到 create 不会把后续答案回退。
+- API 12 的 `querySqlSync`、`executeSync`、`beginTransaction`、`commit` 与 `rollBack` 在同一 JS 调用栈完成“读取 -> CAS -> 写入 -> lifecycle guard -> 提交或回滚”。全部草稿访问仍经过同一 `answerDraftQueue`；后排 get/create 无法观察 create 与 rollback 之间的未提交状态，进程中断由 RDB 事务回滚，而不是依赖第二次补偿写。
+- Quiz create guard 绑定精确 generation run、页面 lifecycle 与请求取消对象；Practice guard 绑定精确 load run、lifecycle 与 attemptId。Practice 只有 create 提交后才设置 `draftCreated`，首次 create 等待期间 `onPageHide` 不再排第二次 create。
+- attemptId 使用 Repository 共享进程计数器生成并拒绝首尾空格；clear、create、save 均按规范化前的精确值校验，不进行模糊匹配。
+- 动态 ArkData fixture 实际执行事务 begin/commit/rollback、guard 失效时后排读取、rollback 后后排 create、guard 抛错、clear 后 late save、同 attempt 迟到 create 及写失败恢复；页面契约固定互斥、生命周期 guard 和重进核验顺序。
+
+### 验证
+
+- **静态诊断通过**：`cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`，exit 0，`56/56` 通过。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，exit 0。
+- **静态诊断通过**：`cd apps/web; pnpm test`，exit 0，28 个文件、`433/433` 测试通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建完成。
+- **构建通过**：本机 API 12 SDK 类型声明确认同步查询、写入和事务接口均为 `@since 12`。`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` 完成 CompileArkTS 与 PackageHap，`BUILD SUCCESSFUL in 21 s 609 ms`；项目未配置 `signingConfigs`，构建跳过签名。
+- **静态诊断通过**：`scripts/harmonyos-app-smoke.ps1 -SelfTest`，exit 0，UI 树 JSON、bounds 中心点、精确文本与设备目标参数 `9/9` 通过。
+- **模拟器通过**：Pura 90 Pro Max，竖屏 1256x2760，目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。本次 `entry-default-unsigned.hap` 返回 `install bundle successfully`，`com.c4ai.hormony/EntryAbility` 返回 `start ability successfully`。UI 树按 bounds 点击“课程” `[448,2421][526,2466]`、“继续课程” `[245,1156][428,1209]` 与二叉树主题“继续” `[1073,2361][1151,2406]`，页面依次为 `pages/Index`、`pages/CourseDetail`、`pages/Lesson`。
+- **模拟器通过**：同批较早构建在同一模拟器从 `pages/MistakeBook` 进入 `pages/Practice`，选择 C 后“下一题”为 enabled，放弃草稿后恢复为 disabled；返回错题本并重进同一复习项后仍为 disabled，旧答案未恢复。最新事务收紧没有重新执行该输入流程，因此它不替代当前 HAP 的构建与契约证据。
+- **模拟器通过**：smoke 已生成启动页与课程页截图，证据目录为 `screenshots/trae-smoke-20260718-152011/`；该本地目录不纳入提交。
+
+### 失败或未验证
+
+- **未验证**：DevEco Agent 当前不可用：`alibaba-cn/qwen3-coder-plus` 返回 `403 AllocationQuota.FreeTierOnly`，内置 `deveco/glm-5` 返回 `401 Token refresh failed`；按主线程指令停止重试且不回落 `openai/*`。此前对 Repository、Quiz、Practice 取得的 `check_ets_files: no diagnostics` 早于本次事务改动，不作为最新静态诊断；API 12 Hvigor 与 HDC 证据单独成立。
+- **未验证**：全量 smoke 在已完成安装、启动、首页和课程页截图后，因当前首屏 UI 树没有精确文本“计算机网络”而 exit 1；该断点与草稿状态机无关，但其后步骤不能标记通过。
+- **未验证**：本次设备流程不使用文本输入；`uitest uiInput inputText` 曾切到系统“学习助理”，重新 `aa start` 后应用正常，属于模拟器输入法干扰，不记录为产品失败。最新 HAP 的 Quiz 生成、取消、放弃、重进与提交设备流程未完成。
+- **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成或业务字段通过；项目未配置生产签名，真机与多设备未验证。

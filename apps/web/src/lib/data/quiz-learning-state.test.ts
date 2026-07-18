@@ -215,6 +215,7 @@ interface RuntimeCourse {
 
 interface RepositoryRuntime {
   initialize(context: object): Promise<void>;
+  createAnswerDraftAttemptId(prefix: string): string;
   getProfile(): Promise<RuntimeProfile | null>;
   getCourses(): Promise<RuntimeCourse[] | null>;
   appendQuizResult(result: RuntimeResult): Promise<RuntimeReceipt>;
@@ -223,10 +224,12 @@ interface RepositoryRuntime {
   getStudyEvents(): Promise<RuntimeStudyEvent[]>;
   appendStudyEvent(event: RuntimeStudyEvent): Promise<void>;
   getAiQuizDraft(courseId: string, topic: string, focusTag: string): Promise<RuntimeAiQuizDraft | null>;
+  createAiQuizDraft(draft: RuntimeAiQuizDraft, isCurrent: () => boolean): Promise<boolean>;
   saveAiQuizDraft(draft: RuntimeAiQuizDraft): Promise<void>;
   clearAiQuizDraft(attemptId: string): Promise<void>;
   getCuratedPracticeDraft(courseId: string, topic: string,
     selectedReviewItemId: string): Promise<RuntimePracticeDraft | null>;
+  createCuratedPracticeDraft(draft: RuntimePracticeDraft, isCurrent: () => boolean): Promise<boolean>;
   saveCuratedPracticeDraft(draft: RuntimePracticeDraft): Promise<void>;
   clearCuratedPracticeDraft(attemptId: string): Promise<void>;
 }
@@ -255,6 +258,7 @@ class MemoryRdbStore {
   readonly queriedKeys: string[] = [];
   private readonly writeCounts = new Map<string, number>();
   private readonly failingWrites = new Map<string, number>();
+  private transactionRows: Map<string, ArkDataRow> | null = null;
 
   constructor(private readonly rows: Map<string, ArkDataRow>) {}
 
@@ -263,7 +267,11 @@ class MemoryRdbStore {
     this.failingWrites.set(key, current + offset);
   }
 
-  async executeSql(sql: string, bindArgs: unknown[] = []): Promise<void> {
+  private activeRows(): Map<string, ArkDataRow> {
+    return this.transactionRows ?? this.rows;
+  }
+
+  private executeWrite(sql: string, bindArgs: unknown[] = []): void {
     if (sql === "CREATE TABLE IF NOT EXISTS app_state " +
       "(state_key TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)") return;
     if (sql !== "INSERT OR REPLACE INTO app_state " +
@@ -280,17 +288,52 @@ class MemoryRdbStore {
       this.failingWrites.delete(key);
       throw new Error(`ArkData fixture 写入失败: ${key}`);
     }
-    this.rows.set(key, { payload, updatedAt });
+    this.activeRows().set(key, { payload, updatedAt });
+  }
+
+  async executeSql(sql: string, bindArgs: unknown[] = []): Promise<void> {
+    this.executeWrite(sql, bindArgs);
+  }
+
+  executeSync(sql: string, bindArgs: unknown[] = []): null {
+    this.executeWrite(sql, bindArgs);
+    return null;
   }
 
   async querySql(sql: string, bindArgs: unknown[]): Promise<MemoryResultSet> {
+    return this.querySqlSync(sql, bindArgs);
+  }
+
+  querySqlSync(sql: string, bindArgs: unknown[]): MemoryResultSet {
     if (sql !== "SELECT payload FROM app_state WHERE state_key = ?") {
       throw new Error(`未实现的 ArkData 查询 SQL: ${sql}`);
     }
     const [key] = bindArgs;
     if (typeof key !== "string") throw new Error("ArkData 查询键无效");
     this.queriedKeys.push(key);
-    return new MemoryResultSet(this.rows.get(key)?.payload ?? null);
+    return new MemoryResultSet(this.activeRows().get(key)?.payload ?? null);
+  }
+
+  beginTransaction(): void {
+    if (this.transactionRows !== null) throw new Error("ArkData fixture 已存在事务");
+    this.transactionRows = new Map<string, ArkDataRow>();
+    for (const [key, row] of this.rows.entries()) {
+      this.transactionRows.set(key, { payload: row.payload, updatedAt: row.updatedAt });
+    }
+  }
+
+  commit(): void {
+    if (this.transactionRows === null) throw new Error("ArkData fixture 不存在可提交事务");
+    this.rows.clear();
+    for (const [key, row] of this.transactionRows.entries()) {
+      this.rows.set(key, { payload: row.payload, updatedAt: row.updatedAt });
+    }
+    this.transactionRows = null;
+  }
+
+  rollBack(): void {
+    if (this.transactionRows === null) throw new Error("ArkData fixture 不存在可回滚事务");
+    this.transactionRows = null;
   }
 }
 
@@ -675,6 +718,10 @@ function queueGuardMethod(queueName: string): { name: string; source: string } {
   };
 }
 const OPTIONS = ["A. 正确项", "B. 干扰项", "C. 其他项", "D. 边界项"];
+
+function keepDraft(): boolean {
+  return true;
+}
 
 function aiDraft(attemptId: string, focusTag = ""): RuntimeAiQuizDraft {
   return {
@@ -1387,7 +1434,9 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
       "quiz_cs101_tree",
       "quiz_cs101_tree",
     ]);
-    expect(quizPageSource).toContain("const attemptId = 'quiz_attempt_' + validation.quizId");
+    expect(quizPageSource).toContain("LocalLearningRepository.createAnswerDraftAttemptId(");
+    expect(quizPageSource).toContain("'quiz_attempt_' + validation.quizId");
+    expect(quizPageSource).not.toContain("private attemptCounter:");
     expect(quizPageSource).toContain("this.attemptId = attemptId");
     expect(quizPageSource).toContain("quizId: this.attemptId");
     expect(quizPageSource).toContain("sourceQuizId: this.quizId");
@@ -1651,22 +1700,40 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     const focusedAiDraft = aiDraft("ai-draft-focused", "边界条件");
     const generalPracticeDraft = practiceDraft("practice-draft-1");
     const reviewPracticeDraft = practiceDraft("practice-review-draft", "review-1");
+    await expect(first.repository.createAiQuizDraft(aiDraft(" ai-draft-spaced "), keepDraft))
+      .rejects.toThrow("AI 测验草稿结构无效");
+    await expect(first.repository.createCuratedPracticeDraft(
+      practiceDraft(" practice-draft-spaced "), keepDraft))
+      .rejects.toThrow("精选练习草稿结构无效");
+    await expect(first.repository.clearAiQuizDraft(" ai-draft-1 "))
+      .rejects.toThrow("AI 测验草稿标识无效");
+    await expect(first.repository.clearCuratedPracticeDraft(" practice-draft-1 "))
+      .rejects.toThrow("精选练习草稿标识无效");
     await Promise.all([
-      first.repository.saveAiQuizDraft(firstAiDraft),
-      first.repository.saveAiQuizDraft(focusedAiDraft),
-      first.repository.saveCuratedPracticeDraft(generalPracticeDraft),
-      first.repository.saveCuratedPracticeDraft(reviewPracticeDraft),
+      first.repository.createAiQuizDraft(firstAiDraft, keepDraft),
+      first.repository.createAiQuizDraft(focusedAiDraft, keepDraft),
+      first.repository.createCuratedPracticeDraft(generalPracticeDraft, keepDraft),
+      first.repository.createCuratedPracticeDraft(reviewPracticeDraft, keepDraft),
     ]);
 
-    const updatedAiDraft = aiDraft("ai-draft-2");
+    const firstAttemptId = first.repository.createAnswerDraftAttemptId("ai-draft");
+    const secondAttemptId = first.repository.createAnswerDraftAttemptId("ai-draft");
+    expect(firstAttemptId).not.toBe(secondAttemptId);
+    await expect(() => first.repository.createAnswerDraftAttemptId(" invalid "))
+      .toThrow("草稿标识前缀无效");
+
+    const updatedAiDraft = aiDraft("ai-draft-1");
     updatedAiDraft.answers[1] = OPTIONS[0];
     updatedAiDraft.currentIndex = 1;
     await first.repository.saveAiQuizDraft(updatedAiDraft);
+    const updatedPracticeDraft = practiceDraft("practice-review-draft", "review-1");
+    updatedPracticeDraft.answers[0] = updatedPracticeDraft.questions[0].options[0];
+    await first.repository.saveCuratedPracticeDraft(updatedPracticeDraft);
 
     const second = loadRepository(rows);
     await second.repository.initialize({});
     await expect(second.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
-      .resolves.toMatchObject({ attemptId: "ai-draft-2", currentIndex: 1 });
+      .resolves.toMatchObject({ attemptId: "ai-draft-1", currentIndex: 1 });
     await expect(second.repository.getAiQuizDraft("cs101", "二叉树与BST", "边界条件"))
       .resolves.toMatchObject({ attemptId: "ai-draft-focused" });
     await expect(second.repository.getAiQuizDraft("cs101", "图的遍历", ""))
@@ -1674,21 +1741,208 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     await expect(second.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", ""))
       .resolves.toMatchObject({ attemptId: "practice-draft-1" });
     await expect(second.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", "review-1"))
-      .resolves.toMatchObject({ attemptId: "practice-review-draft" });
+      .resolves.toMatchObject({ attemptId: "practice-review-draft", answers: ["A. 正确项"] });
 
-    await second.repository.clearAiQuizDraft("ai-draft-2");
+    await second.repository.clearAiQuizDraft("ai-draft-1");
     await second.repository.clearCuratedPracticeDraft("practice-review-draft");
     await expect(second.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
       .resolves.toBeNull();
     await expect(second.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", "review-1"))
       .resolves.toBeNull();
+    await expect(second.repository.saveAiQuizDraft(updatedAiDraft))
+      .rejects.toThrow("AI 测验草稿已被其他页面结束");
+    await expect(second.repository.saveCuratedPracticeDraft(updatedPracticeDraft))
+      .rejects.toThrow("精选练习草稿已被其他页面结束");
+
+    const nextAiDraft = aiDraft("ai-draft-3");
+    const nextPracticeDraft = practiceDraft("practice-review-draft-2", "review-1");
+    await second.repository.createAiQuizDraft(nextAiDraft, keepDraft);
+    await second.repository.createCuratedPracticeDraft(nextPracticeDraft, keepDraft);
+    await expect(second.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ attemptId: "ai-draft-3" });
+    await expect(second.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", "review-1"))
+      .resolves.toMatchObject({ attemptId: "practice-review-draft-2" });
+
+    const replacementAiDraft = aiDraft("ai-draft-4");
+    const replacementPracticeDraft = practiceDraft("practice-review-draft-3", "review-1");
+    await expect(second.repository.createAiQuizDraft(replacementAiDraft, keepDraft))
+      .rejects.toThrow("AI 测验已有其他页面创建的草稿");
+    await expect(second.repository.createCuratedPracticeDraft(replacementPracticeDraft, keepDraft))
+      .rejects.toThrow("精选练习已有其他页面创建的草稿");
+    await expect(second.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ attemptId: "ai-draft-3" });
+    await expect(second.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", "review-1"))
+      .resolves.toMatchObject({ attemptId: "practice-review-draft-2" });
+
+    await second.repository.clearAiQuizDraft("ai-draft-3");
+    await second.repository.clearCuratedPracticeDraft("practice-review-draft-2");
+    await second.repository.createAiQuizDraft(replacementAiDraft, keepDraft);
+    await second.repository.createCuratedPracticeDraft(replacementPracticeDraft, keepDraft);
+    await expect(second.repository.saveAiQuizDraft(nextAiDraft))
+      .rejects.toThrow("AI 测验草稿已被其他页面结束");
+    await expect(second.repository.saveCuratedPracticeDraft(nextPracticeDraft))
+      .rejects.toThrow("精选练习草稿已被其他页面结束");
+    await expect(second.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ attemptId: "ai-draft-4" });
+    await expect(second.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", "review-1"))
+      .resolves.toMatchObject({ attemptId: "practice-review-draft-3" });
 
     const queue = staticPromiseQueue("answerDraftQueue");
     const guard = queueGuardMethod(queue.name);
-    for (const methodName of ["getAiQuizDraft", "saveAiQuizDraft", "clearAiQuizDraft",
-      "getCuratedPracticeDraft", "saveCuratedPracticeDraft", "clearCuratedPracticeDraft"]) {
+    for (const methodName of ["getAiQuizDraft", "createAiQuizDraft", "saveAiQuizDraft", "clearAiQuizDraft",
+      "getCuratedPracticeDraft", "createCuratedPracticeDraft", "saveCuratedPracticeDraft",
+      "clearCuratedPracticeDraft"]) {
       expect(repositoryMethodSource(methodName)).toContain(`LocalLearningRepository.${guard.name}(`);
     }
+  });
+
+  it("草稿清除写失败保留原 attempt，恢复后仍可更新", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const draft = aiDraft("clear-write-failure");
+    await loaded.repository.createAiQuizDraft(draft, keepDraft);
+    loaded.store.failWrite("ai_quiz_drafts");
+    await expect(loaded.repository.clearAiQuizDraft(draft.attemptId))
+      .rejects.toThrow("ArkData fixture 写入失败: ai_quiz_drafts");
+
+    draft.answers[0] = OPTIONS[0];
+    await loaded.repository.saveAiQuizDraft(draft);
+    await expect(loaded.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ attemptId: draft.attemptId, answers: [OPTIONS[0], "", "", "", ""] });
+  });
+
+  it("clear 后排入的跨实例 late save 不得复活 AI 或 Practice 草稿", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const ai = aiDraft("interleaved-ai");
+    const practice = practiceDraft("interleaved-practice");
+    await loaded.repository.createAiQuizDraft(ai, keepDraft);
+    await loaded.repository.createCuratedPracticeDraft(practice, keepDraft);
+
+    const aiClear = loaded.repository.clearAiQuizDraft(ai.attemptId);
+    const aiLateSave = expect(loaded.repository.saveAiQuizDraft(ai))
+      .rejects.toThrow("AI 测验草稿已被其他页面结束");
+    const practiceClear = loaded.repository.clearCuratedPracticeDraft(practice.attemptId);
+    const practiceLateSave = expect(loaded.repository.saveCuratedPracticeDraft(practice))
+      .rejects.toThrow("精选练习草稿已被其他页面结束");
+    await aiClear;
+    await practiceClear;
+    await aiLateSave;
+    await practiceLateSave;
+    await expect(loaded.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toBeNull();
+    await expect(loaded.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", ""))
+      .resolves.toBeNull();
+  });
+
+  it("无效旧草稿不占用精确上下文，新 create 可替换并恢复", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    await loaded.repository.createAiQuizDraft(aiDraft("invalid-stored-ai"), keepDraft);
+    const row = rows.get("ai_quiz_drafts");
+    expect(row).toBeDefined();
+    const stored = JSON.parse(row?.payload ?? "[]") as RuntimeAiQuizDraft[];
+    stored[0].answers = [];
+    rows.set("ai_quiz_drafts", { payload: JSON.stringify(stored), updatedAt: row?.updatedAt ?? 0 });
+
+    const replacement = aiDraft("replacement-valid-ai");
+    await loaded.repository.createAiQuizDraft(replacement, keepDraft);
+    await expect(loaded.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ attemptId: replacement.attemptId });
+  });
+
+  it("create 的失效 guard 在同一事务回滚，后排读取看不到中间草稿", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    let guardChecks = 0;
+    let queuedRead: Promise<RuntimeAiQuizDraft | null> | undefined;
+
+    const kept = await loaded.repository.createAiQuizDraft(aiDraft("rolled-back-ai"), (): boolean => {
+      guardChecks += 1;
+      if (guardChecks === 2) {
+        queuedRead = loaded.repository.getAiQuizDraft("cs101", "二叉树与BST", "");
+      }
+      return guardChecks === 1;
+    });
+
+    expect(kept).toBe(false);
+    expect(guardChecks).toBe(2);
+    expect(queuedRead).toBeDefined();
+    await expect(queuedRead).resolves.toBeNull();
+    expect(rows.has("ai_quiz_drafts")).toBe(false);
+  });
+
+  it("Practice create 回滚完成前后排 create 不可插入，回滚后新 attempt 正常落盘", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const stale = practiceDraft("rolled-back-practice");
+    const replacement = practiceDraft("replacement-practice");
+    let guardChecks = 0;
+    let queuedCreate: Promise<boolean> | undefined;
+
+    const kept = await loaded.repository.createCuratedPracticeDraft(stale, (): boolean => {
+      guardChecks += 1;
+      if (guardChecks === 2) {
+        queuedCreate = loaded.repository.createCuratedPracticeDraft(replacement, keepDraft);
+      }
+      return guardChecks === 1;
+    });
+
+    expect(kept).toBe(false);
+    expect(queuedCreate).toBeDefined();
+    await expect(queuedCreate).resolves.toBe(true);
+    await expect(loaded.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ attemptId: replacement.attemptId });
+  });
+
+  it("create guard 抛错时先回滚，不留下已取消草稿", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    let guardChecks = 0;
+
+    await expect(loaded.repository.createAiQuizDraft(aiDraft("throwing-guard"), (): boolean => {
+      guardChecks += 1;
+      if (guardChecks === 2) throw new Error("生命周期 guard 失败");
+      return true;
+    })).rejects.toThrow("生命周期 guard 失败");
+
+    await expect(loaded.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toBeNull();
+  });
+
+  it("同 attempt create 仅允许同载荷幂等重试，不得覆盖后续答案", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const originalAi = aiDraft("same-attempt-ai");
+    const originalPractice = practiceDraft("same-attempt-practice");
+    await expect(loaded.repository.createAiQuizDraft(originalAi, keepDraft)).resolves.toBe(true);
+    await expect(loaded.repository.createCuratedPracticeDraft(originalPractice, keepDraft)).resolves.toBe(true);
+    await expect(loaded.repository.createAiQuizDraft(originalAi, keepDraft)).resolves.toBe(true);
+    await expect(loaded.repository.createCuratedPracticeDraft(originalPractice, keepDraft)).resolves.toBe(true);
+
+    const updatedAi = aiDraft("same-attempt-ai");
+    updatedAi.answers[1] = OPTIONS[1];
+    updatedAi.currentIndex = 1;
+    const updatedPractice = practiceDraft("same-attempt-practice");
+    updatedPractice.answers[0] = OPTIONS[0];
+    await loaded.repository.saveAiQuizDraft(updatedAi);
+    await loaded.repository.saveCuratedPracticeDraft(updatedPractice);
+
+    await expect(loaded.repository.createAiQuizDraft(originalAi, keepDraft))
+      .rejects.toThrow("AI 测验草稿创建载荷冲突");
+    await expect(loaded.repository.createCuratedPracticeDraft(originalPractice, keepDraft))
+      .rejects.toThrow("精选练习草稿创建载荷冲突");
+    await expect(loaded.repository.getAiQuizDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ answers: [OPTIONS[0], OPTIONS[1], "", "", ""], currentIndex: 1 });
+    await expect(loaded.repository.getCuratedPracticeDraft("cs101", "二叉树与BST", ""))
+      .resolves.toMatchObject({ answers: [OPTIONS[0]] });
   });
 
   it("同一答题 ID 只接受完全相同的重试载荷，不允许页面与 ArkData 分叉", async () => {
@@ -1727,8 +1981,8 @@ describe("Quiz 与 Practice 结果页下一步动作", () => {
     expect(reviewSource).toContain("解析已展开");
     expect(reviewSource).toContain(".height(48)");
     expect(reviewSource).toContain("向学伴追问第 ");
-    expect(quizPageSource).toContain("this.attemptSubmittedAt.length === 0,");
-    expect(practicePageSource).toContain("this.attemptSubmittedAt.length === 0,");
+    expect(quizPageSource).toContain("this.attemptSubmittedAt.length === 0 && !this.discardingDraft");
+    expect(practicePageSource).toContain("this.attemptSubmittedAt.length === 0 && !this.discardingDraft");
   });
 
   it("Quiz 只接受与本次请求课程、Topic、重点标签和题数完全一致的题组", () => {
@@ -1778,6 +2032,101 @@ describe("Quiz 与 Practice 结果页下一步动作", () => {
     expect(practiceSubmit).toContain("let draftPersisted = false");
     expect(practiceSubmit).toContain("提交前草稿保存失败，本次尚未写回");
     expect(practiceSubmit).toContain("clearCuratedPracticeDraft");
+  });
+
+  it("Quiz 与 Practice 放弃草稿期间阻止后排保存重建已清除草稿", () => {
+    for (const pageSource of [quizPageSource, practicePageSource]) {
+      const queueSave = pageMethod(pageSource, "queueDraftSave").source;
+      const discard = pageMethod(pageSource, "discardCurrentDraft").source;
+      const choose = pageSource === quizPageSource ?
+        pageMethod(pageSource, "chooseAnswer").source : pageMethod(pageSource, "choose").source;
+      const submit = pageSource === quizPageSource ?
+        pageMethod(pageSource, "submitQuiz").source : pageMethod(pageSource, "submit").source;
+      const clearCall = pageSource === quizPageSource ?
+        "await LocalLearningRepository.clearAiQuizDraft(attemptId)" :
+        "await LocalLearningRepository.clearCuratedPracticeDraft(attemptId)";
+
+      expect(pageSource).toContain("@State discardingDraft: boolean = false");
+      expect(queueSave).toContain("this.discardingDraft");
+      expect(choose).toContain("this.discardingDraft");
+      expect(submit).toContain("this.discardingDraft");
+      expect(pageMethod(pageSource, "goToPreviousQuestion").source).toContain("this.discardingDraft");
+      expect(pageMethod(pageSource, "goToNextQuestion").source).toContain("this.discardingDraft");
+      expect(pageMethod(pageSource, "goBack").source).toContain("this.discardingDraft");
+      expect(pageMethod(pageSource, "onBackPress").source).toContain("this.discardingDraft");
+
+      const discardStart = discard.indexOf("this.discardingDraft = true");
+      const invalidateSaves = discard.indexOf("this.draftSaveRunId += 1");
+      const clearStart = discard.indexOf(clearCall);
+      expect(discardStart).toBeGreaterThan(-1);
+      expect(invalidateSaves).toBeGreaterThan(discardStart);
+      expect(clearStart).toBeGreaterThan(invalidateSaves);
+      expect(discard).toContain("finally");
+      expect(discard).toContain("this.discardingDraft = false");
+      expect(pageSource).toContain("this.discardingDraft ? '正在放弃...' : '放弃草稿'");
+      expect(pageSource).toContain(".enabled(!this.discardingDraft)");
+      expect(pageSource).toContain("this.attemptSubmittedAt.length === 0 && !this.discardingDraft");
+    }
+  });
+
+  it("Quiz 在同一事务内按精确请求 guard 决定提交或回滚生成草稿", () => {
+    const generate = pageMethod(quizPageSource, "generateQuiz").source;
+    const createIndex = generate.indexOf("await LocalLearningRepository.createAiQuizDraft(draft, (): boolean =>");
+    const guardIndex = generate.indexOf(
+      "this.isActiveGeneration(runId, lifecycleRunId, requestCancellation)", createIndex);
+    const keptIndex = generate.indexOf("if (!created) return;", guardIndex);
+    expect(createIndex).toBeGreaterThan(-1);
+    expect(guardIndex).toBeGreaterThan(createIndex);
+    expect(keptIndex).toBeGreaterThan(guardIndex);
+    expect(generate).not.toContain("stale generated draft cleanup");
+    expect(generate).not.toContain("clearAiQuizDraft(attemptId)");
+    expect(generate).toContain("error instanceof AnswerDraftClearedError");
+  });
+
+  it("Practice 首次 create 使用精确加载 guard，离页不排第二次 create", () => {
+    const persist = pageMethod(practicePageSource, "persistDraft").source;
+    const reload = pageMethod(practicePageSource, "reloadQuestions").source;
+    const discard = pageMethod(practicePageSource, "discardCurrentDraft").source;
+    const pageHide = pageMethod(practicePageSource, "onPageHide").source;
+    const queueSave = pageMethod(practicePageSource, "queueDraftSave").source;
+    const createIndex = reload.indexOf(
+      "await LocalLearningRepository.createCuratedPracticeDraft(draft, (): boolean =>");
+    const guardIndex = reload.indexOf(
+      "this.isActiveLoad(runId, lifecycleRunId) && this.attemptId === attemptId", createIndex);
+    expect(createIndex).toBeGreaterThan(-1);
+    expect(guardIndex).toBeGreaterThan(createIndex);
+    expect(reload).toContain("if (!created || !this.isActiveLoad(runId, lifecycleRunId)) return;");
+    expect(reload).toContain("this.draftCreated = true");
+    expect(reload).not.toContain("clearCuratedPracticeDraft(attemptId)");
+    expect(persist).not.toContain("createCuratedPracticeDraft");
+    expect(persist).toContain("if (!this.draftCreated) throw new Error");
+    expect(pageHide).toContain("this.draftCreated");
+    expect(queueSave).toContain("!this.draftCreated");
+    expect(reload).toContain("error instanceof AnswerDraftClearedError");
+    expect(discard).toContain("const lifecycleRunId = this.lifecycleRunId");
+    expect(discard).toContain("if (!this.isActiveLifecycle(lifecycleRunId)) return;");
+  });
+
+  it("旧页面更新已结束 attempt 时显示终态并移除必然失败的保存重试", () => {
+    for (const pageSource of [quizPageSource, practicePageSource]) {
+      const queueSave = pageMethod(pageSource, "queueDraftSave").source;
+      const submit = pageSource === quizPageSource ?
+        pageMethod(pageSource, "submitQuiz").source : pageMethod(pageSource, "submit").source;
+      const handler = pageMethod(pageSource, "handleClearedDraft").source;
+      const pageShow = pageMethod(pageSource, "onPageShow").source;
+      const revalidate = pageMethod(pageSource, "revalidateDraft").source;
+      expect(queueSave).toContain("error instanceof AnswerDraftClearedError");
+      expect(queueSave.indexOf("error instanceof AnswerDraftClearedError"))
+        .toBeLessThan(queueSave.indexOf("if (!showFailure) return"));
+      expect(submit).toContain("instanceof AnswerDraftClearedError");
+      expect(handler).toContain("reset");
+      expect(handler).toContain("本轮草稿已在其他页面结束");
+      expect(handler).toContain("this.hasError = false");
+      expect(handler).toContain("this.restoreDraft(this.lifecycleRunId)");
+      expect(pageShow).toContain("this.revalidateDraft(lifecycleRunId)");
+      expect(revalidate).toContain("draft.attemptId !== attemptId");
+      expect(revalidate).toContain("this.handleClearedDraft()");
+    }
   });
 
   it("Quiz 有错题时主动作直接进入错题本，导航失败显示明确消息", () => {

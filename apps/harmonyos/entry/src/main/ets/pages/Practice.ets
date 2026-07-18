@@ -2,7 +2,7 @@ import { AnswerOption, GradientHeader, ReviewDetailRow } from '../common/Builder
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
-import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { AnswerDraftClearedError, LocalLearningRepository } from '../common/LocalLearningRepository';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   CuratedPracticeDraft,
@@ -56,10 +56,12 @@ struct PracticePage {
   @State draftLoading: boolean = false;
   @State draftSaveFailed: boolean = false;
   @State draftReadFailed: boolean = false;
+  @State discardingDraft: boolean = false;
   private reviewItemIds: string[] = [];
   private selectedReviewItemId: string = '';
   private attemptId: string = '';
   private attemptSubmittedAt: string = '';
+  private draftCreated: boolean = false;
   private lifecycleRunId: number = 0;
   private loadRunId: number = 0;
   private draftReadRunId: number = 0;
@@ -75,6 +77,10 @@ struct PracticePage {
       this.contextInitialized = true;
       if (!this.initializeContext()) return;
     }
+    if (!this.submitted && this.questions.length > 0 && this.attemptId.length > 0 && !this.loading) {
+      this.revalidateDraft(lifecycleRunId);
+      return;
+    }
     if (!this.submitted && this.questions.length === 0 && !this.loading) {
       this.restoreDraft(lifecycleRunId);
     }
@@ -87,18 +93,23 @@ struct PracticePage {
     this.draftReadRunId += 1;
     this.loading = false;
     this.draftLoading = false;
-    if (!this.submitted && this.questions.length > 0 && this.attemptId.length > 0) {
+    if (!this.submitted && this.draftCreated && this.questions.length > 0 && this.attemptId.length > 0) {
       this.queueDraftSave(false);
     }
   }
 
   onBackPress(): boolean {
+    if (this.discardingDraft) {
+      this.message = '正在放弃本轮草稿，请稍候';
+      this.hasError = false;
+      return true;
+    }
     if (this.saving) {
       this.message = '答题结果正在写入本机，请稍候';
       this.hasError = false;
       return true;
     }
-    if (!this.submitted && this.questions.length > 0 && this.attemptId.length > 0) {
+    if (!this.submitted && this.draftCreated && this.questions.length > 0 && this.attemptId.length > 0) {
       this.queueDraftSave(false);
     }
     return false;
@@ -141,6 +152,7 @@ struct PracticePage {
     this.selectedReviewItemId = '';
     this.attemptId = '';
     this.attemptSubmittedAt = '';
+    this.draftCreated = false;
     this.draftSaveFailed = false;
     this.draftReadFailed = false;
     this.writeBackTotalQuestions = 0;
@@ -156,6 +168,20 @@ struct PracticePage {
 
   private isActiveLoad(runId: number, lifecycleRunId: number): boolean {
     return this.isActiveLifecycle(lifecycleRunId) && this.loadRunId === runId && this.loading;
+  }
+
+  private async revalidateDraft(lifecycleRunId: number): Promise<void> {
+    const attemptId = this.attemptId;
+    try {
+      const draft = await LocalLearningRepository.getCuratedPracticeDraft(
+        this.courseId, this.topic, this.selectedReviewItemId);
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.attemptId !== attemptId) return;
+      if (draft === null || draft.attemptId !== attemptId) this.handleClearedDraft();
+    } catch (error) {
+      if (!this.isActiveLifecycle(lifecycleRunId) || this.attemptId !== attemptId) return;
+      this.message = '本地练习草稿状态校验失败，请重试';
+      this.hasError = true;
+    }
   }
 
   private async restoreDraft(lifecycleRunId: number): Promise<void> {
@@ -181,6 +207,7 @@ struct PracticePage {
       this.activeAnswer = draft.answers[draft.currentIndex] ?? '';
       this.attemptId = draft.attemptId;
       this.attemptSubmittedAt = draft.attemptSubmittedAt ?? '';
+      this.draftCreated = true;
       this.message = this.attemptSubmittedAt.length > 0 ?
         '已恢复待确认写回的练习草稿，请重试提交，不会重复累计' :
         '已恢复上次未提交草稿，已答 ' + this.answeredCount().toString() + ' / ' +
@@ -222,10 +249,12 @@ struct PracticePage {
 
   private async persistDraft(): Promise<void> {
     if (this.submitted || this.questions.length === 0 || this.attemptId.length === 0) return;
+    if (!this.draftCreated) throw new Error('精选练习草稿尚未创建');
     await LocalLearningRepository.saveCuratedPracticeDraft(this.buildDraft());
   }
 
   private queueDraftSave(showFailure: boolean = true): void {
+    if (this.discardingDraft || !this.draftCreated) return;
     const runId = this.draftSaveRunId + 1;
     this.draftSaveRunId = runId;
     this.persistDraft().then((): void => {
@@ -235,32 +264,53 @@ struct PracticePage {
         this.message = '草稿已保存到本机';
         this.hasError = false;
       }
-    }).catch((): void => {
-      if (!showFailure || this.draftSaveRunId !== runId) return;
+    }).catch((error: Error): void => {
+      if (this.draftSaveRunId !== runId) return;
+      if (error instanceof AnswerDraftClearedError) {
+        this.handleClearedDraft();
+        return;
+      }
+      if (!showFailure) return;
       this.draftSaveFailed = true;
       this.message = '草稿保存失败，当前答案仍保留，请重试保存';
       this.hasError = true;
     });
   }
 
+  private handleClearedDraft(): void {
+    const selectedReviewItemId = this.selectedReviewItemId;
+    this.resetPageState();
+    this.selectedReviewItemId = selectedReviewItemId;
+    this.message = '本轮草稿已在其他页面结束，正在同步最新状态';
+    this.hasError = false;
+    if (this.pageActive) this.restoreDraft(this.lifecycleRunId);
+  }
+
   private async discardCurrentDraft(): Promise<void> {
-    if (this.saving || this.attemptId.length === 0) return;
+    if (this.saving || this.discardingDraft || this.attemptId.length === 0) return;
     const attemptId = this.attemptId;
     const selectedReviewItemId = this.selectedReviewItemId;
+    const lifecycleRunId = this.lifecycleRunId;
+    this.discardingDraft = true;
+    this.draftSaveRunId += 1;
     try {
       await LocalLearningRepository.clearCuratedPracticeDraft(attemptId);
       this.resetPageState();
       this.selectedReviewItemId = selectedReviewItemId;
+      if (!this.isActiveLifecycle(lifecycleRunId)) return;
       this.message = '已放弃本轮草稿，正在重新加载练习';
-      this.reloadQuestions();
+      this.discardingDraft = false;
+      await this.reloadQuestions();
     } catch (error) {
       this.message = '草稿清除失败，请重试';
       this.hasError = true;
+    } finally {
+      this.discardingDraft = false;
     }
   }
 
   private goToPreviousQuestion(): void {
-    if (this.currentIndex <= 0) return;
+    if (this.discardingDraft || this.currentIndex <= 0) return;
     this.currentIndex -= 1;
     this.activeQuestion = this.questions[this.currentIndex];
     this.activeAnswer = this.answers[this.currentIndex] ?? '';
@@ -268,7 +318,8 @@ struct PracticePage {
   }
 
   private goToNextQuestion(): void {
-    if (this.currentIndex >= this.questions.length - 1 || this.activeAnswer.length === 0) return;
+    if (this.discardingDraft || this.currentIndex >= this.questions.length - 1 ||
+      this.activeAnswer.length === 0) return;
     this.currentIndex += 1;
     this.activeQuestion = this.questions[this.currentIndex];
     this.activeAnswer = this.answers[this.currentIndex] ?? '';
@@ -276,12 +327,17 @@ struct PracticePage {
   }
 
   private goBack(): void {
+    if (this.discardingDraft) {
+      this.message = '正在放弃本轮草稿，请稍候';
+      this.hasError = false;
+      return;
+    }
     if (this.saving) {
       this.message = '答题结果正在写入本机，请稍候';
       this.hasError = false;
       return;
     }
-    if (!this.submitted && this.questions.length > 0 && this.attemptId.length > 0) {
+    if (!this.submitted && this.draftCreated && this.questions.length > 0 && this.attemptId.length > 0) {
       this.queueDraftSave(false);
     }
     this.getUIContext().getRouter().back();
@@ -307,13 +363,26 @@ struct PracticePage {
     try {
       await this.loadQuestions(this.selectedReviewItemId, runId, lifecycleRunId);
       if (!this.isActiveLoad(runId, lifecycleRunId)) return;
+      const attemptId = this.attemptId;
       try {
-        await this.persistDraft();
+        const draft = this.buildDraft();
+        const created = await LocalLearningRepository.createCuratedPracticeDraft(draft, (): boolean =>
+          this.isActiveLoad(runId, lifecycleRunId) && this.attemptId === attemptId);
+        if (!created || !this.isActiveLoad(runId, lifecycleRunId)) return;
+        this.draftCreated = true;
       } catch (error) {
         if (!this.isActiveLoad(runId, lifecycleRunId)) return;
-        this.draftSaveFailed = true;
-        this.message = '练习已加载，但草稿创建失败；请重试保存';
+        if (error instanceof AnswerDraftClearedError) {
+          this.handleClearedDraft();
+          return;
+        }
+        const selectedReviewItemId = this.selectedReviewItemId;
+        this.resetPageState();
+        this.selectedReviewItemId = selectedReviewItemId;
+        this.loadRetryAvailable = true;
+        this.message = '练习草稿创建失败，请重新加载';
         this.hasError = true;
+        return;
       }
     } catch (error) {
       if (!this.isActiveLoad(runId, lifecycleRunId)) return;
@@ -404,7 +473,7 @@ struct PracticePage {
     this.questions = selectedQuestions;
     this.activeQuestion = selectedQuestions.length > 0 ? selectedQuestions[0] : EMPTY_QUESTION;
     this.attemptId = selectedQuestions.length > 0 ?
-      'curated-' + this.courseId + '-' + Date.now().toString() : '';
+      LocalLearningRepository.createAnswerDraftAttemptId('curated-' + this.courseId) : '';
     this.message = selectedQuestions.length > 0 ? notice : '这个主题还没有精选练习';
     this.hasError = selectedQuestions.length === 0;
   }
@@ -448,7 +517,7 @@ struct PracticePage {
   }
 
   private choose(option: string): void {
-    if (this.submitted || this.attemptSubmittedAt.length > 0) return;
+    if (this.discardingDraft || this.submitted || this.attemptSubmittedAt.length > 0) return;
     const next = this.answers.slice();
     next[this.currentIndex] = option;
     this.answers = next;
@@ -501,7 +570,7 @@ struct PracticePage {
   }
 
   private async submit(): Promise<void> {
-    if (this.saving || !this.allAnswered()) return;
+    if (this.saving || this.discardingDraft || !this.allAnswered()) return;
     if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
       this.message = '当前主题无效，答题记录未保存';
       this.hasError = true;
@@ -565,6 +634,10 @@ struct PracticePage {
         this.hasError = false;
       }
     } catch (error) {
+      if (error instanceof AnswerDraftClearedError) {
+        this.handleClearedDraft();
+        return;
+      }
       this.draftSaveFailed = !draftPersisted;
       this.message = draftPersisted ? '答题结果写回未确认，答案已冻结并保存，请重试提交' :
         '提交前草稿保存失败，本次尚未写回；答案已冻结，请重试保存并提交';
@@ -648,12 +721,13 @@ struct PracticePage {
         Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Button('放弃草稿')
+        Button(this.discardingDraft ? '正在放弃...' : '放弃草稿')
           .height(48)
           .fontSize(11)
           .fontColor(Constants.COLOR_ERROR)
           .backgroundColor(Constants.COLOR_ERROR_LIGHT)
           .borderRadius(Constants.RADIUS_SM)
+          .enabled(!this.discardingDraft)
           .onClick((): void => { this.discardCurrentDraft(); })
       }
       .width('100%')
@@ -701,7 +775,8 @@ struct PracticePage {
       }
       Column({ space: 10 }) {
         ForEach(this.activeQuestion.options, (option: string): void => {
-          AnswerOption(option, this.activeAnswer === option, this.attemptSubmittedAt.length === 0,
+          AnswerOption(option, this.activeAnswer === option,
+            this.attemptSubmittedAt.length === 0 && !this.discardingDraft,
             (): void => { this.choose(option); })
         })
       }
@@ -710,8 +785,9 @@ struct PracticePage {
         Button('上一题')
           .layoutWeight(1)
           .height(46)
-          .enabled(this.currentIndex > 0)
-          .fontColor(this.currentIndex > 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
+          .enabled(this.currentIndex > 0 && !this.discardingDraft)
+          .fontColor(this.currentIndex > 0 && !this.discardingDraft ?
+            Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
           .backgroundColor(Constants.COLOR_BG_TAG)
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => { this.goToPreviousQuestion(); })
@@ -719,19 +795,23 @@ struct PracticePage {
           Button('下一题')
             .layoutWeight(1)
             .height(46)
-            .enabled(this.activeAnswer.length > 0)
-            .fontColor(this.activeAnswer.length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-            .backgroundColor(this.activeAnswer.length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+            .enabled(this.activeAnswer.length > 0 && !this.discardingDraft)
+            .fontColor(this.activeAnswer.length > 0 && !this.discardingDraft ?
+              Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            .backgroundColor(this.activeAnswer.length > 0 && !this.discardingDraft ?
+              Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => { this.goToNextQuestion(); })
         } else {
-          Button(this.saving ? '写入中...' :
-            (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分'))
+          Button(this.discardingDraft ? '正在放弃...' : (this.saving ? '写入中...' :
+            (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分')))
             .layoutWeight(1)
             .height(46)
-            .enabled(this.allAnswered() && !this.saving)
-            .fontColor(this.allAnswered() ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-            .backgroundColor(this.allAnswered() ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+            .enabled(this.allAnswered() && !this.saving && !this.discardingDraft)
+            .fontColor(this.allAnswered() && !this.discardingDraft ?
+              Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            .backgroundColor(this.allAnswered() && !this.discardingDraft ?
+              Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => { this.submit(); })
         }
