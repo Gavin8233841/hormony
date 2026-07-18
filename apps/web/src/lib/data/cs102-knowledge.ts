@@ -208,8 +208,8 @@ export const cs102KnowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "cs102_k28",
-    text: "日志文件系统通过预写日志（WAL）保证文件系统一致性，将元数据修改先写入日志区域再应用到实际位置。系统崩溃后可通过重放日志恢复到一致状态，避免fsck全盘扫描。典型实现包括ext3/ext4的日志模式（journal、ordered、writeback）和XFS、ZFS、Btrfs等现代文件系统。日志文件系统牺牲少量写入性能换取可靠性和快速恢复，是现代存储系统的标准配置。",
-    source: "操作系统概念",
+    text: "ext4 使用 JBD2 日志让写入日志的更新在崩溃恢复时保持原子，从而保护文件系统元数据一致性。data=journal 将文件数据和元数据先写入日志，再写入主文件系统；默认 data=ordered 只记录元数据，并在提交相关元数据前把文件数据先强制写入主文件系统；data=writeback 不保留这项顺序，文件数据可在元数据提交后写入，崩溃后可能暴露旧数据。因此，日志提交不等于所有模式下应用数据已经持久化，必须结合数据模式判断。Btrfs 是写时复制文件系统，Btrfs 不属于 ext4 日志模式。",
+    source: "Linux kernel ext4 Journal (JBD2)；Linux kernel ext4 administration guide；Btrfs documentation Introduction",
     courseId: "cs102",
     topic: "文件系统",
   },

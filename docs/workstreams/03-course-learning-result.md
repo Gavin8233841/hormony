@@ -308,3 +308,32 @@
 - **未验证**：`hdc list targets` 返回 `[Empty]`；课程续学提示、互动保存失败重试、星图 CTA 和并发检索的模拟器/真机交互均未验证。
 - **未验证**：真实 ArkData 故障注入与进程重启并发恢复未验证；当前证据为源码契约、脚本执行和 HAP 构建。
 - **未验证**：HAP 未配置正式签名，安装与竞赛提交包可用性未验证。
+
+## 主线集成：ext4 数据日志模式边界
+
+### 行为
+
+- `cs102_k28` 限定为 ext4/JBD2：`data=journal` 将文件数据和元数据先写入日志；默认 `data=ordered` 只记录元数据，并在提交相关元数据前把关联文件数据写入主文件系统；`data=writeback` 不保留该顺序，崩溃后可能暴露旧数据。
+- 内容明确 journal commit 不能推出所有模式下应用数据已经持久化，不再把 XFS、ZFS、Btrfs 混写成 ext4 的三种数据模式；Btrfs 只按官方 Introduction 说明为 copy on write 文件系统。
+- Web `cs102-knowledge.ts` 与端侧 `knowledge-chunks.json` 只同步 `cs102_k28` 的 `text/source`；新增独立 Python 契约逐字段比较两端，并用三模式事件模型、固定错误文本和来源断言防止事实回退。
+- 本批不修改受保护的 `lesson-experiences.json`。其中 `cs102-文件系统-2` 仍是旧活动文案，不能据此宣称 Lesson 互动已经完成 ext4 三模式同步。
+
+### 来源与文件
+
+- Linux kernel ext4 Journal (JBD2)：`https://docs.kernel.org/filesystems/ext4/journal.html`；2026-07-18 访问，HTTP 200，46,523 bytes，SHA-256 `93a525427430e90363101fd3e763f6ff51efa240596ddba5e0403f2d949c9d64`。
+- Linux kernel ext4 administration guide：`https://docs.kernel.org/admin-guide/ext4.html`；2026-07-18 访问，HTTP 200，41,026 bytes，SHA-256 `3885fe8c133d866972b87d103e02777b676551b5c5b523256eadc580a49ae0f5`。
+- Btrfs documentation Introduction：`https://btrfs.readthedocs.io/en/latest/Introduction.html`；2026-07-18 访问，HTTP 200，16,446 bytes，SHA-256 `1459973f84df3b04e266970885db6a8a8219c704d5b7e799b3e6a67edc018fec`。
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `scripts/test_cs102_ext4_knowledge_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+
+### 证据与未验证
+
+- **源码确认**：三份官方页面本轮均返回 HTTP 200；URL、字节数和响应 SHA-256 已固定在上方，正文分别明确 `data=journal`、默认 `data=ordered`、`data=writeback` 的数据顺序，以及 Btrfs 的 copy on write 定义。
+- **静态诊断通过**：`python -m unittest scripts.test_cs102_ext4_knowledge_facts -v` 退出码 0，10/10 通过；覆盖三模式事件状态、未提交事务、通用持久化误称、矛盾 journal 子句、Btrfs/ZFS 分类、TypeScript 注释与未导出对象误绿、五字段双端一致性和精确 URL 固定。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 知识切片、165 道题和 33 份学习体验的 schema、唯一性、引用、DAG、连通性、单根、层级与 Lesson 路由一致性全部通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；36 个测试文件、437/437 通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 14.2.18 生成 10/10 静态页面和 26.8 kB middleware；HarmonyOS API 12 增量 HAP 退出码 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 通过，`BUILD SUCCESSFUL in 31 s 82 ms`，仍未配置签名。
+- **未验证**：本批尚未在模拟器打开 k28 长文本；屏幕阅读器、手机/平板排版、真机和线上 API 未验证。
+- **未验证**：主线没有 WS03 分支使用的 `generate-knowledge-json.mjs`，因此没有记录不存在的生成命令；本批以两个明确字段的受控同步和可执行逐字段一致性契约证明双端内容一致。
