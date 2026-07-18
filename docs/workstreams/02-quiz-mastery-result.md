@@ -224,3 +224,25 @@
 - **未验证**：本批不构造或清除模拟器用户数据库，长期第 21 条重试与 schema 2 升级由可执行 ArkData fixture 和 API 12 HAP 构建验证，未在模拟器 UI 中人工制造 25 次历史答题。
 - **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；DevEco Agent 的 Alibaba 403 与内置模型 401 状态未重试。
 - **未验证**：项目未配置生产签名，真机与多设备未验证。
+
+## 批次 7：旧测验迁移失败后的重入幂等
+
+### 背景与行为变化
+
+- schema 8/10 的旧测验迁移需要依次写入 `quiz_learning_state` 与清理后的 `study_events`。旧实现若第一键成功、第二键失败，`schema_version` 会保持旧值；下次初始化再次把同一旧画像、掌握度和答题统计追加到已经迁移的状态，造成终身统计翻倍。
+- 历史聚合确实早于当前测验状态时，迁移在追加统计的同一次 `quiz_learning_state` 写入中同步保存 `legacy.updatedAt` 作为 `firstSubmittedAt` 时间边界。失败重入后，同一历史不再满足“早于当前状态”，既有的非追加合并分支保持现状，无需新增 schema 或独立迁移标记。
+- 动态 ArkData fixture 在 `study_events` 写入点注入失败：首次中断后保持 6 次、42 题、30 题正确；同进程重新初始化后仍为 6 次、42 题、30 题正确，Topic 掌握累计保持 6 次、12 题、9 题正确，最终 schema 升至 13。修复前同一用例稳定复现为 10 次、82 题、59 题正确。
+
+### 验证
+
+- **静态诊断通过**：`cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`，exit 0，`60/60` 通过；新增第二键写失败与迁移重入故障注入反例。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，exit 0；`pnpm test` 为 28 个文件、`437/437` 通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建完成。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，exit 0，CompileArkTS 与 PackageHap 完成，`BUILD SUCCESSFUL in 24 s 457 ms`；项目未配置 `signingConfigs`，构建跳过签名。
+- **模拟器通过**：目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。最新 `entry-default-unsigned.hap` 返回 `install bundle successfully`，`com.c4ai.hormony/EntryAbility` 返回 `start ability successfully`；UI 树为 `pages/Index`，根 bounds `[0,137][1256,2760]`。
+
+### 未验证
+
+- **未验证**：本批不修改或清除模拟器用户数据库，schema 8/10 第二键写失败后的统计不重复由可执行 ArkData 故障注入 fixture 验证，未在模拟器内破坏真实迁移过程。
+- **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；按主线程约束未重试当前不可用的 DevEco Agent 模型。
+- **未验证**：项目未配置生产签名，真机与多设备未验证。

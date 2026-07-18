@@ -351,6 +351,7 @@ export class LocalLearningRepository {
     if (appendLegacyHistory) {
       state.stats.totalQuestions += legacy.totalQuestions;
       state.stats.correctQuestions += legacyCorrectQuestions;
+      state.stats.firstSubmittedAt = legacy.updatedAt;
     } else if (legacy.totalQuestions >= state.stats.totalQuestions) {
       state.stats.totalQuestions = legacy.totalQuestions;
       state.stats.correctQuestions = legacyCorrectQuestions;

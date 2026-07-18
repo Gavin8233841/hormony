@@ -82,6 +82,7 @@ interface RuntimeState {
     totalQuestions: number;
     correctQuestions: number;
     quizDates: string[];
+    firstSubmittedAt?: string;
   };
   reviewItems: RuntimeReviewItem[];
   topicMastery: RuntimeMastery[];
@@ -1131,6 +1132,44 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     await second.repository.initialize({});
     expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(persistedSnapshot);
     expect(await second.repository.getCourses()).toEqual(firstCourses);
+  });
+
+  it("旧测验迁移在第二键写入失败后重入不重复累计历史", async () => {
+    const currentState = reducer.createEmptyState();
+    applyReducerResult(currentState, result("migration-retry-wrong", "2026-07-17T11:00:00.000Z", false));
+    applyReducerResult(currentState, result("migration-retry-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    const loaded = loadRepository(rows);
+    loaded.store.failWrite("study_events");
+
+    await expect(loaded.repository.initialize({})).rejects.toThrow("ArkData fixture 写入失败: study_events");
+    expect(rowValue<number>(rows, "schema_version")).toBe(8);
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").stats).toMatchObject({
+      totalAttempts: 6,
+      totalQuestions: 42,
+      correctQuestions: 30,
+    });
+
+    await loaded.repository.initialize({});
+    const recovered = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(recovered.stats).toMatchObject({
+      totalAttempts: 6,
+      totalQuestions: 42,
+      correctQuestions: 30,
+      firstSubmittedAt: "2026-07-10T08:00:00.000Z",
+    });
+    expect(recovered.topicMastery).toEqual([
+      expect.objectContaining({
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 6,
+        totalQuestions: 12,
+        correctQuestions: 9,
+      }),
+    ]);
+    expect(rowValue<number>(rows, "schema_version")).toBe(13);
   });
 
   it("自由回答的已覆盖与有遗漏都只保留自评事实，不改变客观题统计", () => {
