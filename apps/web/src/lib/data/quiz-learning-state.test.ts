@@ -68,7 +68,25 @@ interface RuntimeTagInsight {
   wrongQuestions: number;
 }
 
+interface RuntimeLegacyQuizTopicHistorySnapshot {
+  courseId: string;
+  topic: string;
+  attempts: number;
+  totalQuestions: number;
+  correctQuestions: number;
+  lastPracticedAt?: string;
+}
+
+interface RuntimeLegacyQuizHistorySnapshot {
+  updatedAt: string;
+  totalQuestions: number;
+  correctQuestions: number;
+  resultIds: string[];
+  topicMastery: RuntimeLegacyQuizTopicHistorySnapshot[];
+}
+
 interface RuntimeState {
+  legacyHistorySnapshot?: RuntimeLegacyQuizHistorySnapshot;
   pendingResults: RuntimeResult[];
   appliedQuizIds: string[];
   appliedInsightEventIds: string[];
@@ -78,6 +96,7 @@ interface RuntimeState {
     totalQuestions: number;
     correctQuestions: number;
     quizDates: string[];
+    firstSubmittedAt?: string;
   };
   reviewItems: RuntimeReviewItem[];
   topicMastery: RuntimeMastery[];
@@ -137,6 +156,7 @@ interface ReducerRuntime {
   enqueueResult(state: RuntimeState, result: RuntimeResult): boolean;
   applyPendingResults(state: RuntimeState): number;
   applyResult(state: RuntimeState, result: RuntimeResult): boolean;
+  masteryTotals(mastery: RuntimeMastery[]): RuntimeState["stats"];
   applyLearningInsightEvent(state: RuntimeState, event: RuntimeStudyEvent): boolean;
   createReceipt(state: RuntimeState, result: RuntimeResult, applied: boolean, now?: string): RuntimeReceipt;
   localDateKey(timestamp: string): string;
@@ -174,15 +194,20 @@ interface ArkDataRow {
 }
 
 class MemoryResultSet {
-  constructor(private readonly payload: string | null) {}
+  constructor(private readonly row: ArkDataRow | null) {}
 
   goToFirstRow(): boolean {
-    return this.payload !== null;
+    return this.row !== null;
   }
 
   getString(index: number): string {
-    if (index !== 0 || this.payload === null) throw new Error("ResultSet payload 不存在");
-    return this.payload;
+    if (index !== 0 || this.row === null) throw new Error("ResultSet payload 不存在");
+    return this.row.payload;
+  }
+
+  getLong(index: number): number {
+    if (index !== 1 || this.row === null) throw new Error("ResultSet updated_at 不存在");
+    return this.row.updatedAt;
   }
 
   close(): void {}
@@ -221,13 +246,14 @@ class MemoryRdbStore {
   }
 
   async querySql(sql: string, bindArgs: unknown[]): Promise<MemoryResultSet> {
-    if (sql !== "SELECT payload FROM app_state WHERE state_key = ?") {
+    if (sql !== "SELECT payload FROM app_state WHERE state_key = ?" &&
+      sql !== "SELECT payload, updated_at FROM app_state WHERE state_key = ?") {
       throw new Error(`未实现的 ArkData 查询 SQL: ${sql}`);
     }
     const [key] = bindArgs;
     if (typeof key !== "string") throw new Error("ArkData 查询键无效");
     this.queriedKeys.push(key);
-    return new MemoryResultSet(this.rows.get(key)?.payload ?? null);
+    return new MemoryResultSet(this.rows.get(key) ?? null);
   }
 }
 
@@ -643,6 +669,159 @@ function result(
 }
 
 describe("QuizLearningStateReducer 持久学习闭环", () => {
+  it("首答时间按真实时间戳比较带时区偏移的合法时间", () => {
+    const later = "2026-07-17T02:00:00.000Z";
+    const earlierWithOffset = "2026-07-17T09:30:00.000+08:00";
+    const state = reducer.createEmptyState();
+    reducer.applyResult(state, result("timezone-later", later, false));
+    reducer.applyResult(state, result("timezone-earlier", earlierWithOffset, true));
+    expect(state.stats.firstSubmittedAt).toBe(earlierWithOffset);
+
+    const totals = reducer.masteryTotals([
+      {
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 1,
+        totalQuestions: 1,
+        correctQuestions: 0,
+        accuracy: 0,
+        mastered: false,
+        lastPracticedAt: later,
+      },
+      {
+        courseId: "cs101",
+        topic: "图的遍历",
+        attempts: 1,
+        totalQuestions: 1,
+        correctQuestions: 1,
+        accuracy: 1,
+        mastered: true,
+        lastPracticedAt: earlierWithOffset,
+      },
+    ]);
+    expect(totals.firstSubmittedAt).toBe(earlierWithOffset);
+  });
+
+  it("状态清洗重算首答时间时不按 ISO 字符串字典序", async () => {
+    const later = "2026-07-17T02:00:00.000Z";
+    const earlierWithOffset = "2026-07-17T09:30:00.000+08:00";
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("sanitize-timezone-later", later, false));
+    currentState.recentResults.push(result("sanitize-invalid-topic", later, true, "不存在的Topic"));
+    currentState.quizEvents.push({
+      id: "sanitize-timezone-earlier-event",
+      type: "lesson_activity",
+      timestamp: earlierWithOffset,
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      totalQuestions: 1,
+      correctCount: 1,
+    });
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    rows.set("study_events", { payload: JSON.stringify([]), updatedAt: 102 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 40,
+        accuracy: null,
+        studyDates: [],
+        updatedAt: "2026-07-10T08:00:00.000Z",
+      }),
+      updatedAt: 103,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").stats.firstSubmittedAt)
+      .toBe(earlierWithOffset);
+  });
+
+  it("Quiz 事件按真实时间重放，不因 offset 字典序伪造掌握里程碑", () => {
+    const state = reducer.createEmptyState();
+    state.topicMastery = [
+      {
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 6,
+        totalQuestions: 6,
+        correctQuestions: 4,
+        accuracy: 4 / 6,
+        mastered: false,
+        lastPracticedAt: "2026-07-17T02:00:00.000Z",
+      },
+    ];
+    reducer.mergeQuizEvents(state, [
+      {
+        id: "offset-earlier-wrong",
+        type: "quiz_submitted",
+        timestamp: "2026-07-17T09:30:00.000+08:00",
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        totalQuestions: 1,
+        correctCount: 0,
+      },
+      {
+        id: "offset-later-correct",
+        type: "quiz_mastered",
+        timestamp: "2026-07-17T02:00:00.000Z",
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        totalQuestions: 1,
+        correctCount: 1,
+      },
+    ]);
+    expect(state.masteryMilestones).toEqual([]);
+    expect(state.quizEvents.map((event) => event.id)).toEqual([
+      "offset-earlier-wrong",
+      "offset-later-correct",
+    ]);
+  });
+
+  it("最近结果满 20 条时迟到旧结果不会挤掉真实较新记录", () => {
+    const state = reducer.createEmptyState();
+    for (let index = 0; index < 20; index += 1) {
+      reducer.applyResult(state, result(
+        `recent-newer-${index}`,
+        `2026-07-17T10:${index.toString().padStart(2, "0")}:00.000Z`,
+        true
+      ));
+    }
+    reducer.applyResult(state, result("recent-late-old", "2026-07-01T08:00:00.000Z", false));
+    expect(state.recentResults).toHaveLength(20);
+    expect(state.recentResults.map((item) => item.quizId)).not.toContain("recent-late-old");
+    expect(state.recentResults.map((item) => item.quizId)).toContain("recent-newer-0");
+  });
+
+  it("Quiz 事件满 500 条时最后补入的迟到旧事件不会挤掉较新事件", () => {
+    const state = reducer.createEmptyState();
+    const newerEvents: RuntimeStudyEvent[] = [];
+    const start = new Date("2026-07-17T08:00:00.000Z").getTime();
+    for (let index = 0; index < 500; index += 1) {
+      newerEvents.push({
+        id: `event-newer-${index}`,
+        type: "quiz_submitted",
+        timestamp: new Date(start + index * 1000).toISOString(),
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        totalQuestions: 1,
+        correctCount: 0,
+      });
+    }
+    reducer.mergeQuizEvents(state, newerEvents.concat([{
+      id: "event-late-old",
+      type: "quiz_submitted",
+      timestamp: "2026-07-01T08:00:00.000Z",
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      totalQuestions: 1,
+      correctCount: 0,
+    }]));
+
+    expect(state.quizEvents).toHaveLength(500);
+    expect(state.quizEvents.map((event) => event.id)).not.toContain("event-late-old");
+    expect(state.quizEvents.map((event) => event.id)).toContain("event-newer-0");
+  });
+
   it("Repository 先持久化 pending，再归并并以同一 ArkData 键完成写回", () => {
     expect(repositorySource).toContain("const KEY_QUIZ_LEARNING_STATE: string = 'quiz_learning_state'");
     const appendStart = repositorySource.indexOf("static async appendQuizResult");
@@ -718,10 +897,12 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
   it("schema 迁移按课程的 33 Topic 精确集合清洗全部历史派生状态", () => {
     const exactTopicSource = repositoryMethodSource("isExactCourseTopic");
     const migrationSource = repositoryMethodSource("migrateQuizLearningState");
+    const legacyResultValidationSource = repositoryMethodSource("isValidLegacyQuizResult");
     const sanitizeSource = repositoryMethodSource("sanitizeQuizLearningState");
     expect(exactTopicSource).toContain("LearningContentRepository.getTopics(courseId).includes(topic)");
     expect(exactTopicSource).not.toContain("'综合'");
-    expect(migrationSource).toContain("isExactCourseTopic(result.courseId, result.topic)");
+    expect(migrationSource).toContain("validateLegacyResultWindow(legacyResults)");
+    expect(legacyResultValidationSource).toContain("isExactCourseTopic(result.courseId, result.topic)");
     for (const field of [
       "pendingResults",
       "recentResults",
@@ -733,8 +914,121 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     ]) {
       expect(sanitizeSource).toContain(`state.${field} = state.${field}.filter`);
     }
-    expect(sanitizeSource).toContain("if (retainedStatsSourceCount !== originalStatsSourceCount)");
+    expect(sanitizeSource).toContain("!statsWereValid || retainedStatsSourceCount !== originalStatsSourceCount");
     expect(sanitizeSource).toContain("QuizLearningStateReducer.masteryTotals(state.topicMastery)");
+  });
+
+  it("schema 12 日常加载清除非法时间、空 detail 和非法 tags 的 pending", async () => {
+    const rows = repositoryRows();
+    const state = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    const invalidTime = result("pending-invalid-time", "not-a-time", false);
+    const nullDetail = result("pending-null-detail", "2026-07-18T08:00:00.000Z", false);
+    nullDetail.details = [null as unknown as RuntimeDetail];
+    const invalidTags = result("pending-invalid-tags", "2026-07-18T09:00:00.000Z", false);
+    invalidTags.details[0].tags = [42 as unknown as string];
+    state.pendingResults = [invalidTime, nullDetail, invalidTags];
+    rows.set("quiz_learning_state", { payload: JSON.stringify(state), updatedAt: 100 });
+
+    await loadRepository(rows).repository.initialize({});
+
+    const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(persisted.pendingResults).toEqual([]);
+    expect(persisted.appliedQuizIds).toEqual([]);
+    expect(persisted.stats).toMatchObject({ totalAttempts: 0, totalQuestions: 0, correctQuestions: 0 });
+  });
+
+  it("schema 12 顶层原始值、损坏容器和 null 事件都恢复为可持久化空状态", async () => {
+    for (const payload of [JSON.stringify(42), JSON.stringify({
+      schemaVersion: 2,
+      pendingResults: {},
+      appliedQuizIds: [null, "", "kept", "kept"],
+      appliedInsightEventIds: null,
+      recentResults: null,
+      stats: [],
+      reviewItems: [null],
+      topicMastery: [null],
+      tagInsights: [null],
+      quizEvents: [null],
+      masteryMilestones: [null],
+      weakTopics: null,
+      strongTopics: null,
+    })]) {
+      const rows = repositoryRows(12, [], [null as unknown as RuntimeStudyEvent]);
+      rows.set("quiz_learning_state", { payload, updatedAt: 100 });
+      const loaded = loadRepository(rows);
+
+      await loaded.repository.initialize({});
+
+      const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+      expect(persisted.pendingResults).toEqual([]);
+      expect(persisted.recentResults).toEqual([]);
+      expect(persisted.reviewItems).toEqual([]);
+      expect(persisted.topicMastery).toEqual([]);
+      expect(persisted.tagInsights).toEqual([]);
+      expect(persisted.quizEvents).toEqual([]);
+      expect(persisted.masteryMilestones).toEqual([]);
+      expect(persisted.stats).toMatchObject({ totalAttempts: 0, totalQuestions: 0, correctQuestions: 0 });
+      expect(await loaded.repository.getStudyEvents()).toEqual([]);
+    }
+  });
+
+  it("仅 weakTopics 与 strongTopics 陈旧时日常加载也持久化刷新结果", async () => {
+    const rows = repositoryRows();
+    const state = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    state.stats = {
+      totalAttempts: 1,
+      totalQuestions: 5,
+      correctQuestions: 5,
+      quizDates: ["2026-07-18"],
+      firstSubmittedAt: "2026-07-18T08:00:00.000Z",
+    };
+    state.topicMastery = [{
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      attempts: 1,
+      totalQuestions: 5,
+      correctQuestions: 5,
+      accuracy: 1,
+      mastered: true,
+      lastPracticedAt: "2026-07-18T08:00:00.000Z",
+    }];
+    state.weakTopics = ["二叉树与BST"];
+    state.strongTopics = [];
+    rows.set("quiz_learning_state", { payload: JSON.stringify(state), updatedAt: 100 });
+
+    await loadRepository(rows).repository.initialize({});
+
+    const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(persisted.weakTopics).toEqual([]);
+    expect(persisted.strongTopics).toEqual(["二叉树与BST"]);
+    expect(rows.get("quiz_learning_state")?.updatedAt).not.toBe(100);
+  });
+
+  it("公开学习事件按真实时间而不是 offset 字符串顺序返回", async () => {
+    const rows = repositoryRows(12, [], [{
+      id: "stored-later",
+      type: "task_completed",
+      timestamp: "2026-07-17T02:00:00.000Z",
+      taskId: "task-later",
+    } as RuntimeStudyEvent]);
+    const state = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    state.quizEvents = [{
+      id: "quiz-offset-earlier",
+      type: "quiz_submitted",
+      timestamp: "2026-07-17T09:30:00.000+08:00",
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      totalQuestions: 1,
+      correctCount: 0,
+    }];
+    rows.set("quiz_learning_state", { payload: JSON.stringify(state), updatedAt: 100 });
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+
+    expect((await loaded.repository.getStudyEvents()).map((event) => event.id)).toEqual([
+      "quiz-offset-earlier",
+      "stored-later",
+    ]);
   });
 
   it("从已发布 schema v10 行迁移后保留累计统计，并在 JSON 重读后保持一致", async () => {
@@ -904,6 +1198,1144 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     await second.repository.initialize({});
     expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(persistedSnapshot);
     expect(await second.repository.getCourses()).toEqual(firstCourses);
+  });
+
+  it("旧测验迁移在第二键写入失败后重入不重复累计历史", async () => {
+    for (const failingKey of ["study_events", "schema_version"]) {
+      const currentState = reducer.createEmptyState();
+      reducer.applyResult(currentState, result("migration-retry-wrong", "2026-07-17T11:00:00.000Z", false));
+      reducer.applyResult(currentState, result("migration-retry-correct", "2026-07-17T12:00:00.000Z", true));
+      const rows = v10Rows();
+      rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+      rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+      const loaded = loadRepository(rows);
+      loaded.store.failWrite(failingKey);
+
+      await expect(loaded.repository.initialize({})).rejects.toThrow(`ArkData fixture 写入失败: ${failingKey}`);
+      expect(rowValue<number>(rows, "schema_version")).toBe(8);
+      const firstPass = rowValue<RuntimeState>(rows, "quiz_learning_state");
+      expect(firstPass.stats).toMatchObject({
+        totalAttempts: 6,
+        totalQuestions: 42,
+        correctQuestions: 30,
+        firstSubmittedAt: "2026-07-10T08:00:00.000Z",
+      });
+      expect(firstPass.legacyHistorySnapshot).toEqual({
+        updatedAt: "2026-07-10T08:00:00.000Z",
+        totalQuestions: 40,
+        correctQuestions: 29,
+        resultIds: [],
+        topicMastery: [
+          {
+            courseId: "cs101",
+            topic: "二叉树与BST",
+            attempts: 4,
+            totalQuestions: 10,
+            correctQuestions: 8,
+            lastPracticedAt: "2026-07-10T08:00:00.000Z",
+          },
+        ],
+      });
+      expect(rowValue<RuntimeStudyEvent[]>(rows, "study_events")).toHaveLength(
+        failingKey === "study_events" ? 1 : 0
+      );
+
+      await loaded.repository.initialize({});
+      const recovered = rowValue<RuntimeState>(rows, "quiz_learning_state");
+      expect(recovered).toEqual(firstPass);
+      expect(recovered.topicMastery).toEqual([
+        expect.objectContaining({
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          attempts: 6,
+          totalQuestions: 12,
+          correctQuestions: 9,
+        }),
+      ]);
+      expect(rowValue<RuntimeStudyEvent[]>(rows, "study_events")).toEqual([]);
+      expect(rowValue<number>(rows, "schema_version")).toBe(12);
+    }
+  });
+
+  it("旧历史快照不覆盖 pending 中更早的真实首答时间", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-pending-base", "2026-07-17T12:00:00.000Z", false));
+    reducer.enqueueResult(currentState, result("migration-pending-earlier", "2026-07-05T08:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats.firstSubmittedAt).toBe("2026-07-05T08:00:00.000Z");
+    expect(migrated.stats).toMatchObject({
+      totalAttempts: 5,
+      totalQuestions: 41,
+      correctQuestions: 30,
+    });
+    expect(migrated.legacyHistorySnapshot?.updatedAt).toBe("2026-07-10T08:00:00.000Z");
+  });
+
+  it("旧统计数值无效时不导入任何 aggregate 组件", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-invalid-stats-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("migration-invalid-stats-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 40,
+        accuracy: null,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10"],
+        updatedAt: "2026-07-10T08:00:00.000Z",
+      }),
+      updatedAt: 102,
+    });
+    const loaded = loadRepository(rows);
+    loaded.store.failWrite("study_events");
+
+    await expect(loaded.repository.initialize({})).rejects.toThrow("ArkData fixture 写入失败: study_events");
+    const firstPass = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(firstPass.legacyHistorySnapshot).toBeUndefined();
+    expect(firstPass.stats).toMatchObject({ totalAttempts: 2, totalQuestions: 2, correctQuestions: 1 });
+    await loaded.repository.initialize({});
+    const recovered = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(recovered.topicMastery).toEqual([
+      expect.objectContaining({
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 2,
+        totalQuestions: 2,
+        correctQuestions: 1,
+      }),
+    ]);
+    expect(recovered.stats).toMatchObject({ totalAttempts: 2, totalQuestions: 2, correctQuestions: 1 });
+    expect(recovered.legacyHistorySnapshot).toBeUndefined();
+  });
+
+  it("旧 Topic aggregate 含非法 Topic 时 existing 路径整体拒绝 aggregate", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-invalid-topic-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("migration-invalid-topic-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    const legacyMastery = rowValue<RuntimeMastery[]>(rows, "topic_mastery");
+    legacyMastery.push({
+      courseId: "cs101",
+      topic: "不存在的Topic",
+      attempts: 1,
+      totalQuestions: 5,
+      correctQuestions: 5,
+      accuracy: 1,
+      mastered: true,
+      lastPracticedAt: "2026-07-10T09:00:00.000Z",
+    });
+    rows.set("topic_mastery", { payload: JSON.stringify(legacyMastery), updatedAt: 100 });
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 101 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 102 });
+
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 2, totalQuestions: 2, correctQuestions: 1 });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({ courseId: "cs101", topic: "二叉树与BST", totalQuestions: 2 }),
+    ]);
+    expect(migrated.legacyHistorySnapshot).toBeUndefined();
+  });
+
+  it("旧 Topic aggregate 含非法 Topic 时无 unified state 路径也不部分导入", async () => {
+    const rows = v10Rows();
+    const legacyMastery = rowValue<RuntimeMastery[]>(rows, "topic_mastery");
+    legacyMastery.push({
+      courseId: "cs101",
+      topic: "不存在的Topic",
+      attempts: 1,
+      totalQuestions: 5,
+      correctQuestions: 5,
+      accuracy: 1,
+      mastered: true,
+      lastPracticedAt: "2026-07-10T09:00:00.000Z",
+    });
+    rows.set("topic_mastery", { payload: JSON.stringify(legacyMastery), updatedAt: 100 });
+
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 0, totalQuestions: 0, correctQuestions: 0 });
+    expect(migrated.topicMastery).toEqual([]);
+    expect(migrated.legacyHistorySnapshot).toBeUndefined();
+  });
+
+  it("旧测验迁移第一键写入失败时不落快照并可完整重试", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-first-key-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("migration-first-key-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    const beforeMigration = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    const loaded = loadRepository(rows);
+    loaded.store.failWrite("quiz_learning_state");
+
+    await expect(loaded.repository.initialize({})).rejects.toThrow("ArkData fixture 写入失败: quiz_learning_state");
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(beforeMigration);
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").legacyHistorySnapshot).toBeUndefined();
+
+    await loaded.repository.initialize({});
+    const recovered = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(recovered.stats).toMatchObject({ totalAttempts: 6, totalQuestions: 42, correctQuestions: 30 });
+    expect(recovered.legacyHistorySnapshot?.totalQuestions).toBe(40);
+    expect(rowValue<RuntimeStudyEvent[]>(rows, "study_events")).toEqual([]);
+    expect(rowValue<number>(rows, "schema_version")).toBe(12);
+  });
+
+  it("没有旧事件和练习时间时累计快照仍阻止第二键失败后的重复追加", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-stats-only-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("migration-stats-only-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    const legacyMastery = rowValue<RuntimeMastery[]>(rows, "topic_mastery");
+    delete legacyMastery[0].lastPracticedAt;
+    rows.set("topic_mastery", { payload: JSON.stringify(legacyMastery), updatedAt: 100 });
+    rows.set("study_events", { payload: JSON.stringify([]), updatedAt: 101 });
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 102 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 103 });
+    const loaded = loadRepository(rows);
+    loaded.store.failWrite("study_events");
+
+    await expect(loaded.repository.initialize({})).rejects.toThrow("ArkData fixture 写入失败: study_events");
+    const firstPass = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(firstPass.stats).toMatchObject({
+      totalAttempts: 6,
+      totalQuestions: 42,
+      correctQuestions: 30,
+      firstSubmittedAt: "2026-07-17T11:00:00.000Z",
+    });
+    expect(firstPass.legacyHistorySnapshot?.totalQuestions).toBe(40);
+
+    await loaded.repository.initialize({});
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(firstPass);
+  });
+
+  it("再次降级后的累计增量不受结果窗口和时间先后限制", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-repeat-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("migration-repeat-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    await loadRepository(rows).repository.initialize({});
+
+    const downgradedResult = result("legacy-after-second-downgrade", "2026-07-18T08:00:00.000Z", true);
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 200 });
+    rows.set("quiz_results", { payload: JSON.stringify([downgradedResult]), updatedAt: 201 });
+    rows.set("study_events", {
+      payload: JSON.stringify([
+        {
+          id: "event-after-second-downgrade",
+          type: "quiz_mastered",
+          timestamp: downgradedResult.submittedAt,
+          courseId: downgradedResult.courseId,
+          topic: downgradedResult.topic,
+          source: downgradedResult.source,
+          difficulty: downgradedResult.difficulty,
+          accuracy: downgradedResult.accuracy,
+          tags: ["树结构"],
+          totalQuestions: 1,
+          correctCount: 1,
+        },
+      ]),
+      updatedAt: 202,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([
+        {
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          attempts: 5,
+          totalQuestions: 11,
+          correctQuestions: 9,
+          accuracy: 9 / 11,
+          mastered: true,
+          lastPracticedAt: downgradedResult.submittedAt,
+        },
+      ]),
+      updatedAt: 203,
+    });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 30 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+        updatedAt: downgradedResult.submittedAt,
+      }),
+      updatedAt: 204,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 7, totalQuestions: 43, correctQuestions: 31 });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({ attempts: 7, totalQuestions: 13, correctQuestions: 10 }),
+    ]);
+    expect(migrated.appliedQuizIds).toContain("legacy-after-second-downgrade");
+    expect(migrated.legacyHistorySnapshot).toEqual(expect.objectContaining({
+      updatedAt: "2026-07-18T08:00:00.000Z",
+      totalQuestions: 41,
+      correctQuestions: 30,
+      resultIds: ["legacy-after-second-downgrade"],
+    }));
+
+    const persistedSnapshot = JSON.parse(JSON.stringify(migrated)) as RuntimeState;
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 300 });
+    await loadRepository(rows).repository.initialize({});
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(persistedSnapshot);
+  });
+
+  it("旧版已写 stats 但未写 Topic 时仍按结果窗口精确补齐一次", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-stats-prefix-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("migration-stats-prefix-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    await loadRepository(rows).repository.initialize({});
+
+    const downgradedResult = result("legacy-stats-without-topic", "2026-07-18T08:00:00.000Z", true);
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 200 });
+    rows.set("quiz_results", { payload: JSON.stringify([downgradedResult]), updatedAt: 201 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 30 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+        updatedAt: downgradedResult.submittedAt,
+      }),
+      updatedAt: 202,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 7, totalQuestions: 43, correctQuestions: 31 });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({ attempts: 7, totalQuestions: 13, correctQuestions: 10 }),
+    ]);
+    expect(migrated.legacyHistorySnapshot).toEqual(expect.objectContaining({
+      totalQuestions: 41,
+      correctQuestions: 30,
+      resultIds: ["legacy-stats-without-topic"],
+      topicMastery: [expect.objectContaining({ totalQuestions: 10, correctQuestions: 8 })],
+    }));
+
+    const persistedSnapshot = JSON.parse(JSON.stringify(migrated)) as RuntimeState;
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 300 });
+    await loadRepository(rows).repository.initialize({});
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(persistedSnapshot);
+  });
+
+  it("既有 schema 12 state 无快照时首次再次降级仍恢复新结果", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("rollout-current-wrong", "2026-07-17T11:00:00.000Z", false));
+    reducer.applyResult(currentState, result("rollout-current-correct", "2026-07-17T12:00:00.000Z", true));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    await loadRepository(rows).repository.initialize({});
+    const deployedState = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    delete deployedState.legacyHistorySnapshot;
+    rows.set("quiz_learning_state", { payload: JSON.stringify(deployedState), updatedAt: 200 });
+
+    const downgradedResult = result("rollout-first-downgrade", "2026-07-18T08:00:00.000Z", true);
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 201 });
+    rows.set("quiz_results", { payload: JSON.stringify([downgradedResult]), updatedAt: 202 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 30 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+        updatedAt: downgradedResult.submittedAt,
+      }),
+      updatedAt: 203,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([
+        {
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          attempts: 5,
+          totalQuestions: 11,
+          correctQuestions: 9,
+          accuracy: 9 / 11,
+          mastered: true,
+          lastPracticedAt: downgradedResult.submittedAt,
+        },
+      ]),
+      updatedAt: 204,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 7, totalQuestions: 43, correctQuestions: 31 });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({ attempts: 7, totalQuestions: 13, correctQuestions: 10 }),
+    ]);
+    expect(migrated.appliedQuizIds).toContain("rollout-first-downgrade");
+    expect(migrated.legacyHistorySnapshot?.resultIds).toEqual(["rollout-first-downgrade"]);
+  });
+
+  it("无 unified state 时旧版三个写入停点都恢复为同一完整结果", async () => {
+    for (const stage of ["results", "stats", "topic"] as const) {
+      const rows = v10Rows();
+      const recoveredResult = result(`no-state-${stage}`, "2026-07-18T08:00:00.000Z", false);
+      rows.set("quiz_results", { payload: JSON.stringify([recoveredResult]), updatedAt: 100 });
+      if (stage !== "results") {
+        rows.set("quiz_stats", {
+          payload: JSON.stringify({
+            totalQuestions: 41,
+            accuracy: 29 / 41,
+            studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+            updatedAt: recoveredResult.submittedAt,
+          }),
+          updatedAt: 101,
+        });
+      }
+      if (stage === "topic") {
+        rows.set("study_events", {
+          payload: JSON.stringify([
+            ...rowValue<RuntimeStudyEvent[]>(v10Rows(), "study_events"),
+            {
+              id: "legacy-no-state-result-event",
+              type: "quiz_submitted",
+              timestamp: recoveredResult.submittedAt,
+              courseId: recoveredResult.courseId,
+              topic: recoveredResult.topic,
+              source: recoveredResult.source,
+              difficulty: recoveredResult.difficulty,
+              totalQuestions: 1,
+              correctCount: 0,
+            },
+          ]),
+          updatedAt: 102,
+        });
+        rows.set("topic_mastery", {
+          payload: JSON.stringify([
+            {
+              courseId: "cs101",
+              topic: "二叉树与BST",
+              attempts: 5,
+              totalQuestions: 11,
+              correctQuestions: 8,
+              accuracy: 8 / 11,
+              mastered: false,
+              lastPracticedAt: recoveredResult.submittedAt,
+            },
+          ]),
+          updatedAt: 103,
+        });
+      }
+
+      await loadRepository(rows).repository.initialize({});
+      const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+      expect(migrated.stats).toMatchObject({ totalAttempts: 5, totalQuestions: 41, correctQuestions: 29 });
+      expect(migrated.topicMastery).toEqual([
+        expect.objectContaining({ attempts: 5, totalQuestions: 11, correctQuestions: 8 }),
+      ]);
+      expect(migrated.reviewItems).toEqual([
+        expect.objectContaining({ questionId: `question-no-state-${stage}`, resolved: false }),
+      ]);
+      expect(migrated.tagInsights).toEqual([
+        expect.objectContaining({ courseId: "cs101", topic: "二叉树与BST", wrongQuestions: 1 }),
+      ]);
+      expect(migrated.quizEvents.filter((event) => event.timestamp === recoveredResult.submittedAt)).toHaveLength(1);
+      expect(migrated.legacyHistorySnapshot?.resultIds).toEqual([`no-state-${stage}`]);
+    }
+  });
+
+  it("无 unified state 时回填时间与缺失练习时间都不伪造 aggregate 已包含", async () => {
+    const scenarios = [
+      {
+        quizId: "no-state-backdated",
+        submittedAt: "2026-07-09T08:00:00.000Z",
+        correct: true,
+        removeLastPracticedAt: false,
+        expectedCorrect: 30,
+      },
+      {
+        quizId: "no-state-missing-practice-time",
+        submittedAt: "2026-07-18T08:00:00.000Z",
+        correct: false,
+        removeLastPracticedAt: true,
+        expectedCorrect: 29,
+      },
+      {
+        quizId: "no-state-same-instant-offset",
+        submittedAt: "2026-07-10T16:00:00.000+08:00",
+        correct: true,
+        removeLastPracticedAt: false,
+        expectedCorrect: 30,
+      },
+    ];
+    for (const scenario of scenarios) {
+      const rows = v10Rows();
+      if (scenario.removeLastPracticedAt) {
+        const mastery = rowValue<RuntimeMastery[]>(rows, "topic_mastery");
+        delete mastery[0].lastPracticedAt;
+        rows.set("topic_mastery", { payload: JSON.stringify(mastery), updatedAt: 7 });
+      }
+      rows.set("quiz_results", {
+        payload: JSON.stringify([
+          result(scenario.quizId, scenario.submittedAt, scenario.correct),
+        ]),
+        updatedAt: 100,
+      });
+
+      await loadRepository(rows).repository.initialize({});
+
+      const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+      expect(migrated.stats).toMatchObject({
+        totalAttempts: 5,
+        totalQuestions: 41,
+        correctQuestions: scenario.expectedCorrect,
+      });
+      expect(migrated.topicMastery).toEqual([
+        expect.objectContaining({
+          attempts: 5,
+          totalQuestions: 11,
+          correctQuestions: scenario.expectedCorrect === 30 ? 9 : 8,
+        }),
+      ]);
+      expect(migrated.appliedQuizIds).toContain(scenario.quizId);
+    }
+  });
+
+  it("连续结果写入失败且 aggregate marker 在窗口外时完整回放全部结果", async () => {
+    const rows = v10Rows();
+    const first = result("no-state-results-only-first", "2026-07-18T08:00:00.000Z", true);
+    const second = result("no-state-results-only-second", "2026-07-18T09:00:00.000Z", false);
+    rows.set("quiz_results", { payload: JSON.stringify([second, first]), updatedAt: 100 });
+
+    await loadRepository(rows).repository.initialize({});
+
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({
+      totalAttempts: 6,
+      totalQuestions: 42,
+      correctQuestions: 30,
+    });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({ attempts: 6, totalQuestions: 12, correctQuestions: 9 }),
+    ]);
+    expect(migrated.appliedQuizIds).toEqual(expect.arrayContaining([
+      "no-state-results-only-first",
+      "no-state-results-only-second",
+    ]));
+  });
+
+  it("无 unified 与已有 state 都按窗口物理顺序重放同一真实时刻的结果", async () => {
+    for (const withUnifiedState of [false, true]) {
+      const rows = v10Rows();
+      const latest = result("same-time-latest-correct", "2026-07-10T16:00:00.000+08:00", true);
+      const older = result("same-time-older-wrong", "2026-07-10T08:00:00.000Z", false);
+      rows.set("quiz_results", { payload: JSON.stringify([latest, older]), updatedAt: 100 });
+      rows.set("quiz_stats", {
+        payload: JSON.stringify({
+          totalQuestions: 40,
+          accuracy: null,
+          studyDates: [],
+          updatedAt: "2026-07-10T08:00:00.000Z",
+        }),
+        updatedAt: 101,
+      });
+      rows.set("study_events", { payload: JSON.stringify([]), updatedAt: 102 });
+      if (withUnifiedState) {
+        rows.set("quiz_learning_state", {
+          payload: JSON.stringify(reducer.createEmptyState()),
+          updatedAt: 103,
+        });
+      }
+
+      await loadRepository(rows).repository.initialize({});
+
+      const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+      expect(migrated.stats).toMatchObject({ totalAttempts: 2, totalQuestions: 2, correctQuestions: 1 });
+      expect(migrated.topicMastery).toEqual([
+        expect.objectContaining({ attempts: 2, totalQuestions: 2, correctQuestions: 1, mastered: false }),
+      ]);
+      expect(migrated.masteryMilestones).toEqual([]);
+      expect(migrated.quizEvents.map((event) => event.type)).toEqual([
+        "quiz_submitted",
+        "quiz_submitted",
+      ]);
+    }
+  });
+
+  it("无 unified state 从完整结果窗口重放时只在真实阈值跨越生成 mastered 事件", async () => {
+    const rows = v10Rows();
+    const storedWindow = [
+      result("threshold-5", "2026-07-18T08:05:00.000Z", true),
+      result("threshold-4", "2026-07-18T08:04:00.000Z", true),
+      result("threshold-3", "2026-07-18T08:03:00.000Z", true),
+      result("threshold-2", "2026-07-18T08:02:00.000Z", true),
+      result("threshold-1", "2026-07-18T08:01:00.000Z", false),
+    ];
+    rows.set("quiz_results", { payload: JSON.stringify(storedWindow), updatedAt: 100 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 5,
+        accuracy: null,
+        studyDates: ["2026-07-18"],
+        updatedAt: storedWindow[0].submittedAt,
+      }),
+      updatedAt: 101,
+    });
+    rows.set("study_events", { payload: JSON.stringify([]), updatedAt: 102 });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([{
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 5,
+        totalQuestions: 5,
+        correctQuestions: 4,
+        accuracy: 0.8,
+        mastered: true,
+        lastPracticedAt: storedWindow[0].submittedAt,
+      }]),
+      updatedAt: 103,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 5, totalQuestions: 5, correctQuestions: 4 });
+    expect(migrated.quizEvents.map((event) => event.type)).toEqual([
+      "quiz_submitted",
+      "quiz_submitted",
+      "quiz_submitted",
+      "quiz_submitted",
+      "quiz_mastered",
+    ]);
+    expect(migrated.masteryMilestones).toEqual([{
+      courseId: "cs101",
+      topic: "二叉树与BST",
+      masteredAt: storedWindow[0].submittedAt,
+    }]);
+  });
+
+  it("aggregate marker 指向最旧结果时只补齐更新的结果", async () => {
+    const rows = v10Rows();
+    const included = result("marker-oldest-included", "2026-07-18T08:00:00.000Z", true);
+    const missing = result("marker-newest-missing", "2026-07-18T09:00:00.000Z", false);
+    rows.set("quiz_results", { payload: JSON.stringify([missing, included]), updatedAt: 103 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 30 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+        updatedAt: included.submittedAt,
+      }),
+      updatedAt: 101,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([{
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 5,
+        totalQuestions: 11,
+        correctQuestions: 9,
+        accuracy: 9 / 11,
+        mastered: true,
+        lastPracticedAt: included.submittedAt,
+      }]),
+      updatedAt: 102,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 6, totalQuestions: 42, correctQuestions: 30 });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({ attempts: 6, totalQuestions: 12, correctQuestions: 9 }),
+    ]);
+  });
+
+  it("aggregate marker 后仍有更旧结果时拒绝猜测连续写入", async () => {
+    const rows = v10Rows();
+    const missingOlder = result("marker-gap-older", "2026-07-18T08:00:00.000Z", true);
+    const includedLatest = result("marker-gap-latest", "2026-07-18T09:00:00.000Z", false);
+    rows.set("quiz_results", { payload: JSON.stringify([includedLatest, missingOlder]), updatedAt: 100 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 29 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+        updatedAt: includedLatest.submittedAt,
+      }),
+      updatedAt: 101,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([{
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 5,
+        totalQuestions: 11,
+        correctQuestions: 8,
+        accuracy: 8 / 11,
+        mastered: false,
+        lastPracticedAt: includedLatest.submittedAt,
+      }]),
+      updatedAt: 102,
+    });
+
+    await expect(loadRepository(rows).repository.initialize({}))
+      .rejects.toThrow("旧测验累计结果前缀无法证明");
+    expect(rows.has("quiz_learning_state")).toBe(false);
+  });
+
+  it("aggregate 行时间相同或回拨且载荷声称包含最新结果时拒绝猜测", async () => {
+    for (const aggregateRowTime of [100, 99]) {
+      const rows = v10Rows();
+      const latest = result(`clock-ambiguous-${aggregateRowTime}`, "2026-07-18T08:00:00.000Z", true);
+      rows.set("quiz_results", { payload: JSON.stringify([latest]), updatedAt: 100 });
+      rows.set("quiz_stats", {
+        payload: JSON.stringify({
+          totalQuestions: 41,
+          accuracy: 30 / 41,
+          studyDates: ["2026-07-18"],
+          updatedAt: latest.submittedAt,
+        }),
+        updatedAt: aggregateRowTime,
+      });
+      rows.set("topic_mastery", {
+        payload: JSON.stringify([{
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          attempts: 5,
+          totalQuestions: 11,
+          correctQuestions: 9,
+          accuracy: 9 / 11,
+          mastered: true,
+          lastPracticedAt: latest.submittedAt,
+        }]),
+        updatedAt: aggregateRowTime,
+      });
+
+      await expect(loadRepository(rows).repository.initialize({}))
+        .rejects.toThrow("写入阶段无法区分");
+      expect(rows.has("quiz_learning_state")).toBe(false);
+    }
+  });
+
+  it("同一 submittedAt 的前一结果 aggregate 不能冒充已包含最新结果", async () => {
+    const rows = v10Rows();
+    const submittedAt = "2026-07-18T08:00:00.000Z";
+    const latest = result("same-submitted-at-latest", submittedAt, false);
+    const older = result("same-submitted-at-older", submittedAt, true);
+    rows.set("quiz_results", { payload: JSON.stringify([latest, older]), updatedAt: 100 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 30 / 41,
+        studyDates: ["2026-07-18"],
+        updatedAt: submittedAt,
+      }),
+      updatedAt: 200,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([{
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 5,
+        totalQuestions: 11,
+        correctQuestions: 9,
+        accuracy: 9 / 11,
+        mastered: true,
+        lastPracticedAt: submittedAt,
+      }]),
+      updatedAt: 200,
+    });
+
+    await expect(loadRepository(rows).repository.initialize({}))
+      .rejects.toThrow("同一提交时间的写入阶段无法区分");
+    expect(rows.has("quiz_learning_state")).toBe(false);
+  });
+
+  it("无 unified state 时物理行较新但 aggregate 载荷不对应最新结果会拒绝推断", async () => {
+    const rows = v10Rows();
+    const latest = result("no-state-ambiguous-stage", "2026-07-18T08:00:00.000Z", true);
+    rows.set("quiz_results", { payload: JSON.stringify([latest]), updatedAt: 100 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 30 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10"],
+        updatedAt: "2026-07-17T08:00:00.000Z",
+      }),
+      updatedAt: 101,
+    });
+
+    await expect(loadRepository(rows).repository.initialize({}))
+      .rejects.toThrow("旧测验累计写入阶段与最新结果不一致");
+    expect(rows.has("quiz_learning_state")).toBe(false);
+  });
+
+  it("旧 quiz event 清理第二写失败后重入仍只保留一个统一事件", async () => {
+    const rows = v10Rows();
+    const latest = result("legacy-event-retry", "2026-07-18T08:00:00.000Z", false);
+    rows.set("quiz_results", { payload: JSON.stringify([latest]), updatedAt: 100 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 29 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+        updatedAt: latest.submittedAt,
+      }),
+      updatedAt: 101,
+    });
+    rows.set("study_events", {
+      payload: JSON.stringify([{
+        id: "legacy-event-retry-source",
+        type: "quiz_submitted",
+        timestamp: latest.submittedAt,
+        courseId: latest.courseId,
+        topic: latest.topic,
+        source: latest.source,
+        difficulty: latest.difficulty,
+        totalQuestions: latest.totalQuestions,
+        correctCount: latest.correctCount,
+      }]),
+      updatedAt: 102,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([{
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 5,
+        totalQuestions: 11,
+        correctQuestions: 8,
+        accuracy: 8 / 11,
+        mastered: false,
+        lastPracticedAt: latest.submittedAt,
+      }]),
+      updatedAt: 103,
+    });
+    const loaded = loadRepository(rows);
+    loaded.store.failWrite("study_events");
+
+    await expect(loaded.repository.initialize({})).rejects.toThrow("ArkData fixture 写入失败: study_events");
+    const firstPass = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(firstPass.quizEvents.filter((event) => event.timestamp === latest.submittedAt))
+      .toEqual([expect.objectContaining({ id: "quiz_legacy-event-retry" })]);
+
+    await loaded.repository.initialize({});
+    const recovered = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(recovered.quizEvents.filter((event) => event.timestamp === latest.submittedAt))
+      .toEqual([expect.objectContaining({ id: "quiz_legacy-event-retry" })]);
+    expect(rowValue<RuntimeStudyEvent[]>(rows, "study_events")).toEqual([]);
+  });
+
+  it("同载荷旧事件按一对一消费，保留额外不同 ID 的历史事件", async () => {
+    const rows = v10Rows();
+    const latest = result("legacy-event-multiset", "2026-07-18T08:00:00.000Z", true);
+    rows.set("quiz_results", { payload: JSON.stringify([latest]), updatedAt: 100 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 30 / 41,
+        studyDates: ["2026-07-08", "2026-07-09", "2026-07-10", "2026-07-18"],
+        updatedAt: latest.submittedAt,
+      }),
+      updatedAt: 101,
+    });
+    const duplicatePayload = {
+      type: "quiz_mastered",
+      timestamp: latest.submittedAt,
+      courseId: latest.courseId,
+      topic: latest.topic,
+      source: latest.source,
+      difficulty: latest.difficulty,
+      totalQuestions: latest.totalQuestions,
+      correctCount: latest.correctCount,
+    };
+    rows.set("study_events", {
+      payload: JSON.stringify([
+        { id: "legacy-event-window-result", ...duplicatePayload },
+        { id: "legacy-event-older-result", ...duplicatePayload },
+      ]),
+      updatedAt: 102,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([{
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 5,
+        totalQuestions: 11,
+        correctQuestions: 9,
+        accuracy: 9 / 11,
+        mastered: true,
+        lastPracticedAt: latest.submittedAt,
+      }]),
+      updatedAt: 103,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.quizEvents.filter((event) => event.timestamp === latest.submittedAt)
+      .map((event) => event.id).sort()).toEqual([
+      "legacy-event-older-result",
+      "quiz_legacy-event-multiset",
+    ]);
+  });
+
+  it("完全相同 ID 与内容的重复旧事件先归一再与窗口结果一对一消费", async () => {
+    const rows = v10Rows();
+    const latest = result("legacy-event-exact-duplicate", "2026-07-18T08:00:00.000Z", false);
+    rows.set("quiz_results", { payload: JSON.stringify([latest]), updatedAt: 100 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 41,
+        accuracy: 29 / 41,
+        studyDates: ["2026-07-18"],
+        updatedAt: latest.submittedAt,
+      }),
+      updatedAt: 101,
+    });
+    const duplicatedEvent = {
+      id: "legacy-event-exact-duplicate-source",
+      type: "quiz_submitted",
+      timestamp: latest.submittedAt,
+      courseId: latest.courseId,
+      topic: latest.topic,
+      source: latest.source,
+      difficulty: latest.difficulty,
+      totalQuestions: latest.totalQuestions,
+      correctCount: latest.correctCount,
+    };
+    rows.set("study_events", {
+      payload: JSON.stringify([duplicatedEvent, duplicatedEvent]),
+      updatedAt: 102,
+    });
+    rows.set("topic_mastery", {
+      payload: JSON.stringify([{
+        courseId: "cs101",
+        topic: "二叉树与BST",
+        attempts: 5,
+        totalQuestions: 11,
+        correctQuestions: 8,
+        accuracy: 8 / 11,
+        mastered: false,
+        lastPracticedAt: latest.submittedAt,
+      }]),
+      updatedAt: 103,
+    });
+
+    await loadRepository(rows).repository.initialize({});
+
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").quizEvents
+      .filter((event) => event.timestamp === latest.submittedAt))
+      .toEqual([expect.objectContaining({ id: "quiz_legacy-event-exact-duplicate" })]);
+  });
+
+  it("旧 quiz event 同 ID 不同内容时明确拒绝迁移", async () => {
+    const rows = v10Rows();
+    rows.set("study_events", {
+      payload: JSON.stringify([
+        {
+          id: "legacy-event-conflict",
+          type: "quiz_submitted",
+          timestamp: "2026-07-10T08:00:00.000Z",
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          totalQuestions: 1,
+          correctCount: 0,
+        },
+        {
+          id: "legacy-event-conflict",
+          type: "quiz_mastered",
+          timestamp: "2026-07-10T08:00:00.000Z",
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          totalQuestions: 1,
+          correctCount: 1,
+        },
+      ]),
+      updatedAt: 100,
+    });
+
+    await expect(loadRepository(rows).repository.initialize({}))
+      .rejects.toThrow("旧测验事件 ID 与已保存内容冲突");
+    expect(rows.has("quiz_learning_state")).toBe(false);
+  });
+
+  it("pending 与旧结果窗口同 ID 时保留完整 reducer 副作用且只应用一次", async () => {
+    const rows = v10Rows();
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("pending-overlap-base", "2026-07-17T12:00:00.000Z", true));
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    await loadRepository(rows).repository.initialize({});
+
+    const pendingResult = result("pending-legacy-same-id", "2026-07-18T08:00:00.000Z", false);
+    const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    reducer.enqueueResult(persisted, pendingResult);
+    const beforeReviewCount = persisted.reviewItems.length;
+    const beforeTagQuestions = persisted.tagInsights.find((item) => item.tag === "树结构")?.totalQuestions ?? 0;
+    const beforeEventCount = persisted.quizEvents.length;
+    rows.set("quiz_learning_state", { payload: JSON.stringify(persisted), updatedAt: 200 });
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 201 });
+    rows.set("quiz_results", { payload: JSON.stringify([pendingResult]), updatedAt: 202 });
+
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.pendingResults).toEqual([]);
+    expect(migrated.stats).toMatchObject({ totalAttempts: 6, totalQuestions: 42, correctQuestions: 30 });
+    expect(migrated.reviewItems).toHaveLength(beforeReviewCount + 1);
+    expect(migrated.tagInsights.find((item) => item.tag === "树结构")?.totalQuestions)
+      .toBe(beforeTagQuestions + 1);
+    expect(migrated.quizEvents).toHaveLength(beforeEventCount + 1);
+    expect(migrated.quizEvents.filter((event) => event.id === "quiz_pending-legacy-same-id")).toHaveLength(1);
+    expect(migrated.appliedQuizIds.filter((id) => id === "pending-legacy-same-id")).toHaveLength(1);
+  });
+
+  it("累计快照损坏或旧来源计数回退时明确拒绝迁移", async () => {
+    const rows = v10Rows();
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-snapshot-base", "2026-07-17T12:00:00.000Z", true));
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    await loadRepository(rows).repository.initialize({});
+
+    const damagedState = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    damagedState.legacyHistorySnapshot!.totalQuestions = -1;
+    rows.set("quiz_learning_state", { payload: JSON.stringify(damagedState), updatedAt: 200 });
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 201 });
+    await expect(loadRepository(rows).repository.initialize({})).rejects.toThrow("旧测验累计迁移快照无效");
+
+    const restoredState = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    restoredState.legacyHistorySnapshot = {
+      updatedAt: "2026-07-10T08:00:00.000Z",
+      totalQuestions: 40,
+      correctQuestions: 29,
+      resultIds: [],
+      topicMastery: [
+        {
+          courseId: "cs101",
+          topic: "二叉树与BST",
+          attempts: 4,
+          totalQuestions: 10,
+          correctQuestions: 8,
+          lastPracticedAt: "2026-07-10T08:00:00.000Z",
+        },
+      ],
+    };
+    rows.set("quiz_learning_state", { payload: JSON.stringify(restoredState), updatedAt: 202 });
+    rows.set("quiz_stats", {
+      payload: JSON.stringify({
+        totalQuestions: 39,
+        accuracy: 28 / 39,
+        studyDates: ["2026-07-08", "2026-07-09"],
+        updatedAt: "2026-07-09T08:00:00.000Z",
+      }),
+      updatedAt: 203,
+    });
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 204 });
+    await expect(loadRepository(rows).repository.initialize({})).rejects.toThrow("旧测验累计统计发生回退");
+  });
+
+  it("Topic 累计回退、增量矛盾与已合并目标缺失时分别拒绝迁移", async () => {
+    const scenarios = [
+      { kind: "rollback", error: "旧测验 Topic 累计发生回退" },
+      { kind: "invalid-delta", error: "旧测验 Topic 累计增量不一致" },
+      { kind: "missing-target", error: "旧测验 Topic 迁移基线缺失" },
+    ];
+    for (const scenario of scenarios) {
+      const rows = v10Rows();
+      const currentState = reducer.createEmptyState();
+      reducer.applyResult(currentState, result(`migration-topic-${scenario.kind}`, "2026-07-17T12:00:00.000Z", true));
+      rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+      rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+      await loadRepository(rows).repository.initialize({});
+
+      const legacyMastery = rowValue<RuntimeMastery[]>(rows, "topic_mastery");
+      if (scenario.kind === "rollback") {
+        legacyMastery[0].attempts = 3;
+        legacyMastery[0].totalQuestions = 9;
+        legacyMastery[0].correctQuestions = 7;
+      } else if (scenario.kind === "invalid-delta") {
+        legacyMastery[0].attempts = 5;
+        legacyMastery[0].totalQuestions = 11;
+        legacyMastery[0].correctQuestions = 10;
+      } else {
+        const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+        persisted.topicMastery = [];
+        rows.set("quiz_learning_state", { payload: JSON.stringify(persisted), updatedAt: 200 });
+      }
+      rows.set("topic_mastery", { payload: JSON.stringify(legacyMastery), updatedAt: 201 });
+      rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 202 });
+
+      await expect(loadRepository(rows).repository.initialize({})).rejects.toThrow(scenario.error);
+      expect(rowValue<number>(rows, "schema_version")).toBe(8);
+    }
+  });
+
+  it("旧版仅写结果窗口时从完整新前缀恢复统计和 Topic", async () => {
+    const rows = v10Rows();
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-window-base", "2026-07-17T12:00:00.000Z", true));
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    await loadRepository(rows).repository.initialize({});
+
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 200 });
+    rows.set("quiz_results", {
+      payload: JSON.stringify([result("migration-window-unseen", "2026-07-18T08:00:00.000Z", true)]),
+      updatedAt: 201,
+    });
+    await loadRepository(rows).repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(migrated.stats).toMatchObject({ totalAttempts: 6, totalQuestions: 42, correctQuestions: 31 });
+    expect(migrated.topicMastery).toEqual([
+      expect.objectContaining({ attempts: 6, totalQuestions: 12, correctQuestions: 10 }),
+    ]);
+    expect(migrated.appliedQuizIds).toContain("migration-window-unseen");
+    expect(migrated.legacyHistorySnapshot?.resultIds).toEqual(["migration-window-unseen"]);
+  });
+
+  it("旧结果窗口达到 20 条且与空基线无交集时明确拒绝推断", async () => {
+    const rows = v10Rows();
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-full-window-base", "2026-07-17T12:00:00.000Z", true));
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    await loadRepository(rows).repository.initialize({});
+    const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+
+    const fullWindow: RuntimeResult[] = [];
+    for (let index = 0; index < 20; index += 1) {
+      fullWindow.push(result(`migration-full-window-${index}`, `2026-07-18T08:${index.toString().padStart(2, "0")}:00.000Z`, true));
+    }
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 200 });
+    rows.set("quiz_results", { payload: JSON.stringify(fullWindow), updatedAt: 201 });
+
+    await expect(loadRepository(rows).repository.initialize({}))
+      .rejects.toThrow("旧测验结果窗口无法证明完整");
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state")).toEqual(persisted);
+  });
+
+  it("有效旧结果中的更早 submittedAt 参与首答时间", async () => {
+    const currentState = reducer.createEmptyState();
+    reducer.applyResult(currentState, result("migration-first-time-current", "2026-07-17T12:00:00.000Z", false));
+    const rows = v10Rows();
+    rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
+    rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
+    rows.set("quiz_results", {
+      payload: JSON.stringify([result("migration-first-time-legacy", "2026-07-01T08:00:00.000Z", true)]),
+      updatedAt: 102,
+    });
+    rows.set("study_events", { payload: JSON.stringify([]), updatedAt: 103 });
+
+    await loadRepository(rows).repository.initialize({});
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").stats.firstSubmittedAt)
+      .toBe("2026-07-01T08:00:00.000Z");
   });
 
   it("自由回答的已覆盖与有遗漏都只保留自评事实，不改变客观题统计", () => {

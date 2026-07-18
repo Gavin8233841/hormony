@@ -130,3 +130,39 @@
 - **未验证**：无模拟器或真机目标，未执行结果页点击、错题本跳转、难度递进和应用重启后的设备流程。
 - **未验证**：本批次未重新调用线上 Quiz，不声明线上题组生成或业务字段通过。
 - **未验证**：HAP 未签名，安装、真机和多设备行为未验证。
+
+## 2026-07-19 主线：旧测验累计迁移重入与再次降级
+
+### 背景与行为变化
+
+- WS07 `c03930e` 原修复通过覆盖 `firstSubmittedAt` 阻止第二键失败后的重复追加；主线复核确认聚合 `updatedAt` 不是首次答题事实，而且单一时间标记会漏掉再次降级后写入旧累计键的新答题，因此未原样采用。
+- `QuizLearningState` 新增向前兼容的可选 `legacyHistorySnapshot`，记录旧来源的整体题数、正确数、各精确课程/Topic 累计高水位，以及旧版最多 20 条结果窗口的有序唯一 ID；不提升全局 schema 12 或 quiz state schema 2，旧 JSON 缺少整个快照时仍按首轮迁移处理。
+- 首次迁移继续按已核验时间边界执行全量追加或较大快照采用；pending 的真实最早时间参与边界判断，但其数值在 aggregate 合并后单独回放，避免被 max 吞掉或被 append 双计。快照与合并统计在同一次 `quiz_learning_state` 写入；第一键失败时两者都不落盘，后续键失败时重入为零增量。
+- 用户再次运行旧版时，以结果窗口相对上次有序 ID 的可证明完整新前缀作为新增答题唯一事实源。旧版停在 `quiz_results`、已写 `quiz_stats` 但未写 `topic_mastery`、或三键全部写完时，stats 与 Topic 均只补一次；原始 aggregate 只做单调性和窗口一致性校验，不再驱动二次统计。达到 20 条且无旧 ID 交集、顺序断裂、重复 ID、累计回退、增量超出新前缀或已合并 Topic 目标缺失时明确拒绝迁移。
+- stats 或 Topic aggregate 结构/数值无效时不导入任何 aggregate 组件，也不写快照；任一未知课程/Topic 会使整组 aggregate 拒绝导入，existing 与无 unified state 两条路径不会把全局统计和过滤后的局部 Topic 混合。
+- `firstSubmittedAt` 只从合法结果 `submittedAt`、Quiz 事件时间、Topic 实际练习时间和 pending 中取真实最早值；聚合更新时间只保留在审计快照中，不再冒充首次答题时间。Repository 清洗、Reducer 答题和 mastery 汇总均按解析后的时间戳比较，支持带时区偏移的合法 ISO 时间。
+- 主线复核补足旧结果窗口的严格 marker 判定：只有 `quiz_stats.updatedAt` 和同一精确课程/Topic 的 `lastPracticedAt` 均与结果原始 `submittedAt` 完全匹配时，才将该结果视为已进入相应累计；marker 不在窗口则全部重放，marker 后仍出现更旧结果、物理写入顺序不明或同提交时间多重匹配均 fail-closed，避免把未证明的历史当作已累计。
+
+### 文件
+
+- `apps/harmonyos/entry/src/main/ets/common/LocalLearningRepository.ets`
+- `apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets`
+- `apps/harmonyos/entry/src/main/ets/model/LearningMetadataModels.ets`
+- `apps/web/src/lib/data/quiz-learning-state.test.ts`
+- `docs/workstreams/02-quiz-mastery-result.md`
+
+### 验证
+
+- **静态诊断通过**：`cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`，exit 0，`78/78` 通过；覆盖第一键、第二键和 schema 版本键失败重入、旧版三个源键中断点、20 条无交集窗口、无效 aggregate、非法 Topic 两条迁移路径、损坏/回退快照、Topic 三类回退、pending、带时区首答时间及连续仅写 `quiz_results` 的完整回放/marker 边界拒绝。
+- **静态诊断通过**：独立内存变异确认删除 delta、改回 max/replace、删除快照写入、静默吞掉全局/Topic 回退或移除旧结果首答时间合并都会使对应反例变红。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，exit 0；`pnpm test` 为 36 个文件、`453/453` 通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 14.2.18 生产构建完成，10/10 静态页面和 26.8 kB middleware 进入产物。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`，exit 0，API 12 CompileArkTS、PackageHap 与 PackingCheck 通过，`BUILD SUCCESSFUL in 49 s 34 ms`；项目未配置正式签名。
+- **源码确认**：`hdc list targets -v`，exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+- **模拟器通过**：在 `127.0.0.1:5555` 对本批 HAP 执行 `install -r`、`aa force-stop com.c4ai.hormony`、`aa start -a EntryAbility -b com.c4ai.hormony` 均 exit 0；`uitest dumpLayout` 返回 `pages/Index`，可见“鸿学伴”节点 bounds 为 `[56,328][372,451]`。
+
+### 未验证
+
+- **未验证**：本批使用可执行 ArkData 内存 fixture 注入三处写失败、旧版源键中断、损坏快照和累计回退，没有修改或清除模拟器真实用户数据库；安装启动和首页 UI 树通过不等于设备迁移故障流程通过。
+- **未验证**：未调用线上 Quiz、Agent 或模型，不声明线上题组生成、提交或业务字段通过；已知不可用模型 Provider 未重试，也未回落 `openai/*`。
+- **未验证**：正式签名、真机、多设备、横屏与平板未验证。

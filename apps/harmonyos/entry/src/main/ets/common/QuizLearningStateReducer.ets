@@ -84,26 +84,58 @@ export class QuizLearningStateReducer {
     return appliedCount;
   }
 
+  private static timestampPrecedes(incoming: string, current: string): boolean {
+    const incomingTime = new Date(incoming).getTime();
+    const currentTime = new Date(current).getTime();
+    return !Number.isNaN(incomingTime) && (Number.isNaN(currentTime) || incomingTime < currentTime);
+  }
+
+  private static compareTimestamps(left: string, right: string): number {
+    const leftTime = new Date(left).getTime();
+    const rightTime = new Date(right).getTime();
+    if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime)) return leftTime - rightTime;
+    if (!Number.isNaN(leftTime)) return -1;
+    if (!Number.isNaN(rightTime)) return 1;
+    return left.localeCompare(right);
+  }
+
   static applyResult(state: QuizLearningState, result: QuizResult): boolean {
+    return QuizLearningStateReducer.applyMigratedResult(state, result, false, false);
+  }
+
+  static applyMigratedResult(state: QuizLearningState, result: QuizResult,
+    statsAlreadyIncluded: boolean, topicAlreadyIncluded: boolean): boolean {
     if (state.appliedQuizIds.includes(result.quizId)) return false;
 
     state.appliedQuizIds.push(result.quizId);
-    state.recentResults.unshift(result);
+    state.recentResults.push(result);
+    state.recentResults.sort((left: QuizResult, right: QuizResult): number => {
+      const timestampOrder = QuizLearningStateReducer.compareTimestamps(right.submittedAt, left.submittedAt);
+      return timestampOrder !== 0 ? timestampOrder : left.quizId.localeCompare(right.quizId);
+    });
     state.recentResults = state.recentResults.slice(0, RECENT_RESULT_LIMIT);
-    state.stats.totalAttempts += 1;
-    state.stats.totalQuestions += result.totalQuestions;
-    state.stats.correctQuestions += result.correctCount;
-    const quizDate = QuizLearningStateReducer.localDateKey(result.submittedAt);
-    if (!state.stats.quizDates.includes(quizDate)) state.stats.quizDates.push(quizDate);
-    if (state.stats.firstSubmittedAt === undefined || result.submittedAt < state.stats.firstSubmittedAt) {
+    let topicMastery = state.topicMastery.find((item: TopicMastery): boolean =>
+      item.courseId === result.courseId && item.topic === result.topic);
+    const hasIncludedTopic = topicAlreadyIncluded && topicMastery !== undefined;
+    if (!hasIncludedTopic) state.stats.totalAttempts += 1;
+    if (!statsAlreadyIncluded) {
+      state.stats.totalQuestions += result.totalQuestions;
+      state.stats.correctQuestions += result.correctCount;
+      const quizDate = QuizLearningStateReducer.localDateKey(result.submittedAt);
+      if (!state.stats.quizDates.includes(quizDate)) state.stats.quizDates.push(quizDate);
+    }
+    if (state.stats.firstSubmittedAt === undefined ||
+      QuizLearningStateReducer.timestampPrecedes(result.submittedAt, state.stats.firstSubmittedAt)) {
       state.stats.firstSubmittedAt = result.submittedAt;
     }
 
-    const topicMastery = QuizLearningStateReducer.applyTopicMastery(state.topicMastery, result);
-    QuizLearningStateReducer.recordMasteryMilestone(state, result);
+    if (!hasIncludedTopic) {
+      topicMastery = QuizLearningStateReducer.applyTopicMastery(state.topicMastery, result);
+      QuizLearningStateReducer.recordMasteryMilestone(state, result);
+    }
     QuizLearningStateReducer.applyReviewItems(state, result);
     QuizLearningStateReducer.applyTagInsights(state.tagInsights, result);
-    QuizLearningStateReducer.appendQuizEvent(state.quizEvents, result, topicMastery);
+    QuizLearningStateReducer.appendQuizEvent(state.quizEvents, result, topicMastery!);
     state.quizEvents = QuizLearningStateReducer.compactQuizEvents(state.quizEvents);
     QuizLearningStateReducer.refreshProfileTopics(state);
     return true;
@@ -159,7 +191,7 @@ export class QuizLearningStateReducer {
       uniqueEvents.push(event);
     }
     uniqueEvents.sort((left: StudyEvent, right: StudyEvent): number => {
-      const timestampOrder = left.timestamp.localeCompare(right.timestamp);
+      const timestampOrder = QuizLearningStateReducer.compareTimestamps(left.timestamp, right.timestamp);
       return timestampOrder !== 0 ? timestampOrder : left.id.localeCompare(right.id);
     });
 
@@ -246,7 +278,7 @@ export class QuizLearningStateReducer {
       merged.push(event);
     }
     merged.sort((left: StudyEvent, right: StudyEvent): number => {
-      const timestampOrder = left.timestamp.localeCompare(right.timestamp);
+      const timestampOrder = QuizLearningStateReducer.compareTimestamps(left.timestamp, right.timestamp);
       return timestampOrder !== 0 ? timestampOrder : left.id.localeCompare(right.id);
     });
     state.quizEvents = merged;
@@ -268,7 +300,8 @@ export class QuizLearningStateReducer {
       if (item.lastPracticedAt !== undefined) {
         const date = QuizLearningStateReducer.localDateKey(item.lastPracticedAt);
         if (!stats.quizDates.includes(date)) stats.quizDates.push(date);
-        if (stats.firstSubmittedAt === undefined || item.lastPracticedAt < stats.firstSubmittedAt) {
+        if (stats.firstSubmittedAt === undefined ||
+          QuizLearningStateReducer.timestampPrecedes(item.lastPracticedAt, stats.firstSubmittedAt)) {
           stats.firstSubmittedAt = item.lastPracticedAt;
         }
       }
@@ -506,7 +539,11 @@ export class QuizLearningStateReducer {
   }
 
   static compactQuizEvents(events: StudyEvent[]): StudyEvent[] {
-    return events.length > QUIZ_EVENT_LIMIT ? events.slice(-QUIZ_EVENT_LIMIT) : events;
+    const sorted = events.slice().sort((left: StudyEvent, right: StudyEvent): number => {
+      const timestampOrder = QuizLearningStateReducer.compareTimestamps(left.timestamp, right.timestamp);
+      return timestampOrder !== 0 ? timestampOrder : left.id.localeCompare(right.id);
+    });
+    return sorted.length > QUIZ_EVENT_LIMIT ? sorted.slice(-QUIZ_EVENT_LIMIT) : sorted;
   }
 
   private static normalizeTopicMastery(mastery: TopicMastery[]): boolean {

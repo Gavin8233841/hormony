@@ -64,6 +64,23 @@ export interface QuizLearningStats {
   firstSubmittedAt?: string;
 }
 
+export interface LegacyQuizTopicHistorySnapshot {
+  courseId: string;
+  topic: string;
+  attempts: number;
+  totalQuestions: number;
+  correctQuestions: number;
+  lastPracticedAt?: string;
+}
+
+export interface LegacyQuizHistorySnapshot {
+  updatedAt: string;
+  totalQuestions: number;
+  correctQuestions: number;
+  resultIds: string[];
+  topicMastery: LegacyQuizTopicHistorySnapshot[];
+}
+
 export interface TopicMasteryMilestone {
   courseId: string;
   topic: string;
@@ -72,6 +89,7 @@ export interface TopicMasteryMilestone {
 
 export interface QuizLearningState {
   schemaVersion: number;
+  legacyHistorySnapshot?: LegacyQuizHistorySnapshot;
   pendingResults: LearningQuizResult[];
   appliedQuizIds: string[];
   appliedInsightEventIds: string[];
