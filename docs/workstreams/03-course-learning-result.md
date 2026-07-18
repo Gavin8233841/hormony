@@ -1121,3 +1121,38 @@
 - **未验证**：本批没有在模拟器打开 k28 长文本；受保护 Lesson 三字段和规格仍待主线程同步，不能把文件系统互动记为事实一致性通过。
 - **未验证**：手机、平板、真机、线上 API 与 DevEco Agent 专属工具未验证；模型状态沿用批次三十六记录，不重复消耗受阻模型。
 - 未跟踪混合研究文件 `scripts/test_cs102_filesystem_lesson_facts.py` 仍保留且不暂存。本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
+
+## 批次三十八：System V 与 POSIX 消息队列接收语义边界
+
+### 行为
+
+- `cs102_q54` 不再把 System V 的消息类型选择规则泛化成所有消息队列。题面明确限定 System V 消息队列，并以管道不保留消息边界的字节流语义作为比较前提。
+- 正确选项 B 明确 System V 消息队列保留消息边界并可按消息类型选择接收；不再用没有边界定义的“消息有格式”描述核心能力，也不再暗示通信速度必然更快。
+- 解释按 POSIX.1-2024 展开 `msgrcv()` 的三种 `msgtyp` 规则：0 取队首、正值取该类型首条、负值取类型不大于绝对值的最低类型首条。
+- 解释同时区分 POSIX 消息队列：`mq_receive()` 先选最高优先级，再取该优先级中最早入队的消息，不提供 System V 的 `msgtyp` 类型筛选；删除“消息队列是内核维护的链表”这一非标准实现断言。
+- 新增可执行选择模型，用同一组消息证明 System V 类型筛选与 POSIX 优先级筛选会得到不同结果；另覆盖 `msgtyp=0`、负 `msgtyp`、同优先级 FIFO、正确 fixture 与旧泛化 fixture。
+
+### 文件与生成边界
+
+- 题库唯一源为 `apps/web/src/lib/data/quizzes.ts`；`scripts/generate-quizzes-json.mjs` 生成 HarmonyOS `quizzes.json` 并校验 165 道选择题逐字段一致。
+- 端侧精确变化仅为 `$[106].question`、`$[106].options[0]`、`$[106].options[1]` 与 `$[106].explanation`（`id=cs102_q54`）。`answer=B`、`difficulty=medium` 和标签 `IPC机制/结构操作/应用推理` 均不变。
+- `scripts/test_cs102_message_queue_quiz_facts.py` 是本批独立契约；其他未跟踪 CS101 二次探测、CS102 文件系统与管道研究文件均保留但不纳入本批。
+- 本批不修改主动学习规格、受保护的 `lesson-experiences.json`、页面、仓储或 `DEVLOG.md`。q54 是独立题库事实，不产生待同步 Lesson JSON 路径；Lesson 文件零差异检查退出码 0。
+
+### 证据
+
+- **源码确认**：POSIX.1-2024 `msgsnd()`、`msgrcv()`、`mq_send()`、`mq_receive()` 与 Base Definitions 3.206 官方页面本轮均读取 HTTP 200。正文分别确认正整数 `mtype`、`msgtyp` 三分支、高优先级在前且同优先级新消息在后、最高优先级中最早消息，以及只定义消息队列对象和可观察移除顺序而不规定链表实现。
+- **源码确认**：Linux man-pages `pipe(7)` 官方页面读取 HTTP 200，响应长度 21,854 字节；正文明确管道是没有消息边界概念的字节流。独立子 agent 的只读核验结论由主代理按上述官方正文复核，未直接采用未经复核的文案。
+- **源码确认**：修正前 `python scripts/test_cs102_message_queue_quiz_facts.py` 退出码 1；6 项中 5 项通过，唯一生产契约红灯并报告 System V 范围、`msgtyp`、POSIX 优先级/FIFO 和链表实现四类缺口。
+- **源码确认**：只修 Web 唯一源、尚未生成端侧 JSON 时，目标测试仍退出码 1；6 项中 5 项通过，唯一失败变为 Web/raw q54 不一致，证明契约没有绕过生成链。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0，165 道端侧选择题与 Web 唯一源完全一致；最终 `python -m unittest scripts.test_cs102_message_queue_quiz_facts -v` 与 Python 编译均退出码 0，6 项通过。
+- **静态诊断通过**：以 `git ls-files scripts` 取得全部已跟踪测试模块并显式加入本批契约，退出码 0；146 项运行，145 项通过，1 项跨 WS02 reducer 契约为预期失败。其他三个未跟踪研究文件未计入通过数。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的 schema、引用、DAG、层级与 Lesson 路由闭环通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 生产构建成功并生成 10/10 静态页面；HarmonyOS API 12 增量 `assembleHap --no-daemon` 退出码 0，资源与 ArkTS 编译成功，`BUILD SUCCESSFUL in 32 s 97 ms`，仍提示未配置 `signingConfigs`。
+
+### 失败与未验证
+
+- **未验证**：本批没有争抢可能被其他 worktree 覆盖的模拟器运行态，未在端侧实际打开 `cs102_q54`；手机、平板、真机和线上 API 未验证。沿用此前安装启动证据仅证明既有 HAP 可运行，不证明本批新题面已渲染。
+- DevEco Agent 未重复调用：任何 `openai/*` 均被禁止，`alibaba-cn/qwen3-coder-plus` 已确认 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 已确认 `401 Token refresh failed`；本批使用 Python、Web 与直接 Hvigor 完成静态和构建验证。
+- 本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
