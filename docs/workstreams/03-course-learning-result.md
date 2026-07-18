@@ -1156,3 +1156,40 @@
 - **未验证**：本批没有争抢可能被其他 worktree 覆盖的模拟器运行态，未在端侧实际打开 `cs102_q54`；手机、平板、真机和线上 API 未验证。沿用此前安装启动证据仅证明既有 HAP 可运行，不证明本批新题面已渲染。
 - DevEco Agent 未重复调用：任何 `openai/*` 均被禁止，`alibaba-cn/qwen3-coder-plus` 已确认 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 已确认 `401 Token refresh failed`；本批使用 Python、Web 与直接 Hvigor 完成静态和构建验证。
 - 本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
+
+## 批次三十九：匿名管道描述符传递与容量边界
+
+### 行为
+
+- `cs102_q53` 不再把普通管道只概括为“半双工”，而按 POSIX/Linux 精确表述为单向字节流。正确选项 B 明确常见流程是在 `fork` 后由亲缘进程共享端点描述符。
+- 解释删除“普通管道只能用于具有共同祖先的进程”这一绝对限制。`fork()` 继承是常见交接方式，但任何持有对应文件描述符的进程都可使用端点；Linux 的 UNIX 域套接字可用 `SCM_RIGHTS` 把打开文件描述的引用传给无亲缘关系进程。
+- 解释删除“固定大小缓冲区”断言。Linux 管道容量有限但可通过 `F_GETPIPE_SZ` 查询，并在权限与系统资源约束内用 `F_SETPIPE_SZ` 请求调整；内核可能向上取整，函数返回实际容量。
+- 新增描述符注册表执行模型，分别覆盖 `fork()` 继承与 `SCM_RIGHTS` 传递；容量模型覆盖请求值小于页大小时取整、返回容量不小于请求值、非特权请求超过上限，以及缩容低于已缓冲字节时精确 `errno.EBUSY`。
+- 契约同时拒绝旧绝对亲缘/固定容量 fixture，以及“包含 SCM_RIGHTS 与无亲缘关键词但声称不能传递”的否定句误绿。
+
+### 文件与生成边界
+
+- 题库唯一源为 `apps/web/src/lib/data/quizzes.ts`；`scripts/generate-quizzes-json.mjs` 生成 HarmonyOS `quizzes.json` 并校验 165 道选择题逐字段一致。
+- 端侧精确变化仅为 `$[105].question`、`$[105].options[0]`、`$[105].options[1]`、`$[105].options[2]`、`$[105].options[3]` 与 `$[105].explanation`（`id=cs102_q53`）。`answer=B`、`difficulty=easy` 和标签 `IPC机制/状态推演/基础识别` 均不变。
+- `scripts/test_cs102_pipe_quiz_facts.py` 是本批独立契约；CS101 二次探测与 CS102 文件系统两个未跟踪研究文件均保留但不纳入本批。
+- 本批不修改主动学习规格、受保护的 `lesson-experiences.json`、页面、仓储或 `DEVLOG.md`。现有管道 Lesson 活动独立推演 EOF/描述符关闭，q53 修订不产生待同步 Lesson JSON 路径；Lesson 文件零差异检查退出码 0。
+
+### 证据
+
+- **源码确认**：POSIX.1-2024 `pipe()` 官方页面读取 HTTP 200，响应长度 12,554 字节；正文只规定读端、写端文件描述符及对应打开文件描述，没有进程亲缘前置条件。
+- **源码确认**：Linux man-pages `unix(7)`、`pipe(7)` 与 `F_GETPIPE_SZ(2const)` 官方页面均读取 HTTP 200，响应长度分别为 47,008、21,854、10,370 字节。正文明确 `SCM_RIGHTS` 传递的是打开文件描述的引用、管道是没有消息边界的单向字节流，以及容量查询、调整、页大小取整、实际容量返回、资源上限与 `EBUSY` 边界。
+- **源码确认**：修正前 `python -m unittest scripts.test_cs102_pipe_quiz_facts -v` 退出码 1；6 项中 5 项通过，唯一生产契约红灯并报告绝对亲缘限制、描述符传递、固定容量和容量控制四类缺口。
+- **源码确认**：修正 Web 源并扩展为 7 项契约、尚未生成端侧 JSON 时，6 项通过，唯一失败变为 Web/raw q53 不一致，证明契约没有绕过生成链。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0，165 道端侧选择题与 Web 唯一源完全一致；最终 `python -m unittest scripts.test_cs102_pipe_quiz_facts -v` 与 Python 编译均退出码 0，7 项通过。
+- **静态诊断通过**：以 `git ls-files scripts` 取得全部已跟踪测试模块并显式加入本批契约，退出码 0；153 项运行，152 项通过，1 项跨 WS02 reducer 契约为预期失败。其他两个未跟踪研究文件未计入通过数。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的 schema、引用、DAG、层级与 Lesson 路由闭环通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 生产构建成功并生成 10/10 静态页面；HarmonyOS API 12 增量 `assembleHap --no-daemon` 退出码 0，资源与 ArkTS 编译成功，`BUILD SUCCESSFUL in 34 s 838 ms`，仍提示未配置 `signingConfigs`。
+- **源码确认**：HDC 只读设备列表为 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+
+### 失败与未验证
+
+- 子 agent 复核指出初版研究契约不应强制“半双工”，且原容量模型错误承诺返回请求值；主代理按 POSIX/Linux 原文改为单向字节流，并补页大小取整、实际容量与 `EBUSY` 固定输入后才纳入本批。
+- **未验证**：为避免覆盖其他 worktree 的模拟器应用状态，本批没有安装或启动新 HAP，也未在端侧实际打开 `cs102_q53`；手机、平板、真机和线上 API 未验证。此前安装启动证据不证明本批新题面已渲染。
+- DevEco Agent 未重复调用：任何 `openai/*` 均被禁止，`alibaba-cn/qwen3-coder-plus` 已确认 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 已确认 `401 Token refresh failed`；本批使用 Python、Web、直接 Hvigor 与 HDC 只读设备检查完成分层验证。
+- 本批未创建或提交截图、HAP、日志、密钥及本地 IDE 文件。
