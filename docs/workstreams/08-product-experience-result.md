@@ -1,12 +1,12 @@
 # WS08 成熟产品级首屏与课程体验结果
 
 更新时间：2026-07-18
-基线提交：`922f52f`
+恢复基线提交：`a3f6b59`（已包含批次 A-E）
 工作分支：`codex/08-product-experience`
 
 ## 一、目标与边界
 
-本工作流把 HarmonyOS 首页、课程列表、课程详情和 Lesson 收束为一条可信的学习路径：应用先读取本机真实学习状态，再给出唯一下一步；进入课程后继续最近学习内容；阅读、互动、提交、反馈和后续练习保持连续。
+本工作流把 HarmonyOS 首页、课程列表、课程详情、Lesson 和学伴问答收束为可信的学习路径：应用先读取本机真实学习状态，再给出唯一下一步；进入课程后继续最近学习内容；阅读、互动、提交、反馈、后续练习和学伴追问保持连续。
 
 执行边界：
 
@@ -88,6 +88,14 @@
 - 首页本地任务写回、系统提醒发布和服务卡片重试使用互斥入口；提醒行动绑定精确 `nextActionRunId`，发布等待期间或后续任务切换导致版本变化时，服务卡片不能重试同步旧行动，CTA 会切换为按当前行动重新创建提醒。
 - 新增浅色表面专用品牌文字色 `COLOR_BRAND_TEXT`；品牌填充色保持不变，标签、百分比、辅助操作和状态文字在实际浅色背景上的对比度由源契约计算并达到 WCAG AA。
 
+### 批次 G：学伴关键操作无障碍与自适应
+
+- 推荐问题、云端重连、问题输入、发送/停止、本机会话重试、回答重试、引用展开、错误详情、回答生成过程和代码解释等关键操作统一保留至少 48 vp 触控区。
+- 发送按钮按停止、发送、重连、连接中和不可用状态提供动态无障碍名称；输入、重连、历史恢复和代码解释提供对象化名称与用途说明。
+- 引用、错误详情和回答生成过程可聚焦，展开/收起名称包含具体对象及引用数量，避免读屏只播报“展开”。
+- 发送状态、生成过程和 Agent 说明移除单行或双行省略；欢迎区、消息列表、连接状态和输入栏限制最大内容宽度 760 vp，窄屏保持全宽，宽屏避免阅读行过长。
+- 本批只修改 `Chat.ets` 展示与无障碍属性；未修改 SSE、请求身份、取消、历史持久化、路由、Repository 或 Plan 状态机。
+
 ## 四、文件
 
 - `DESIGN.md`
@@ -98,6 +106,7 @@
 - `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
 - `scripts/test-product-experience-contracts.mjs`
 - `scripts/test-proactive-learning-service.mjs`
 - `scripts/test-proactive-delivery-contracts.mjs`
@@ -112,8 +121,8 @@
 node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs
 ```
 
-- exit 0，58/58 通过。
-- 覆盖首页真实状态门禁、提醒/任务写回互斥、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、提交后输入与选项冻结、后续动作路由失败、长文本、48 vp、返回语义和实际颜色对比度。
+- 主线融合批次 G 后复跑 exit 0，62/62 通过。
+- 覆盖首页真实状态门禁、提醒/任务写回互斥、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、提交后输入与选项冻结、后续动作路由失败、Chat 动态操作语义与 48 vp、长文本、返回语义和实际颜色对比度。
 
 ```powershell
 python -m unittest scripts.test_course_resume_contract scripts.test_lesson_activity_resume_contract
@@ -121,6 +130,13 @@ python -m unittest scripts.test_course_resume_contract scripts.test_lesson_activ
 
 - exit 0，16/16 通过。
 - 覆盖课程/Topic 精确隔离、断点续学、Lesson 互动证据恢复、写入失败重试和学伴/测验交接。
+
+```powershell
+node --test scripts/test-ws01-chat-plan-source-contract.mjs
+```
+
+- exit 0，13/13 通过。
+- 覆盖 Chat 真实 SSE 提交、单调请求身份、取消、结构化失败、本机会话恢复、引用/代码/表格阅读，以及 Plan 串行写入和安全区；证明本批展示层修改未改变既有 Chat/Plan 状态契约。
 
 ### API 12 HAP
 
@@ -131,15 +147,16 @@ cd apps/harmonyos
 .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon
 ```
 
-- 首批 exit 0，`BUILD SUCCESSFUL in 23 s 216 ms`；渐进提示批次 exit 0，`BUILD SUCCESSFUL in 25 s 664 ms`；后续动作失败恢复批次 exit 0，`BUILD SUCCESSFUL in 31 s 639 ms`；多轮独立审查修正后的最终源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`。
+- 主线批次 F 独立审查后的源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`；WS08 分支学伴无障碍批次首次 `BUILD SUCCESSFUL in 19 s 885 ms`，最终复核 `BUILD SUCCESSFUL in 6 s 863 ms`。
 - `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，多项任务显示 `UP-TO-DATE`。
 - 项目没有 `signingConfigs`，Hvigor 跳过签名；该结果只记为**构建通过**。
+- 最终 HAP：`apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap`；SHA-256 为 `F31EF1965DCA92436288FD6DA1AB315600B6F4140B6EBD446ADA46AB0CA24DF3`。
 - 早期通用 `assembleHap --no-daemon` 构建虽 exit 0，但日志内部出现 `:entry:clean`；最终证据以上述显式增量构建为准。
 
 ### 设备
 
 ```powershell
-& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' list targets
+& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' list targets -v
 ```
 
 - 重启后首次查询输出 `[Empty]`；对交接文档中已确认的精确目标执行 `hdc tconn 127.0.0.1:5555` 后，复核为 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。设备参数返回 `emulator`。
@@ -148,18 +165,25 @@ cd apps/harmonyos
 - Alibaba DevEco Code 会话 `ses_08bb0ef19ffeXBJ9AYKEfASkxw`：`arkui-knowledge`、`arkts-grammar-standards` 加载成功；独立审查修正前的六个本批 `.ets` 的 `check_ets_files` 均为 `no diagnostics`。`arkts_knowledge_search` 返回 `Unknown response format from knowledge service`，不记知识库通过。
 - Alibaba DevEco Code 会话 `ses_08ba97913ffesXh7hsStWLfVXi`：`start_app` 完成同一 HAP 安装与 `com.c4ai.hormony/EntryAbility` 启动。`verify_ui` 因未配置多模态模型不可用；build agent 不暴露 `get_app_ui_tree`，因此屏幕朗读、最大字体、旋转、平板与动态安全区仍为**未验证**。
 - 独立审查修正后的最终 DevEco 复检会话 `ses_08b962424ffeZxO9aSPgtKl4eU` 在工具调用前返回 `403 AllocationQuota.FreeTierOnly`；最终 Home/Lesson 单文件诊断为**未验证**，以随后 API 12 `CompileArkTS` 成功作为最终构建证据。
+- WS08 分支另一次限定流程中，HAP 安装和 EntryAbility 启动成功；DevEco Emulator 为竖屏 `1256 x 2760`、密度 3.5、旋转 0，Chat 输入框和发送按钮设备高度均为 48 vp，截图人工复核未见重叠。
+- 证据目录：`screenshots/ws08-chat-a11y-20260718T093940Z/`。主要证据为 `04-chat-postinstall-ui.json` 和 `04-chat-postinstall.jpeg`；该目录按仓库规范不提交。
+- `uitest dumpLayout` 不导出源码中的 `accessibilityText`；尝试 `-e accessibilityText` 和 `-e focusable` 均返回 `Invalid attribute name, currently supported names are 'uniqueId'.`，因此对象化语义只记为**源码确认/源契约通过**，屏幕朗读与设备焦点行为仍为**未验证**。
+- 已按 DisplayManagerService 帮助执行 `-rotationlock,0` 与 `-motion,1`，等待后 DMS 仍显示旋转 0、`1256 x 2760`；横屏未取得有效证据，明确记为**未验证**。最大字体、平板、减少动效和动态安全区同样未取得对应设备证据。
+- 本次主线融合时 `hdc list targets -v` 输出 `[Empty] / hdc`；上述历史支线证据不代表当前主线重新安装或设备通过。
 
 ## 六、仍未验证与下一缺口
 
 1. 仓库没有 API 12 系统“减少动效”信号的精确使用依据，本批未猜写接口；减少动效仍为**未验证**。
-2. `Index` 已响应式订阅安全区，但公共二级页标题仍通过静态 getter 读取顶部安全区；旋转时的即时重排需设备证据和统一 Builder 参数设计。
-3. 课程路径仍使用现有 `router`。迁移到 `Navigation` 影响全部子页和回流契约，不属于本批安全范围。
-4. Lesson 底部“上一篇 / 继续互动”仍是固定 48 vp 横向操作组；窄屏和字体放大下的实际增高与折行仍需设备证据。
-5. 本批未调用线上 API、通知或服务卡片，不声明线上通过或真机通过；只对上节列出的构建、安装、启动和首页/课程局部流程声明模拟器通过。
+2. `Index` 已响应式订阅安全区，但公共二级页标题仍通过静态 getter 读取顶部安全区；旋转时的即时重排需有效横屏设备证据和统一 Builder 参数设计。
+3. Chat 当前在线失败时保留真实重连，但屏幕朗读、硬件键盘焦点顺序和最大字体下的回答卡展开仍需对应设备能力验证。
+4. 课程路径仍使用现有 `router`。迁移到 `Navigation` 影响全部子页和回流契约，不属于本批安全范围。
+5. Lesson 底部“上一篇 / 继续互动”横向操作组的大字号折行仍需设备证据。
+6. 本批未调用线上 API、模型、通知或服务卡片；不声明线上通过、真机通过、屏幕朗读通过或横屏通过。
 
 ## 七、审计说明
 
 - 四条只读委派分别完成成熟学习产品/开源实现基准、窄屏/字体/动效契约审计、首页-课程-Lesson 产品流程审计和 Lesson 后续动作状态反例复核；委派代理未修改文件。
 - 主线提交前多轮独立审查发现发布等待、卡片部分失败后切任务、任务写回尾部窗口中的旧提醒重试路径，以及两个条件颜色表达式绕过对比度契约、busy 禁用态与读屏文案不一致；均已修正并重新通过 58/58、16/16 与最终 API 12 HAP。
 - 独立 diff 审查尝试因本机没有 CodeRabbit CLI 和后续并发连接中断而未形成审查结论；未将其记为通过证据。
-- 交付结论以当前源码、58 项 Node 契约、16 项 Python 契约、API 12 增量构建、DevEco 静态诊断与已连接模拟器局部流程为准；完整 smoke、DevEco 多模态校验、读屏和自适应设备矩阵仍按未验证记录。
+- Chat 批次恢复后未重复请求 DevEco Agent；已知 Alibaba `qwen3-coder-plus` 返回 403 `AllocationQuota.FreeTierOnly`，`deveco/glm-5` 返回 401 `Token refresh failed`，按任务要求停止重试并使用本地契约、Hvigor 与 HDC 完成验证。
+- 本次融合后的产品契约为 62/62；API 12 与设备结论须以整条 WS08 合并后的主线复跑为准，历史支线记录不提升当前主线证据等级。

@@ -125,6 +125,14 @@ export struct ChatContent {
     return Constants.COLOR_BRAND;
   }
 
+  private sendButtonAccessibilityText(): string {
+    if (this.loading) return '停止回答';
+    if (this.canSend) return '发送问题';
+    if (this.canRetryCloudAgent()) return '重新连接云端学伴';
+    if (this.probing) return '正在连接云端学伴';
+    return '发送问题不可用';
+  }
+
   private sendButtonHint(): string {
     if (this.loading) return '学伴正在回答，点击右侧按钮可停止';
     if (this.historyLoading) return '正在恢复本机会话';
@@ -698,10 +706,12 @@ export struct ChatContent {
                 .fontColor(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_LG)
-                .height(44)
-                .padding({ left: 16, right: 16 })
+                .constraintSize({ minHeight: 48 })
+                .padding({ left: 16, right: 16, top: 10, bottom: 10 })
                 .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
                   !this.historyLoadFailed)
+                .accessibilityText('提问：' + s)
+                .accessibilityDescription('使用该问题向云端学伴提问')
                 .onClick(() => {
                   this.inputText = s;
                   this.sendMessage();
@@ -714,6 +724,7 @@ export struct ChatContent {
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .padding({ left: 24, right: 24, bottom: 100 })
+        .constraintSize({ maxWidth: 760 })
       } else {
         // 消息列表
         List({ scroller: this.scroller }) {
@@ -729,6 +740,7 @@ export struct ChatContent {
         .cachedCount(5)
         .scrollBar(BarState.Off)
         .padding({ left: 16, right: 16 })
+        .constraintSize({ maxWidth: 760 })
       }
 
       // 输入栏
@@ -745,12 +757,15 @@ export struct ChatContent {
               .fontSize(12)
               .fontColor(Constants.COLOR_BRAND)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .height(32)
+              .constraintSize({ minHeight: 48 })
+              .padding({ left: 14, right: 14 })
+              .accessibilityText('重新连接云端学伴')
               .onClick((): void => { this.probeCloudAgent(); })
           }
         }
         .width('100%')
         .padding({ left: 18, right: 18, top: 8 })
+        .constraintSize({ maxWidth: 760 })
       }
       Column({ space: 6 }) {
         Row({ space: 12 }) {
@@ -760,11 +775,13 @@ export struct ChatContent {
             placeholder: this.cloudAgentReady ? '输入你的问题...' : '云端学伴连接后可提问'
           })
             .layoutWeight(1)
-            .height(44)
+            .constraintSize({ minHeight: 48 })
             .fontSize(14)
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_MD)
             .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historyLoadFailed)
+            .accessibilityText('输入学习问题')
+            .accessibilityDescription('输入后可通过右侧按钮发送给云端学伴')
             .maxLength(2000)
             .enterKeyType(EnterKeyType.Send)
             .onChange((value: string) => {
@@ -792,15 +809,17 @@ export struct ChatContent {
                 .fontColor([this.sendButtonIconColor()])
             }
           }
-            .width(44)
-            .height(44)
+            .width(48)
+            .height(48)
             .backgroundColor(this.sendButtonBackground())
             .border({
               width: 1,
               color: this.loading ? Constants.COLOR_ERROR :
                 (this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
             })
-            .borderRadius(22)
+            .borderRadius(24)
+            .accessibilityText(this.sendButtonAccessibilityText())
+            .accessibilityDescription(this.sendButtonHint())
             .onClick(() => {
               if (this.loading) {
                 this.cancelCurrentRequest(true);
@@ -817,17 +836,18 @@ export struct ChatContent {
           Text(this.sendButtonHint().length > 0 ? this.sendButtonHint() : ' ')
             .layoutWeight(1)
             .fontSize(11)
+            .lineHeight(18)
             .fontColor(this.sendButtonHintColor())
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
           if (this.historyLoadFailed || this.historySaveFailed) {
             Button(this.historyLoadFailed ? '重新读取' : (this.historySaving ? '保存中' : '重试保存'))
-              .height(28)
+              .constraintSize({ minHeight: 48 })
               .fontSize(11)
               .fontColor(Constants.COLOR_BRAND)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(14)
+              .borderRadius(Constants.RADIUS_MD)
+              .padding({ left: 12, right: 12 })
               .enabled(!this.loading && !this.historySaving && !this.historyLoading)
+              .accessibilityText(this.historyLoadFailed ? '重新读取本机会话' : '重试保存本机会话')
               .onClick((): void => {
                 if (this.historyLoadFailed) this.retryLocalHistoryLoad();
                 else this.retryLocalHistorySave();
@@ -835,10 +855,11 @@ export struct ChatContent {
           }
         }
         .width('100%')
-        .height(28)
+        .constraintSize({ minHeight: 48 })
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 20, top: 12 })
+      .constraintSize({ maxWidth: 760 })
     }
     .width('100%')
     .height('100%')
@@ -1277,8 +1298,12 @@ export struct ChatContent {
                 }
               }
               .width('100%')
-              .height(40)
+              .constraintSize({ minHeight: 48 })
               .margin({ top: 4 })
+              .focusable(true)
+              .accessibilityText((msg.citationExpanded ? '收起' : '展开') + '参考资料，共 ' +
+                msg.citations.length.toString() + ' 条')
+              .accessibilityDescription('查看回答引用的课程资料')
               .onClick(() => {
                 msg.citationExpanded = !msg.citationExpanded;
                 this.messages = this.messages.slice();
@@ -1345,7 +1370,10 @@ export struct ChatContent {
             .fontSize(11)
             .fontColor([Constants.COLOR_TEXT_SECONDARY])
         }
-        .height(28)
+        .constraintSize({ minHeight: 48 })
+        .focusable(true)
+        .accessibilityText(msg.statusExpanded ? '收起这次回答的错误详情' : '展开这次回答的错误详情')
+        .accessibilityDescription('查看 HTTP 状态和错误代码')
         .onClick((): void => {
           msg.statusExpanded = !msg.statusExpanded;
           this.messages = this.messages.slice();
@@ -1376,9 +1404,12 @@ export struct ChatContent {
       Button(msg.cancelled ? '重新提问' : '重试')
         .fontSize(12)
         .fontColor(Constants.COLOR_BRAND)
-        .height(36)
+        .constraintSize({ minHeight: 48 })
+        .padding({ left: 14, right: 14 })
         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-        .borderRadius(18)
+        .borderRadius(Constants.RADIUS_MD)
+        .accessibilityText(msg.cancelled ? '重新提问上一条问题' : '重试上一条问题')
+        .accessibilityDescription(msg.statusMessage)
         .onClick((): void => {
           this.retryMessage(msg);
         })
@@ -1439,6 +1470,10 @@ export struct ChatContent {
           .fontColor(Constants.COLOR_BRAND)
       }
       .width('100%')
+      .constraintSize({ minHeight: 48 })
+      .focusable(true)
+      .accessibilityText(msg.agentExpanded ? '收起回答生成过程' : '展开回答生成过程')
+      .accessibilityDescription(this.agentSummary(msg))
       .onClick((): void => {
         msg.agentExpanded = !msg.agentExpanded;
         this.messages = this.messages.slice();
@@ -1459,8 +1494,6 @@ export struct ChatContent {
               .fontSize(11)
               .lineHeight(17)
               .fontColor(Constants.COLOR_TEXT_TERTIARY)
-              .maxLines(2)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
           })
         }
         .width('100%')
@@ -1483,8 +1516,6 @@ export struct ChatContent {
       Text(this.agentDescription(agent))
         .fontSize(9)
         .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .width('100%')
     .constraintSize({ minHeight: 48 })
@@ -1576,10 +1607,12 @@ export struct ChatContent {
               Button('解释这段')
                 .fontSize(11)
                 .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                .height(28)
+                .constraintSize({ minHeight: 48 })
                 .padding({ left: 10, right: 10 })
                 .backgroundColor(Constants.COLOR_BRAND)
-                .borderRadius(14)
+                .borderRadius(Constants.RADIUS_MD)
+                .accessibilityText('让学伴解释当前代码片段')
+                .accessibilityDescription('把代码片段填入问题输入框')
                 .onClick((): void => {
                   this.explainCodeBlock(block);
                 })

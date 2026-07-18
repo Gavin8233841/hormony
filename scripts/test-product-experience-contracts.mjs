@@ -34,6 +34,7 @@ const home = source('apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets');
 const course = source('apps/harmonyos/entry/src/main/ets/pages/Course.ets');
 const detail = source('apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets');
 const lesson = source('apps/harmonyos/entry/src/main/ets/pages/Lesson.ets');
+const chat = source('apps/harmonyos/entry/src/main/ets/pages/Chat.ets');
 const builders = source('apps/harmonyos/entry/src/main/ets/common/Builders.ets');
 const constants = source('apps/harmonyos/entry/src/main/ets/common/Constants.ets');
 
@@ -217,6 +218,40 @@ test('共享返回控件提供 48vp 触控区与可访问名称', () => {
     assert.match(header, /\.height\(48\)/);
     assert.match(header, /\.accessibilityText\('返回上一页'\)/);
   }
+});
+
+test('Chat 核心操作在大字号与读屏下保留 48vp 和对象化语义', () => {
+  const actionName = methodBlock(chat, 'sendButtonAccessibilityText');
+  const build = methodBlock(chat, 'build');
+  const bubble = methodBlock(chat, 'MessageBubble');
+  const status = methodBlock(chat, 'MessageStatus');
+  const process = methodBlock(chat, 'AnswerProcessCard');
+  const markdown = methodBlock(chat, 'MarkdownContent');
+
+  for (const label of ['停止回答', '发送问题', '重新连接云端学伴', '正在连接云端学伴', '发送问题不可用']) {
+    assert.match(actionName, new RegExp(`return '${label}';`));
+  }
+  assert.match(build, /\.width\(48\)\s*\.height\(48\)/);
+  assert.match(build, /\.accessibilityText\(this\.sendButtonAccessibilityText\(\)\)/);
+  assert.match(build, /\.accessibilityText\('输入学习问题'\)/);
+  assert.match(build, /\.accessibilityText\('重新连接云端学伴'\)/);
+  assert.match(build, /\.accessibilityText\(this\.historyLoadFailed \? '重新读取本机会话' : '重试保存本机会话'\)/);
+  assert.doesNotMatch(build, /\.height\((?:28|32|44)\)/);
+  assert.doesNotMatch(build, /\.maxLines\(1\)\s*\.textOverflow\(\{ overflow: TextOverflow\.Ellipsis \}\)/);
+
+  for (const block of [bubble, status, process]) {
+    assert.match(block, /\.constraintSize\(\{ minHeight: 48 \}\)/);
+    assert.match(block, /\.focusable\(true\)/);
+    assert.match(block, /\.accessibilityText\(/);
+  }
+  assert.match(bubble, /'参考资料，共 ' \+\s*msg\.citations\.length\.toString\(\) \+ ' 条'/);
+  assert.match(status, /'展开这次回答的错误详情'/);
+  assert.match(status, /'重试上一条问题'/);
+  assert.match(process, /'展开回答生成过程'/);
+  assert.doesNotMatch(status, /\.height\((?:28|36)\)/);
+  assert.match(markdown, /Button\('解释这段'\)/);
+  assert.match(markdown, /\.accessibilityText\('让学伴解释当前代码片段'\)/);
+  assert.doesNotMatch(markdown, /\.height\(28\)/);
 });
 
 test('正文辅助色和语义小字在实际浅色表面达到 WCAG AA', () => {
