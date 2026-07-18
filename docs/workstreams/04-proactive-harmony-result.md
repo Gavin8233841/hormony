@@ -50,6 +50,8 @@
 - 已掌握节点不再只检查一层后继，而是遍历真实 Topic DAG 的全部可达后继，并复用现有层级、练习状态、正确率与目录顺序选择最近可执行行动。分支汇合处的后继仍锁定时，会解析到未掌握且已解锁的真实前置 Topic。
 - 独立答题可能形成“长期掌握事实存在、先修关系仍未满足”的状态。此时行动先沿可达后继继续，节点文字、读屏语义和可见度优先保留“已掌握”，同时明确显示“前置未完成”，不再把同一节点降级描述为单纯未解锁。
 - 多层后继行动统一解释为“后继主题”；锁定节点的主按钮解释并执行精确前置 Topic。课程切换、失败恢复和主动作保留至少 48 vp，动作读屏文本包含实际解析出的 Topic。
+- LearningMap 使用 `onPageShow`，首次进入、从 Lesson/Practice 返回或应用再次显示时都按当前课程重读课程目录、先修关系、学习进度和掌握状态；每轮继续复用单调 `requestVersion`，旧成功、旧失败和旧 `finally` 不能覆盖新快照。
+- 页内课程切换只有在完整快照读取成功且通过 latest-version 守卫后，才把精确 `selectedCourseId/selectedCourseTitle` 写回 AppStorage；前后台恢复不会再退回旧课程，失败或过期请求也不能改写选择。
 
 ### 标签洞察状态
 
@@ -92,8 +94,9 @@
 | **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
 | **源码确认** | schema 12 学习状态契约 | 标签洞察按 `courseId + topic + tag` 隔离；画像继续使用课程目录校验后的 `TopicMastery` |
 | **源码确认** | 四个 WS04 契约脚本合并执行 | exit 0，55/55 通过；覆盖主动行动、提醒/卡片、Form 冷启动、画像真实 Topic、记录一致快照、双错误态恢复、窄屏与无障碍 |
-| **源码确认** | `node --test scripts/test-learning-map-contracts.mjs` | 最终源码 exit 0，5/5 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，覆盖多层后继、分支汇合前置动作、独立掌握但关系锁定、旧课程回调隔离、精确路由、动态读屏与 48 vp |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 最终源码 exit 0，API 12 `CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 21 s 706 ms` |
+| **源码确认** | `node --test scripts/test-learning-map-contracts.mjs` | 当前主线 exit 0，6/6 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，并覆盖返回刷新、课程选择保持、多层后继、分支汇合、独立掌握、旧回调隔离、精确路由、动态读屏与 48 vp |
+| **静态诊断通过** | `python -m unittest scripts.test_learning_map_navigation_contract scripts.test_validate_topic_relations -v` | 当前主线 exit 0，13/13 通过；Python 契约锁定空目标守卫、目标状态路由、跨节点文案与真实 Lesson/Practice 动作，不再依赖局部变量写法 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 当前主线 exit 0，API 12 `CompileArkTS`、HAP 打包与 `PackingCheck` 通过，`BUILD SUCCESSFUL in 5 s 488 ms` |
 | **静态诊断通过** | DevEco build agent `check_ets_files`，会话 `ses_08b973018ffe09UP9Ypjm6iO9d` | 显式使用 `alibaba-cn/qwen3-coder-plus` 对最终 `LearningMap.ets` 返回 `no diagnostics`；此前“诊断 + 启动”组合进程在 184.1 秒超时，不作为诊断结论 |
 | **模拟器通过** | `hdc list targets -v`、HAP 安装、`aa force-stop`、`aa start`、`aa dump` | 目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；最新 HAP 安装成功，旧进程强停成功，`entry/EntryAbility` 以新 PID 5344 前台启动 |
 | **模拟器通过** | `hdc uitest dumpLayout/uiInput` 与 `snapshot_display` | 1256 x 2760 竖屏：计算机网络星图从锁定“物理层与数据链路层”解析并实际进入精确前置 `OSI与TCP/IP模型` 的 `pages/Lesson`。证据位于 `screenshots/ws04-learning-map-20260718-165422/`，不纳入 Git |
@@ -110,6 +113,7 @@
 - Profile 与 ActivityRecords 的屏幕阅读器播报顺序、字体放大、窄屏排版、48 vp 实际触控和错误重试独立聚焦尚无设备证据。
 - LearningMap 的 1256 x 2760 竖屏视觉和 bounds 导航已通过模拟器；屏幕阅读器实际播报顺序、系统字体放大、横屏、平板布局与失败恢复聚焦仍未验证。
 - Achievements 的动态屏幕阅读器播报、字体放大换行和 48 vp 实际触控尚无设备证据。
+- WS04 `9c65367` 的 Achievements 返回刷新依赖主线尚未融合的长期里程碑与两阶段行动上下文前置；本批只采用独立的 LearningMap 部分，待前置提交逐文件验证后再融合成就部分。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
 - 正式签名 HAP、横屏、平板和真机仍未验证；当前只完成未签名 debug HAP 的模拟器安装运行。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。

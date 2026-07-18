@@ -58,7 +58,7 @@ struct LearningMapPage {
   @State failedCourseId: string = '';
   private requestVersion: number = 0;
 
-  aboutToAppear(): void {
+  onPageShow(): void {
     this.loadMap();
   }
 
@@ -189,6 +189,8 @@ struct LearningMapPage {
       }
     }
     if (requestVersion !== this.requestVersion) return;
+    AppStorage.setOrCreate<string>('selectedCourseId', course.id);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
     this.selectedCourseId = course.id;
     this.selectedCourseTitle = course.title;
     this.nodes = nextNodes;

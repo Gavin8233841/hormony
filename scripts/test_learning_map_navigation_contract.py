@@ -22,7 +22,7 @@ class LearningMapNavigationContractTest(unittest.TestCase):
 
         self.assertIn("const target = this.nextActionTarget(node)", uses_practice)
         self.assertIn(
-            "return target.lessonCompleted || target.mastery !== null",
+            "return target !== null && (target.lessonCompleted || target.mastery !== null)",
             uses_practice,
         )
         self.assertNotIn("target.id !== node.id", uses_practice)
@@ -45,13 +45,20 @@ class LearningMapNavigationContractTest(unittest.TestCase):
         )
         run = compact(extract_method(self.source, "runNextAction"))
 
-        for method in (label, description):
-            self.assertIn(
-                "const action = this.nextActionUsesPractice(node) ? '练习' : '学习'",
-                method,
-            )
-        self.assertIn("action + '后继主题'", label)
-        self.assertIn("action + '前置主题'", label)
+        self.assertIn(
+            "const relation = this.isReachableSuccessor(node, target) ? '后继主题' : '前置主题'",
+            label,
+        )
+        self.assertIn(
+            "(this.nextActionUsesPractice(node) ? '练习' : '学习') + relation",
+            label,
+        )
+        self.assertIn(
+            "const action = this.nextActionUsesPractice(node) ? '练习' : '学习'",
+            description,
+        )
+        self.assertIn("action + '后继", description)
+        self.assertIn("action + '前置", description)
         self.assertIn("const target = this.nextActionTarget(node)", run)
         practice = run.find("this.openPractice(target.topic)")
         lesson = run.find("this.openLesson(target.topic)")
