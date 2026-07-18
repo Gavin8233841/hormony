@@ -96,6 +96,8 @@ struct QuizPage {
   @State draftSaveFailed: boolean = false;
   @State draftReadFailed: boolean = false;
   @State discardingDraft: boolean = false;
+  @State submittedDraftCleanupPending: boolean = false;
+  @State cleaningSubmittedDraft: boolean = false;
   private grading: QuizGradingItem[] = [];
   private attemptId: string = '';
   private attemptSubmittedAt: string = '';
@@ -167,6 +169,10 @@ struct QuizPage {
     if (this.submitting) {
       this.message = '答题结果正在写入本机，请稍候';
       this.hasError = false;
+      return true;
+    }
+    if (this.resultReady && this.submittedDraftCleanupPending) {
+      this.goBack();
       return true;
     }
     this.cancelQuizGeneration(false);
@@ -418,7 +424,7 @@ struct QuizPage {
     this.queueDraftSave();
   }
 
-  private goBack(): void {
+  private async goBack(): Promise<void> {
     if (this.discardingDraft) {
       this.message = '正在放弃本轮草稿，请稍候';
       this.hasError = false;
@@ -429,6 +435,7 @@ struct QuizPage {
       this.hasError = false;
       return;
     }
+    if (this.resultReady && !(await this.ensureSubmittedDraftCleared())) return;
     this.cancelQuizGeneration(false);
     if (!this.resultReady && this.questions.length > 0 && this.attemptId.length > 0) {
       this.queueDraftSave(false);
@@ -451,7 +458,8 @@ struct QuizPage {
     }
   }
 
-  private askTutor(detail: QuizResultDetail): void {
+  private async askTutor(detail: QuizResultDetail): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     const question = '请结合课程资料讲解这道题：' + detail.stem +
       '。我的答案是“' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答') +
       '”，正确答案是“' + detail.correctAnswer + '”。请指出关键概念和判断步骤。';
@@ -488,9 +496,12 @@ struct QuizPage {
     this.attemptSubmittedAt = '';
     this.draftSaveFailed = false;
     this.draftReadFailed = false;
+    this.submittedDraftCleanupPending = false;
+    this.cleaningSubmittedDraft = false;
   }
 
-  private reviewTopic(topic: string): void {
+  private async reviewTopic(topic: string): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
     AppStorage.setOrCreate<string>('knowledgePrefillQuery', topic);
@@ -500,7 +511,30 @@ struct QuizPage {
     });
   }
 
-  private openMistakeBook(): void {
+  private async ensureSubmittedDraftCleared(): Promise<boolean> {
+    if (!this.submittedDraftCleanupPending) return true;
+    if (this.cleaningSubmittedDraft || this.attemptId.length === 0) return false;
+    const attemptId = this.attemptId;
+    this.cleaningSubmittedDraft = true;
+    try {
+      await LocalLearningRepository.clearAiQuizDraft(attemptId);
+      if (this.attemptId !== attemptId || !this.resultReady) return false;
+      this.submittedDraftCleanupPending = false;
+      this.message = '答题已写回本机，草稿已清除';
+      this.hasError = false;
+      return true;
+    } catch (error) {
+      this.submittedDraftCleanupPending = true;
+      this.message = '答题已写回本机，但草稿仍未清除，请重试清理';
+      this.hasError = false;
+      return false;
+    } finally {
+      this.cleaningSubmittedDraft = false;
+    }
+  }
+
+  private async openMistakeBook(): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeBook' }).catch((err: Error): void => {
       this.message = '无法打开错题本，请重试';
       this.hasError = true;
@@ -521,7 +555,8 @@ struct QuizPage {
     return '保持挑战难度';
   }
 
-  private startNextQuiz(): void {
+  private async startNextQuiz(): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     if (this.resultAccuracy < 0.8) {
       this.resetQuiz();
       return;
@@ -715,7 +750,8 @@ struct QuizPage {
       try {
         await LocalLearningRepository.clearAiQuizDraft(this.attemptId);
       } catch (error) {
-        this.message = '答题已写回本机，但草稿清理失败；再次提交不会重复累计';
+        this.submittedDraftCleanupPending = true;
+        this.message = '答题已写回本机，但草稿清理失败；请重试清理草稿后继续';
         this.hasError = false;
       }
     } catch (e) {
@@ -992,7 +1028,8 @@ struct QuizPage {
     return Constants.COLOR_ERROR;
   }
 
-  private askTutorForResult(): void {
+  private async askTutorForResult(): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     const weakTags = this.resultTagSummaries
       .filter((item: QuizTagSummary): boolean => item.wrongQuestions > 0)
       .map((item: QuizTagSummary): string => item.tag)
@@ -1008,7 +1045,8 @@ struct QuizPage {
     });
   }
 
-  private startFocusedTagDrill(tag: string): void {
+  private async startFocusedTagDrill(tag: string): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     const normalized = tag.trim().substring(0, 12);
     if (normalized.length === 0) return;
     this.focusTag = normalized;
@@ -1420,7 +1458,16 @@ struct QuizPage {
         .fontSize(12)
         .lineHeight(18)
         .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
-      if (this.draftReadFailed) {
+      if (this.submittedDraftCleanupPending) {
+        Button(this.cleaningSubmittedDraft ? '正在清理...' : '重试清理草稿')
+          .height(48)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_SM)
+          .enabled(!this.cleaningSubmittedDraft)
+          .onClick((): void => { this.ensureSubmittedDraftCleared(); })
+      } else if (this.draftReadFailed) {
         Button('恢复草稿')
           .height(48)
           .fontSize(12)

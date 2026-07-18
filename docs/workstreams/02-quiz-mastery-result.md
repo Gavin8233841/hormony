@@ -291,3 +291,26 @@
 - **未验证**：本批不修改或清除模拟器用户数据库，proof 与 recent 明细分叉由可执行 ArkData fixture 验证，未在模拟器内直接篡改真实状态行。
 - **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；按主线程约束未重试当前不可用的 DevEco Agent 模型。
 - **未验证**：项目未配置生产签名，真机与多设备未验证。
+
+## 批次 10：结果写回后的草稿清理恢复
+
+### 背景与行为变化
+
+- Quiz/Practice 在结果与画像写回成功后才清理答题草稿。旧实现若清理失败会进入结果态并提示“再次提交不会重复累计”，但结果页没有提交入口；直接再练还可能因遗留 attempt 的 create CAS 冲突，离页后重新进入则恢复已经写回的旧草稿。
+- 两页新增独立的 `submittedDraftCleanupPending` 与 `cleaningSubmittedDraft` 状态。初次清理失败明确显示“重试清理草稿”，重试期间冻结重复动作；成功提示草稿已清除，失败保持结果页和同一恢复入口。
+- 所有会离开或重置结果页的显式动作先幂等清理精确 attempt。Quiz 覆盖再练、错题本、资料、学伴、标签练习和标题栏返回；Practice 覆盖错题本、AI 测验、学伴、结果页返回和标题栏返回。系统返回在清理 pending 时转为受控异步返回，清理失败不离页。
+- 页面源码契约验证 clear 调用使用提交时保留的精确 `attemptId`，只有 clear 成功后才重置或导航；旧的不可执行“再次提交”提示已移除。
+
+### 验证
+
+- **静态诊断通过**：`cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`，exit 0，`63/63` 通过；覆盖 Quiz/Practice 清理 pending、恢复按钮、精确 attempt、失败留页、全部结果下一步和系统返回契约。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，exit 0；`pnpm test` 为 28 个文件、`440/440` 通过。
+- **构建通过**：`cd apps/web; pnpm build` 单独重跑 exit 0，Next.js 生产构建完成。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，exit 0，CompileArkTS 与 PackageHap 完成，`BUILD SUCCESSFUL in 35 s 452 ms`；项目未配置 `signingConfigs`，构建跳过签名。
+- **模拟器通过**：目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。最新 `entry-default-unsigned.hap` 返回 `install bundle successfully`，`com.c4ai.hormony/EntryAbility` 返回 `start ability successfully`；最终重启等待后的 UI 树为 `pages/Index`，可见“鸿学伴” bounds `[56,328][372,451]`。
+
+### 未验证
+
+- **未验证**：本批不修改或清除模拟器用户数据库，未在模拟器中人为制造“结果写回成功、草稿 clear 写失败”；恢复控件和导航门控由页面可执行源码契约及 API 12 HAP 构建验证。
+- **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；按主线程约束未重试当前不可用的 DevEco Agent 模型。
+- **未验证**：项目未配置生产签名，真机与多设备未验证。

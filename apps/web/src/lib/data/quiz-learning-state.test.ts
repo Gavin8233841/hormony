@@ -2321,6 +2321,54 @@ describe("Quiz 与 Practice 结果页下一步动作", () => {
     expect(practiceSubmit).toContain("clearCuratedPracticeDraft");
   });
 
+  it("写回成功但草稿清理失败时，所有结果下一步先重试精确清理", () => {
+    const pages = [
+      {
+        source: quizPageSource,
+        submit: "submitQuiz",
+        clear: "await LocalLearningRepository.clearAiQuizDraft(attemptId)",
+        resultState: "this.resultReady",
+        actions: ["startNextQuiz", "openMistakeBook", "askTutor", "reviewTopic", "askTutorForResult",
+          "startFocusedTagDrill"],
+      },
+      {
+        source: practicePageSource,
+        submit: "submit",
+        clear: "await LocalLearningRepository.clearCuratedPracticeDraft(attemptId)",
+        resultState: "this.submitted",
+        actions: ["openQuiz", "openMistakeBook", "askTutor"],
+      },
+    ];
+
+    for (const page of pages) {
+      expect(page.source).toContain("@State submittedDraftCleanupPending: boolean = false");
+      expect(page.source).toContain("@State cleaningSubmittedDraft: boolean = false");
+      expect(page.source).toContain("'重试清理草稿'");
+      const submit = pageMethod(page.source, page.submit).source;
+      expect(submit).toContain("this.submittedDraftCleanupPending = true");
+      expect(submit).not.toContain("再次提交不会重复累计");
+
+      const cleanup = pageMethod(page.source, "ensureSubmittedDraftCleared").source;
+      expect(cleanup).toContain("const attemptId = this.attemptId");
+      expect(cleanup).toContain(page.clear);
+      expect(cleanup).toContain("this.submittedDraftCleanupPending = false");
+      expect(cleanup).toContain("this.submittedDraftCleanupPending = true");
+      expect(cleanup).toContain("return false");
+
+      for (const action of page.actions) {
+        expect(pageMethod(page.source, action).source).toContain(
+          "if (!(await this.ensureSubmittedDraftCleared())) return;"
+        );
+      }
+      expect(pageMethod(page.source, "goBack").source).toContain(
+        `if (${page.resultState} && !(await this.ensureSubmittedDraftCleared())) return;`
+      );
+      const systemBack = pageMethod(page.source, "onBackPress").source;
+      expect(systemBack).toContain(`${page.resultState} && this.submittedDraftCleanupPending`);
+      expect(systemBack).toContain("this.goBack()");
+    }
+  });
+
   it("Quiz 与 Practice 放弃草稿期间阻止后排保存重建已清除草稿", () => {
     for (const pageSource of [quizPageSource, practicePageSource]) {
       const queueSave = pageMethod(pageSource, "queueDraftSave").source;

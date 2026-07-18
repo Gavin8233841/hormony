@@ -63,6 +63,8 @@ struct PracticePage {
   @State draftSaveFailed: boolean = false;
   @State draftReadFailed: boolean = false;
   @State discardingDraft: boolean = false;
+  @State submittedDraftCleanupPending: boolean = false;
+  @State cleaningSubmittedDraft: boolean = false;
   private reviewItemIds: string[] = [];
   private selectedReviewItemId: string = '';
   private attemptId: string = '';
@@ -113,6 +115,10 @@ struct PracticePage {
     if (this.saving) {
       this.message = '答题结果正在写入本机，请稍候';
       this.hasError = false;
+      return true;
+    }
+    if (this.submitted && this.submittedDraftCleanupPending) {
+      this.goBack();
       return true;
     }
     if (!this.submitted && this.draftCreated && this.questions.length > 0 && this.attemptId.length > 0) {
@@ -167,6 +173,8 @@ struct PracticePage {
     this.writeBackActivityCount = 0;
     this.writeBackCourseProgress = 0;
     this.writeBackBlocked = false;
+    this.submittedDraftCleanupPending = false;
+    this.cleaningSubmittedDraft = false;
   }
 
   private isActiveLifecycle(lifecycleRunId: number): boolean {
@@ -333,7 +341,7 @@ struct PracticePage {
     this.queueDraftSave();
   }
 
-  private goBack(): void {
+  private async goBack(): Promise<void> {
     if (this.discardingDraft) {
       this.message = '正在放弃本轮草稿，请稍候';
       this.hasError = false;
@@ -344,6 +352,7 @@ struct PracticePage {
       this.hasError = false;
       return;
     }
+    if (this.submitted && !(await this.ensureSubmittedDraftCleared())) return;
     if (!this.submitted && this.draftCreated && this.questions.length > 0 && this.attemptId.length > 0) {
       this.queueDraftSave(false);
     }
@@ -532,7 +541,8 @@ struct PracticePage {
     this.queueDraftSave();
   }
 
-  private askTutor(detail: QuizResultDetail): void {
+  private async askTutor(detail: QuizResultDetail): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     const question = '请结合课程资料讲解这道题：' + detail.stem +
       '。我的答案是“' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答') +
       '”，正确答案是“' + detail.correctAnswer + '”。请指出关键概念和判断步骤。';
@@ -542,7 +552,30 @@ struct PracticePage {
     });
   }
 
-  private openQuiz(): void {
+  private async ensureSubmittedDraftCleared(): Promise<boolean> {
+    if (!this.submittedDraftCleanupPending) return true;
+    if (this.cleaningSubmittedDraft || this.attemptId.length === 0) return false;
+    const attemptId = this.attemptId;
+    this.cleaningSubmittedDraft = true;
+    try {
+      await LocalLearningRepository.clearCuratedPracticeDraft(attemptId);
+      if (this.attemptId !== attemptId || !this.submitted) return false;
+      this.submittedDraftCleanupPending = false;
+      this.message = '答题已写回本机，草稿已清除';
+      this.hasError = false;
+      return true;
+    } catch (error) {
+      this.submittedDraftCleanupPending = true;
+      this.message = '答题已写回本机，但草稿仍未清除，请重试清理';
+      this.hasError = false;
+      return false;
+    } finally {
+      this.cleaningSubmittedDraft = false;
+    }
+  }
+
+  private async openQuiz(): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
       this.message = '当前主题无效，无法进入 AI 测验';
       return;
@@ -558,7 +591,8 @@ struct PracticePage {
     });
   }
 
-  private openMistakeBook(): void {
+  private async openMistakeBook(): Promise<void> {
+    if (!(await this.ensureSubmittedDraftCleared())) return;
     this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeBook' }).catch((err: Error): void => {
       this.message = '无法打开错题本，请重试';
       this.hasError = true;
@@ -637,7 +671,8 @@ struct PracticePage {
       try {
         await LocalLearningRepository.clearCuratedPracticeDraft(this.attemptId);
       } catch (error) {
-        this.message = '答题已写回本机，但草稿清理失败；再次提交不会重复累计';
+        this.submittedDraftCleanupPending = true;
+        this.message = '答题已写回本机，但草稿清理失败；请重试清理草稿后继续';
         this.hasError = false;
       }
     } catch (error) {
@@ -968,7 +1003,16 @@ struct PracticePage {
             .layoutWeight(1)
             .fontSize(12)
             .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_WARNING)
-          if (this.draftSaveFailed) {
+          if (this.submittedDraftCleanupPending) {
+            Button(this.cleaningSubmittedDraft ? '正在清理...' : '重试清理草稿')
+              .height(48)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_SM)
+              .enabled(!this.cleaningSubmittedDraft)
+              .onClick((): void => { this.ensureSubmittedDraftCleared(); })
+          } else if (this.draftSaveFailed) {
             Button('保存草稿')
               .height(48)
               .fontSize(12)
