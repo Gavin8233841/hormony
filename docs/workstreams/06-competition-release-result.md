@@ -868,3 +868,98 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
   WS03 的 Topic 整行进入 Lesson 改动，当前 `CourseDetail.ets` 仍把“学习内容”作为
   独立按钮。不得把本批局部模拟器证据写成完整黄金路径通过；主线集成 WS03 后需重跑。
 - **未验证**：未配置正式签名，未执行真机、线上 API、最终 MP4/PDF/ZIP 或门户上传。
+
+## 批次 17：正式证据 artifact、真实 capture 与统一发布预检
+
+背景：批次 15 的 schema v2 仍允许把自由文本、自报 HTTP 200 和合成 JSON 解释为
+线上通过；发布包又只允许五类固定附件，导致真实截图、UI 树、视频和原始响应没有
+受控角色。评分计划中的两张图长期固定为未验证，官方权重、字数和时长也只依赖文档
+硬编码，无法证明与仓库跟踪的两份官方 PDF 同版。
+
+文件：
+
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `scripts/validate-competition-evidence.py`
+- `scripts/test_validate_competition_evidence.py`
+- `scripts/validate-release-evidence.py`
+- `scripts/test_validate_release_evidence.py`
+- `scripts/validate-release-bundle.py`
+- `scripts/test_validate_release_bundle.py`
+- `scripts/validate-official-deliverables.py`
+- `scripts/test_validate_official_deliverables.py`
+- `scripts/validate-release-dependencies.py`
+- `scripts/test_validate_release_dependencies.py`
+- `scripts/validate-competition-release.py`
+- `scripts/test_validate_competition_release.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 发布证据升级为 `schemaVersion=3`。运行证据只接受包内 `evidence-artifact`，路径固定
+  在 `evidence/artifacts/`；manifest 限制最多 50 项、单项 64 MiB、合计 256 MiB，
+  并逐项绑定角色、大小、SHA-256 与 evidence ID 引用闭包。未引用、越界、Git 源文件
+  伪装运行证据和附加 ZIP 条目均失败。
+- Web `线上通过` 只接受最多 2 MiB、跨度不超过 15 分钟的 HAR 1.2 capture；从原始
+  request/response 解析同源 Health、Chat、Plan、Quiz 的 endpoint、时间、HTTP 状态
+  和业务字段。旧自报 capture JSON、`.invalid`/本地地址、非 capture artifact、正文
+  与索引 hash 不一致均不能授予线上等级。
+- `golden-demo` 只接受未验证、模拟器通过或真机通过，且正向等级必须绑定 D01-D07
+  七项业务检查和实际 artifact。D02 精确为用户手动创建系统学习提醒、选择时间并
+  同步服务卡片；“系统定时主动触达”和无需用户的后台自动提醒叙事被拒绝。
+- 两张效果图支持从未验证迁移到模拟器/真机通过：未验证时必须列精确缺口；正向状态
+  必须与 `golden-demo` 等级一致并绑定同一 screenshot artifact。已有正向证据时继续
+  保留过期“未验证”文本会失败。
+- 发布包对 screenshot 解析 PNG 块、CRC、IDAT 解压、位深/色型和扫描行；UI tree 要求
+  `pages/*`、有效根 bounds、非空 children 与可见文本 bounds；MP4 先验 box 结构，
+  设备正向等级还必须由调用者提供绝对普通文件 `ffprobe`，实际解码出唯一视频流、
+  有效尺寸和正帧数。`nb_read_frames=N/A` 与非空 stderr 由两个互不依赖的固定负例
+  分别拒绝；ZIP 比较、哈希与秘密扫描使用流式读取，不整包载入内存。
+- 官方规则绑定仓库跟踪 PDF：竞赛规程为 11 页、SHA-256
+  `E5093C61BED5A10C249E165095127AC1F03FD3CE5B8B993D3A8D6AE878BEC1A9`；报名手册
+  为 12 页、SHA-256
+  `6034ACA8F908D76DEBD0EA1DC606C3F594DF8FE29310866F1E5EF91D170BD26E`。门禁同时要求
+  800 字、视频 5 分钟、50/20/20/10 + 20 权重、三类材料和最多更新 10 次的条款锚点，
+  证据等级仍为源码确认，不写成门户线上确认。
+- 正式三文件门禁把 PDF 页数、MP4 时长/格式/视频流和最终 ZIP 错误收束为有限 reason
+  code；`pdfinfo`、`ffprobe` 路径必须是调用者明确提供的绝对普通文件，超时、缺失、
+  非零退出、非法输出均结构化失败且不回显子进程内容。
+- 新增统一入口，顺序执行最小依赖、评分证据、内容和正式三文件四阶段；运行前后绑定
+  同一 Git HEAD 与干净工作树，单阶段失败不阻止后续只读检查，汇总只输出状态、退出码
+  和有限 reason code。所有子 Python 命令带 `-B` 并禁用 bytecode 写入。
+- source manifest 闭包扩展为 18 个直接文件、7 个测试文件、11 条运行时边和 7 条
+  测试边；统一入口、媒体解析、证据 artifact 和官方 PDF 绑定不能在主线移植时遗漏。
+
+验证：
+
+- **静态诊断通过**：七组 Python 固定输入分别 exit 0，共 133 项：内容 29、评分证据
+  11、发布证据 13、发布包 39、正式三文件 20、依赖闭包 8、统一入口 13。
+- **静态诊断通过**：`python -B scripts/validate-competition-content.py` exit 0，
+  165 题/33 Topic、147 条知识、36 条外部资源、33 个 Lesson 体验与源码 manifest
+  通过；外部 URL 仅核验记录状态，未联网。
+- **静态诊断通过**：`python -B scripts/validate-competition-evidence.py` exit 0，
+  `scoreRows=13; timelineSegments=7; timelineSeconds=285; introductionCharacters=480`。
+- **静态诊断通过**：`python -B scripts/validate-release-dependencies.py` exit 0，
+  `directFiles=18; testFiles=7; runtimeEdges=11; testEdges=7; planCommands=7`。
+- **静态诊断通过**：`cd apps/web; pnpm lint; pnpm typecheck; pnpm test; pnpm build`
+  分别 exit 0；13 个测试文件、169 项测试通过，Next.js 生产构建成功。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` exit 0，
+  `BUILD SUCCESSFUL in 4 s 918 ms`，未执行 clean；仍明确警告没有 signingConfigs。
+
+失败后纠正：
+
+- 内容总门禁首次 exit 1，只报告两个新统一入口尚未被 Git 跟踪；精确暂存两个文件后
+  同一命令 exit 0，没有放宽 manifest 的 Git 索引约束。
+- 七组聚合测试的工具会话丢失结果，未把它记为通过；改为七个互不依赖的进程后取得
+  每组明确 exit 0 和测试数量。
+- 独立红队确认旧媒体测试同时设置 `nb_read_frames=N/A` 与非空 stderr，只覆盖先返回的
+  stderr 分支；拆为两项后发布包测试从 37 项增至 39 项，两个错误分别独立触发。
+
+未验证：
+
+- **未验证**：仓库没有最终作品说明 PDF、演示 MP4、Demo/源码 ZIP、真实队名和作品名，
+  不能构造统一入口的正式实参；没有用两份规则 PDF 或固定输入冒充参赛材料。
+- **未验证**：没有正式 evidence index、HAR、截图、UI 树、完整视频、门户回执或签名
+  HAP；schema 与解析器通过不证明模拟器/真机/线上/门户业务已经通过。
+- **未验证**：`pdfinfo`/`ffprobe` 尚未对最终三文件联合执行，最终 PDF 页数、MP4 完整
+  解码与时长、ZIP/HAP 同版绑定和门户上传仍须材料生成后重跑统一入口。

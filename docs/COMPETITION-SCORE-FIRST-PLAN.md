@@ -276,6 +276,23 @@ AI 使用说明是项目透明性材料，不把它写成两份 PDF 明示的独
 
 ## 十二、正式发布门禁
 
+### 一条入口正式预检
+
+最终 PDF、MP4 与源码 ZIP 准备完成后，从仓库根目录运行总门禁。它按固定仓库根目录和有限超时依次检查依赖闭包、评分/黄金演示结构、内容/source manifest 与正式材料；任一文件、工具或子门禁失败时整体失败，不把前三阶段通过写成正式交付通过。
+
+```powershell
+python -B scripts/validate-competition-release.py `
+  --pdf-path <正式 PDF 的明确路径> `
+  --video-path <正式 MP4 的明确路径> `
+  --bundle-path <正式 ZIP 的明确路径> `
+  --team-name <门户真实队名> `
+  --work-name <门户真实作品名> `
+  --pdfinfo-path <pdfinfo 现有绝对普通文件路径> `
+  --ffprobe-path <ffprobe 现有绝对普通文件路径>
+```
+
+运行前后都必须确认工作树干净且 `HEAD` 未改变，确保 PDF、MP4、ZIP、HAP 和发布证据索引绑定同一提交。正式媒体失败只记录结构化原因，不回显子进程正文或秘密。
+
 ### 1. 内容与数据
 
 ```powershell
