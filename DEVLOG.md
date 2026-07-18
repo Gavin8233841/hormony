@@ -7500,3 +7500,42 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - HDC 已连接但本批未在共享设备打开 q54/k45；端侧长解释换行、读屏、答题流程、横屏、平板、真机和线上 API 未验证。
 - 当前受保护的 `lesson-experiences.json` 仍含旧的统一“按类型筛选”类比；在 WS09 受控生成提交融合前，不能宣称 IPC Lesson 文案已同步。
 - Alibaba provider 的已知 `403 AllocationQuota.FreeTierOnly` 与 `deveco/glm-5` 的已知 `401 Token refresh failed` 均未重试，也未回落到 `openai/*`。
+
+---
+
+## 2026-07-18 [MAIN+WS03] 匿名管道描述符与读取边界
+
+背景：WS03 `9ef8b50` 将 `cs102_q53` 从“只能亲缘进程、固定大小缓冲区”的泛化表述修为可审计的 POSIX/Linux 边界，但独立复核确认同 Topic 的 `cs102_k44`、主动学习案例与活动反馈仍直接反驳新题；原提取器还会把 `cs102Quizzes` 数组闭合后、`cs103Quizzes` 之前的同 ID 对象误当成生产题。主线补齐整个源链并加强 q53/q54 契约，融合提交为 `4396195`。
+
+文件：
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `scripts/test_cs102_pipe_quiz_facts.py`
+- `scripts/test_cs102_message_queue_quiz_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- q53 与 k44 统一为单向、无消息边界的匿名管道字节流；`fork()` 继承是常见交接方式，但接口不施加亲缘限制，Linux `SCM_RIGHTS` 可传递打开文件描述的引用。
+- Linux 管道容量不再写成固定 64KB；正文固定 `F_GETPIPE_SZ` 查询、受约束的 `F_SETPIPE_SZ` 请求、向上取整和实际容量返回。规格活动区分已有数据立即返回、读空且仍有写端等待、所有写端关闭后 `read()` 返回 0/EOF，并为 `printf()` 补入 `<stdio.h>`。
+- 现实案例不再写“只能父子进程”，改为能否使用取决于是否持有端点描述符；k44 双端来源固定为 POSIX.1-2024 `pipe/read/write` 与 Linux `pipe(7)/unix(7)/F_GETPIPE_SZ(2const)`。
+- q53/q54 的 TypeScript 提取器剥离注释并用字符串感知的平衡方括号扫描止于真实数组闭合；数组之前、之后或注释内的同 ID 对象均不能误绿。q53 另固定完整 Web 文案、端侧元数据、k44 双端字段和规格关键句。
+- 五份一手页面的响应哈希及额外 POSIX `write()` 哈希已写入 WS03 结果文档；独立复核最终确认当前源和测试无剩余 P1/P2。
+
+验证：
+- `python -B scripts/test_cs102_pipe_quiz_facts.py`：exit 0，11/11 通过；`python -B scripts/test_cs102_message_queue_quiz_facts.py`：exit 0，11/11 通过。
+- `node scripts/generate-quizzes-json.mjs`：exit 0，165 道端侧选择题与 Web 唯一源逐字段一致。
+- `python -B scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识切片、165 道题、33 份学习体验的结构与路由门禁全部通过。
+- `cd apps/web; pnpm lint`、`pnpm typecheck`：exit 0；`pnpm test`：exit 0，36 个文件、437/437 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10/10 静态页面与 26.8 kB middleware 进入产物。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，最终 `BUILD SUCCESSFUL in 55 s 920 ms`；未配置签名。
+- `hdc list targets -v`：exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+
+失败或未验证：
+- 新来源固定断言首次红灯发现 POSIX `read()` URL 未记录；独立复核随后又复现现实案例旧句与数组闭合后对象误绿。三项均修正并以固定反例转绿后才提交。
+- 受保护的 `lesson-experiences.json` 未修改、未暂存，当前 IPC 生成产物仍含旧的“只能父子、半双工、一直阻塞、通常 64KB”；已向 WS09 发出从已修正规格源生成和回归的精确请求，融合前不能宣称 Lesson 用户路径闭环。
+- HDC 已连接但本批未打开 q53/k44；端侧长文、读屏、答题流程、横屏、平板、真机、正式签名与线上 API 未验证。
+- 已知失败的 Alibaba/DevEco Provider 未重试，也未回落到 `openai/*`。
