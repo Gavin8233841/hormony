@@ -23,31 +23,36 @@ struct AchievementsPage {
   @State loading: boolean = false;
   @State actionLoading: boolean = false;
   @State message: string = '';
+  private achievementLoadSequence: number = 0;
   private actionLoadSequence: number = 0;
 
-  aboutToAppear(): void {
+  onPageShow(): void {
     this.loadAchievements();
   }
 
   private async loadAchievements(): Promise<void> {
-    if (this.loading) return;
+    const requestSequence = ++this.achievementLoadSequence;
     this.actionLoadSequence += 1;
     this.loading = true;
     this.actionLoading = false;
     this.message = '';
     this.actionContextReady = false;
     try {
-      this.achievements = await LocalLearningRepository.getAchievements();
+      const achievements = await LocalLearningRepository.getAchievements();
+      if (requestSequence !== this.achievementLoadSequence) return;
+      this.achievements = achievements;
     } catch (error) {
+      if (requestSequence !== this.achievementLoadSequence) return;
       this.achievements = [];
       this.courses = [];
       this.studyEvents = [];
       this.masteryMilestones = [];
       this.message = '成就进度读取失败，请重新读取';
-      this.loading = false;
       return;
+    } finally {
+      if (requestSequence === this.achievementLoadSequence) this.loading = false;
     }
-    this.loading = false;
+    if (requestSequence !== this.achievementLoadSequence) return;
     await this.loadActionContext();
   }
 

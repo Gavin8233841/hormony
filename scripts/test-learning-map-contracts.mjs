@@ -8,6 +8,10 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, '..');
 const learningMapPath = path.join(repositoryRoot,
   'apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets');
+const practicePath = path.join(repositoryRoot,
+  'apps/harmonyos/entry/src/main/ets/pages/Practice.ets');
+const quizReducerPath = path.join(repositoryRoot,
+  'apps/harmonyos/entry/src/main/ets/common/QuizLearningStateReducer.ets');
 const relationsPath = path.join(repositoryRoot,
   'apps/harmonyos/entry/src/main/resources/rawfile/learning/topic-relations.json');
 
@@ -92,6 +96,8 @@ function nextActionTarget(node, nodes) {
 }
 
 const learningMapSource = readSource(learningMapPath);
+const practiceSource = readSource(practicePath);
+const quizReducerSource = readSource(quizReducerPath);
 const relations = JSON.parse(readSource(relationsPath));
 
 test('课程切换只提交最新请求的完整本机快照', () => {
@@ -114,14 +120,62 @@ test('课程切换只提交最新请求的完整本机快照', () => {
     'relations must be read for the exact selected course');
 
   const latestGuard = loadSnapshot.indexOf('if (requestVersion !== this.requestVersion) return;');
+  const storedCourseCommit = loadSnapshot.indexOf(
+    "AppStorage.setOrCreate<string>('selectedCourseId', course.id);");
+  const storedTitleCommit = loadSnapshot.indexOf(
+    "AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);");
   const courseCommit = loadSnapshot.indexOf('this.selectedCourseId = course.id;');
   const nodesCommit = loadSnapshot.indexOf('this.nodes = nextNodes;');
-  assert.equal(latestGuard >= 0 && latestGuard < courseCommit && courseCommit < nodesCommit, true,
-    'the latest-version guard must run before any course or node state is committed');
+  assert.equal(latestGuard >= 0 && latestGuard < storedCourseCommit &&
+    storedCourseCommit < storedTitleCommit && storedTitleCommit < courseCommit && courseCommit < nodesCommit, true,
+  'the latest-version guard must run before the successful course choice or node state is committed');
   assert.equal(loadSnapshot.slice(0, latestGuard).includes('this.selectedCourseId ='), false,
     'an incomplete request must not publish its course identity');
   assert.equal(loadSnapshot.slice(0, latestGuard).includes('this.nodes ='), false,
     'an incomplete request must not publish partial map nodes');
+  assert.equal(loadSnapshot.slice(0, latestGuard).includes("AppStorage.setOrCreate<string>('selectedCourse"), false,
+    'an old or failed course request must not overwrite the choice restored by the next page show');
+});
+
+test('真实学习动作返回时重新读取掌握事实与动态行动', () => {
+  const lifecycle = sourceSection(learningMapSource,
+    '  onPageShow(): void {', '\n  private async loadMap(');
+  const loadMap = sourceSection(learningMapSource,
+    '  private async loadMap(): Promise<void> {', '\n  private async selectCourse(');
+  assert.equal(lifecycle.includes('this.loadMap();'), true,
+    'every page show, including router back, must refresh the current map from ArkData');
+  assert.equal(learningMapSource.includes('  aboutToAppear(): void {'), false,
+    'initial creation must not add a second one-off map load beside onPageShow');
+  assert.equal(loadMap.includes('const requestVersion = ++this.requestVersion;'), true,
+    'each return refresh must invalidate older course callbacks');
+  assert.equal(loadMap.includes("AppStorage.get<string>('selectedCourseId')"), true,
+    'a return refresh must preserve and reload the exact course used by the learning action');
+  assert.equal(loadMap.includes('await this.loadCourseSnapshot(selected, requestVersion);'), true,
+    'the current course mastery and lesson progress must be rebuilt on every page show');
+
+  const practiceSubmit = sourceSection(practiceSource,
+    '  private async submit(): Promise<void> {', '\n  private applyWriteReceipt(');
+  assert.equal(practiceSubmit.includes(
+    'const receipt = await LocalLearningRepository.appendQuizResult(result);'), true,
+  'the curated practice must persist its objective quiz result before returning');
+  assert.equal(practiceSource.includes(
+    ".onClick((): void => { this.getUIContext().getRouter().back(); })"), true,
+  'the audited action must return to the existing LearningMap page instance');
+  assert.equal(quizReducerSource.includes('const TOPIC_MASTERY_THRESHOLD: number = 0.8;'), true);
+  assert.equal(quizReducerSource.includes(
+    'correctQuestions / totalQuestions >= TOPIC_MASTERY_THRESHOLD'), true,
+  'a 5/5 curated practice must produce the mastery fact consumed by the refreshed map');
+
+  const loadSnapshot = sourceSection(learningMapSource,
+    '  private async loadCourseSnapshot(course: Course, requestVersion: number): Promise<void> {',
+    '\n  private clearMapSnapshot(');
+  assert.equal(loadSnapshot.includes(
+    "AppStorage.setOrCreate<string>('selectedCourseId', course.id);"), true,
+  'a successful in-page course switch must survive foreground and router-return refreshes');
+  assert.equal(loadSnapshot.includes('this.nodes = nextNodes;'), true,
+    'the refreshed mastery facts must replace the nodes used by counts, actions and accessibility text');
+  assert.equal(learningMapSource.includes('this.masteredCount()'), true);
+  assert.equal(learningMapSource.includes('this.nodeAccessibilityText(node)'), true);
 });
 
 test('真实 33 Topic DAG 的每个锁定节点都能解析到未掌握且已解锁的前置动作', () => {

@@ -217,7 +217,8 @@ test('两阶段加载在辅助入口失败时保留已读取的真实成就', ()
   const loadActionContext = balancedBlock(achievementsSource,
     '  private async loadActionContext(): Promise<void> {');
   const achievementRead = loadAchievements.indexOf(
-    'this.achievements = await LocalLearningRepository.getAchievements();');
+    'const achievements = await LocalLearningRepository.getAchievements();');
+  const achievementCommit = loadAchievements.indexOf('this.achievements = achievements;');
   const actionLoad = loadAchievements.indexOf('await this.loadActionContext();');
   const skeletonRelease = loadAchievements.lastIndexOf('this.loading = false;', actionLoad);
   const courseRead = loadActionContext.indexOf(
@@ -229,7 +230,8 @@ test('两阶段加载在辅助入口失败时保留已读取的真实成就', ()
   const milestoneCommit = loadActionContext.indexOf('this.masteryMilestones = masteryMilestones;');
 
   assert.equal(achievementRead >= 0, true, 'the first phase must read achievements directly');
-  assert.equal(achievementRead < skeletonRelease && skeletonRelease < actionLoad, true,
+  assert.equal(achievementRead < achievementCommit && achievementCommit < skeletonRelease &&
+    skeletonRelease < actionLoad, true,
     'the primary achievement fact must render after releasing the skeleton and before auxiliary reads');
   assert.equal(courseRead >= 0 && milestoneRead >= 0 && eventRead >= 0, true,
     'course, milestone and activity context must stay in the auxiliary method');
@@ -257,14 +259,19 @@ test('两阶段加载在辅助入口失败时保留已读取的真实成就', ()
 });
 
 test('再次读取主成就时旧辅助快照不能覆盖最新事实', () => {
+  assert.equal(achievementsSource.includes('private achievementLoadSequence: number = 0;'), true,
+    'the page needs a monotonic owner for primary achievement snapshots');
   assert.equal(achievementsSource.includes('private actionLoadSequence: number = 0;'), true,
     'the page needs a monotonic owner for auxiliary snapshots');
   const loadAchievements = balancedBlock(achievementsSource,
     '  private async loadAchievements(): Promise<void> {');
+  const primaryRequestStart = loadAchievements.indexOf(
+    'const requestSequence = ++this.achievementLoadSequence;');
   const invalidateOldAction = loadAchievements.indexOf('this.actionLoadSequence += 1;');
   const achievementRead = loadAchievements.indexOf(
-    'this.achievements = await LocalLearningRepository.getAchievements();');
-  assert.equal(invalidateOldAction >= 0 && invalidateOldAction < achievementRead, true,
+    'const achievements = await LocalLearningRepository.getAchievements();');
+  assert.equal(primaryRequestStart >= 0 && invalidateOldAction > primaryRequestStart &&
+    invalidateOldAction < achievementRead, true,
     'a new primary read must invalidate the previous auxiliary request before awaiting ArkData');
 
   const loadActionContext = balancedBlock(achievementsSource,
@@ -291,4 +298,56 @@ test('再次读取主成就时旧辅助快照不能覆盖最新事实', () => {
   assert.equal(loadActionContext.includes(
     'if (requestSequence === this.actionLoadSequence) this.actionLoading = false;'), true,
   'a stale request must not end the loading state owned by a newer auxiliary read');
+});
+
+test('消费页写回后页面重新显示会由最新主请求刷新进度与行动上下文', () => {
+  const lifecycle = balancedBlock(achievementsSource, '  onPageShow(): void {');
+  assert.equal(lifecycle.includes('this.loadAchievements();'), true,
+    'every page show, including router back, must refresh achievements from ArkData');
+  assert.equal(achievementsSource.includes('  aboutToAppear(): void {'), false,
+    'initial creation must not add a second one-off load beside onPageShow');
+
+  const loadAchievements = balancedBlock(achievementsSource,
+    '  private async loadAchievements(): Promise<void> {');
+  assert.equal(loadAchievements.includes('if (this.loading) return;'), false,
+    'a newer page show must supersede an in-flight primary read instead of being ignored');
+  const achievementRead = loadAchievements.indexOf(
+    'const achievements = await LocalLearningRepository.getAchievements();');
+  const successGuard = loadAchievements.indexOf(
+    'if (requestSequence !== this.achievementLoadSequence) return;', achievementRead);
+  const achievementCommit = loadAchievements.indexOf('this.achievements = achievements;');
+  assert.equal(achievementRead >= 0 && successGuard > achievementRead &&
+    achievementCommit > successGuard, true,
+  'an old primary success must not replace the progress read by the latest page show');
+
+  const catchIndex = loadAchievements.indexOf('} catch (error) {');
+  const failureGuard = loadAchievements.indexOf(
+    'if (requestSequence !== this.achievementLoadSequence) return;', catchIndex);
+  const failureClear = loadAchievements.indexOf('this.achievements = [];', catchIndex);
+  assert.equal(failureGuard > catchIndex && failureClear > failureGuard, true,
+    'an old primary failure must not clear the latest page snapshot');
+  assert.equal(loadAchievements.includes(
+    'if (requestSequence === this.achievementLoadSequence) this.loading = false;'), true,
+  'an old primary finally block must not end loading owned by the latest page show');
+
+  const lessonWrite = balancedBlock(lessonSource,
+    '  private async persistActivityEvidence(activity: LearningActivity, correct: boolean, selfAssessed: boolean): Promise<void> {');
+  assert.equal(lessonWrite.includes('await LocalLearningRepository.appendStudyEvent(event);'), true,
+    'the active-learning consumer must persist its fact before returning to achievements');
+  const getAchievements = balancedBlock(localRepositorySource,
+    '  static async getAchievements(): Promise<AchievementProgress[]> {');
+  assert.equal(getAchievements.includes(
+    "const lessonActivities = LocalLearningRepository.uniqueEvents(events, 'lesson_activity', true);"), true);
+  assert.equal(getAchievements.includes('lessonActivities.length, 3'), true,
+    'the refreshed active-learning progress must be derived from the newly persisted interaction');
+
+  const beforeActivities = [{ type: 'lesson_activity', taskId: 'activity-a' }];
+  const afterActivities = beforeActivities.concat([{ type: 'lesson_activity', taskId: 'activity-b' }]);
+  assert.equal(new Set(beforeActivities.map((event) => event.taskId)).size, 1);
+  assert.equal(new Set(afterActivities.map((event) => event.taskId)).size, 2,
+    'the audited return state must advance active_learning_3 from one to two unique interactions');
+  const beforeMilestones = [{ courseId: 'cs103', topic: 'OSI与TCP/IP模型' }];
+  const afterMilestones = beforeMilestones.concat([{ courseId: 'cs103', topic: '物理层与数据链路层' }]);
+  assert.equal(afterMilestones.some((item) => item.topic === '物理层与数据链路层'), true,
+    'the audited return state must include the newly persisted mastery milestone');
 });

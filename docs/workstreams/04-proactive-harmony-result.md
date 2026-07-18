@@ -1,6 +1,6 @@
 # WS04 主动服务与鸿蒙原生体验结果
 
-更新时间：2026-07-17
+更新时间：2026-07-18
 
 ## 目标与边界
 
@@ -50,6 +50,7 @@
 - `LocalLearningRepository.getMasteryMilestones()` 只公开页面需要的三个字段并返回防御性拷贝；成就主事实与课程、事件、里程碑行动上下文分两阶段读取。
 - 成就主事实读取成功后立即展示。课程、事件或里程碑辅助读取失败时，只清空行动上下文并提供“重新准备学习入口”，不隐藏已显示的真实成就；任务成就仍可直接进入今日计划。
 - 主事实再次读取会先作废仍在飞行的旧辅助请求；课程、事件和长期里程碑仅由最新请求整批提交，旧成功或旧失败都不能覆盖新快照或提前结束加载状态。
+- 成就页在首次显示、从 Lesson/Practice/Plan/Quiz 返回及重新前台时都会重读 ArkData。主事实使用独立单调代次，旧主成功、旧主失败和旧 `finally` 均不能覆盖或结束最新页面显示；最新主事实提交后才启动新的行动上下文读取。
 - 初次练习、课程互动、今日计划和长期掌握四类动作分别写入消费页已有的精确 `AppStorage` 键并进入唯一目标页；掌握动作只选择存在本机题目的未达里程碑 Topic，并清空旧测验标签。
 - 主动作及失败恢复入口最小高度为 48 vp；动作读屏文本随加载、恢复、四类目标和全部解锁状态变化，成就条目播报标题、说明、状态与事实来源。标题和状态允许换行，来源与长状态分行显示。
 
@@ -64,6 +65,7 @@
 ### 学习星图可达行动
 
 - `LearningMap.ets` 的课程切换使用单调请求版本，只由最新课程请求整批提交课程目录、先修关系、学习进度和掌握状态；旧成功、旧失败和旧 `finally` 均不能覆盖新快照。
+- 星图在首次显示、从 Lesson/Practice 返回及重新前台时重读当前课程的掌握与学习进度，掌握数、推荐节点、行动和读屏由新快照重新派生。成功切课只在 latest-version 守卫后保存精确课程 ID/标题，旧请求和读取失败不能污染恢复选择。
 - 已掌握节点不再只检查一层后继，而是遍历真实 Topic DAG 的全部可达后继，并复用现有层级、练习状态、正确率与目录顺序选择最近可执行行动。分支汇合处的后继仍锁定时，会解析到未掌握且已解锁的真实前置 Topic。
 - 独立答题可能形成“长期掌握事实存在、先修关系仍未满足”的状态。此时行动先沿可达后继继续，节点文字、读屏语义和可见度优先保留“已掌握”，同时明确显示“前置未完成”，不再把同一节点降级描述为单纯未解锁。
 - 多层后继行动统一解释为“后继主题”；锁定节点的主按钮解释并执行精确前置 Topic。课程切换、失败恢复和主动作保留至少 48 vp，动作读屏文本包含实际解析出的 Topic。
@@ -112,16 +114,16 @@
 | **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
 | **源码确认** | schema 12 学习状态契约 | 标签洞察按 `courseId + topic + tag` 隔离；画像继续使用课程目录校验后的 `TopicMastery` |
 | **源码确认** | 四个 WS04 契约脚本合并执行 | exit 0，55/55 通过；覆盖主动行动、提醒/卡片、Form 冷启动、画像真实 Topic、记录一致快照、双错误态恢复、窄屏与无障碍 |
-| **源码确认** | 成就下一行动与长期里程碑路由契约 | exit 0，9/9 通过；覆盖 500 条事件淘汰反例、四类精确路由、两阶段辅助失败保留、旧辅助快照淘汰、动态读屏与 48 vp |
+| **源码确认** | 成就下一行动与长期里程碑路由契约 | 最终源码 exit 0，10/10 通过；覆盖 500 条事件淘汰反例、四类精确路由、两阶段辅助失败保留、旧主/辅助快照淘汰、消费页返回刷新、动态读屏与 48 vp |
 | **源码确认** | 既有 WS04 契约脚本 | exit 0，59/59 通过；覆盖主动行动、触达、画像、记录和学习星图回归 |
 | **源码确认** | `pnpm test -- src/lib/data/quiz-learning-state.test.ts` | exit 0，39/39 通过；真实 reducer 证明第 501 条事件压缩后长期掌握里程碑仍保留 |
 | **源码确认** | `python scripts/validate-topic-relations.py` | exit 0；33 Topic、147 切片、165 道题与 33 份课程体验的 DAG、引用和 Topic 一致性全部通过 |
-| **源码确认** | `node --test scripts/test-learning-map-contracts.mjs` | 最终源码 exit 0，5/5 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，覆盖多层后继、分支汇合前置动作、独立掌握但关系锁定、旧课程回调隔离、精确路由、动态读屏与 48 vp |
-| **源码确认** | WS04 Profile、ActivityRecords、Achievements、LearningMap 与主动触达七个相关契约脚本 | 最终源码 exit 0，70/70 通过；覆盖两阶段快照、旧回调隔离、精确恢复、500 条页面窗口、完成节点语义、长期里程碑与分支级星图行动 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 最终源码 exit 0，API 12 `CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 21 s 706 ms` |
-| **静态诊断通过** | DevEco build agent `check_ets_files`，会话 `ses_08b973018ffe09UP9Ypjm6iO9d` | 显式使用 `alibaba-cn/qwen3-coder-plus` 对最终 `LearningMap.ets` 返回 `no diagnostics`；此前“诊断 + 启动”组合进程在 184.1 秒超时，不作为诊断结论 |
-| **模拟器通过** | `hdc list targets -v`、HAP 安装、`aa force-stop`、`aa start`、`aa dump` | 目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；最新 HAP 安装成功，旧进程强停成功，`entry/EntryAbility` 以新 PID 5344 前台启动 |
-| **模拟器通过** | `hdc uitest dumpLayout/uiInput` 与 `snapshot_display` | 1256 x 2760 竖屏：Profile bounds 导航成功；ActivityRecords 显示“本页近期 93 条 · 最多展示 500 条”、可见选中勾选、“4 天有完成节点”及完成节点图例；计算机网络星图从锁定“物理层与数据链路层”解析并实际进入精确前置 `OSI与TCP/IP模型` 的 `pages/Lesson`。证据位于 `screenshots/ws04-learning-map-20260718-165422/`，不纳入 Git |
+| **源码确认** | `node --test scripts/test-learning-map-contracts.mjs` | 最终源码 exit 0，6/6 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，覆盖多层后继、分支汇合前置动作、独立掌握但关系锁定、页面返回刷新、课程选择保持、旧课程回调隔离、精确路由、动态读屏与 48 vp |
+| **源码确认** | WS04 Profile、ActivityRecords、Achievements、LearningMap 与主动触达七个相关契约脚本 | 最终源码 exit 0，72/72 通过；覆盖两阶段快照、旧回调隔离、消费页返回刷新、精确恢复、500 条页面窗口、完成节点语义、长期里程碑与分支级星图行动 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 最终源码 exit 0，API 12 增量任务与当前 HAP 状态一致，`BUILD SUCCESSFUL in 8 s 456 ms` |
+| **静态诊断通过** | DevEco build agent `check_ets_files`，会话 `ses_08b973018ffe09UP9Ypjm6iO9d` | 对 `5fe90b7` 的 `LearningMap.ets` 返回 `no diagnostics`；当前页面返回刷新批次因模型不可用未重跑 DevEco 专属诊断，以 API 12 HAP 构建作为当前 ArkTS 证据 |
+| **模拟器通过** | `hdc list targets -v`、HAP 安装、`aa force-stop`、`aa start`、`aa dump` | `5fe90b7` 批次目标为 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；当时 HAP 安装、旧进程强停和 `entry/EntryAbility` PID 5344 前台启动成功 |
+| **模拟器通过** | `hdc uitest dumpLayout/uiInput` 与 `snapshot_display` | `5fe90b7` 的 1256 x 2760 竖屏流程：Profile bounds 导航成功；ActivityRecords 显示“本页近期 93 条 · 最多展示 500 条”、可见选中勾选、“4 天有完成节点”及完成节点图例；计算机网络星图从锁定“物理层与数据链路层”解析并实际进入精确前置 `OSI与TCP/IP模型` 的 `pages/Lesson`。证据位于 `screenshots/ws04-learning-map-20260718-165422/`，不纳入 Git |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前连接模拟器未执行这些系统流程 |
 | **未验证** | DevEco Agent `start_app` 最终调用 | 会话 `ses_08b9515ddffeBfIe2lRMHp5Or1` 在工具调用前返回 HTTP 403 `AllocationQuota.FreeTierOnly`；这不否定随后 HDC 安装启动成功。当前内置 `deveco/glm-5` 登录态为 401 `Token refresh failed`，未回落到 `openai/*` |
 
@@ -134,6 +136,7 @@
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
 - Profile、ActivityRecords 与 LearningMap 的 1256 x 2760 竖屏视觉和 bounds 导航已通过模拟器；屏幕阅读器实际播报顺序、系统字体放大、横屏、平板布局与失败恢复聚焦仍未验证。
 - Achievements 的动态屏幕阅读器播报、字体放大换行和 48 vp 实际触控尚无设备证据。
+- Achievements 与 LearningMap 的“消费页写回 -> Router 返回 -> 同一页面实例刷新”当前为源码、竞态契约和 API 12 HAP 通过；共享模拟器随后被其他 worktree 的同 Bundle 安装覆盖，本批按指令未反复争抢设备，因此真实返回刷新仍未验证。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
 - 正式签名 HAP、横屏、平板和真机仍未验证；当前只完成未签名 debug HAP 的模拟器安装运行。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。
@@ -142,3 +145,6 @@
 第二批提交：`c6697ef fix: 修正主动学习状态与入口边界`。
 第三批提交：`17057cc fix: 强化主动触达幂等与失败恢复`，主线集成时保留最新行动重算与成功后消费状态机。
 第四批提交：`d54e2d5 feat: 强化真实画像与记录无障碍`；产品与契约文件已在集成主线保持字节级一致。
+第五批提交：`95f38bd fix: 以长期里程碑驱动成就行动`。
+第六批提交：`43b01b2 fix: 保留画像记录精确恢复`。
+第七批提交：`5fe90b7 fix: 闭合学习星图可达行动`；主线已融合，本批未改写该历史。
