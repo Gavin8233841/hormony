@@ -1225,6 +1225,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         help=f"明确的源码目录或源码 ZIP；省略时读取 {SUBMISSION_MANIFEST}",
     )
+    parser.add_argument(
+        "--require-notice-ready",
+        action="store_true",
+        help="正式发布模式：源码 manifest 中的 NOTICE 仍含待处理标记时失败",
+    )
     return parser.parse_args(argv)
 
 
@@ -1293,7 +1298,9 @@ def main(argv: list[str] | None = None) -> int:
         submission_errors.extend(
             check_submission_package(
                 entries,
-                allow_pending_notice=manifest_mode,
+                allow_pending_notice=(
+                    manifest_mode and not args.require_notice_ready
+                ),
                 expected_names=expected_names,
                 expected_entries=expected_entries,
             )

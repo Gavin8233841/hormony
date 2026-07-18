@@ -165,7 +165,12 @@ def build_stage_specs(args: argparse.Namespace) -> tuple[StageSpec, ...]:
         ),
         StageSpec(
             "competition-content",
-            (python, "-B", str(CONTENT_GATE_PATH)),
+            (
+                python,
+                "-B",
+                str(CONTENT_GATE_PATH),
+                "--require-notice-ready",
+            ),
             (),
             False,
         ),

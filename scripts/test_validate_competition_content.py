@@ -1,7 +1,9 @@
 import importlib.util
+import io
 import json
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).with_name("validate-competition-content.py")
@@ -496,6 +498,32 @@ class CompetitionContentGateTests(unittest.TestCase):
         self.assertFalse(any("待人工处理标记" in error for error in source_errors))
         self.assertTrue(any("待人工处理标记" in error for error in final_errors))
         self.assertEqual([MODULE.COMPETITION_NOTICE], pending_paths)
+
+    def test_formal_notice_mode_fails_while_source_audit_stays_available(self) -> None:
+        entries = complete_submission_entries()
+        entries[MODULE.COMPETITION_NOTICE] = MODULE.PENDING_SUBMISSION_MARKER
+
+        relaxed_output = io.StringIO()
+        with mock.patch.object(
+            MODULE,
+            "submission_entries",
+            return_value=(entries, [], "固定源码 manifest"),
+        ), mock.patch("sys.stdout", relaxed_output):
+            relaxed_exit = MODULE.main([])
+
+        strict_output = io.StringIO()
+        with mock.patch.object(
+            MODULE,
+            "submission_entries",
+            return_value=(entries, [], "固定源码 manifest"),
+        ), mock.patch("sys.stdout", strict_output):
+            strict_exit = MODULE.main(["--require-notice-ready"])
+
+        self.assertEqual(0, relaxed_exit)
+        self.assertEqual(1, strict_exit)
+        self.assertIn("[UNVERIFIED] 源码 NOTICE 尚未就绪", relaxed_output.getvalue())
+        self.assertIn("待人工处理标记", strict_output.getvalue())
+        self.assertIn("SOME CHECKS FAILED", strict_output.getvalue())
 
     def test_manifest_parser_and_selection_accept_explicit_tracked_paths(self) -> None:
         content = manifest_text(["README.md", "apps/web"], ["apps/web/dev-only.txt"])
