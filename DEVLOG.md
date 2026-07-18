@@ -7404,3 +7404,35 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本轮没有重新安装主线 HAP 或重走 LearningMap UI；模拟器流程证据来自代码字节一致的 WS04 提交，主线重新验证到 API 12 构建层级。
 - 屏幕阅读器实际播报、系统字体放大、横屏、平板、失败恢复聚焦、正式签名 HAP 和真机未验证。
 - Alibaba provider 当前为 `403 AllocationQuota.FreeTierOnly`，`deveco/glm-5` 当前为 `401 Token refresh failed`；本轮没有重复请求模型，也未回落到 `openai/*`。
+
+---
+
+## 2026-07-18 [MAIN+WS03] ext4 数据日志模式事实边界
+
+背景：`cs102_k28` 旧内容把 ext4 的 journal/ordered/writeback 只列名称，并把 XFS、ZFS、Btrfs 混为同类“日志模式”，没有解释三种模式对文件数据的不同顺序和崩溃边界。WS03 `283505f` 基于较新支线历史，主线没有其中两份大型旧测试和知识生成器，因此本批只选择性融合两个数据字段、新独立契约和精简结果记录；独立子 agent 再发现并推动修复两类测试误绿。
+
+文件：
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `scripts/test_cs102_ext4_knowledge_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- k28 明确 `data=journal` 的数据/元数据日志、默认 `data=ordered` 的关联数据先落主文件系统再提交元数据，以及 `data=writeback` 不保持顺序且崩溃后可能暴露旧数据；journal commit 不再被表述成通用应用数据持久化保证。
+- Btrfs 只按官方 Introduction 定位为 copy on write 文件系统，不再与 XFS/ZFS 一起列为 ext4 数据模式。
+- 新契约按模式子句验证语义并拒绝“正确关键词 + 矛盾 journal 句”的误绿；TypeScript 提取器只读取真实导出数组，词法剥离注释并比较 `id/text/source/courseId/topic` 五字段，注释和未导出同 ID 对象不能冒充生产数据。
+- 状态模型使用“日志数据可重放”“关联数据在提交前已强制写入”“可能为旧/陈旧数据”等限定状态，不把 ordered 概括成一般性的文件内容崩溃一致性。
+- 三份官方 URL、2026-07-18 响应字节数与 SHA-256 已写入 WS03 结果文档；主线融合提交为 `adee1e5`。
+
+验证：
+- `python -m unittest scripts.test_cs102_ext4_knowledge_facts -v`：exit 0，10/10 通过。
+- `python scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识切片、165 道题、33 份学习体验的 schema、唯一性、引用、DAG、连通性、单根、层级与 Lesson 路由一致性全部通过。
+- `cd apps/web; pnpm lint`、`pnpm typecheck`：exit 0，无 warning/error；`pnpm test`：exit 0，36 个文件、437/437 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 production 构建通过，10/10 静态页面、全部 dynamic API route 与 26.8 kB middleware 进入产物。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`：exit 0，API 12 `CompileArkTS`、`PackageHap`、`PackingCheck` 通过，`BUILD SUCCESSFUL in 31 s 82 ms`；仍未配置签名。
+
+失败或未验证：
+- 主线没有 WS03 支线使用的 `generate-knowledge-json.mjs`，本批没有伪造生成命令；两个明确字段通过受控同步和可执行五字段一致性契约锁定。
+- 用户保留的 `lesson-experiences.json` 未修改、未暂存；`cs102-文件系统-2` 仍需受控同步后才能宣称 Lesson 互动事实一致。
+- k28 长文本的模拟器页面、读屏、手机/平板排版、真机、线上 API 与模型调用未验证。
