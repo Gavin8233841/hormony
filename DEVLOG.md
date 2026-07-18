@@ -7300,3 +7300,42 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 失败或未验证：
 - 真实模型编排/上游在 100 秒时的网络取消、线上 SSE timeout、平台 120 秒回收和当前分支部署未验证。
 - 浏览器、HarmonyOS 模拟器和真机未验证；本批未修改 HarmonyOS、生产模型 ID、API Key、RAG、缓存或端侧状态。
+
+---
+
+## 2026-07-18 [MAIN+WS08] 提交态冻结、主动行动互斥与浅色表面对比度
+
+背景：课程体验批次进入设备复核后仍有三类真实缺口：自由回答提交后继续绑定可变输入，选择题结果态仍可点击；首页任务写回和系统提醒可并发，迟到提醒可能覆盖更新后的下一行动；浅色品牌底上的亮蓝辅助文字没有统一使用可读文字色。本批在主线保留既有课程事实、路由和 ArkData 边界，只修状态机、语义和设计令牌。
+
+文件：
+- `DESIGN.md`
+- `apps/harmonyos/entry/src/main/ets/common/Builders.ets`
+- `apps/harmonyos/entry/src/main/ets/common/Constants.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Course.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/HomeContent.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
+- `scripts/test-proactive-delivery-contracts.mjs`
+- `scripts/test-product-experience-contracts.mjs`
+- `docs/workstreams/08-product-experience-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Lesson 提交自由回答时保存标准化快照并冻结输入；反馈、学习证据和学伴交接只读取提交快照。
+- 单选与排序选项提交后禁用，读屏语义保留选中状态、顺序和“答案已提交”，结果态不再允许误触改写。
+- 首页任务写回、提醒发布和服务卡片重试互斥；提醒行动绑定精确 run ID，发布等待期间或卡片部分失败后再切任务时都拒绝同步旧行动，并把警告操作切换为按当前行动重新创建提醒。任务保存和提醒发布期间的透明度、禁用态与读屏文案保持一致。
+- 新增 `COLOR_BRAND_TEXT=#0b57d0` 供浅色表面文字使用；品牌填充色不变，设计文档同步，源契约按真实前景/背景计算 WCAG AA。
+
+验证：
+- `node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，58/58 通过。
+- `python -m unittest scripts.test_course_resume_contract scripts.test_lesson_activity_resume_contract`：exit 0，16/16 通过。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：审查前 exit 0，`BUILD SUCCESSFUL in 33 s 143 ms`；多轮独立审查修正后的最终源码 exit 0，API 12 HAP `BUILD SUCCESSFUL in 39 s 148 ms`。`CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，项目未配置签名。
+- Alibaba DevEco Code `ses_08bb0ef19ffeXBJ9AYKEfASkxw`：两项 ArkUI/ArkTS skill 加载成功；独立审查修正前的六个本批 `.ets` 的 `check_ets_files` 全部 `no diagnostics`。知识库工具返回未知响应格式，不记通过。
+- Alibaba DevEco Code `ses_08ba97913ffesXh7hsStWLfVXi`：`start_app` 完成 HAP 安装和 `EntryAbility` 启动。
+- `scripts/harmonyos-app-smoke.ps1 -DeviceTarget '127.0.0.1:5555'`：整体 exit 1；构建、安装、启动、根页、首页、课程 Tab 和两门可见课程通过，第三门离屏课程因脚本未滚动而失败。竖屏 emulator 截图 1256 x 2760，证据保留在未提交目录 `screenshots/trae-smoke-20260718-160913`。
+
+失败或未验证：
+- DevEco `build_project` 在底层构建后未返回，已精确终止该会话；构建结论仅来自直接 Hvigor 与 smoke 内部 Hvigor。
+- 最终 Home/Lesson DevEco 复检会话 `ses_08b962424ffeZxO9aSPgtKl4eU` 在工具调用前返回 Alibaba `403 AllocationQuota.FreeTierOnly`，未取得最终单文件诊断；最终 ArkTS 结论来自随后 API 12 HAP 编译。
+- DevEco `verify_ui` 未配置多模态模型，build agent 不提供 `get_app_ui_tree`；完整课程/Lesson 流程、读屏、最大字体、旋转、平板和动态安全区未验证。
+- 真机、线上 API、通知和服务卡片桌面刷新未验证；未修改课程事实、题库、Repository、模型、秘密或用户保留的 `lesson-experiences.json`。

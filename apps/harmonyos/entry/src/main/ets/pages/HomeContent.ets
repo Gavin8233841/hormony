@@ -42,6 +42,7 @@ export struct HomeContent {
   @State nextActionNavigationMessage: string = '';
   @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [];
   private reminderAction: ProactiveLearningAction | null = null;
+  private reminderActionRunId: number = -1;
   private nextActionRunId: number = 0;
 
   aboutToAppear(): void {
@@ -82,7 +83,7 @@ export struct HomeContent {
   }
 
   private async toggleTask(task: PlanTask): Promise<void> {
-    if (this.updatingTaskId.length > 0) return;
+    if (this.updatingTaskId.length > 0 || this.notificationState === 'loading') return;
     const taskId = task.id;
     const desiredDone = !Boolean(task.done);
     let receipt: PlanTaskUpdateReceipt | null = null;
@@ -90,53 +91,67 @@ export struct HomeContent {
     this.taskUpdateMessage = '正在保存任务状态';
     this.taskUpdateFailed = false;
     try {
-      receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);
-      const nextTasks = receipt.plan.tasks;
-      this.planTasks = nextTasks;
-      this.taskUpdateMessage = receipt.task.done === true ? '任务已完成并保存到本机' : '任务已恢复为待完成';
-    } catch (e) {
-      this.taskUpdateMessage = '任务状态保存失败，请重试';
-      this.taskUpdateFailed = true;
-      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'HomeContent local task update failed');
+      try {
+        receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);
+        const nextTasks = receipt.plan.tasks;
+        this.planTasks = nextTasks;
+        this.reminderAction = null;
+        this.reminderActionRunId = -1;
+        this.taskUpdateMessage = receipt.task.done === true ? '任务已完成并保存到本机' : '任务已恢复为待完成';
+      } catch (e) {
+        this.taskUpdateMessage = '任务状态保存失败，请重试';
+        this.taskUpdateFailed = true;
+        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+          'HomeContent local task update failed');
+        return;
+      }
+      if (receipt === null) return;
+      try {
+        await LearningFormUpdater.refreshAll();
+      } catch (_) {
+      }
+      let studyEventSaved: boolean = true;
+      if (receipt.changed && receipt.task.done === true) {
+        const event: StudyEvent = {
+          id: 'event_' + Date.now().toString(),
+          type: 'task_completed',
+          timestamp: new Date().toISOString(),
+          taskId: taskId
+        };
+        try {
+          await LocalLearningRepository.appendStudyEvent(event);
+        } catch (_) {
+          studyEventSaved = false;
+        }
+      }
+      if (!studyEventSaved) {
+        this.taskUpdateMessage = '任务已完成并保存，学习记录暂未更新';
+        this.taskUpdateFailed = true;
+      }
+      await this.loadNextAction();
     } finally {
       if (this.updatingTaskId === taskId) this.updatingTaskId = '';
     }
-    if (receipt === null) return;
-    try {
-      await LearningFormUpdater.refreshAll();
-    } catch (_) {
-    }
-    let studyEventSaved: boolean = true;
-    if (receipt.changed && receipt.task.done === true) {
-      const event: StudyEvent = {
-        id: 'event_' + Date.now().toString(),
-        type: 'task_completed',
-        timestamp: new Date().toISOString(),
-        taskId: taskId
-      };
-      try {
-        await LocalLearningRepository.appendStudyEvent(event);
-      } catch (_) {
-        studyEventSaved = false;
-      }
-    }
-    if (!studyEventSaved) {
-      this.taskUpdateMessage = '任务已完成并保存，学习记录暂未更新';
-      this.taskUpdateFailed = true;
-    }
-    await this.loadNextAction();
   }
 
   private async publishReminder(): Promise<void> {
-    if (this.notificationState === 'loading') return;
+    if (this.notificationState === 'loading' || this.updatingTaskId.length > 0) return;
+    const actionRunId: number = this.nextActionRunId;
     this.notificationOpen = true;
     this.notificationState = 'loading';
     this.notificationMessage = '正在创建系统学习提醒';
     try {
       const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       const action = await LearningReminder.publishNextTask(hostContext);
+      if (this.nextActionRunId !== actionRunId) {
+        this.reminderAction = null;
+        this.reminderActionRunId = -1;
+        this.notificationState = 'warning';
+        this.notificationMessage = '系统提醒已创建；当前学习行动已更新，请重新创建提醒';
+        return;
+      }
       this.reminderAction = action;
+      this.reminderActionRunId = actionRunId;
       this.applyNextAction(action);
       this.nextActionReady = true;
       this.nextActionError = false;
@@ -161,12 +176,24 @@ export struct HomeContent {
   }
 
   private async retryReminderCards(): Promise<void> {
-    if (this.notificationState === 'loading' || this.reminderAction === null) return;
+    if (this.notificationState === 'loading' || this.updatingTaskId.length > 0) return;
+    const action: ProactiveLearningAction | null = this.reminderAction;
+    if (action === null || this.reminderActionRunId !== this.nextActionRunId) {
+      this.reminderAction = null;
+      this.reminderActionRunId = -1;
+      this.notificationState = 'warning';
+      this.notificationMessage = '当前学习行动已更新，请重新创建系统提醒';
+      return;
+    }
     this.notificationState = 'loading';
     this.notificationMessage = '正在重新同步服务卡片';
-    if (!(await this.syncReminderCards(this.reminderAction))) return;
+    if (!(await this.syncReminderCards(action))) return;
     this.notificationState = 'success';
-    this.notificationMessage = '系统提醒和服务卡片已同步：' + this.reminderAction.title;
+    this.notificationMessage = '系统提醒和服务卡片已同步：' + action.title;
+  }
+
+  private hasCurrentReminderAction(): boolean {
+    return this.reminderAction !== null && this.reminderActionRunId === this.nextActionRunId;
   }
 
   private submitQuickAsk(): void {
@@ -299,10 +326,10 @@ export struct HomeContent {
         .height(48)
         .backgroundColor(Constants.COLOR_BG_CARD)
         .borderRadius(24)
-        .enabled(this.notificationState !== 'loading')
-        .opacity(this.notificationState === 'loading' ? 0.56 : 1)
+        .enabled(this.notificationState !== 'loading' && this.updatingTaskId.length === 0)
+        .opacity(this.notificationState === 'loading' || this.updatingTaskId.length > 0 ? 0.56 : 1)
         .accessibilityText(this.notificationState === 'loading' ? '正在创建当前学习提醒' :
-          '创建当前学习任务提醒')
+          this.updatingTaskId.length > 0 ? '正在保存学习任务，稍后可创建提醒' : '创建当前学习任务提醒')
         .margin({ left: 8 })
         .onClick(() => {
           this.publishReminder();
@@ -341,14 +368,16 @@ export struct HomeContent {
               .backgroundColor(Constants.COLOR_BG_CARD)
               .border({ width: 1, color: Constants.COLOR_ERROR })
               .borderRadius(24)
-              .accessibilityText('重试创建当前学习提醒')
+              .enabled(this.updatingTaskId.length === 0)
+              .accessibilityText(this.updatingTaskId.length > 0 ? '正在保存学习任务，稍后可重试创建提醒' :
+                '重试创建当前学习提醒')
               .onClick(() => {
                 this.publishReminder();
               })
           }
           if (this.notificationState === 'warning') {
-            Button('重试同步')
-              .width(80)
+            Button(this.hasCurrentReminderAction() ? '重试同步' : '重新创建')
+              .width(this.hasCurrentReminderAction() ? 80 : 88)
               .height(48)
               .padding({ left: 10, right: 10 })
               .fontSize(12)
@@ -356,9 +385,16 @@ export struct HomeContent {
               .backgroundColor(Constants.COLOR_BG_CARD)
               .border({ width: 1, color: Constants.COLOR_WARNING })
               .borderRadius(24)
-              .accessibilityText('重试同步当前学习任务到服务卡片')
+              .enabled(this.updatingTaskId.length === 0)
+              .accessibilityText(this.updatingTaskId.length > 0 ? '正在保存学习任务，稍后可处理系统提醒' :
+                this.hasCurrentReminderAction() ? '重试同步当前学习任务到服务卡片' :
+                  '根据当前学习行动重新创建系统提醒')
               .onClick(() => {
-                this.retryReminderCards();
+                if (this.hasCurrentReminderAction()) {
+                  this.retryReminderCards();
+                } else {
+                  this.publishReminder();
+                }
               })
           }
         }
@@ -448,7 +484,7 @@ export struct HomeContent {
           Text(this.nextActionBadge)
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_BRAND)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
         }
         .width('100%')
 
@@ -487,7 +523,7 @@ export struct HomeContent {
             .width('100%')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_BRAND)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -571,7 +607,7 @@ export struct HomeContent {
       Text(this.taskStatus(task))
         .fontSize(11)
         .fontColor(this.taskStatus(task) === '已完成' ? Constants.COLOR_SUCCESS :
-          this.taskStatus(task) === '进行中' ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_SECONDARY)
+          this.taskStatus(task) === '进行中' ? Constants.COLOR_BRAND_TEXT : Constants.COLOR_TEXT_SECONDARY)
         .padding({ left: 10, right: 10, top: 5, bottom: 5 })
         .backgroundColor(this.taskStatus(task) === '已完成' ? Constants.COLOR_SUCCESS_LIGHT :
           this.taskStatus(task) === '进行中' ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
@@ -581,9 +617,10 @@ export struct HomeContent {
     .padding({ top: 11, bottom: 11 })
     .scale({ x: this.pressedTask === index ? 0.98 : 1, y: this.pressedTask === index ? 0.98 : 1 })
     .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
-    .enabled(this.updatingTaskId.length === 0)
+    .enabled(this.updatingTaskId.length === 0 && this.notificationState !== 'loading')
     .accessibilityText(task.title + '，' + this.taskStatus(task) +
-      (this.updatingTaskId === task.id ? '，正在保存到本机' : '，点击切换任务状态'))
+      (this.updatingTaskId.length > 0 ? '，正在保存学习任务' :
+        this.notificationState === 'loading' ? '，系统提醒创建期间暂不可切换' : '，点击切换任务状态'))
     .onTouch((event?: TouchEvent) => {
       if (event) {
         if (event.type === TouchType.Down) {
@@ -609,7 +646,7 @@ export struct HomeContent {
         Row({ space: 4 }) {
           Text('查看全部')
             .fontSize(13)
-            .fontColor(Constants.COLOR_BRAND)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
           SymbolGlyph($r('sys.symbol.chevron_right'))
             .fontSize(13)
             .fontColor([Constants.COLOR_BRAND])
@@ -645,7 +682,7 @@ export struct HomeContent {
               .constraintSize({ minHeight: 48 })
               .padding({ left: 16, right: 16 })
               .fontSize(13)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .borderRadius(Constants.RADIUS_MD)
               .onClick((): void => { this.loadPlan(); })
@@ -683,7 +720,7 @@ export struct HomeContent {
               .height(48)
               .fontSize(13)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
               .borderRadius(18)
               .onClick(() => this.openPlan())
           }

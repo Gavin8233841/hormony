@@ -155,7 +155,7 @@ export struct CourseContent {
             Button('重试')
               .constraintSize({ minHeight: 48 })
               .fontSize(12)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .borderRadius(Constants.RADIUS_SM)
               .onClick((): void => { this.loadCourses(); })
@@ -212,7 +212,7 @@ export struct CourseContent {
                   Text(Math.round(c.progress * 100).toString() + '%')
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor(Constants.COLOR_BRAND)
+                    .fontColor(Constants.COLOR_BRAND_TEXT)
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)

@@ -646,7 +646,7 @@ test('显式行动同步尝试全部卡片并向首页暴露部分失败', async
 
   const homeSource = readSource(homeContentPath);
   assert.equal(homeSource.includes("this.notificationState = 'warning';"), true);
-  assert.equal(homeSource.includes("Button('重试同步')"), true);
+  assert.equal(homeSource.includes("Button(this.hasCurrentReminderAction() ? '重试同步' : '重新创建')"), true);
   assert.equal(homeSource.includes('this.retryReminderCards();'), true);
   assert.equal(homeSource.includes('LearningFormUpdater.refreshAllWithAction(action)'), true);
 });
@@ -965,12 +965,14 @@ test('首页提醒以 loading 防并发并在错误态提供可执行重试', ()
   assert.notEqual(methodStart, -1, 'HomeContent.publishReminder missing');
   assert.notEqual(methodEnd, -1, 'HomeContent.publishReminder boundary changed');
   const method = source.slice(methodStart, methodEnd);
-  const guardIndex = method.indexOf("if (this.notificationState === 'loading') return;");
+  const guardIndex = method.indexOf(
+    "if (this.notificationState === 'loading' || this.updatingTaskId.length > 0) return;"
+  );
   const openIndex = method.indexOf('this.notificationOpen = true;');
   const loadingIndex = method.indexOf("this.notificationState = 'loading';");
   const publishIndex = method.indexOf('LearningReminder.publishNextTask(hostContext)');
   const errorIndex = method.indexOf("this.notificationState = 'error';");
-  assert.notEqual(guardIndex, -1, 'HomeContent loading guard missing');
+  assert.notEqual(guardIndex, -1, 'HomeContent reminder and task-operation guard missing');
   assert.notEqual(openIndex, -1, 'HomeContent notification visibility write missing');
   assert.notEqual(loadingIndex, -1, 'HomeContent loading state write missing');
   assert.notEqual(publishIndex, -1, 'HomeContent reminder publish call missing');
@@ -1015,13 +1017,14 @@ test('首页提醒和卡片同步入口具备动态播报与 48vp 触控区', ()
   assert.equal(bell.includes('.accessibilityText('), true);
   assert.equal(bell.includes("this.notificationState === 'loading'"), true);
 
-  const warningRetryStart = header.indexOf("Button('重试同步')");
+  const warningRetryStart = header.indexOf("Button(this.hasCurrentReminderAction() ? '重试同步' : '重新创建')");
   const warningRetryEnd = header.indexOf('\n              .onClick(', warningRetryStart);
   const warningRetry = header.slice(warningRetryStart, warningRetryEnd);
   assert.notEqual(warningRetryStart, -1);
   assert.notEqual(warningRetryEnd, -1);
   assert.equal(warningRetry.includes('.height(48)'), true);
-  assert.equal(warningRetry.includes(".accessibilityText('重试同步当前学习任务到服务卡片')"), true);
+  assert.equal(warningRetry.includes("'根据当前学习行动重新创建系统提醒'"), true);
+  assert.equal(warningRetry.includes("'重试同步当前学习任务到服务卡片'"), true);
   assert.equal(header.includes("this.notificationState !== 'warning'"), true);
 });
 

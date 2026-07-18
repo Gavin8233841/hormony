@@ -164,7 +164,7 @@ struct CourseDetailPage {
           Column({ space: 4 }) {
             Text(this.nextTopic() === this.resumeState().recentTopic ? '继续上次主题' : '开始下一主题')
               .fontSize(12)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
             Text(this.nextTopic())
               .width('100%')
               .fontSize(18)
@@ -259,7 +259,7 @@ struct CourseDetailPage {
                 Text(Math.round(this.progress * 100).toString() + '%')
                   .fontSize(20)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(Constants.COLOR_BRAND)
+                  .fontColor(Constants.COLOR_BRAND_TEXT)
               }
               .width('100%')
               .justifyContent(FlexAlign.SpaceBetween)
@@ -288,7 +288,7 @@ struct CourseDetailPage {
                 Text(this.nextTopicHint())
                   .fontSize(11)
                   .fontWeight(FontWeight.Medium)
-                  .fontColor(Constants.COLOR_BRAND)
+                  .fontColor(Constants.COLOR_BRAND_TEXT)
                   .padding({ left: 9, right: 9, top: 5, bottom: 5 })
                   .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                   .borderRadius(Constants.RADIUS_SM)

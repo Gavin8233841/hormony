@@ -41,6 +41,7 @@ export class Constants {
   static readonly COLOR_TEXT_TERTIARY: string = '#526078';
   // 品牌与功能色
   static readonly COLOR_BRAND: string = '#176bff';
+  static readonly COLOR_BRAND_TEXT: string = '#0b57d0';
   static readonly COLOR_SUCCESS: string = '#18794e';
   static readonly COLOR_WARNING: string = '#9a5b00';
   static readonly COLOR_ERROR: string = '#b42318';

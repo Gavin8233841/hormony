@@ -81,8 +81,16 @@
 - 主题练习失败文案明确本节进度已经保存，避免学习者因重复操作担心进度丢失；原操作保持为重试入口。
 - 复用既有 `message` 区、`router` 和幂等课程进度写入，不修改路由目标、课程事实、学习事件或 Repository。
 
+### 批次 F：提交态冻结、主动行动互斥与浅色表面对比度
+
+- 自由回答提交时保存去除首尾空白后的不可变快照；输入框随即冻结，反馈与“向学伴追问”只读取该快照，提交后的输入变化不会改写学习证据。
+- 单选和排序选项提交后禁用，并继续向读屏暴露“已选择/未选择、答案已提交”的精确状态，避免结果页误触改变视觉答案。
+- 首页本地任务写回、系统提醒发布和服务卡片重试使用互斥入口；提醒行动绑定精确 `nextActionRunId`，发布等待期间或后续任务切换导致版本变化时，服务卡片不能重试同步旧行动，CTA 会切换为按当前行动重新创建提醒。
+- 新增浅色表面专用品牌文字色 `COLOR_BRAND_TEXT`；品牌填充色保持不变，标签、百分比、辅助操作和状态文字在实际浅色背景上的对比度由源契约计算并达到 WCAG AA。
+
 ## 四、文件
 
+- `DESIGN.md`
 - `apps/harmonyos/entry/src/main/ets/common/Builders.ets`
 - `apps/harmonyos/entry/src/main/ets/common/Constants.ets`
 - `apps/harmonyos/entry/src/main/ets/common/ProactiveLearningService.ets`
@@ -104,8 +112,8 @@
 node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs
 ```
 
-- exit 0，55/55 通过。
-- 覆盖首页真实状态门禁、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、后续动作路由失败、长文本、48 vp、返回语义和实际颜色对比度。
+- exit 0，58/58 通过。
+- 覆盖首页真实状态门禁、提醒/任务写回互斥、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、提交后输入与选项冻结、后续动作路由失败、长文本、48 vp、返回语义和实际颜色对比度。
 
 ```powershell
 python -m unittest scripts.test_course_resume_contract scripts.test_lesson_activity_resume_contract
@@ -123,7 +131,7 @@ cd apps/harmonyos
 .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon
 ```
 
-- 首批 exit 0，`BUILD SUCCESSFUL in 23 s 216 ms`；渐进提示批次 exit 0，`BUILD SUCCESSFUL in 25 s 664 ms`；后续动作失败恢复批次 exit 0，`BUILD SUCCESSFUL in 31 s 639 ms`。
+- 首批 exit 0，`BUILD SUCCESSFUL in 23 s 216 ms`；渐进提示批次 exit 0，`BUILD SUCCESSFUL in 25 s 664 ms`；后续动作失败恢复批次 exit 0，`BUILD SUCCESSFUL in 31 s 639 ms`；多轮独立审查修正后的最终源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`。
 - `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，多项任务显示 `UP-TO-DATE`。
 - 项目没有 `signingConfigs`，Hvigor 跳过签名；该结果只记为**构建通过**。
 - 早期通用 `assembleHap --no-daemon` 构建虽 exit 0，但日志内部出现 `:entry:clean`；最终证据以上述显式增量构建为准。
@@ -134,8 +142,12 @@ cd apps/harmonyos
 & 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' list targets
 ```
 
-- exit 0，输出 `[Empty]`。
-- 模拟器、真机、UI 树、截图、屏幕朗读、最大字体、旋转、平板与动态安全区均为**未验证**。
+- 重启后首次查询输出 `[Empty]`；对交接文档中已确认的精确目标执行 `hdc tconn 127.0.0.1:5555` 后，复核为 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。设备参数返回 `emulator`。
+- `scripts/harmonyos-app-smoke.ps1 -DeviceTarget '127.0.0.1:5555'`：整体 exit 1；API 12 增量构建、HAP 安装、`EntryAbility` 启动、根页、首页“今日”、课程 Tab、可见的“操作系统/数据结构”状态均通过。脚本在未滚动视口直接查找第三门“计算机网络”时停止；这是真实门禁缺口，不记完整流程通过。
+- 局部流程为**模拟器通过**：竖屏 HarmonyOS emulator，截图 1256 x 2760；证据位于本地未提交目录 `screenshots/trae-smoke-20260718-160913`。截图确认课程页无重叠，第三张课程卡仅露出顶部，和失败位置一致。
+- Alibaba DevEco Code 会话 `ses_08bb0ef19ffeXBJ9AYKEfASkxw`：`arkui-knowledge`、`arkts-grammar-standards` 加载成功；独立审查修正前的六个本批 `.ets` 的 `check_ets_files` 均为 `no diagnostics`。`arkts_knowledge_search` 返回 `Unknown response format from knowledge service`，不记知识库通过。
+- Alibaba DevEco Code 会话 `ses_08ba97913ffesXh7hsStWLfVXi`：`start_app` 完成同一 HAP 安装与 `com.c4ai.hormony/EntryAbility` 启动。`verify_ui` 因未配置多模态模型不可用；build agent 不暴露 `get_app_ui_tree`，因此屏幕朗读、最大字体、旋转、平板与动态安全区仍为**未验证**。
+- 独立审查修正后的最终 DevEco 复检会话 `ses_08b962424ffeZxO9aSPgtKl4eU` 在工具调用前返回 `403 AllocationQuota.FreeTierOnly`；最终 Home/Lesson 单文件诊断为**未验证**，以随后 API 12 `CompileArkTS` 成功作为最终构建证据。
 
 ## 六、仍未验证与下一缺口
 
@@ -143,10 +155,11 @@ cd apps/harmonyos
 2. `Index` 已响应式订阅安全区，但公共二级页标题仍通过静态 getter 读取顶部安全区；旋转时的即时重排需设备证据和统一 Builder 参数设计。
 3. 课程路径仍使用现有 `router`。迁移到 `Navigation` 影响全部子页和回流契约，不属于本批安全范围。
 4. Lesson 底部“上一篇 / 继续互动”仍是固定 48 vp 横向操作组；窄屏和字体放大下的实际增高与折行仍需设备证据。
-5. 本批未调用线上 API、模型、通知或服务卡片，不声明线上通过、模拟器通过或真机通过。
+5. 本批未调用线上 API、通知或服务卡片，不声明线上通过或真机通过；只对上节列出的构建、安装、启动和首页/课程局部流程声明模拟器通过。
 
 ## 七、审计说明
 
 - 四条只读委派分别完成成熟学习产品/开源实现基准、窄屏/字体/动效契约审计、首页-课程-Lesson 产品流程审计和 Lesson 后续动作状态反例复核；委派代理未修改文件。
+- 主线提交前多轮独立审查发现发布等待、卡片部分失败后切任务、任务写回尾部窗口中的旧提醒重试路径，以及两个条件颜色表达式绕过对比度契约、busy 禁用态与读屏文案不一致；均已修正并重新通过 58/58、16/16 与最终 API 12 HAP。
 - 独立 diff 审查尝试因本机没有 CodeRabbit CLI 和后续并发连接中断而未形成审查结论；未将其记为通过证据。
-- 交付结论以当前源码、55 项 Node 契约、16 项 Python 契约、API 12 显式增量构建和设备空列表为准。
+- 交付结论以当前源码、58 项 Node 契约、16 项 Python 契约、API 12 增量构建、DevEco 静态诊断与已连接模拟器局部流程为准；完整 smoke、DevEco 多模态校验、读屏和自适应设备矩阵仍按未验证记录。

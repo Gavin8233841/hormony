@@ -151,6 +151,33 @@ test('Lesson 单选先选择再由明确提交动作写入证据', () => {
   assert.match(practice, /this\.submitSingle\(\)/);
 });
 
+test('Lesson 自由回答提交后冻结输入并固定学伴与反馈使用的答案快照', () => {
+  const reset = methodBlock(lesson, 'resetActivityInput');
+  const reveal = methodBlock(lesson, 'revealFreeResponse');
+  const answer = methodBlock(lesson, 'activityAnswerText');
+  const practice = methodBlock(lesson, 'PracticeExperience');
+
+  assert.match(lesson, /@State submittedResponseText: string = '';/);
+  assert.match(reset, /this\.submittedResponseText = '';/);
+  assert.match(reveal, /const answer: string = this\.responseText\.trim\(\);/);
+  assert.match(reveal, /this\.submittedResponseText = answer;/);
+  assert.match(answer, /this\.feedbackVisible \? this\.submittedResponseText : this\.responseText\.trim\(\)/);
+  assert.match(practice, /TextArea\(\{ placeholder: '先写下你的答案或推演过程', text: this\.responseText \}\)/);
+  assert.match(practice, /if \(!this\.feedbackVisible\) this\.responseText = value;/);
+  assert.match(practice, /答案已冻结，可向下对照关键点/);
+});
+
+test('Lesson 选项提交后禁用交互并保留选中与冻结读屏语义', () => {
+  const description = methodBlock(lesson, 'activityOptionAccessibilityDescription');
+  const option = methodBlock(lesson, 'ActivityOption');
+
+  assert.match(description, /if \(this\.feedbackVisible\) return selected \? '已选择，答案已提交' : '未选择，答案已提交';/);
+  assert.match(description, /排序第 ' \+ \(this\.selectedIndexes\.indexOf\(index\) \+ 1\)\.toString\(\) \+ ' 位'/);
+  assert.match(option, /\.enabled\(!this\.feedbackVisible\)/);
+  assert.match(option, /\.accessibilityText\(option\)/);
+  assert.match(option, /\.accessibilityDescription\(this\.activityOptionAccessibilityDescription\(index, ordered\)\)/);
+});
+
 test('Lesson 分步示例默认折叠并只按学习者请求逐步揭示', () => {
   const reset = methodBlock(lesson, 'resetActivityInput');
   const count = methodBlock(lesson, 'visibleWorkedExampleStepCount');
@@ -193,8 +220,9 @@ test('共享返回控件提供 48vp 触控区与可访问名称', () => {
 });
 
 test('正文辅助色和语义小字在实际浅色表面达到 WCAG AA', () => {
-  const surfaces = ['COLOR_BG_CARD', 'COLOR_BG_PAGE', 'COLOR_BRAND_LIGHT'].map(constantColor);
-  for (const token of ['COLOR_TEXT_SECONDARY', 'COLOR_TEXT_TERTIARY', 'COLOR_SUCCESS', 'COLOR_WARNING',
+  const surfaces = ['COLOR_BG_CARD', 'COLOR_BG_PAGE', 'COLOR_BRAND_LIGHT', 'COLOR_SUCCESS_LIGHT',
+    'COLOR_ERROR_LIGHT'].map(constantColor);
+  for (const token of ['COLOR_TEXT_SECONDARY', 'COLOR_TEXT_TERTIARY', 'COLOR_BRAND_TEXT', 'COLOR_SUCCESS', 'COLOR_WARNING',
     'COLOR_ERROR']) {
     const foreground = constantColor(token);
     for (const background of surfaces) {
@@ -204,4 +232,40 @@ test('正文辅助色和语义小字在实际浅色表面达到 WCAG AA', () => 
   }
   assert.ok(contrast(constantColor('COLOR_TEXT_PLACEHOLDER'), constantColor('COLOR_BG_CARD')) >= 4.5);
   assert.ok(contrast(constantColor('COLOR_NAV_INACTIVE'), constantColor('COLOR_BG_CARD')) >= 4.5);
+  for (const uiSource of [home, course, detail, lesson, builders]) {
+    assert.doesNotMatch(uiSource, /\.fontColor\(Constants\.COLOR_BRAND\)/);
+  }
+  assert.match(lesson, /\.fontColor\(index <= this\.codeRunStepIndex \? Constants\.COLOR_TEXT_ON_GRADIENT :\s*Constants\.COLOR_BRAND_TEXT\)/);
+  assert.match(lesson, /\.fontColor\(this\.activityEvidenceMessage\.includes\('失败'\) \?\s*Constants\.COLOR_ERROR : Constants\.COLOR_BRAND_TEXT\)/);
+});
+
+test('首页任务写回与系统提醒共享互斥门禁且迟到提醒不能覆盖新行动', () => {
+  const toggle = methodBlock(home, 'toggleTask');
+  const publish = methodBlock(home, 'publishReminder');
+  const retry = methodBlock(home, 'retryReminderCards');
+  const isCurrent = methodBlock(home, 'hasCurrentReminderAction');
+
+  assert.match(toggle, /this\.updatingTaskId\.length > 0 \|\| this\.notificationState === 'loading'/);
+  assert.match(toggle, /this\.planTasks = nextTasks;\s*this\.reminderAction = null;\s*this\.reminderActionRunId = -1;/);
+  assert.ok(toggle.indexOf('await this.loadNextAction();') < toggle.lastIndexOf("this.updatingTaskId = '';"));
+  assert.match(publish, /this\.notificationState === 'loading' \|\| this\.updatingTaskId\.length > 0/);
+  assert.match(publish, /const actionRunId: number = this\.nextActionRunId;/);
+  assert.match(publish, /if \(this\.nextActionRunId !== actionRunId\) \{\s*this\.reminderAction = null;\s*this\.reminderActionRunId = -1;/);
+  assert.match(publish, /当前学习行动已更新，请重新创建提醒/);
+  assert.ok(publish.indexOf('this.reminderAction = action;') >
+    publish.indexOf('if (this.nextActionRunId !== actionRunId)'));
+  assert.match(publish, /this\.reminderAction = action;\s*this\.reminderActionRunId = actionRunId;/);
+  assert.match(retry, /this\.notificationState === 'loading' \|\| this\.updatingTaskId\.length > 0/);
+  assert.match(retry, /action === null \|\| this\.reminderActionRunId !== this\.nextActionRunId/);
+  assert.match(retry, /this\.reminderAction = null;\s*this\.reminderActionRunId = -1;/);
+  assert.match(retry, /await this\.syncReminderCards\(action\)/);
+  assert.match(isCurrent, /this\.reminderAction !== null && this\.reminderActionRunId === this\.nextActionRunId/);
+  assert.match(home, /\.enabled\(this\.notificationState !== 'loading' && this\.updatingTaskId\.length === 0\)/);
+  assert.match(home, /\.enabled\(this\.updatingTaskId\.length === 0 && this\.notificationState !== 'loading'\)/);
+  assert.match(home, /Button\(this\.hasCurrentReminderAction\(\) \? '重试同步' : '重新创建'\)/);
+  assert.match(home, /if \(this\.hasCurrentReminderAction\(\)\) \{\s*this\.retryReminderCards\(\);\s*\} else \{\s*this\.publishReminder\(\);/);
+  assert.match(home, /this\.updatingTaskId\.length > 0 \? '正在保存学习任务，稍后可创建提醒'/);
+  assert.match(home, /this\.notificationState === 'loading' \? '，系统提醒创建期间暂不可切换'/);
+  assert.match(home, /this\.updatingTaskId\.length > 0 \? '正在保存学习任务，稍后可重试创建提醒'/);
+  assert.match(home, /this\.updatingTaskId\.length > 0 \? '正在保存学习任务，稍后可处理系统提醒'/);
 });

@@ -32,6 +32,7 @@ struct LessonPage {
   @State activeActivityIndex: number = 0;
   @State selectedIndexes: number[] = [];
   @State responseText: string = '';
+  @State submittedResponseText: string = '';
   @State feedbackVisible: boolean = false;
   @State attemptedActivityIds: string[] = [];
   @State pendingActivityIds: string[] = [];
@@ -131,6 +132,7 @@ struct LessonPage {
   private resetActivityInput(): void {
     this.selectedIndexes = [];
     this.responseText = '';
+    this.submittedResponseText = '';
     this.feedbackVisible = false;
     this.codeRunStepIndex = -1;
     this.workedExampleRevealCount = 0;
@@ -199,12 +201,25 @@ struct LessonPage {
   }
 
   private revealFreeResponse(): void {
-    if (this.responseText.trim().length === 0) {
+    const answer: string = this.responseText.trim();
+    if (answer.length === 0) {
       this.message = '请先写下你的推演或填空答案';
       return;
     }
     this.message = '';
+    this.responseText = answer;
+    this.submittedResponseText = answer;
     this.feedbackVisible = true;
+  }
+
+  private activityOptionAccessibilityDescription(index: number, ordered: boolean): string {
+    const selected: boolean = this.selectedIndexes.includes(index);
+    if (this.feedbackVisible) return selected ? '已选择，答案已提交' : '未选择，答案已提交';
+    if (!selected) return ordered ? '未选择，点击加入排序' : '未选择，点击选择';
+    if (ordered) {
+      return '已选择，排序第 ' + (this.selectedIndexes.indexOf(index) + 1).toString() + ' 位';
+    }
+    return '已选择，可更改选择';
   }
 
   private selfAssess(activity: LearningActivity, covered: boolean): void {
@@ -461,7 +476,8 @@ struct LessonPage {
 
   private activityAnswerText(activity: LearningActivity): string {
     if (activity.interactionMode === 'free_response') {
-      return this.responseText.trim().length > 0 ? this.responseText.trim() : '未作答';
+      const answer: string = this.feedbackVisible ? this.submittedResponseText : this.responseText.trim();
+      return answer.length > 0 ? answer : '未作答';
     }
     const answers: string[] = [];
     for (const index of this.selectedIndexes) {
@@ -559,7 +575,7 @@ struct LessonPage {
         Text('本节掌握标准')
           .fontSize(12)
           .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_BRAND)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
         Text(this.activityProgressText())
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -680,7 +696,7 @@ struct LessonPage {
             .height(24)
             .fontSize(11)
             .fontWeight(FontWeight.Bold)
-            .fontColor(index <= this.codeRunStepIndex ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND)
+            .fontColor(index <= this.codeRunStepIndex ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BRAND_TEXT)
             .textAlign(TextAlign.Center)
             .backgroundColor(index <= this.codeRunStepIndex ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND_LIGHT)
             .borderRadius(12)
@@ -750,6 +766,9 @@ struct LessonPage {
         (this.activityIsCorrect() ? Constants.COLOR_SUCCESS : Constants.COLOR_ERROR)) :
       Constants.COLOR_BG_TAG)
     .borderRadius(Constants.RADIUS_MD)
+    .enabled(!this.feedbackVisible)
+    .accessibilityText(option)
+    .accessibilityDescription(this.activityOptionAccessibilityDescription(index, ordered))
     .onClick((): void => {
       if (ordered) {
         this.chooseOrderStep(index);
@@ -878,7 +897,7 @@ struct LessonPage {
           Text('分步示例')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_BRAND)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
           Text(this.visibleWorkedExampleStepCount().toString() + ' / ' +
             this.experience.workedExampleSteps.length.toString() + ' 步')
             .fontSize(11)
@@ -917,7 +936,7 @@ struct LessonPage {
           .constraintSize({ minHeight: 48 })
           .enabled(this.experience.workedExampleSteps.length > 0)
           .fontSize(13)
-          .fontColor(Constants.COLOR_BRAND)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
           .backgroundColor(Constants.COLOR_BRAND_LIGHT)
           .borderRadius(Constants.RADIUS_MD)
           .accessibilityText(this.workedExampleActionLabel())
@@ -935,7 +954,7 @@ struct LessonPage {
             Text('主动练习 · ' + this.activeActivity()!.title)
               .fontSize(13)
               .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
             Text((this.activeActivityIndex + 1).toString() + ' / ' +
               this.experience.activities.length.toString())
               .fontSize(12)
@@ -951,7 +970,7 @@ struct LessonPage {
               .layoutWeight(1)
               .fontSize(12)
               .fontWeight(FontWeight.Medium)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
@@ -1013,7 +1032,13 @@ struct LessonPage {
               .backgroundColor(Constants.COLOR_SURFACE_TINT)
               .border({ width: 1, color: Constants.COLOR_BORDER })
               .borderRadius(Constants.RADIUS_MD)
-              .onChange((value: string): void => { this.responseText = value; })
+              .enabled(!this.feedbackVisible)
+              .accessibilityText(this.feedbackVisible ? '已提交的自由回答' : '自由回答输入框')
+              .accessibilityDescription(this.feedbackVisible ? '答案已冻结，可向下对照关键点' :
+                '输入你的答案或推演过程')
+              .onChange((value: string): void => {
+                if (!this.feedbackVisible) this.responseText = value;
+              })
             Button(this.feedbackVisible ? '已提交，向下对照答案' : '提交并对照答案')
               .width('100%')
               .constraintSize({ minHeight: 48 })
@@ -1047,7 +1072,7 @@ struct LessonPage {
                   .fontWeight(FontWeight.Medium)
                   .lineHeight(18)
                   .fontColor(this.activityEvidenceMessage.includes('失败') ?
-                    Constants.COLOR_ERROR : Constants.COLOR_BRAND)
+                    Constants.COLOR_ERROR : Constants.COLOR_BRAND_TEXT)
               }
             }
             .width('100%')
@@ -1100,7 +1125,7 @@ struct LessonPage {
                 .layoutWeight(1)
                 .constraintSize({ minHeight: 48 })
                 .fontSize(12)
-                .fontColor(Constants.COLOR_BRAND)
+                .fontColor(Constants.COLOR_BRAND_TEXT)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_MD)
                 .onClick((): void => { this.askTutorForActivity(this.activeActivity()!); })
@@ -1204,7 +1229,7 @@ struct LessonPage {
           Row() {
             Text('精选课程内容')
               .fontSize(11)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .borderRadius(Constants.RADIUS_SM)
@@ -1235,7 +1260,7 @@ struct LessonPage {
                 Text('先抓住核心')
                   .fontSize(13)
                   .fontWeight(FontWeight.Medium)
-                  .fontColor(Constants.COLOR_BRAND)
+                  .fontColor(Constants.COLOR_BRAND_TEXT)
               }
               .width('100%')
 
@@ -1338,7 +1363,7 @@ struct LessonPage {
                 .constraintSize({ minHeight: 48 })
                 .padding({ left: 14, right: 14 })
                 .fontSize(12)
-                .fontColor(Constants.COLOR_BRAND)
+                .fontColor(Constants.COLOR_BRAND_TEXT)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_MD)
                 .accessibilityText('重新读取当前主题学习进度')

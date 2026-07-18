@@ -259,7 +259,7 @@ export function ReviewDetailRow(
             ForEach(detail.tags ?? [], (tag: string): void => {
               Text(tag)
                 .fontSize(10)
-                .fontColor(Constants.COLOR_BRAND)
+                .fontColor(Constants.COLOR_BRAND_TEXT)
                 .padding({ left: 8, right: 8, top: 3, bottom: 3 })
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(9)
@@ -291,7 +291,7 @@ export function ReviewDetailRow(
             Text('向学伴追问')
               .fontSize(12)
               .fontWeight(FontWeight.Medium)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
           }
         }
         .height(36)
