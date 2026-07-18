@@ -348,3 +348,26 @@
 - 主线程首次黑盒严格比较 `Cache-Control` 字符串顺序，实际 production 返回等价的 `no-store, private`，因此该轮 exit 1 未计作通过；重启干净实例后改为校验指令集合，完整序列 exit 0。
 - **未验证**：多实例间全局限流一致性、线上代理的可信 IP 注入、真实 CDN/WAF 联合限流、已配置真实模型时的 SSE 正文与流中错误、`MODEL_BASE_URL` 包含 URL 凭据或查询参数时的公开响应、当前分支线上发布。
 - 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Safety、RAG、生产模型 ID、服务端秘密或端侧状态。
+
+## 19. Model Status 上游配置脱敏
+
+### 19.1 源码确认与行为
+
+- `/api/model/status` 旧实现直接序列化 `getModelRuntimeInfo()`。该内部对象包含完整 `MODEL_BASE_URL`；若部署把 Basic Auth userinfo、查询 token 或片段放入 URL，匿名状态请求会原样取得这些值。
+- 路由现在只选择 `configured`、`mode`、`provider`、`modelName`、`timeoutMs` 五个非敏感联调字段，不再返回 `baseURL`。模型内部仍使用原始配置建立客户端，本批没有修改 `model.ts`、默认或生产模型 ID、模型调用、超时、取消、Safety、orchestrator 或 SSE 行为。
+- `docs/api-spec.md` 与 `docs/API-REFERENCE.md` 已同步删除公开 `baseURL`，并把旧的 `mode: model | demo` 修正为源码中的精确 `model | unavailable`。
+
+### 19.2 反例与验证
+
+- 路由级反例使用非真实 sentinel：`MODEL_BASE_URL` 同时包含 userinfo、password、query 和 fragment，`MODEL_API_KEY` 使用独立 sentinel。修复前 `pnpm exec vitest run src/app/api/model/status/route.test.ts` exit 1，响应的 `baseURL` 原样包含完整 URL；修复后响应键集合被锁定为五个允许字段，所有 sentinel 均不存在。
+- 定向联合：`pnpm exec vitest run src/app/api/model/status/route.test.ts src/lib/agents/model-runtime.test.ts src/app/api/stateless-agent.test.ts` exit 0，3 个测试文件、11 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，35 个测试文件、378 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面、全部 dynamic API route 与 26.9 kB middleware 的 production 构建。
+- 本地 production 黑盒通过：`127.0.0.1:4328`，显式 stateless 且空模型 Key；`/api/model/status` 为 HTTP 200、`configured=false`、`mode=unavailable`，响应字段精确为 `configured,mode,modelName,provider,timeoutMs`，`baseURL` 与 Key/Authorization 字段名均不存在，允许 Origin 与安全头通过。实例 PID 11428 已停止，端口监听已关闭。
+
+### 19.3 委派、失败与未验证
+
+- 子 agent `model_status_secret_regression` 被限定为单个路由测试，但在约定时间内没有创建文件或返回阻塞，随后被中断；工作树保持干净，主线程独立完成红测、实现与复核。
+- 尝试用非真实 Key sentinel 启动 production 实例时，命令在执行前被终端策略拒绝，没有启动进程或发出请求；该次未计作通过。带 URL 凭据的泄露防护证据来自真实路由函数测试，production 黑盒只证明空 Key 部署的字段集合。
+- **未验证**：当前分支线上部署、线上已配置模型时的 Model Status 响应、多实例/CDN 缓存行为。没有把本地路由测试或 HTTP 200 单独标记为线上通过。
+- 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Safety、RAG、生产模型 ID、模型请求预算、服务端秘密或端侧状态。

@@ -346,7 +346,7 @@ curl -X POST http://localhost:3000/api/knowledge/upload \
 
 ### 3.5 GET /api/model/status — 模型状态
 
-查询服务端模型配置状态。该接口仅返回配置元信息，**不会泄露任何 API 密钥**。
+查询服务端模型配置状态。该接口仅返回非敏感联调字段，**不会返回 API 密钥或模型上游基础地址**。
 
 **请求**
 
@@ -365,7 +365,6 @@ curl http://localhost:3000/api/model/status
   "configured": true,
   "mode": "model",
   "provider": "openai-compatible",
-  "baseURL": "https://api.example.com/v1",
   "modelName": "gpt-4o-mini",
   "timeoutMs": 30000
 }
@@ -376,9 +375,8 @@ curl http://localhost:3000/api/model/status
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `configured` | boolean | 模型是否已正确配置（API Key 非空且非占位符） |
-| `mode` | `"model" \| "demo"` | 运行模式：`model` 为真实模型，`demo` 为演示模式 |
+| `mode` | `"model" \| "unavailable"` | 运行模式：`model` 为真实模型，`unavailable` 为服务端未配置模型 |
 | `provider` | `"openai-compatible"` | 模型提供商类型 |
-| `baseURL` | string | 模型 API 基础地址 |
 | `modelName` | string | 模型名称 |
 | `timeoutMs` | number | 请求超时时间（毫秒） |
 

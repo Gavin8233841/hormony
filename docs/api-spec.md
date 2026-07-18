@@ -23,13 +23,12 @@
   "configured": false,
   "mode": "unavailable",
   "provider": "openai-compatible",
-  "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
   "modelName": "doubao-seed-2-1-pro-260628",
   "timeoutMs": 45000
 }
 ```
 
-> 响应不包含 `MODEL_API_KEY`。
+> 响应不包含 `MODEL_API_KEY` 或模型上游基础地址。
 
 ---
 
