@@ -6,11 +6,29 @@ import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModel
 import { Course, PlanTask } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
+const ACTIVITY_WINDOW_LIMIT: number = 500;
+const NAVIGATION_PLAN: string = 'plan';
+const NAVIGATION_COURSE_DETAIL: string = 'course_detail';
+const NAVIGATION_LESSON: string = 'lesson';
+const NAVIGATION_PRACTICE: string = 'practice';
+const NAVIGATION_QUIZ: string = 'quiz';
+
 interface ActivityDay {
   key: string;
   label: string;
   count: number;
   completed: boolean;
+}
+
+interface PendingNavigationAction {
+  kind: string;
+  route: string;
+  target: string;
+  failureMessage: string;
+  courseId: string;
+  courseTitle: string;
+  topic: string;
+  focusTag: string;
 }
 
 @Entry
@@ -24,17 +42,24 @@ struct ActivityRecordsPage {
   @State selectedFilter: string = 'all';
   @State streakDays: number = 0;
   @State loading: boolean = true;
-  @State message: string = '';
+  @State dataMessage: string = '';
+  @State navigationMessage: string = '';
+  @State navigationTarget: string = '';
+  private pendingNavigationAction: PendingNavigationAction | null = null;
+  private loadSequence: number = 0;
+  private navigationAttemptSequence: number = 0;
 
   aboutToAppear(): void {
     this.loadEvents();
   }
 
   private async loadEvents(): Promise<void> {
+    const requestSequence = ++this.loadSequence;
     this.loading = true;
-    this.message = '';
+    this.dataMessage = '';
     try {
-      const events: StudyEvent[] = (await LocalLearningRepository.getStudyEvents()).slice().reverse();
+      const events: StudyEvent[] = (await LocalLearningRepository.getStudyEvents())
+        .slice(-ACTIVITY_WINDOW_LIMIT).reverse();
       const visibleEvents: StudyEvent[] = events.filter((event: StudyEvent): boolean =>
         this.eventMatchesFilter(event, this.selectedFilter));
       const courses: Course[] = await LocalLearningRepository.getCourses() ?? [];
@@ -44,6 +69,7 @@ struct ActivityRecordsPage {
       const profile = await LocalLearningRepository.getProfile();
       const streakDays: number = profile?.stats.streakDays ?? 0;
 
+      if (requestSequence !== this.loadSequence) return;
       this.events = events;
       this.visibleEvents = visibleEvents;
       this.courses = courses;
@@ -51,9 +77,11 @@ struct ActivityRecordsPage {
       this.recentDays = recentDays;
       this.streakDays = streakDays;
     } catch (error) {
-      this.message = '学习记录读取失败';
+      if (requestSequence !== this.loadSequence) return;
+      this.dataMessage = this.events.length > 0 ? '学习记录刷新失败，当前显示上次读取结果' :
+        '学习记录读取失败';
     } finally {
-      this.loading = false;
+      if (requestSequence === this.loadSequence) this.loading = false;
     }
   }
 
@@ -100,24 +128,65 @@ struct ActivityRecordsPage {
     return course !== undefined && course.topics.includes(topic);
   }
 
-  private setCourseContext(courseId: string): boolean {
-    const title = this.courseTitle(courseId);
-    if (title.length === 0) {
-      this.message = '无法定位这条记录对应的课程';
-      return false;
-    }
-    AppStorage.setOrCreate<string>('selectedCourseId', courseId);
-    AppStorage.setOrCreate<string>('selectedCourseTitle', title);
-    return true;
+  private clearNavigationFailure(): void {
+    this.navigationMessage = '';
+    this.navigationTarget = '';
+    this.pendingNavigationAction = null;
   }
 
-  private pushPage(url: string, failureMessage: string): void {
-    this.message = '';
-    this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
+  private beginNavigation(): number {
+    this.navigationAttemptSequence += 1;
+    this.clearNavigationFailure();
+    return this.navigationAttemptSequence;
+  }
+
+  private applyNavigationContext(action: PendingNavigationAction): void {
+    if (action.kind === NAVIGATION_PLAN) return;
+    AppStorage.setOrCreate<string>('selectedCourseId', action.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', action.courseTitle);
+    if (action.kind === NAVIGATION_LESSON) {
+      AppStorage.setOrCreate<string>('selectedContentTopic', action.topic);
+    } else if (action.kind === NAVIGATION_PRACTICE) {
+      AppStorage.setOrCreate<string>('selectedPracticeTopic', action.topic);
+    } else if (action.kind === NAVIGATION_QUIZ) {
+      AppStorage.setOrCreate<string>('selectedQuizTopic', action.topic);
+      AppStorage.setOrCreate<string>('selectedQuizFocusTag', action.focusTag);
+    }
+  }
+
+  private navigate(action: PendingNavigationAction): void {
+    const attemptSequence = this.beginNavigation();
+    this.applyNavigationContext(action);
+    this.getUIContext().getRouter().pushUrl({ url: action.route }).then((): void => {
+      if (attemptSequence === this.navigationAttemptSequence) this.clearNavigationFailure();
+    }).catch((error: Error): void => {
+      if (attemptSequence !== this.navigationAttemptSequence) return;
+      this.pendingNavigationAction = action;
+      this.navigationMessage = action.failureMessage;
+      this.navigationTarget = action.target;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ActivityRecordsPage navigation failed: %{public}s', error.message);
-      this.message = failureMessage;
     });
+  }
+
+  private retryNavigation(): void {
+    const action = this.pendingNavigationAction;
+    if (action === null) return;
+    if (!this.navigationActionValid(action)) {
+      this.beginNavigation();
+      this.dataMessage = '课程目录已更新，请重新读取本机学习记录';
+      return;
+    }
+    this.navigate(action);
+  }
+
+  private navigationActionValid(action: PendingNavigationAction): boolean {
+    if (action.kind === NAVIGATION_PLAN) return true;
+    const course = this.courses.find((item: Course): boolean => item.id === action.courseId);
+    if (course === undefined) return false;
+    if (course.title !== action.courseTitle) return false;
+    if (action.kind === NAVIGATION_COURSE_DETAIL) return true;
+    return action.topic.length > 0 && course.topics.includes(action.topic);
   }
 
   private icon(event: StudyEvent): Resource {
@@ -187,6 +256,10 @@ struct ActivityRecordsPage {
     return this.recentDays.filter((day: ActivityDay): boolean => day.count > 0).length;
   }
 
+  private completedDaysCount(): number {
+    return this.recentDays.filter((day: ActivityDay): boolean => day.completed).length;
+  }
+
   private recentEventCount(): number {
     let total = 0;
     for (const day of this.recentDays) total += day.count;
@@ -203,9 +276,10 @@ struct ActivityRecordsPage {
   }
 
   private activityOverviewAccessibilityText(): string {
-    return '近 4 周学习节奏，连续 ' + this.streakDays.toString() + ' 天，' +
-      this.activeDaysCount().toString() + ' 天有学习，共 ' + this.recentEventCount().toString() +
-      ' 条本机学习事件，记录最多：' + this.bestDayLabel();
+    return '近 4 周学习节奏，来自本机记录中最新 500 条的页面窗口，连续 ' +
+      this.streakDays.toString() + ' 天，' + this.activeDaysCount().toString() + ' 天有学习，其中 ' +
+      this.completedDaysCount().toString() + ' 天出现完成节点，窗口近 4 周共有 ' +
+      this.recentEventCount().toString() + ' 条事件，记录最多：' + this.bestDayLabel();
   }
 
   private activityDayColor(day: ActivityDay): string {
@@ -297,44 +371,107 @@ struct ActivityRecordsPage {
 
   private openEvent(event: StudyEvent): void {
     if (event.type === 'task_completed') {
-      this.pushPage('pages/Plan', '无法打开学习计划，请重试');
+      this.navigate({
+        kind: NAVIGATION_PLAN,
+        route: 'pages/Plan',
+        target: '学习计划',
+        failureMessage: '无法打开学习计划，请重试',
+        courseId: '',
+        courseTitle: '',
+        topic: '',
+        focusTag: ''
+      });
       return;
     }
     const courseId = event.courseId;
-    if (courseId === undefined || !this.setCourseContext(courseId)) return;
+    const courseTitle = courseId !== undefined ? this.courseTitle(courseId) : '';
+    if (courseId === undefined || courseTitle.length === 0) {
+      this.beginNavigation();
+      this.dataMessage = '无法定位这条记录对应的课程，请重新读取本机学习记录';
+      return;
+    }
     const topic = event.topic ?? '';
     const hasExactTopic = topic.length > 0 && this.hasCourseTopic(courseId, topic);
     if ((event.type === 'lesson_activity' || event.type === 'lesson_completed') && hasExactTopic) {
-      AppStorage.setOrCreate<string>('selectedContentTopic', topic);
-      this.pushPage('pages/Lesson', '无法打开对应课程，请重试');
+      this.navigate({
+        kind: NAVIGATION_LESSON,
+        route: 'pages/Lesson',
+        target: courseTitle + ' · ' + topic + ' 课程',
+        failureMessage: '无法打开对应课程，请重试',
+        courseId: courseId,
+        courseTitle: courseTitle,
+        topic: topic,
+        focusTag: ''
+      });
       return;
     }
     if ((event.type === 'quiz_submitted' || event.type === 'quiz_mastered') && hasExactTopic) {
       if (event.source === 'curated') {
-        AppStorage.setOrCreate<string>('selectedPracticeTopic', topic);
-        this.pushPage('pages/Practice', '无法打开精选练习，请重试');
+        this.navigate({
+          kind: NAVIGATION_PRACTICE,
+          route: 'pages/Practice',
+          target: courseTitle + ' · ' + topic + ' 精选练习',
+          failureMessage: '无法打开精选练习，请重试',
+          courseId: courseId,
+          courseTitle: courseTitle,
+          topic: topic,
+          focusTag: ''
+        });
       } else if (event.source === 'ai') {
-        AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
         const focusTag = event.tags !== undefined && event.tags.length > 0 ? event.tags[0] : '';
-        AppStorage.setOrCreate<string>('selectedQuizFocusTag', focusTag);
-        this.pushPage('pages/Quiz', '无法打开 AI 测验，请重试');
+        this.navigate({
+          kind: NAVIGATION_QUIZ,
+          route: 'pages/Quiz',
+          target: courseTitle + ' · ' + topic + ' AI 测验',
+          failureMessage: '无法打开 AI 测验，请重试',
+          courseId: courseId,
+          courseTitle: courseTitle,
+          topic: topic,
+          focusTag: focusTag
+        });
       } else {
-        this.pushPage('pages/CourseDetail', '无法打开课程详情，请重试');
+        this.navigate({
+          kind: NAVIGATION_COURSE_DETAIL,
+          route: 'pages/CourseDetail',
+          target: courseTitle + ' 课程详情',
+          failureMessage: '无法打开课程详情，请重试',
+          courseId: courseId,
+          courseTitle: courseTitle,
+          topic: '',
+          focusTag: ''
+        });
       }
       return;
     }
-    this.pushPage('pages/CourseDetail', '无法打开课程详情，请重试');
+    this.navigate({
+      kind: NAVIGATION_COURSE_DETAIL,
+      route: 'pages/CourseDetail',
+      target: courseTitle + ' 课程详情',
+      failureMessage: '无法打开课程详情，请重试',
+      courseId: courseId,
+      courseTitle: courseTitle,
+      topic: '',
+      focusTag: ''
+    });
   }
 
   @Builder
   FilterPill(value: string) {
     Button({ type: ButtonType.Normal }) {
-      Text(this.filterLabel(value))
-        .fontSize(12)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(this.selectedFilter === value ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_TERTIARY)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Row({ space: 4 }) {
+        if (this.selectedFilter === value) {
+          SymbolGlyph($r('sys.symbol.checkmark'))
+            .fontSize(12)
+            .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+        }
+        Text(this.filterLabel(value))
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.selectedFilter === value ? Constants.COLOR_TEXT_ON_GRADIENT :
+            Constants.COLOR_TEXT_TERTIARY)
+          .textAlign(TextAlign.Center)
+      }
+      .justifyContent(FlexAlign.Center)
     }
     .layoutWeight(1)
     .constraintSize({ minHeight: 48 })
@@ -357,10 +494,13 @@ struct ActivityRecordsPage {
           Text('连续 ' + this.streakDays.toString() + ' 天 · ' + this.activeDaysCount().toString() + ' 天有学习')
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.completedDaysCount().toString() + ' 天有完成节点')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
-        Text(this.recentEventCount().toString() + ' 条')
+        Text('4 周内 ' + this.recentEventCount().toString() + ' 条')
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_BRAND)
@@ -397,14 +537,25 @@ struct ActivityRecordsPage {
         Text('记录最多：' + this.bestDayLabel())
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_TERTIARY)
-        Row({ space: 5 }) {
-          Text('少').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_BG_TAG).borderRadius(4)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND_LIGHT).borderRadius(4)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND).borderRadius(4)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(4)
-          Text('多').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Flex({ wrap: FlexWrap.Wrap }) {
+          Row({ space: 4 }) {
+            Text('无活动').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Column().width(14).height(8).backgroundColor(Constants.COLOR_BG_TAG).borderRadius(4)
+          }
+          .margin({ right: 10, bottom: 4 })
+          Row({ space: 4 }) {
+            Text('普通活动').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND_LIGHT).borderRadius(4)
+            Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND).borderRadius(4)
+          }
+          .margin({ right: 10, bottom: 4 })
+          Row({ space: 4 }) {
+            Text('完成节点').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Column().width(14).height(8).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(4)
+          }
+          .margin({ bottom: 4 })
         }
+        .width('100%')
       }
       .width('100%')
       .alignItems(HorizontalAlign.Start)
@@ -422,7 +573,7 @@ struct ActivityRecordsPage {
       if (this.loading) {
         TitleBar('学习记录', '正在读取本地记录', () => this.getUIContext().getRouter().back())
       } else {
-        TitleBar('学习记录', this.events.length.toString() + ' 条活动 · 仅保存在本机',
+        TitleBar('学习记录', '本页近期 ' + this.events.length.toString() + ' 条 · 最多展示 500 条',
           () => this.getUIContext().getRouter().back())
       }
       if (this.loading) {
@@ -436,10 +587,10 @@ struct ActivityRecordsPage {
       } else if (this.events.length === 0) {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.clock')).fontSize(38).fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
-          Text(this.message.length > 0 ? this.message : '完成第一次学习后，记录会出现在这里')
+          Text(this.dataMessage.length > 0 ? this.dataMessage : '完成第一次学习后，记录会出现在这里')
             .fontSize(14)
-            .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
-          if (this.message.length > 0) {
+            .fontColor(this.dataMessage.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+          if (this.dataMessage.length > 0) {
             Button('重新读取')
               .width(144)
               .constraintSize({ minHeight: 48 })
@@ -468,10 +619,10 @@ struct ActivityRecordsPage {
             }
             .width('100%')
           }
-          if (this.message.length > 0) {
+          if (this.dataMessage.length > 0) {
             ListItem() {
               Column({ space: 10 }) {
-                Text(this.message)
+                Text(this.dataMessage)
                   .width('100%')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_ERROR)
@@ -485,6 +636,31 @@ struct ActivityRecordsPage {
                   .borderRadius(24)
                   .accessibilityText('重新读取本机学习记录')
                   .onClick((): void => { this.loadEvents(); })
+              }
+              .width('100%')
+              .padding(12)
+              .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+            }
+          }
+          if (this.navigationMessage.length > 0) {
+            ListItem() {
+              Column({ space: 10 }) {
+                Text(this.navigationMessage)
+                  .width('100%')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_ERROR)
+                Button('重试打开 ' + this.navigationTarget)
+                  .width('100%')
+                  .constraintSize({ minHeight: 48 })
+                  .fontSize(13)
+                  .fontColor(Constants.COLOR_ERROR)
+                  .backgroundColor(Constants.COLOR_BG_CARD)
+                  .border({ width: 1, color: Constants.COLOR_ERROR })
+                  .borderRadius(24)
+                  .accessibilityText('重试打开' + this.navigationTarget)
+                  .accessibilityDescription(this.navigationMessage)
+                  .onClick((): void => { this.retryNavigation(); })
               }
               .width('100%')
               .padding(12)
@@ -578,11 +754,11 @@ struct ActivityRecordsPage {
           if (this.visibleEvents.length === 0) {
             ListItem() {
               Column({ space: 6 }) {
-                Text('这个分类下还没有记录')
+                Text('本机保留窗口中没有此类记录')
                   .fontSize(14)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                Text('完成一次' + this.filterLabel(this.selectedFilter) + '后会自动出现')
+                Text('完成一次' + this.filterLabel(this.selectedFilter) + '后会在此窗口中出现')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
               }

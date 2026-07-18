@@ -9,13 +9,30 @@ import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { Course, TopicMastery, UserProfile } from '../model/DataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
+const PROFILE_RECOVERY_NONE: string = '';
+const PROFILE_RECOVERY_CORE: string = 'core';
+const PROFILE_RECOVERY_MASTERY: string = 'mastery';
+const PROFILE_NAVIGATION_NONE: string = '';
+const PROFILE_NAVIGATION_ROUTE: string = 'route';
+const PROFILE_NAVIGATION_QUIZ: string = 'quiz';
+
 @Component
 export struct ProfileContent {
   @State profile: UserProfile | null = null;
   @State courses: Course[] = [];
   @State topicMastery: TopicMastery[] = [];
   @State loading: boolean = false;
-  @State message: string = '';
+  @State masteryLoading: boolean = false;
+  @State dataMessage: string = '';
+  @State dataRecoveryAction: string = PROFILE_RECOVERY_NONE;
+  @State navigationMessage: string = '';
+  @State navigationTarget: string = '';
+  private masteryLoadSequence: number = 0;
+  private navigationSequence: number = 0;
+  private pendingNavigationKind: string = PROFILE_NAVIGATION_NONE;
+  private pendingRoute: string = '';
+  private pendingCourseId: string = '';
+  private pendingTopic: string = '';
 
   aboutToAppear(): void {
     this.loadProfile();
@@ -23,25 +40,63 @@ export struct ProfileContent {
 
   async loadProfile(): Promise<void> {
     if (this.loading) return;
+    this.masteryLoadSequence += 1;
     this.loading = true;
-    this.message = '';
+    this.masteryLoading = false;
+    this.dataMessage = '';
+    this.dataRecoveryAction = PROFILE_RECOVERY_NONE;
     try {
       const profile = await LocalLearningRepository.getProfile();
-      const courses = (await LocalLearningRepository.getCourses()) ?? [];
-      const mastery = await LocalLearningRepository.getTopicMastery();
       this.profile = profile;
-      this.courses = courses;
-      this.topicMastery = this.sortTopicMastery(mastery.filter((item: TopicMastery): boolean =>
-        courses.some((course: Course): boolean =>
-          course.id === item.courseId && course.topics.includes(item.topic)))).slice(0, 6);
     } catch (_) {
-      this.profile = null;
+      this.dataMessage = this.profile === null ? '本地学习画像加载失败' :
+        '学习画像刷新失败，当前显示上次读取结果';
+      this.dataRecoveryAction = PROFILE_RECOVERY_CORE;
+      this.loading = false;
+      return;
+    }
+    this.loading = false;
+    if (this.profile === null) {
       this.courses = [];
       this.topicMastery = [];
-      this.message = '本地学习画像加载失败';
-    } finally {
-      this.loading = false;
+      return;
     }
+    await this.loadMasteryContext();
+  }
+
+  private async loadMasteryContext(): Promise<void> {
+    const requestSequence = ++this.masteryLoadSequence;
+    this.masteryLoading = true;
+    this.dataMessage = '';
+    this.dataRecoveryAction = PROFILE_RECOVERY_NONE;
+    try {
+      const courses = (await LocalLearningRepository.getCourses()) ?? [];
+      const mastery = await LocalLearningRepository.getTopicMastery();
+      if (requestSequence !== this.masteryLoadSequence) return;
+      const topicMastery = this.sortTopicMastery(mastery.filter((item: TopicMastery): boolean =>
+        courses.some((course: Course): boolean =>
+          course.id === item.courseId && course.topics.includes(item.topic)))).slice(0, 6);
+      this.courses = courses;
+      this.topicMastery = topicMastery;
+    } catch (_) {
+      if (requestSequence !== this.masteryLoadSequence) return;
+      this.dataMessage = '知识点画像读取失败，当前统计与成长入口仍可使用';
+      this.dataRecoveryAction = PROFILE_RECOVERY_MASTERY;
+    } finally {
+      if (requestSequence === this.masteryLoadSequence) this.masteryLoading = false;
+    }
+  }
+
+  private dataRecoveryLabel(): string {
+    return this.dataRecoveryAction === PROFILE_RECOVERY_MASTERY ? '重新读取知识点画像' : '重新加载学习画像';
+  }
+
+  private retryDataRecovery(): void {
+    if (this.dataRecoveryAction === PROFILE_RECOVERY_MASTERY) {
+      this.loadMasteryContext();
+      return;
+    }
+    this.loadProfile();
   }
 
   private sortTopicMastery(items: TopicMastery[]): TopicMastery[] {
@@ -54,18 +109,34 @@ export struct ProfileContent {
   }
 
   private openLearningMap(): void {
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/LearningMap' }).catch((error: Error): void => {
-      this.message = '学习星图打开失败，请重试';
-      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'ProfileContent LearningMap navigation failed: %{public}s', error.message);
-    });
+    this.openPage('pages/LearningMap', '学习星图');
   }
 
-  private openPage(url: string): void {
+  private clearNavigationFailure(): void {
+    this.navigationMessage = '';
+    this.navigationTarget = '';
+    this.pendingNavigationKind = PROFILE_NAVIGATION_NONE;
+    this.pendingRoute = '';
+    this.pendingCourseId = '';
+    this.pendingTopic = '';
+  }
+
+  private beginNavigation(): number {
+    this.navigationSequence += 1;
+    this.clearNavigationFailure();
+    return this.navigationSequence;
+  }
+
+  private openPage(url: string, target: string): void {
+    const requestSequence = this.beginNavigation();
     this.getUIContext().getRouter().pushUrl({ url: url }).catch((error: Error): void => {
-      this.message = '页面打开失败，请重试';
+      if (requestSequence !== this.navigationSequence) return;
+      this.navigationMessage = target + '打开失败，请重试';
+      this.navigationTarget = target;
+      this.pendingNavigationKind = PROFILE_NAVIGATION_ROUTE;
+      this.pendingRoute = url;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
-        'ProfileContent page navigation failed: %{public}s', error.message);
+        'ProfileContent route navigation failed: %{public}s', error.message);
     });
   }
 
@@ -82,18 +153,52 @@ export struct ProfileContent {
   private openFocusedQuiz(item: TopicMastery): void {
     const course = this.findCourse(item);
     if (course === undefined) {
-      this.message = '课程目录已更新，请重新加载画像';
+      this.beginNavigation();
+      this.dataMessage = '课程目录已更新，请重新读取知识点画像';
+      this.dataRecoveryAction = PROFILE_RECOVERY_MASTERY;
       return;
     }
+    this.navigateFocusedQuiz(course, item.topic);
+  }
+
+  private navigateFocusedQuiz(course: Course, topic: string): void {
+    const requestSequence = this.beginNavigation();
     AppStorage.setOrCreate<string>('selectedCourseId', course.id);
     AppStorage.setOrCreate<string>('selectedCourseTitle', course.title);
-    AppStorage.setOrCreate<string>('selectedQuizTopic', item.topic);
+    AppStorage.setOrCreate<string>('selectedQuizTopic', topic);
     AppStorage.setOrCreate<string>('selectedQuizFocusTag', '');
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
-      this.message = '练习页面打开失败，请重试';
+      if (requestSequence !== this.navigationSequence) return;
+      this.navigationMessage = course.title + ' · ' + topic + ' 测验打开失败，请重试';
+      this.navigationTarget = course.title + ' · ' + topic + ' 测验';
+      this.pendingNavigationKind = PROFILE_NAVIGATION_QUIZ;
+      this.pendingCourseId = course.id;
+      this.pendingTopic = topic;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'ProfileContent focused quiz navigation failed: %{public}s', error.message);
     });
+  }
+
+  private retryNavigation(): void {
+    if (this.pendingNavigationKind === PROFILE_NAVIGATION_ROUTE) {
+      const route = this.pendingRoute;
+      const target = this.navigationTarget;
+      this.openPage(route, target);
+      return;
+    }
+    if (this.pendingNavigationKind === PROFILE_NAVIGATION_QUIZ) {
+      const courseId = this.pendingCourseId;
+      const topic = this.pendingTopic;
+      const course = this.courses.find((item: Course): boolean =>
+        item.id === courseId && item.topics.includes(topic));
+      if (course !== undefined) {
+        this.navigateFocusedQuiz(course, topic);
+        return;
+      }
+      this.beginNavigation();
+      this.dataMessage = '课程目录已更新，请重新读取知识点画像';
+      this.dataRecoveryAction = PROFILE_RECOVERY_MASTERY;
+    }
   }
 
   @Builder
@@ -114,7 +219,7 @@ export struct ProfileContent {
     .width('100%')
     .constraintSize({ minHeight: 64 })
     .padding({ top: 8, bottom: 8 })
-    .onClick((): void => { this.openPage(url); })
+    .onClick((): void => { this.openPage(url, title); })
     .accessibilityGroup(true)
     .accessibilityText(title)
     .accessibilityDescription(subtitle)
@@ -219,33 +324,64 @@ export struct ProfileContent {
       .alignItems(HorizontalAlign.Start)
       .padding({ left: 22, right: 22, top: 24, bottom: 18 })
 
-      if (this.loading) {
+      if (this.loading && this.profile === null) {
         this.ProfileSkeleton()
       } else if (this.profile) {
         Scroll() {
           Column({ space: 12 }) {
-            if (this.message.length > 0) {
+            if (this.dataMessage.length > 0) {
               Column({ space: 10 }) {
                 Row({ space: 10 }) {
                   SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
                     .fontSize(20)
                     .fontColor([Constants.COLOR_ERROR])
-                  Text(this.message)
+                  Text(this.dataMessage)
                     .layoutWeight(1)
                     .fontSize(13)
                     .fontColor(Constants.COLOR_ERROR)
                     .lineHeight(20)
                 }
                 .width('100%')
-                Button('重新加载')
+                Button(this.dataRecoveryLabel())
                   .width('100%')
                   .constraintSize({ minHeight: 48 })
                   .fontSize(12)
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   .backgroundColor(Constants.COLOR_ERROR)
                   .borderRadius(Constants.RADIUS_SM)
-                  .onClick((): void => { this.loadProfile(); })
-                  .accessibilityText('重新加载学习画像')
+                  .onClick((): void => { this.retryDataRecovery(); })
+                  .accessibilityText(this.dataRecoveryLabel())
+                  .accessibilityDescription(this.dataMessage)
+              }
+              .width('100%')
+              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .backgroundColor(Constants.COLOR_ERROR_LIGHT)
+                .borderRadius(Constants.RADIUS_MD)
+            }
+
+            if (this.navigationMessage.length > 0) {
+              Column({ space: 10 }) {
+                Row({ space: 10 }) {
+                  SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+                    .fontSize(20)
+                    .fontColor([Constants.COLOR_ERROR])
+                  Text(this.navigationMessage)
+                    .layoutWeight(1)
+                    .fontSize(13)
+                    .fontColor(Constants.COLOR_ERROR)
+                    .lineHeight(20)
+                }
+                .width('100%')
+                Button('重试打开 ' + this.navigationTarget)
+                  .width('100%')
+                  .constraintSize({ minHeight: 48 })
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .backgroundColor(Constants.COLOR_ERROR)
+                  .borderRadius(Constants.RADIUS_SM)
+                  .onClick((): void => { this.retryNavigation(); })
+                  .accessibilityText('重试打开' + this.navigationTarget)
+                  .accessibilityDescription(this.navigationMessage)
               }
               .width('100%')
               .padding({ left: 14, right: 14, top: 8, bottom: 8 })
@@ -375,7 +511,16 @@ export struct ProfileContent {
                 .fontSize(11)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
                 .lineHeight(18)
-              if (this.topicMastery.length === 0) {
+              if (this.masteryLoading) {
+                Text(this.topicMastery.length > 0 ? '正在刷新本机知识点画像，当前保留上次读取结果' :
+                  '正在读取本机知识点画像')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  .lineHeight(20)
+                  .accessibilityText(this.topicMastery.length > 0 ?
+                    '正在刷新本机知识点画像，当前显示上次读取结果' : '正在读取本机知识点画像')
+              }
+              if (this.topicMastery.length === 0 && !this.masteryLoading) {
                 Text('完成一次测验后，这里会显示累计答题、正确率与掌握依据')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -406,9 +551,9 @@ export struct ProfileContent {
           SymbolGlyph($r('sys.symbol.person'))
             .fontSize(42)
             .fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
-          Text(this.message.length > 0 ? this.message : '暂无学习画像')
+          Text(this.dataMessage.length > 0 ? this.dataMessage : '暂无学习画像')
             .fontSize(15)
-            .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(this.dataMessage.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
             .textAlign(TextAlign.Center)
             .lineHeight(22)
           Button('重新加载')

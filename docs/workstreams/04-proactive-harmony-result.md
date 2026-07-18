@@ -53,6 +53,14 @@
 - 初次练习、课程互动、今日计划和长期掌握四类动作分别写入消费页已有的精确 `AppStorage` 键并进入唯一目标页；掌握动作只选择存在本机题目的未达里程碑 Topic，并清空旧测验标签。
 - 主动作及失败恢复入口最小高度为 48 vp；动作读屏文本随加载、恢复、四类目标和全部解锁状态变化，成就条目播报标题、说明、状态与事实来源。标题和状态允许换行，来源与长状态分行显示。
 
+### 画像与记录精确恢复
+
+- `Profile.ets` 先独立提交 ArkData `UserProfile` 核心事实，再读取课程目录与 `TopicMastery` 辅助上下文。辅助失败或核心刷新失败均保留上次真实快照；新核心读取会作废旧辅助回调，旧成功、旧失败和旧 `finally` 都不能覆盖最新状态。
+- Profile 的数据失败与导航失败分别保存。核心画像和知识点画像只重试各自读取阶段；学习记录、错题本、成就、学习星图与精确 Topic 测验的导航失败会重试原目标，旧导航回调不能覆盖最后一次操作，Quiz 重试前再次校验当前课程目录中的 `courseId + topic`。
+- `ActivityRecords.ets` 对事件、课程、计划、四周节奏和连续天数使用 latest-wins 整体快照；刷新失败保留旧快照。页面从 Repository 合并结果中只展示最新 500 条，标题与读屏明确这是页面窗口，不把它表述为完整历史或 Repository 的单一总窗口。
+- 学习记录的 Plan、CourseDetail、Lesson、Practice 与 Quiz 动作分别保留精确 route、课程、Topic、标签和 `AppStorage` 写入；重试前重新核对当前课程 ID、标题和 Topic，导航恢复不再错误调用数据读取。
+- 四周图绿色明确表示“完成节点”，完成天数直接从 `recentDays.completed` 汇总并同时可见、可读；一次完成节点与三次普通活动的颜色反例已纳入契约。筛选选中态增加可见勾选，标签和图例允许窄屏换行，数据与导航恢复动作均保持至少 48 vp。
+
 ### 标签洞察状态
 
 - schema 12 已使用 `courseId + topic + tag` 三元组累计标签洞察，并提供不截断的全量读取契约；跨课程和跨 Topic 同名标签不会合并。
@@ -99,11 +107,14 @@
 | **源码确认** | 既有 WS04 契约脚本 | exit 0，59/59 通过；覆盖主动行动、触达、画像、记录和学习星图回归 |
 | **源码确认** | `pnpm test -- src/lib/data/quiz-learning-state.test.ts` | exit 0，39/39 通过；真实 reducer 证明第 501 条事件压缩后长期掌握里程碑仍保留 |
 | **源码确认** | `python scripts/validate-topic-relations.py` | exit 0；33 Topic、147 切片、165 道题与 33 份课程体验的 DAG、引用和 Topic 一致性全部通过 |
+| **源码确认** | WS04 Profile、ActivityRecords、Achievements、LearningMap 与主动触达相关契约 | 本轮 exit 0，73/73 通过；Profile 8/8、ActivityRecords 9/9，覆盖两阶段快照、旧回调隔离、精确恢复、500 条页面窗口、完成节点语义和分支级路由 |
 | **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 31 s 973 ms` |
 | **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 本轮 exit 0，当前源码增量任务全部通过，`BUILD SUCCESSFUL in 10 s 13 ms` |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | Profile/ActivityRecords 最终源码 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 37 s 231 ms` |
 | **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
 | **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
+| **未验证** | DevEco Agent 诊断、安装运行与 UI 验证 | 主线程现场状态为 `OpenAI invalid_api_key 401`，本轮按指令未等待或重试；没有取得 `check_ets_files`、`start_app`、UI 树或新截图证据 |
 
 构建仍提示仓库未配置 `signingConfigs`，所以只证明未签名 debug HAP 构建通过，不证明安装或提交包可用。
 
