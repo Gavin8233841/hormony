@@ -7539,3 +7539,39 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 受保护的 `lesson-experiences.json` 未修改、未暂存，当前 IPC 生成产物仍含旧的“只能父子、半双工、一直阻塞、通常 64KB”；已向 WS09 发出从已修正规格源生成和回归的精确请求，融合前不能宣称 Lesson 用户路径闭环。
 - HDC 已连接但本批未打开 q53/k44；端侧长文、读屏、答题流程、横屏、平板、真机、正式签名与线上 API 未验证。
 - 已知失败的 Alibaba/DevEco Provider 未重试，也未回落到 `openai/*`。
+
+---
+
+## 2026-07-18 [MAIN+WS03] 二次探测可达槽位事实边界
+
+背景：`cs101_q53` 旧解析错误声称表长为 4k+3 型质数就能让单侧 `+i²` 探测遍历所有位置。WS03 `1cee7f2` 将题目改为 M=7 的可执行槽位集合；主线独立审查确认数学成立，同时发现专项测试会接受注释/导出外对象、raw 路由元数据漂移和正反覆盖语义共存，难度审计也仍描述旧记忆题。主线补齐后融合为 `070fde8`。
+
+文件：
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `docs/QUIZ-DIFFICULTY-AUDIT-CS101.md`
+- `scripts/test_cs101_quadratic_probing_quiz_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- q53 固定单侧 `H_i=(H(key)+i²) mod M`、M=7、home=0、i=0..6，执行序列为 `0,1,4,2,2,4,1`，唯一可达集合为 `{0,1,2,4}`。
+- 质数表长/平方偏移只承诺至少覆盖一半槽位，不能保证全表；M=7 即使是 4k+3 型质数仍无法访问 3/5/6。另一全覆盖组合严格限定为 2 的幂表长配 `(i²+i)/2`，M=8 执行结果验证覆盖八个槽位。
+- 契约精确截取真实 `cs101Quizzes` 数组，剥离注释，固定完整生产文案和端侧九字段，并拒绝数组前后对象、单侧全覆盖肯定句与正反语义共存。
+- `QUIZ-DIFFICULTY-AUDIT-CS101.md` 同步真实题面；难度仍为 easy，因为全部公式和输入已给出，只需七次模运算和去重。
+- OpenDSA 源文及仓库 MIT 许可 URL、响应字节数和 SHA-256 已写入 WS03 结果文档；本批只引用事实，没有复制外部课程正文或题库。
+
+验证：
+- `python -B scripts/test_cs101_quadratic_probing_quiz_facts.py`：exit 0，9/9 通过。
+- `node scripts/generate-quizzes-json.mjs`：exit 0，165 道端侧选择题与 Web 唯一源逐字段一致。
+- `python -B scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识切片、165 道题、33 份学习体验的结构与路由门禁全部通过。
+- `cd apps/web; pnpm lint`、`pnpm typecheck`：exit 0；`pnpm test`：exit 0，36 个文件、437/437 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10/10 静态页面和 26.8 kB middleware 进入产物。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，`BUILD SUCCESSFUL in 35 s 259 ms`；未配置签名。
+- `hdc list targets -v`：exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+
+失败或未验证：
+- 新反向语义正则首次误把“不能保证”识别为正向保证；改为按句切分并显式识别否定词后，生产文案与矛盾 fixture 分别按预期绿/红。
+- CS101 ACTIVE 规格与 Lesson 明确采用线性探测，不与本批单侧二次探测矛盾；受保护 `lesson-experiences.json` 未修改或暂存。
+- HDC 已连接但本批未打开 q53；Unicode 公式、箭头、长解释、读屏、答题流程、横屏、平板、真机、正式签名与线上 API 未验证。
+- 已知失败的模型 Provider 未重试，也未回落到 `openai/*`。
