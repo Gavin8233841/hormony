@@ -59,9 +59,22 @@ async function readBodyWithinLimit(
   const decoder = new TextDecoder();
   let raw = "";
   let bytesRead = 0;
+  let requestAborted = request.signal.aborted;
+  let abortListenerRegistered = false;
+  const handleRequestAbort = () => {
+    requestAborted = true;
+    void reader.cancel("JSON request body aborted").catch(() => undefined);
+  };
+  if (requestAborted) handleRequestAbort();
+  else {
+    request.signal.addEventListener("abort", handleRequestAbort, { once: true });
+    abortListenerRegistered = true;
+  }
   try {
+    if (requestAborted) return invalidJsonBody();
     while (true) {
       const { done, value } = await reader.read();
+      if (requestAborted) return invalidJsonBody();
       if (done) break;
       bytesRead += value.byteLength;
       if (bytesRead > MAX_JSON_BODY_BYTES) {
@@ -79,6 +92,9 @@ async function readBodyWithinLimit(
   } catch {
     return invalidJsonBody();
   } finally {
+    if (abortListenerRegistered) {
+      request.signal.removeEventListener("abort", handleRequestAbort);
+    }
     reader.releaseLock();
   }
 }

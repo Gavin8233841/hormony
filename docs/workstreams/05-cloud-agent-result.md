@@ -372,3 +372,29 @@
 
 - **未验证**：多实例间全局限流一致性、线上代理是否提供可信 `req.ip`、真实 CDN/WAF 联合限流、当前分支线上发布。
 - 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Chat/Plan/Quiz 预算、Safety 行为、RAG、生产模型 ID、秘密或端侧状态。
+
+## 17. JSON 请求体取消收敛
+
+### 17.1 源码确认与行为
+
+- 所有 JSON API 共用 `readJsonObject`。旧 reader 只等待 `reader.read()`，不监听 `Request.signal`；客户端在发送完整 JSON 后不关闭 body、再中止请求时，handler 仍保持 pending，底层 ReadableStream 也未收到 cancel。
+- reader 现在注册一次 Request.signal abort listener。请求中止时主动 cancel 未结束 body，停止继续累计字节，并沿用既有无效 JSON 的 `400/BAD_REQUEST`，没有引入或猜测新的取消错误码。
+- 即使已接收的部分文本恰好可解析为完整对象，只要 Request 已中止也不会返回成功数据。正常完成、超限、读取异常和取消路径最终都移除 abort listener 并释放 reader lock。
+- 既有实际 UTF-8 256 KiB 上限、Content-Length 预检/伪小绕过防护、非对象 JSON 400 与超限 413 契约保持不变；该修复同时覆盖 Chat、Plan、Quiz、Knowledge、Safety 和所有其他 JSON 路由的请求读取阶段。
+
+### 17.2 委派与反例
+
+- 子 agent `safety_review_counterexample` 在 Safety 结构边界无新增缺口后，转为只新增共享 reader 取消反例。修复前目标测试 exit 1、2/2 失败：Abort 后 20 个微任务仍 pending，底层 cancel 未调用；正常读取没有注册 listener，因此也无法证明清理。
+- 修复后测试确认底层 cancel 恰好一次，解析及时收敛为 `400/BAD_REQUEST`；正常 JSON 成功后 remove 使用与 add 相同的 abort listener。
+- 定向联合：`pnpm exec vitest run src/lib/request-json-cancellation.test.ts src/lib/request-json.test.ts src/app/api/request-validation.test.ts` exit 0，3 个测试文件、115 项通过。
+
+### 17.3 验证
+
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，33 个测试文件、375 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面、全部 dynamic API route 与 26.9 kB middleware 的生产构建。
+- 本地 production 黑盒：`127.0.0.1:4326`，无模型秘密、stateless/off；有效 Safety Review 为 HTTP 200、`passed=true`、`hallucinationRisk=low`、flags 为空；顶层数组为 HTTP 400、`BAD_REQUEST`。PID 58484 已停止，端口已关闭。
+
+### 17.4 未验证
+
+- **未验证**：真实反向代理/Node socket 半包断连是否在当前 Next 14 适配层触发 Request.signal、线上断流后的连接释放、当前分支线上发布。自定义 WHATWG stream 证据只记为路由实现回归，不冒充网络层通过。
+- 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Safety 规则、RAG、生产模型 ID、秘密或端侧状态。
