@@ -7465,3 +7465,38 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 本轮未在模拟器执行“切换课程 -> 前后台 -> 返回保持”或“Practice 写回 -> 返回星图刷新”的完整流程；当前 HDC 连接不等于该业务流程通过。
 - Achievements 返回刷新、长期掌握里程碑前置、读屏实际播报、系统字体放大、横屏、平板、真机和正式签名 HAP 未验证。
 - 本批未修改 Repository/schema、课程事实、题库、用户保留的 `lesson-experiences.json`、模型或秘密。
+
+---
+
+## 2026-07-18 [MAIN+WS03] System V 与 POSIX 消息队列语义一致性
+
+背景：WS03 `d183737` 正确修订了 `cs102_q54`，但主线只读复核发现 `cs102_k45` 和主动学习规格仍把所有消息队列泛化为“按类型接收、支持优先级、内核链表”，与题目对 System V/POSIX 的区分直接矛盾；原目标测试也只比较部分字段并允许关键词误绿。主线在融合时补齐内容链和独立契约，提交为 `c918402`。
+
+文件：
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `docs/ACTIVE-LEARNING-SPEC-CS102.md`
+- `scripts/test_cs102_message_queue_quiz_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- q54 明确限定 System V：`msgtyp=0` 取队首，正值取指定类型首条，负值取不大于绝对值的最低类型首条；解释同时区分 POSIX `mq_receive()` 的最高优先级与同优先级 FIFO。
+- k45 的 Web/端侧正文同步为同一套可审计表述，并明确标准不要求链表等统一内部实现；来源改为精确的 POSIX.1-2024 接口集合。
+- 主动学习规格的知识摘要和邮件类比不再把 POSIX 描述成按消息类型接收。生成产物 `lesson-experiences.json` 当前由 WS09/用户修改占用，主线未覆盖；已向 WS09 发出从真实规格源受控再生成的同步请求。
+- 目标契约只解析真实 `cs102Quizzes` 与 `cs102KnowledgeChunks` 导出，剥离注释，固定 q54 完整文案和端侧元数据、k45 双端五字段、规格关键句、两套选择器及相反语义负例。
+
+验证：
+- `python -B scripts/test_cs102_message_queue_quiz_facts.py`：exit 0，11/11 通过。
+- `python -B scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识切片、165 道题、33 份学习体验的结构与路由门禁全部通过。
+- `cd apps/web; pnpm lint`、`pnpm typecheck`：exit 0；`pnpm test`：exit 0，36 个文件、437/437 通过。
+- `cd apps/web; pnpm build`：exit 0，Next.js 14.2.18 生产构建通过，10/10 静态页面与 26.8 kB middleware 进入产物。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`：exit 0，API 12 `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，`BUILD SUCCESSFUL in 37 s 635 ms`；未配置签名。
+- `hdc list targets -v`：exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+
+失败或未验证：
+- HDC 已连接但本批未在共享设备打开 q54/k45；端侧长解释换行、读屏、答题流程、横屏、平板、真机和线上 API 未验证。
+- 当前受保护的 `lesson-experiences.json` 仍含旧的统一“按类型筛选”类比；在 WS09 受控生成提交融合前，不能宣称 IPC Lesson 文案已同步。
+- Alibaba provider 的已知 `403 AllocationQuota.FreeTierOnly` 与 `deveco/glm-5` 的已知 `401 Token refresh failed` 均未重试，也未回落到 `openai/*`。
