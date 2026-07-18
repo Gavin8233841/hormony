@@ -7575,3 +7575,33 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - CS101 ACTIVE 规格与 Lesson 明确采用线性探测，不与本批单侧二次探测矛盾；受保护 `lesson-experiences.json` 未修改或暂存。
 - HDC 已连接但本批未打开 q53；Unicode 公式、箭头、长解释、读屏、答题流程、横屏、平板、真机、正式签名与线上 API 未验证。
 - 已知失败的模型 Provider 未重试，也未回落到 `openai/*`。
+
+---
+
+## 2026-07-18 [MAIN+WS04] 同路由主动入口重建消费页
+
+背景：通知或服务卡片再次指向当前子页面时，旧实现会把“已经位于该路由”直接视为回流成功并消费入口，页面实例仍保留旧课程、Topic 与动作。主线逐文件采用 WS04 `196d938`，并补强旧 Promise 与新入口并发、重复失败重试两类契约后融合为 `62128a0`。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Index.ets`
+- `scripts/test-proactive-delivery-contracts.mjs`
+- `docs/workstreams/04-proactive-harmony-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- 当前子页与主动目标相同时也执行 API 12 `Router.replaceUrl()`，由页面重建重新消费精确课程、Topic 与动作；只有导航 Promise 成功后才清除入口。
+- 导航失败保留目标并按同一 launch version 只安排一次重试；旧导航 Promise 完成时若已有更新入口，不会消费新目标，而是释放导航锁并调度最新版本。
+- 主线结果文档使用当前实际存在的六个 WS04 Node 脚本口径，不沿用含主线不存在脚本的支线 74/74 结论。
+
+验证：
+- API 12 SDK `@ohos.arkui.UIContext.d.ts`：源码确认 `Router.replaceUrl()` 销毁当前页并返回 `Promise<void>`。
+- 六个 WS04 Node 契约脚本合并执行：exit 0，66/66；其中主动触达契约 25/25。
+- `python -B -m unittest scripts.test_learning_map_navigation_contract scripts.test_validate_topic_relations -v`：exit 0，13/13。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`：exit 0，API 12 HAP 构建通过，`BUILD SUCCESSFUL in 7 s 980 ms`；未配置正式签名。
+- `hdc list targets -v`：exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+
+失败或未验证：
+- WS04 支线 PID 18915、UI 树与 1256 x 2760 截图证明支线 HAP 的合法 Want 同路由重建；本批没有把该记录表述为主线重新安装后的设备验收。
+- 主线通知面板实际点击、服务卡片桌面点击、屏幕阅读器与字体放大、正式签名、真机完整学习回流仍未验证。
+- `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包和本地证据均未修改或暂存。
+- 已知失败的 Alibaba/DevEco Provider 未重试，也未回落到 `openai/*`。
