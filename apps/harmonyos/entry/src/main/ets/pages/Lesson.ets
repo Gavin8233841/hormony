@@ -508,6 +508,7 @@ struct LessonPage {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'LessonPage focused quiz navigation failed: %{public}s', error.message);
+      this.message = '同标签测验打开失败，请重试';
     });
   }
 
@@ -547,6 +548,7 @@ struct LessonPage {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'LessonPage Practice navigation failed: %{public}s', error.message);
+      this.message = '本节进度已保存，但主题练习打开失败，请重试';
     });
   }
 
