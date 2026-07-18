@@ -357,7 +357,10 @@ export class QuizLearningStateReducer {
     item.correctQuestions += result.correctCount;
     item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
     item.mastered = QuizLearningStateReducer.isTopicMastered(item.correctQuestions, item.totalQuestions);
-    item.lastPracticedAt = result.submittedAt;
+    if (item.lastPracticedAt === undefined ||
+      !QuizLearningStateReducer.isEarlierThanStored(result.submittedAt, item.lastPracticedAt)) {
+      item.lastPracticedAt = result.submittedAt;
+    }
     return item;
   }
 
@@ -379,6 +382,12 @@ export class QuizLearningStateReducer {
   private static applyReviewItems(state: QuizLearningState, result: QuizResult): void {
     for (const detail of result.details) {
       const existingIndex = QuizLearningStateReducer.reviewIndex(state.reviewItems, result, detail);
+      const storedItem = existingIndex >= 0 ? state.reviewItems[existingIndex] : undefined;
+      if (storedItem !== undefined &&
+        QuizLearningStateReducer.isEarlierThanStored(result.submittedAt, storedItem.updatedAt)) {
+        storedItem.attempts += 1;
+        continue;
+      }
       if (detail.isCorrect) {
         if (existingIndex >= 0) {
           const previous = state.reviewItems[existingIndex];
@@ -487,6 +496,12 @@ export class QuizLearningStateReducer {
     return new Date(submittedAt).getTime() >= nextReviewTime;
   }
 
+  private static isEarlierThanStored(submittedAt: string, storedAt: string): boolean {
+    const storedTime = new Date(storedAt).getTime();
+    if (Number.isNaN(storedTime)) return false;
+    return new Date(submittedAt).getTime() < storedTime;
+  }
+
   private static applyTagInsights(insights: TagInsight[], result: QuizResult): void {
     for (const detail of result.details) {
       const seenTags: string[] = [];
@@ -509,8 +524,10 @@ export class QuizLearningStateReducer {
         else item.mediumQuestions += 1;
         item.wrongQuestions = item.totalQuestions - item.correctQuestions;
         item.accuracy = item.totalQuestions > 0 ? item.correctQuestions / item.totalQuestions : 0;
-        item.lastPracticedAt = result.submittedAt;
-        item.lastDifficulty = difficulty;
+        if (!QuizLearningStateReducer.isEarlierThanStored(result.submittedAt, item.lastPracticedAt)) {
+          item.lastPracticedAt = result.submittedAt;
+          item.lastDifficulty = difficulty;
+        }
         item.masteryPoints = QuizLearningStateReducer.tagMasteryPoints(item);
         item.masteryLevel = QuizLearningStateReducer.tagMasteryLevel(item.masteryPoints);
         item.weakReason = QuizLearningStateReducer.tagWeakReason(item);

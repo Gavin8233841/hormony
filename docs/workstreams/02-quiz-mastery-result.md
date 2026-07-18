@@ -246,3 +246,26 @@
 - **未验证**：本批不修改或清除模拟器用户数据库，schema 8/10 第二键写失败后的统计不重复由可执行 ArkData 故障注入 fixture 验证，未在模拟器内破坏真实迁移过程。
 - **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；按主线程约束未重试当前不可用的 DevEco Agent 模型。
 - **未验证**：项目未配置生产签名，真机与多设备未验证。
+
+## 批次 8：失败重试的乱序写回保护
+
+### 背景与行为变化
+
+- 答题首次 pending 写入失败时，结果尚未进入 ArkData outbox；另一页面可先成功写入时间更晚的复习结果，旧页面随后沿用冻结的 `submittedAt` 重试。旧 reducer 虽能正确累计两次事实，却无条件用迟到旧结果覆盖 Topic/标签最近时间，并把已经推进到 3 天的错题重新设为 1 天，造成错题立即到期、题面和难度回退。
+- Topic 掌握与标签洞察继续累计所有已验证结果，但 `lastPracticedAt`、`lastDifficulty` 只接受不早于当前快照的时间。错题收到早于当前 `updatedAt` 的结果时只增加复习尝试次数，不覆盖较新的题面、答案、解析、难度、解决状态、间隔和下次复习时间。
+- 时间比较使用可解析的持久时间；旧记录时间无效时不阻止合法新结果覆盖，保留原有无效复习时间恢复路径。
+- 动态 Repository fixture 覆盖“初始错题 -> 旧提交首次写失败 -> 较新正确复习成功 -> 旧提交重试”完整序列。累计保持 3 次、3 题、1 题正确，复习项保持较新题面、3 天间隔与 `2026-07-05T08:00:00.000Z`，Topic 和标签最近时间保持 `2026-07-02T08:00:00.000Z`。修复前同一用例稳定回退到旧题面、hard 难度、1 天间隔及 `2026-07-02T07:00:00.000Z`。
+
+### 验证
+
+- **静态诊断通过**：`cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`，exit 0，`61/61` 通过；新增首次 outbox 写失败、跨页面较新提交和旧结果重试的动态反例。
+- **静态诊断通过**：`cd apps/web; pnpm lint`、`pnpm typecheck`，exit 0；`pnpm test` 为 28 个文件、`438/438` 通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建完成。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon`，exit 0，CompileArkTS 与 PackageHap 完成，`BUILD SUCCESSFUL in 26 s 830 ms`；项目未配置 `signingConfigs`，构建跳过签名。
+- **模拟器通过**：目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。最新 `entry-default-unsigned.hap` 返回 `install bundle successfully`，`com.c4ai.hormony/EntryAbility` 返回 `start ability successfully`；UI 树为 `pages/Index`，根 bounds `[0,137][1256,2760]`。
+
+### 未验证
+
+- **未验证**：本批不修改或清除模拟器用户数据库，首次 outbox 写失败后的跨页面乱序提交由可执行 ArkData 故障注入 fixture 验证，未在模拟器 UI 中并发操纵两个答题页面。
+- **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；按主线程约束未重试当前不可用的 DevEco Agent 模型。
+- **未验证**：项目未配置生产签名，真机与多设备未验证。
