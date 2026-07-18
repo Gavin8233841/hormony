@@ -59,10 +59,10 @@ class ReleaseDependencyGateTests(unittest.TestCase):
         self.assertEqual([], test_errors)
         self.assertEqual([], errors)
         self.assertEqual(len(MODULE.REQUIRED_DIRECT_INCLUDE_PATHS), metrics.direct_files)
-        self.assertEqual(6, metrics.test_files)
-        self.assertEqual(6, metrics.runtime_edges)
-        self.assertEqual(6, metrics.test_edges)
-        self.assertEqual(6, metrics.plan_commands)
+        self.assertEqual(7, metrics.test_files)
+        self.assertEqual(11, metrics.runtime_edges)
+        self.assertEqual(7, metrics.test_edges)
+        self.assertEqual(7, metrics.plan_commands)
         self.assertEqual(MODULE.EXPECTED_RUNTIME_EDGES, runtime_edges)
         self.assertEqual(MODULE.EXPECTED_TEST_EDGES, test_edges)
 
@@ -74,6 +74,8 @@ class ReleaseDependencyGateTests(unittest.TestCase):
             "scripts/test_validate_release_evidence.py",
             "scripts/validate-official-deliverables.py",
             "scripts/test_validate_release_dependencies.py",
+            "scripts/validate-competition-release.py",
+            "scripts/test_validate_competition_release.py",
         )
         for required_path in required_examples:
             with self.subTest(required_path=required_path):
@@ -99,6 +101,42 @@ class ReleaseDependencyGateTests(unittest.TestCase):
 
         self.assertTrue(any("运行时依赖边不一致" in error for error in wrong_errors))
         self.assertTrue(any("缺少运行时依赖边" in error for error in missing_errors))
+
+    def test_release_preflight_must_reference_all_four_existing_gates(self) -> None:
+        expected = {
+            (
+                "scripts/validate-competition-release.py",
+                "DEPENDENCY_GATE_PATH",
+            ): "scripts/validate-release-dependencies.py",
+            (
+                "scripts/validate-competition-release.py",
+                "EVIDENCE_GATE_PATH",
+            ): "scripts/validate-competition-evidence.py",
+            (
+                "scripts/validate-competition-release.py",
+                "CONTENT_GATE_PATH",
+            ): "scripts/validate-competition-content.py",
+            (
+                "scripts/validate-competition-release.py",
+                "OFFICIAL_GATE_PATH",
+            ): "scripts/validate-official-deliverables.py",
+        }
+
+        self.assertLessEqual(expected.items(), MODULE.EXPECTED_RUNTIME_EDGES.items())
+
+    def test_release_bundle_must_bind_competition_plan_and_release_evidence(self) -> None:
+        expected = {
+            (
+                "scripts/validate-release-bundle.py",
+                "COMPETITION_GATE_PATH",
+            ): "scripts/validate-competition-evidence.py",
+            (
+                "scripts/validate-release-bundle.py",
+                "EVIDENCE_GATE_PATH",
+            ): "scripts/validate-release-evidence.py",
+        }
+
+        self.assertLessEqual(expected.items(), MODULE.EXPECTED_RUNTIME_EDGES.items())
 
     def test_required_file_must_be_tracked_in_git_index(self) -> None:
         tracked = tracked_required_files()

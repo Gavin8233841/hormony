@@ -196,6 +196,108 @@ class CompetitionEvidenceGateTests(unittest.TestCase):
         self.assertTrue(any("必须包含 2 张图" in error for error in errors))
         self.assertTrue(any("缺少图 2" in error for error in errors))
 
+    def test_figure_state_can_migrate_only_with_bound_evidence(self) -> None:
+        unverified = (
+            "- 证据状态：`level=未验证; evidenceId=golden-demo; "
+            "artifact=none; gap=需在最终 HAP 和固定设备环境采集`。"
+        )
+        passed = (
+            "- 证据状态：`level=模拟器通过; evidenceId=golden-demo; "
+            "artifact=evidence/artifacts/figure-1.png; gap=none`。"
+        )
+        self.assertIn(unverified, current_plan())
+
+        transitioned = current_plan().replace(unverified, passed, 1)
+        _, transitioned_errors = MODULE.validate_plan(transitioned)
+        self.assertEqual([], transitioned_errors)
+
+        missing_artifact = transitioned.replace(
+            "artifact=evidence/artifacts/figure-1.png",
+            "artifact=none",
+            1,
+        )
+        _, artifact_errors = MODULE.validate_plan(missing_artifact)
+        self.assertTrue(any("通过状态必须绑定" in error for error in artifact_errors))
+
+        stale = transitioned.replace(
+            passed,
+            passed + "\n- 当前状态：**未验证**。",
+            1,
+        )
+        _, stale_errors = MODULE.validate_plan(stale)
+        self.assertTrue(any("过期未验证文本" in error for error in stale_errors))
+
+        missing_gap = current_plan().replace(
+            "gap=需在最终 HAP 和固定设备环境采集",
+            "gap=none",
+            1,
+        )
+        _, gap_errors = MODULE.validate_plan(missing_gap)
+        self.assertTrue(any("未验证状态必须列出缺口" in error for error in gap_errors))
+
+    def test_d02_requires_user_created_reminder_and_card_sync(self) -> None:
+        plan = current_plan()
+        d02_line = next(
+            line for line in plan.splitlines() if line.startswith("| D02-proactive-service |")
+        )
+        self.assertIn("用户手动创建系统学习提醒", d02_line)
+        self.assertIn("同步服务卡片", d02_line)
+
+        false_claim = plan.replace(
+            d02_line,
+            d02_line.replace(
+                "用户手动创建系统学习提醒",
+                "系统定时主动触达",
+                1,
+            ),
+            1,
+        )
+        _, errors = MODULE.validate_plan(false_claim)
+        self.assertTrue(any("D02" in error and "业务证据锚点" in error for error in errors))
+        self.assertTrue(any("失实主动提醒口径" in error for error in errors))
+
+        semantic_bypass = plan.replace(
+            "本地计划只按明确操作同步，不扩写为后台自主服务",
+            "本地计划只按明确操作同步，不扩写为后台自主服务；"
+            "系统无需用户操作自主安排新的学习任务",
+            1,
+        )
+        _, bypass_errors = MODULE.validate_plan(semantic_bypass)
+        self.assertTrue(
+            any("D02" in error and "精确手动提醒口径" in error for error in bypass_errors)
+        )
+
+        moved_bypass = replace_blockquote(
+            plan,
+            "### 1. 一句话创新点",
+            "鸿学伴串联真实学习闭环，系统无需用户操作自主安排新的学习任务。",
+        )
+        _, moved_errors = MODULE.validate_plan(moved_bypass)
+        self.assertTrue(any("无需用户操作" in error for error in moved_errors))
+
+    def test_official_pdf_fingerprints_pages_and_clause_sources_are_bound(self) -> None:
+        sources, errors = MODULE.validate_official_sources(current_plan())
+        self.assertEqual([], errors)
+        self.assertEqual(2, len(sources))
+        self.assertEqual({11, 12}, {source.pages for source in sources})
+
+        first = MODULE.OFFICIAL_PDF_SOURCES[0]
+        wrong_hash = current_plan().replace(first.sha256.upper(), "0" * 64, 1)
+        _, hash_errors = MODULE.validate_plan(wrong_hash)
+        self.assertTrue(any("文档缺少精确 SHA-256" in error for error in hash_errors))
+
+        wrong_pages = current_plan().replace("共 11 页", "共 10 页", 1)
+        _, page_errors = MODULE.validate_plan(wrong_pages)
+        self.assertTrue(any("文档缺少精确页数" in error for error in page_errors))
+
+        missing_clause = current_plan().replace(
+            "视频 5 分钟内完整展示核心功能",
+            "视频需展示核心功能",
+            1,
+        )
+        _, clause_errors = MODULE.validate_plan(missing_clause)
+        self.assertTrue(any("缺少可复核条款摘录" in error for error in clause_errors))
+
     def test_disallowed_old_claims_fail_only_when_used_in_formal_narrative(self) -> None:
         plan = current_plan()
         _, baseline_errors = MODULE.validate_plan(plan)

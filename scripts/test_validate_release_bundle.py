@@ -6,6 +6,7 @@ import struct
 import unittest
 import warnings
 import zipfile
+import zlib
 from pathlib import Path
 from unittest import mock
 
@@ -17,6 +18,56 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 SOURCE_COMMIT = "a" * 40
+
+
+def png_bytes(width: int = 2, height: int = 2) -> bytes:
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        checksum = zlib.crc32(kind + payload) & 0xFFFFFFFF
+        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", checksum)
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    rows = b"".join(b"\x00" + (b"\x00\x00\x00\xff" * width) for _ in range(height))
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(
+        b"IDAT", zlib.compress(rows)
+    ) + chunk(b"IEND", b"")
+
+
+def ui_tree_bytes() -> bytes:
+    return json.dumps(
+        {
+            "attributes": {
+                "visible": "true",
+                "pagePath": "pages/Index",
+                "bounds": "[0,0][1260,2720]",
+            },
+            "children": [
+                {
+                    "attributes": {
+                        "visible": "true",
+                        "text": "固定输入页面",
+                        "bounds": "[10,10][200,100]",
+                    },
+                    "children": [],
+                }
+            ],
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def mp4_bytes() -> bytes:
+    def box(kind: bytes, payload: bytes) -> bytes:
+        return struct.pack(">I4s", len(payload) + 8, kind) + payload
+
+    handler = b"\x00\x00\x00\x00" + b"\x00\x00\x00\x00" + b"vide" + (b"\x00" * 12)
+    mdia = box(b"mdia", box(b"hdlr", handler))
+    moov = box(b"moov", box(b"trak", mdia))
+    ftyp = box(b"ftyp", b"isom" + (b"\x00" * 4) + b"isommp42")
+    return ftyp + moov + box(b"mdat", b"\x00")
+
+
+def fixed_media_probe(_path: str, _kind: str, _content: bytes) -> list[str]:
+    return []
 
 
 def zip_bytes(
@@ -161,6 +212,7 @@ def complete_fixture(
         "README.md": b"source readme\n",
         MODULE.CONTENT_GATE.SUBMISSION_MANIFEST: b"source manifest\n",
         MODULE.CONTENT_GATE.COMPETITION_NOTICE: b"reviewed notice\n",
+        MODULE.COMPETITION_PLAN_PATH: MODULE.COMPETITION_GATE.DEFAULT_PLAN_PATH.read_bytes(),
     }
     resolved_hap = hap if hap is not None else zip_bytes([("module.json", b"{}")])
     attachments = {
@@ -216,9 +268,199 @@ def with_attachment(
     return with_document(result, document)
 
 
+def with_static_evidence_artifact(
+    entries: dict[str, bytes],
+    document: dict[str, object],
+    *,
+    path: str = "evidence/artifacts/source-check.txt",
+    content: bytes = b"fixed diagnostic evidence; not product runtime evidence",
+    referenced: bool = True,
+) -> dict[str, bytes]:
+    result = dict(entries)
+    records = document["nonGitFiles"]
+    assert isinstance(records, list)
+    records.append(file_record(path, MODULE.EVIDENCE_ARTIFACT_ROLE, content))
+    result[path] = content
+
+    evidence_record = next(
+        item for item in records if item["role"] == "release-evidence-index"
+    )
+    evidence_document = json.loads(result[evidence_record["path"]])
+    if referenced:
+        source_record = next(
+            item
+            for item in evidence_document["records"]
+            if item["id"] == "source-package"
+        )
+        source_record["level"] = "静态诊断通过"
+        source_record["command"] = ["python", "-B", "scripts/validate-competition-content.py"]
+        source_record["exitCode"] = 0
+        source_record["environment"] = {
+            "os": "Windows 11",
+            "tool": "python",
+            "toolVersion": "3.12",
+        }
+        source_record["artifacts"] = [
+            {
+                "path": path,
+                "kind": "diagnostic",
+                "bytes": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+        ]
+    evidence_content = json.dumps(
+        evidence_document,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    result[evidence_record["path"]] = evidence_content
+    evidence_record["bytes"] = len(evidence_content)
+    evidence_record["sha256"] = hashlib.sha256(evidence_content).hexdigest()
+    return with_document(result, document)
+
+
+def with_verified_golden_demo(
+    entries: dict[str, bytes],
+    sources: dict[str, bytes],
+    document: dict[str, object],
+) -> tuple[dict[str, bytes], dict[str, bytes]]:
+    result = dict(entries)
+    expected_sources = dict(sources)
+    figure_paths = (
+        "evidence/artifacts/figure-1.png",
+        "evidence/artifacts/figure-2.png",
+    )
+    supporting_artifacts = (
+        (figure_paths[0], "screenshot", png_bytes()),
+        (figure_paths[1], "screenshot", png_bytes(3, 2)),
+        ("evidence/artifacts/golden-demo-ui-tree.json", "ui-tree", ui_tree_bytes()),
+        ("evidence/artifacts/golden-demo.mp4", "video", mp4_bytes()),
+    )
+
+    plan_lines = result[MODULE.COMPETITION_PLAN_PATH].decode("utf-8").splitlines()
+    state_indexes = [
+        index
+        for index, line in enumerate(plan_lines)
+        if line.startswith("- 证据状态：")
+    ]
+    assert len(state_indexes) == 2
+    for figure_index, state_index in enumerate(state_indexes):
+        plan_lines[state_index] = (
+            "- 证据状态：`level=模拟器通过; evidenceId=golden-demo; "
+            f"artifact={figure_paths[figure_index]}; gap=none`。"
+        )
+    plan_content = ("\n".join(plan_lines) + "\n").encode("utf-8")
+    result[MODULE.COMPETITION_PLAN_PATH] = plan_content
+    expected_sources[MODULE.COMPETITION_PLAN_PATH] = plan_content
+
+    manifest_records = document["nonGitFiles"]
+    assert isinstance(manifest_records, list)
+    for path, _, content in supporting_artifacts:
+        result[path] = content
+        manifest_records.append(
+            file_record(path, MODULE.EVIDENCE_ARTIFACT_ROLE, content)
+        )
+
+    evidence_record = next(
+        item
+        for item in manifest_records
+        if item["role"] == "release-evidence-index"
+    )
+    evidence_document = json.loads(result[evidence_record["path"]])
+    demo = next(
+        item
+        for item in evidence_document["records"]
+        if item["id"] == "golden-demo"
+    )
+    demo["level"] = "模拟器通过"
+    demo["command"] = ["hdc", "shell", "uitest", "dumpLayout"]
+    demo["exitCode"] = 0
+    demo["environment"] = {
+        "device": "fixed-emulator",
+        "systemVersion": "HarmonyOS 5.0.0",
+        "orientation": "portrait",
+        "resolution": {"widthPx": 1260, "heightPx": 2720},
+    }
+    demo["artifacts"] = [
+        {
+            "path": path,
+            "kind": kind,
+            "bytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        }
+        for path, kind, content in supporting_artifacts
+    ]
+    video_path = supporting_artifacts[-1][0]
+    demo["businessChecks"] = [
+        {
+            "id": check_id,
+            "passed": True,
+            "actual": True,
+            "artifactPath": video_path,
+        }
+        for check_id in sorted(MODULE.EVIDENCE_GATE.GOLDEN_DEMO_CHECK_IDS)
+    ]
+    evidence_content = json.dumps(
+        evidence_document,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    result[evidence_record["path"]] = evidence_content
+    evidence_record["bytes"] = len(evidence_content)
+    evidence_record["sha256"] = hashlib.sha256(evidence_content).hexdigest()
+    return with_document(result, document), expected_sources
+
+
+def replace_evidence_artifact(
+    entries: dict[str, bytes],
+    path: str,
+    content: bytes,
+) -> dict[str, bytes]:
+    result = dict(entries)
+    manifest = json.loads(result[MODULE.RELEASE_MANIFEST_PATH])
+    manifest_records = manifest["nonGitFiles"]
+    artifact_record = next(item for item in manifest_records if item["path"] == path)
+    result[path] = content
+    artifact_record["bytes"] = len(content)
+    artifact_record["sha256"] = hashlib.sha256(content).hexdigest()
+
+    evidence_record = next(
+        item
+        for item in manifest_records
+        if item["role"] == "release-evidence-index"
+    )
+    evidence_document = json.loads(result[evidence_record["path"]])
+    artifact_metadata = next(
+        artifact
+        for record in evidence_document["records"]
+        for artifact in record["artifacts"]
+        if artifact["path"] == path
+    )
+    artifact_metadata["bytes"] = len(content)
+    artifact_metadata["sha256"] = hashlib.sha256(content).hexdigest()
+    evidence_content = json.dumps(
+        evidence_document,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    result[evidence_record["path"]] = evidence_content
+    evidence_record["bytes"] = len(evidence_content)
+    evidence_record["sha256"] = hashlib.sha256(evidence_content).hexdigest()
+    result[MODULE.RELEASE_MANIFEST_PATH] = json.dumps(
+        manifest,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return result
+
+
 class ReleaseBundleGateTests(unittest.TestCase):
     def check(self, entries: dict[str, bytes], sources: dict[str, bytes]) -> list[str]:
-        return MODULE.check_release_bundle_entries(entries, sources, SOURCE_COMMIT)
+        return MODULE.check_release_bundle_entries(
+            entries,
+            sources,
+            SOURCE_COMMIT,
+            fixed_media_probe,
+        )
 
     def test_schema_identifiers_and_complete_fixture_are_exact(self) -> None:
         entries, sources, _ = complete_fixture()
@@ -242,6 +484,348 @@ class ReleaseBundleGateTests(unittest.TestCase):
             MODULE.REQUIRED_NON_GIT_ROLES,
         )
         self.assertEqual([], errors)
+
+    def test_controlled_evidence_artifact_and_reference_closure(self) -> None:
+        entries, sources, document = complete_fixture()
+        valid = with_static_evidence_artifact(entries, document)
+
+        self.assertEqual([], self.check(valid, sources))
+        self.assertIn(MODULE.EVIDENCE_ARTIFACT_ROLE, MODULE.ALLOWED_NON_GIT_ROLES)
+
+        unreferenced_entries, unreferenced_sources, unreferenced_document = complete_fixture()
+        unreferenced = with_static_evidence_artifact(
+            unreferenced_entries,
+            unreferenced_document,
+            referenced=False,
+        )
+        unreferenced_errors = self.check(unreferenced, unreferenced_sources)
+        self.assertTrue(
+            any("未被任何发布证据 ID 引用" in error for error in unreferenced_errors)
+        )
+
+    def test_figure_states_bind_to_golden_demo_level_and_artifacts(self) -> None:
+        entries, sources, document = complete_fixture()
+        valid, valid_sources = with_verified_golden_demo(entries, sources, document)
+
+        self.assertEqual([], self.check(valid, valid_sources))
+
+        manifest = json.loads(valid[MODULE.RELEASE_MANIFEST_PATH])
+        evidence_record = next(
+            item
+            for item in manifest["nonGitFiles"]
+            if item["role"] == "release-evidence-index"
+        )
+        evidence_document = json.loads(valid[evidence_record["path"]])
+        demo = next(
+            item
+            for item in evidence_document["records"]
+            if item["id"] == "golden-demo"
+        )
+        demo["artifacts"] = [
+            artifact
+            for artifact in demo["artifacts"]
+            if artifact["path"] != "evidence/artifacts/figure-1.png"
+        ]
+        missing_content = json.dumps(
+            evidence_document,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        missing = dict(valid)
+        missing[evidence_record["path"]] = missing_content
+        evidence_record["bytes"] = len(missing_content)
+        evidence_record["sha256"] = hashlib.sha256(missing_content).hexdigest()
+        missing[MODULE.RELEASE_MANIFEST_PATH] = json.dumps(
+            manifest,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        missing_errors = self.check(missing, valid_sources)
+        self.assertTrue(
+            any("figure-1 图片未被 golden-demo artifacts 引用" in error for error in missing_errors)
+        )
+
+        stale = dict(valid)
+        stale_sources = dict(valid_sources)
+        unverified_plan = MODULE.COMPETITION_GATE.DEFAULT_PLAN_PATH.read_bytes()
+        stale[MODULE.COMPETITION_PLAN_PATH] = unverified_plan
+        stale_sources[MODULE.COMPETITION_PLAN_PATH] = unverified_plan
+        stale_errors = self.check(stale, stale_sources)
+        self.assertTrue(
+            any("仍为未验证" in error and "必须迁移状态" in error for error in stale_errors)
+        )
+
+        mismatched = dict(valid)
+        mismatched_sources = dict(valid_sources)
+        mismatched_plan = valid[MODULE.COMPETITION_PLAN_PATH].decode("utf-8").replace(
+            "level=模拟器通过",
+            "level=真机通过",
+            1,
+        ).encode("utf-8")
+        mismatched[MODULE.COMPETITION_PLAN_PATH] = mismatched_plan
+        mismatched_sources[MODULE.COMPETITION_PLAN_PATH] = mismatched_plan
+        mismatch_errors = self.check(mismatched, mismatched_sources)
+        self.assertTrue(
+            any("真机通过" in error and "模拟器通过" in error for error in mismatch_errors)
+        )
+
+    def test_golden_demo_rejects_fake_image_ui_tree_and_video_bytes(self) -> None:
+        entries, sources, document = complete_fixture()
+        valid, valid_sources = with_verified_golden_demo(entries, sources, document)
+        fake = valid
+        replacements = {
+            "evidence/artifacts/figure-1.png": b"not a PNG",
+            "evidence/artifacts/figure-2.png": b"still not a PNG",
+            "evidence/artifacts/golden-demo-ui-tree.json": b"not a UI tree",
+            "evidence/artifacts/golden-demo.mp4": b"not an MP4",
+        }
+        for path, content in replacements.items():
+            fake = replace_evidence_artifact(fake, path, content)
+
+        output = "\n".join(self.check(fake, valid_sources))
+
+        self.assertIn("PNG 结构无效", output)
+        self.assertIn("UI tree JSON 结构无效", output)
+        self.assertIn("MP4 结构无效", output)
+
+    def test_device_pass_requires_external_media_decoder(self) -> None:
+        entries, sources, document = complete_fixture()
+        valid, valid_sources = with_verified_golden_demo(entries, sources, document)
+
+        errors = MODULE.check_release_bundle_entries(
+            valid,
+            valid_sources,
+            SOURCE_COMMIT,
+        )
+
+        self.assertTrue(any("必须提供外部 ffprobe" in error for error in errors))
+
+    def test_weak_png_and_empty_ui_tree_do_not_pass_structural_validation(self) -> None:
+        def chunk(kind: bytes, payload: bytes) -> bytes:
+            checksum = zlib.crc32(kind + payload) & 0xFFFFFFFF
+            return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", checksum)
+
+        invalid_ihdr = struct.pack(">IIBBBBB", 1, 1, 0, 6, 0, 0, 0)
+        weak_png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", invalid_ihdr) + chunk(
+            b"IDAT", b""
+        ) + chunk(b"IEND", b"")
+        empty_tree = json.dumps(
+            {
+                "attributes": {
+                    "pagePath": "pages/Index",
+                    "bounds": "[0,0][1260,2720]",
+                },
+                "children": [],
+            }
+        ).encode("utf-8")
+
+        self.assertFalse(MODULE._png_structure_valid(weak_png))
+        self.assertFalse(MODULE._ui_tree_structure_valid(empty_tree))
+
+    def test_ffprobe_bytes_must_report_decoded_dimensions_and_duration(self) -> None:
+        image_output = json.dumps(
+            {
+                "streams": [
+                    {
+                        "codec_type": "video",
+                        "codec_name": "png",
+                        "width": 2,
+                        "height": 2,
+                        "nb_read_frames": "1",
+                    }
+                ],
+                "format": {"format_name": "png_pipe"},
+            }
+        ).encode("utf-8")
+        video_output = json.dumps(
+            {
+                "streams": [
+                    {
+                        "codec_type": "video",
+                        "codec_name": "h264",
+                        "width": 1260,
+                        "height": 2720,
+                        "nb_read_frames": "1425",
+                    }
+                ],
+                "format": {"format_name": "mov,mp4", "duration": "285.0"},
+            }
+        ).encode("utf-8")
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            side_effect=[
+                MODULE.subprocess.CompletedProcess([], 0, image_output, b""),
+                MODULE.subprocess.CompletedProcess([], 0, video_output, b""),
+            ],
+        ):
+            image_errors = MODULE._ffprobe_media_errors(
+                "evidence/artifacts/figure.png",
+                "screenshot",
+                png_bytes(),
+                Path("C:/tools/ffprobe.exe"),
+            )
+            video_errors = MODULE._ffprobe_media_errors(
+                "evidence/artifacts/demo.mp4",
+                "video",
+                mp4_bytes(),
+                Path("C:/tools/ffprobe.exe"),
+            )
+
+        self.assertEqual([], image_errors)
+        self.assertEqual([], video_errors)
+
+    def test_ffprobe_rejects_unavailable_decoded_frame_count(self) -> None:
+        unavailable_frame_output = json.dumps(
+            {
+                "streams": [
+                    {
+                        "codec_type": "video",
+                        "codec_name": "h264",
+                        "width": 1260,
+                        "height": 2720,
+                        "nb_read_frames": "N/A",
+                    }
+                ],
+                "format": {"format_name": "mov,mp4", "duration": "285.0"},
+            }
+        ).encode("utf-8")
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=MODULE.subprocess.CompletedProcess(
+                [],
+                0,
+                unavailable_frame_output,
+                b"",
+            ),
+        ):
+            errors = MODULE._ffprobe_media_errors(
+                "evidence/artifacts/demo.mp4",
+                "video",
+                mp4_bytes(),
+                Path("C:/tools/ffprobe.exe"),
+            )
+
+        self.assertEqual(["黄金演示媒体未解码出正帧数"], errors)
+
+    def test_ffprobe_rejects_nonempty_stderr_with_valid_metadata(self) -> None:
+        valid_output = json.dumps(
+            {
+                "streams": [
+                    {
+                        "codec_type": "video",
+                        "codec_name": "h264",
+                        "width": 1260,
+                        "height": 2720,
+                        "nb_read_frames": "1425",
+                    }
+                ],
+                "format": {"format_name": "mov,mp4", "duration": "285.0"},
+            }
+        ).encode("utf-8")
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=MODULE.subprocess.CompletedProcess(
+                [],
+                0,
+                valid_output,
+                b"decoder warning",
+            ),
+        ):
+            errors = MODULE._ffprobe_media_errors(
+                "evidence/artifacts/demo.mp4",
+                "video",
+                mp4_bytes(),
+                Path("C:/tools/ffprobe.exe"),
+            )
+
+        self.assertEqual(["黄金演示媒体 ffprobe 解码报告错误"], errors)
+
+    def test_evidence_artifact_prefix_count_and_size_limits(self) -> None:
+        _, _, outside_document = complete_fixture()
+        outside_records = outside_document["nonGitFiles"]
+        outside_records.append(
+            file_record("release/evidence.log", MODULE.EVIDENCE_ARTIFACT_ROLE, b"x")
+        )
+        _, outside_errors = MODULE.parse_release_manifest(
+            json.dumps(outside_document).encode("utf-8")
+        )
+        self.assertTrue(any("必须位于 evidence/artifacts/" in error for error in outside_errors))
+
+        _, _, size_document = complete_fixture()
+        size_records = size_document["nonGitFiles"]
+        for index in range(5):
+            size_records.append(
+                {
+                    "path": f"evidence/artifacts/large-{index}.mp4",
+                    "role": MODULE.EVIDENCE_ARTIFACT_ROLE,
+                    "bytes": MODULE.MAX_EVIDENCE_ARTIFACT_BYTES,
+                    "sha256": "0" * 64,
+                }
+            )
+        size_records[-1]["bytes"] = MODULE.MAX_EVIDENCE_ARTIFACT_BYTES + 1
+        _, size_errors = MODULE.parse_release_manifest(
+            json.dumps(size_document).encode("utf-8")
+        )
+        size_output = "\n".join(size_errors)
+        self.assertIn("单项大小超过", size_output)
+        self.assertIn("总大小超过", size_output)
+
+        _, _, count_document = complete_fixture()
+        count_records = count_document["nonGitFiles"]
+        for index in range(MODULE.MAX_EVIDENCE_ARTIFACTS + 1):
+            count_records.append(
+                {
+                    "path": f"evidence/artifacts/item-{index}.txt",
+                    "role": MODULE.EVIDENCE_ARTIFACT_ROLE,
+                    "bytes": 1,
+                    "sha256": "0" * 64,
+                }
+            )
+        _, count_errors = MODULE.parse_release_manifest(
+            json.dumps(count_document).encode("utf-8")
+        )
+        self.assertTrue(any("项数超过内部上限" in error for error in count_errors))
+
+    def test_git_source_cannot_masquerade_as_diagnostic_evidence(self) -> None:
+        entries, sources, document = complete_fixture()
+        records = document["nonGitFiles"]
+        evidence_record = next(
+            item for item in records if item["role"] == "release-evidence-index"
+        )
+        evidence_document = json.loads(entries[evidence_record["path"]])
+        source_record = next(
+            item for item in evidence_document["records"] if item["id"] == "source-package"
+        )
+        source_record["level"] = "静态诊断通过"
+        source_record["command"] = ["python", "-B", "scripts/validate-competition-content.py"]
+        source_record["exitCode"] = 0
+        source_record["environment"] = {
+            "os": "Windows 11",
+            "tool": "python",
+            "toolVersion": "3.12",
+        }
+        source_record["artifacts"] = [
+            {
+                "path": "README.md",
+                "kind": "diagnostic",
+                "bytes": len(entries["README.md"]),
+                "sha256": hashlib.sha256(entries["README.md"]).hexdigest(),
+            }
+        ]
+        evidence_content = json.dumps(
+            evidence_document,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        entries[evidence_record["path"]] = evidence_content
+        evidence_record["bytes"] = len(evidence_content)
+        evidence_record["sha256"] = hashlib.sha256(evidence_content).hexdigest()
+
+        errors = self.check(with_document(entries, document), sources)
+
+        self.assertTrue(any("运行证据不得来自 Git 源文件" in error for error in errors))
 
     def test_source_tampering_is_rejected_byte_for_byte(self) -> None:
         entries, sources, _ = complete_fixture()
@@ -712,6 +1296,33 @@ class ReleaseBundleGateTests(unittest.TestCase):
             hap_errors = MODULE.check_hap_content("release/app.hap", one_entry)
         self.assertTrue(any("条目解压大小超过内部上限" in error for error in hap_errors))
         reader.assert_not_called()
+
+    def test_zip_entry_view_streams_compare_hash_and_secret_scan(self) -> None:
+        content = b"fixed streamed entry content"
+        archive_bytes = zip_bytes([("evidence/artifacts/fixed.txt", content)])
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+            infos, errors = MODULE._archive_infos(
+                archive,
+                "固定输入 ZIP",
+                max_entry_bytes=MODULE.MAX_OUTER_ENTRY_BYTES,
+                max_total_bytes=MODULE.MAX_OUTER_TOTAL_BYTES,
+                require_first_header_at_zero=True,
+            )
+            view = MODULE.ZipEntryView(archive, infos)
+            with mock.patch.object(
+                archive,
+                "read",
+                side_effect=AssertionError("stream operations must not use ZipFile.read"),
+            ) as reader:
+                self.assertEqual(len(content), view.byte_count("evidence/artifacts/fixed.txt"))
+                self.assertEqual(
+                    hashlib.sha256(content).hexdigest(),
+                    view.sha256("evidence/artifacts/fixed.txt"),
+                )
+                self.assertTrue(view.matches("evidence/artifacts/fixed.txt", content))
+                self.assertEqual([], view.secret_hits("evidence/artifacts/fixed.txt"))
+            reader.assert_not_called()
+        self.assertEqual([], errors)
 
     def test_invalid_utf8_filename_is_a_structured_outer_and_hap_failure(self) -> None:
         malformed = zip_with_invalid_utf8_filename()

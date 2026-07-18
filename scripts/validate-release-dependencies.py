@@ -32,6 +32,7 @@ RUNTIME_REQUIRED_FILES = frozenset(
         "docs/SUBMISSION-SOURCE-MANIFEST.md",
         "scripts/validate-competition-content.py",
         "scripts/validate-competition-evidence.py",
+        "scripts/validate-competition-release.py",
         "scripts/validate-official-deliverables.py",
         "scripts/validate-release-bundle.py",
         "scripts/validate-release-dependencies.py",
@@ -42,6 +43,7 @@ TEST_REQUIRED_FILES = frozenset(
     {
         "scripts/test_validate_competition_content.py",
         "scripts/test_validate_competition_evidence.py",
+        "scripts/test_validate_competition_release.py",
         "scripts/test_validate_official_deliverables.py",
         "scripts/test_validate_release_bundle.py",
         "scripts/test_validate_release_dependencies.py",
@@ -74,6 +76,22 @@ EXPECTED_RUNTIME_EDGES = {
         "DEFAULT_PLAN_PATH",
     ): "docs/COMPETITION-SCORE-FIRST-PLAN.md",
     (
+        "scripts/validate-competition-release.py",
+        "DEPENDENCY_GATE_PATH",
+    ): "scripts/validate-release-dependencies.py",
+    (
+        "scripts/validate-competition-release.py",
+        "EVIDENCE_GATE_PATH",
+    ): "scripts/validate-competition-evidence.py",
+    (
+        "scripts/validate-competition-release.py",
+        "CONTENT_GATE_PATH",
+    ): "scripts/validate-competition-content.py",
+    (
+        "scripts/validate-competition-release.py",
+        "OFFICIAL_GATE_PATH",
+    ): "scripts/validate-official-deliverables.py",
+    (
         "scripts/validate-release-bundle.py",
         "CONTENT_GATE_PATH",
     ): "scripts/validate-competition-content.py",
@@ -81,6 +99,10 @@ EXPECTED_RUNTIME_EDGES = {
         "scripts/validate-release-bundle.py",
         "EVIDENCE_GATE_PATH",
     ): "scripts/validate-release-evidence.py",
+    (
+        "scripts/validate-release-bundle.py",
+        "COMPETITION_GATE_PATH",
+    ): "scripts/validate-competition-evidence.py",
     (
         "scripts/validate-official-deliverables.py",
         "RELEASE_GATE_PATH",
@@ -95,6 +117,10 @@ EXPECTED_TEST_EDGES = {
         "scripts/test_validate_competition_evidence.py",
         "SCRIPT_PATH",
     ): "scripts/validate-competition-evidence.py",
+    (
+        "scripts/test_validate_competition_release.py",
+        "SCRIPT_PATH",
+    ): "scripts/validate-competition-release.py",
     (
         "scripts/test_validate_release_evidence.py",
         "SCRIPT_PATH",
@@ -116,6 +142,7 @@ REQUIRED_PLAN_COMMANDS = frozenset(
     {
         "python -B scripts/validate-competition-content.py",
         "python -B scripts/validate-competition-evidence.py",
+        "python -B scripts/validate-competition-release.py",
         "python -B scripts/validate-official-deliverables.py",
         "python -B scripts/validate-release-bundle.py",
         "python -B scripts/validate-release-dependencies.py",
@@ -125,10 +152,12 @@ REQUIRED_PLAN_COMMANDS = frozenset(
 MODULE_NAMES = {
     "scripts/validate-competition-content.py": "release_dependency_content_gate",
     "scripts/validate-competition-evidence.py": "release_dependency_score_gate",
+    "scripts/validate-competition-release.py": "release_dependency_preflight_gate",
     "scripts/validate-release-bundle.py": "release_dependency_bundle_gate",
     "scripts/validate-official-deliverables.py": "release_dependency_media_gate",
     "scripts/test_validate_competition_content.py": "release_dependency_content_tests",
     "scripts/test_validate_competition_evidence.py": "release_dependency_score_tests",
+    "scripts/test_validate_competition_release.py": "release_dependency_preflight_tests",
     "scripts/test_validate_release_evidence.py": "release_dependency_evidence_tests",
     "scripts/test_validate_release_bundle.py": "release_dependency_bundle_tests",
     "scripts/test_validate_official_deliverables.py": "release_dependency_media_tests",

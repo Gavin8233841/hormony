@@ -28,12 +28,14 @@
     "scripts/test-chat.mjs",
     "scripts/test_validate_competition_evidence.py",
     "scripts/test_validate_competition_content.py",
+    "scripts/test_validate_competition_release.py",
     "scripts/test_validate_official_deliverables.py",
     "scripts/test_validate_release_bundle.py",
     "scripts/test_validate_release_dependencies.py",
     "scripts/test_validate_release_evidence.py",
     "scripts/validate-competition-content.py",
     "scripts/validate-competition-evidence.py",
+    "scripts/validate-competition-release.py",
     "scripts/validate-official-deliverables.py",
     "scripts/validate-release-bundle.py",
     "scripts/validate-release-dependencies.py",
@@ -66,8 +68,8 @@
 
 `nonGitFiles` 每项必须且只能包含 `path`、`role`、`bytes`、`sha256`。`path`
 必须是规范化的包内相对路径，路径与大小写折叠后的路径都必须唯一；`bytes`
-必须是正整数；`sha256` 必须是 64 位小写十六进制值。以下五个 `role` 必须
-且只能各出现一次，不接受未定义角色：
+必须是正整数；`sha256` 必须是 64 位小写十六进制值。以下五个基础 `role` 必须
+且只能各出现一次：
 
 - `hap`
 - `third-party-license-index`
@@ -75,9 +77,14 @@
 - `ai-usage-declaration`
 - `release-evidence-index`
 
+此外只允许重复角色 `evidence-artifact`：路径必须位于 `evidence/artifacts/`，后缀
+只接受 `.har|.jpeg|.jpg|.json|.log|.mp4|.png|.txt|.xml`，最多 50 项，单项不超过
+64 MiB、合计不超过 256 MiB。每项都必须被至少一个发布证据 ID 的 `artifacts`
+引用；未引用、越界、未声明或额外附件均阻断。
+
 `release-evidence-index` 对应的 UTF-8 JSON 是项目内部证据合同。顶层必须且只能包含
 `schemaVersion`、`sourceCommit`、`hapSha256`、`records`、`limitations`；
-`schemaVersion` 固定为 `2`，不兼容接受旧自由文本 v1；提交与 HAP 哈希分别绑定
+`schemaVersion` 固定为 `3`，不兼容接受旧自由文本 v1/v2；提交与 HAP 哈希分别绑定
 `release-manifest.json` 和包内唯一 HAP 的实际字节，`limitations` 至少保留一项真实
 边界。
 
@@ -111,7 +118,8 @@
 evidence CLI 没有 artifact resolver，因此只能验收全部保持未验证的索引，不能单靠
 自报 metadata 产生正向等级。
 
-`businessChecks` 每项必须且只能含 `{id,passed,actual}`，`passed` 必须为 `true`。
+`businessChecks` 每项必须且只能含 `{id,passed,actual,artifactPath}`，`passed` 必须为
+`true`，`artifactPath` 必须指向本记录声明并由最终 ZIP 解析的实际 artifact。
 Web 线上通过必须恰好覆盖以下 16 项，且 actual 使用对应类型/值，不接受统一 `ok`：
 
 - Health：`health.status=ready`、非空 `health.model`、与 deploymentVersion 相同的
@@ -124,7 +132,27 @@ Web 线上通过必须恰好覆盖以下 16 项，且 actual 使用对应类型/
   `quiz.grading-separated`、`quiz.grading-shape`。生产无状态部署不把
   `/api/quiz/submit` 写成线上评分通过，本地评分/回写归黄金演示设备证据。
 
+Web 线上通过必须绑定唯一 `.har` capture。门禁只接受 HAR 1.2 `log`，从恰好四个
+`entries[].request/response/content.text` 原始记录推导请求方法、HTTPS endpoint、
+含时区时间、HTTP 状态、Content-Type、部署版本及上述业务字段；四个请求须在 15 分钟
+内完成。旧 `schemaVersion/capturedAt/deploymentVersion/requests` 自报 JSON、示例域名、
+本机地址、非 200、混合 origin、query/fragment、元数据与原始响应不一致均阻断。
+固定输入 HAR 只证明解析合同，不构成线上通过证据。
+
 静态诊断、构建、模拟器、真机和线上通过还须分别提供对应类型的实际 artifact。
+`golden-demo` 只接受未验证、模拟器通过或真机通过；升级设备等级时必须同时绑定
+UI tree 与 MP4，并完整覆盖 `demo.d01` 至 `demo.d07` 七个固定业务检查。两张图在
+`docs/COMPETITION-SCORE-FIRST-PLAN.md` 中仍为未验证时必须列出缺口且不得绑定图片；
+迁移到模拟器/真机通过时，等级必须与 `golden-demo` 相同，图片必须是该记录实际引用
+的 `screenshot` evidence-artifact。若 `golden-demo` 已升级而计划仍写未验证，视为过期
+状态并阻断。
+
+完整 ZIP 门禁读取 artifact 实际字节：PNG/JPEG 校验容器、块/段和正尺寸；UI tree
+复用当前 `dumpLayout` JSON 根节点的 `attributes/pagePath/bounds/children` 合同；MP4
+解析 ISO BMFF box，并要求 `ftyp`、非空 `mdat` 与 `moov/trak/mdia/hdlr=vide`。这些
+结构检查只拒绝任意字节伪装，不证明截图内容真实、UI 流程完成或视频可播放；正式
+演示视频仍必须由正式三文件门禁使用明确 `ffprobe` 路径解析，并保留人工真实性复核。
+
 `未验证` 必须说明真实缺口，且不得夹带命令、退出码、环境、产物或业务通过字段。
 结构通过只证明索引合同和实际包内字节绑定，不会把任一记录自动升级为产品通过。
 
@@ -141,8 +169,14 @@ python -B scripts/validate-release-evidence.py `
 运行命令：
 
 ```powershell
-python -B scripts/validate-release-bundle.py --bundle-path <最终 ZIP 的明确路径>
+python -B scripts/validate-release-bundle.py `
+  --bundle-path <最终 ZIP 的明确路径> `
+  --ffprobe-path <ffprobe 现有绝对普通文件路径>
 ```
+
+当全部运行记录保持未验证时，独立 ZIP 静态检查可以省略 `--ffprobe-path`；只要
+`golden-demo` 声明模拟器或真机通过，就必须提供该工具并让包内截图、MP4 实际字节
+通过解码探测。正式三文件与一条入口始终传入同一个明确工具路径。
 
 脚本只读打开 ZIP，不解压到磁盘，不构建、不清理也不改写文件。它从声明提交的
 Git tree 读取本清单展开的源码并逐字比较，同时要求声明提交等于当前 `HEAD`；
@@ -171,15 +205,17 @@ Git tree 读取本清单展开的源码并逐字比较，同时要求声明提�
 - 评分/演示：`scripts/validate-competition-evidence.py` 和
   `docs/COMPETITION-SCORE-FIRST-PLAN.md`。
 - 发布证据：`scripts/validate-release-evidence.py`。
-- 最终 ZIP：`scripts/validate-release-bundle.py`，运行时动态复用内容门禁和发布证据
-  门禁。
+- 最终 ZIP：`scripts/validate-release-bundle.py`，运行时动态复用内容门禁、评分门禁和
+  发布证据门禁，并交叉绑定两图状态。
 - 正式媒体：`scripts/validate-official-deliverables.py`，运行时动态复用最终 ZIP
   门禁。
-- 依赖闭包：`scripts/validate-release-dependencies.py`；上述六个门禁各自的
+- 一条入口：`scripts/validate-competition-release.py`，按依赖、评分证据、内容源码、
+  正式三文件顺序运行，正式三文件继续递归覆盖最终 ZIP，不重复执行同一包门禁。
+- 依赖闭包：`scripts/validate-release-dependencies.py`；上述七个门禁各自的
   `scripts/test_validate_*.py` 固定输入测试必须一并采用。
 - 审计记录：`docs/workstreams/06-competition-release-result.md`。
 
-执行以下只读命令，核验这些直接包含项均在 manifest 与 Git 索引中，并确认六条
+执行以下只读命令，核验这些直接包含项均在 manifest 与 Git 索引中，并确认十一条
 运行时路径仍指向上述精确文件：
 
 ```powershell
@@ -229,6 +265,11 @@ python -B scripts/validate-official-deliverables.py `
 上一节完整发布包门禁。两个工具路径必须是调用者明确提供的现有绝对普通文件，
 拒绝符号链接；工具缺失、超时、非零退出、超限或无效输出均为结构化失败，工具
 输出和媒体路径不会写入错误正文。
+
+总入口调用该脚本时追加 `--summary-json`，此模式只返回 `status` 与固定白名单
+`reasonCodes`，不返回文件路径、探测工具 stdout/stderr、哈希或任意错误正文。总入口
+对未知、重复、乱序、超限或退出码不一致的摘要闭锁失败；普通独立调用仍保留原有
+可读输出。
 
 脚本只读流式计算三文件字节数和 SHA-256。通过只证明本地文件名、解析元数据、
 哈希与 ZIP 静态门禁，不证明 PDF 使用了官方最新模板、视频已完整人工播放、HAP

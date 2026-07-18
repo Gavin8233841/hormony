@@ -33,6 +33,60 @@ def ffprobe_output(
 
 
 class OfficialDeliverablesGateTests(unittest.TestCase):
+    def test_safe_reason_codes_distinguish_tool_and_media_failures(self) -> None:
+        errors = [
+            "pdfinfo工具不可用",
+            "pdfinfo工具执行超时",
+            "pdfinfo工具返回非零退出码: 7",
+            "MP4 至少需要一个视频流",
+        ]
+
+        self.assertEqual(
+            (
+                "mp4.media-invalid",
+                "pdfinfo.nonzero",
+                "pdfinfo.timeout",
+                "pdfinfo.unavailable",
+            ),
+            MODULE.failure_reason_codes(errors),
+        )
+
+    def test_summary_json_contains_only_stable_reason_codes(self) -> None:
+        secret = "MODEL_API_KEY=fixed-sensitive-value"
+        output = io.StringIO()
+        arguments = [
+            "--pdf-path",
+            secret + ".pdf",
+            "--video-path",
+            secret + ".mp4",
+            "--bundle-path",
+            secret + ".zip",
+            "--team-name",
+            "team",
+            "--work-name",
+            "work",
+            "--pdfinfo-path",
+            "C:/tools/pdfinfo.exe",
+            "--ffprobe-path",
+            "C:/tools/ffprobe.exe",
+            "--summary-json",
+        ]
+
+        with mock.patch.object(
+            MODULE,
+            "validate_official_deliverables",
+            return_value=([], ["ffprobe工具执行超时"]),
+        ), mock.patch("sys.stdout", output):
+            exit_code = MODULE.main(arguments)
+
+        document = json.loads(output.getvalue())
+        self.assertEqual(1, exit_code)
+        self.assertEqual(
+            {"status": "failed", "reasonCodes": ["ffprobe.timeout"]},
+            document,
+        )
+        self.assertNotIn(secret, output.getvalue())
+
     def test_exact_filenames_and_wrong_names_or_suffixes(self) -> None:
         expected = MODULE.expected_filenames("鸿学队", "鸿学伴")
 
@@ -376,7 +430,7 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
             evidence[1].details,
         )
         self.assertEqual("releaseBundleGate=passed", evidence[2].details)
-        release_gate.assert_called_once_with(bundle)
+        release_gate.assert_called_once_with(bundle, Path("C:/tools/ffprobe.exe"))
 
     def test_failed_video_format_evidence_reports_detected_container(self) -> None:
         pdf = Path("01-作品说明文档+鸿学队.pdf")

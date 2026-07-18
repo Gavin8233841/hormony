@@ -36,6 +36,29 @@ VIDEO_DURATION_LIMIT_SECONDS = Decimal("300")
 DEFAULT_TOOL_TIMEOUT_SECONDS = 20.0
 MAX_TOOL_OUTPUT_BYTES = 1024 * 1024
 HASH_CHUNK_BYTES = 1024 * 1024
+OFFICIAL_REASON_CODES = frozenset(
+    {
+        "identity.invalid",
+        "pdf.input-invalid",
+        "pdf.hash-failed",
+        "pdf.media-invalid",
+        "pdfinfo.nonzero",
+        "pdfinfo.output-invalid",
+        "pdfinfo.timeout",
+        "pdfinfo.unavailable",
+        "mp4.input-invalid",
+        "mp4.hash-failed",
+        "mp4.media-invalid",
+        "ffprobe.nonzero",
+        "ffprobe.output-invalid",
+        "ffprobe.timeout",
+        "ffprobe.unavailable",
+        "zip.input-invalid",
+        "zip.hash-failed",
+        "zip.bundle-invalid",
+        "internal.validation-error",
+    }
+)
 PDF_PAGES_PATTERN = re.compile(rb"(?m)^Pages:[ \t]*([0-9]{1,9})[ \t]*\r?$")
 PDF_ENCRYPTED_PATTERN = re.compile(
     rb"(?mi)^Encrypted:[ \t]*(yes|no)(?:[ \t].*)?\r?$"
@@ -58,6 +81,58 @@ class VideoProbe(NamedTuple):
     duration_seconds: Decimal
     video_stream_count: int
     format_names: tuple[str, ...]
+
+
+def failure_reason_codes(errors: list[str]) -> tuple[str, ...]:
+    codes: set[str] = set()
+    for error in errors:
+        if error.startswith(("team-name", "work-name")):
+            codes.add("identity.invalid")
+        elif error.startswith("pdfinfo工具"):
+            if "执行超时" in error:
+                codes.add("pdfinfo.timeout")
+            elif "非零退出码" in error:
+                codes.add("pdfinfo.nonzero")
+            elif "输出" in error:
+                codes.add("pdfinfo.output-invalid")
+            else:
+                codes.add("pdfinfo.unavailable")
+        elif error.startswith("pdfinfo 输出"):
+            codes.add("pdfinfo.output-invalid")
+        elif error.startswith("PDF无法完成只读哈希"):
+            codes.add("pdf.hash-failed")
+        elif error.startswith(("PDF 页数", "PDF 不得", "PDF 整份")):
+            codes.add("pdf.media-invalid")
+        elif error.startswith("PDF"):
+            codes.add("pdf.input-invalid")
+        elif error.startswith("ffprobe工具"):
+            if "执行超时" in error:
+                codes.add("ffprobe.timeout")
+            elif "非零退出码" in error:
+                codes.add("ffprobe.nonzero")
+            elif "输出" in error:
+                codes.add("ffprobe.output-invalid")
+            else:
+                codes.add("ffprobe.unavailable")
+        elif error.startswith(("ffprobe 输出", "ffprobe duration")):
+            codes.add("ffprobe.output-invalid")
+        elif error.startswith("ffprobe format_name"):
+            codes.add("mp4.media-invalid")
+        elif error.startswith("MP4无法完成只读哈希"):
+            codes.add("mp4.hash-failed")
+        elif error.startswith(("MP4 时长", "MP4 至少")):
+            codes.add("mp4.media-invalid")
+        elif error.startswith("MP4"):
+            codes.add("mp4.input-invalid")
+        elif error.startswith("ZIP无法完成只读哈希"):
+            codes.add("zip.hash-failed")
+        elif error.startswith(("ZIP 未通过", "ZIP 发布包门禁")):
+            codes.add("zip.bundle-invalid")
+        elif error.startswith("ZIP"):
+            codes.add("zip.input-invalid")
+        else:
+            codes.add("internal.validation-error")
+    return tuple(sorted(codes))
 
 
 def expected_filenames(team_name: str, work_name: str) -> tuple[str, str, str]:
@@ -287,12 +362,18 @@ def probe_video(
     return probe, [*errors, *parse_errors]
 
 
-def run_release_bundle_gate(path: Path) -> list[str]:
+def run_release_bundle_gate(
+    path: Path,
+    ffprobe_path: Path | None = None,
+) -> list[str]:
     stdout = io.StringIO()
     stderr = io.StringIO()
     try:
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = RELEASE_GATE.main(["--bundle-path", str(path)])
+            arguments = ["--bundle-path", str(path)]
+            if ffprobe_path is not None:
+                arguments.extend(["--ffprobe-path", str(ffprobe_path)])
+            exit_code = RELEASE_GATE.main(arguments)
     except SystemExit as error:
         exit_code = error.code if isinstance(error.code, int) else 1
     except Exception as error:  # pragma: no cover - defensive boundary
@@ -389,7 +470,7 @@ def validate_official_deliverables(
             evidence.append(item)
 
     if "ZIP" in valid_labels:
-        release_gate_errors = run_release_bundle_gate(bundle_path)
+        release_gate_errors = run_release_bundle_gate(bundle_path, ffprobe_path)
         errors.extend(release_gate_errors)
         item, hash_errors = _hash_evidence(
             bundle_path,
@@ -426,6 +507,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=_positive_timeout,
         default=DEFAULT_TOOL_TIMEOUT_SECONDS,
     )
+    parser.add_argument(
+        "--summary-json",
+        action="store_true",
+        help="只输出不含路径和工具正文的稳定状态/原因码 JSON",
+    )
     return parser.parse_args(argv)
 
 
@@ -449,6 +535,19 @@ def main(argv: list[str] | None = None) -> int:
         ffprobe_path=args.ffprobe_path,
         timeout_seconds=args.tool_timeout_seconds,
     )
+    if args.summary_json:
+        print(
+            json.dumps(
+                {
+                    "status": "failed" if errors else "passed",
+                    "reasonCodes": list(failure_reason_codes(errors)),
+                },
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+        return 1 if errors else 0
     if errors:
         print(f"[FAIL] 正式三文件门禁: {len(errors)} 项")
         _print_evidence(evidence)

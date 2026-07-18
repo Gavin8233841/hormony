@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
+import base64
+import binascii
+import ipaddress
 import json
 import re
 import sys
@@ -17,13 +19,16 @@ from urllib.parse import urlsplit
 
 sys.dont_write_bytecode = True
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_EVIDENCE_INDEX_BYTES = 64 * 1024
 MAX_LIST_ITEMS = 50
 MAX_COMMAND_ARGUMENTS = 32
 MAX_SHORT_TEXT_CHARACTERS = 300
 MAX_NOTES_CHARACTERS = 2000
 MAX_ARTIFACT_PATH_BYTES = 512
+MAX_ONLINE_CAPTURE_BYTES = 2 * 1024 * 1024
+MAX_ONLINE_CAPTURE_SPAN_SECONDS = 15 * 60
+EVIDENCE_ARTIFACT_PREFIX = "evidence/artifacts/"
 FULL_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 RECORD_ID_PATTERN = re.compile(r"[a-z][a-z0-9-]{2,63}")
@@ -50,8 +55,40 @@ RECORD_FIELDS = frozenset(
     }
 )
 ARTIFACT_FIELDS = frozenset({"path", "kind", "bytes", "sha256"})
-BUSINESS_CHECK_FIELDS = frozenset({"id", "passed", "actual"})
+BUSINESS_CHECK_FIELDS = frozenset(
+    {"id", "passed", "actual", "artifactPath"}
+)
 ONLINE_REQUEST_FIELDS = frozenset({"id", "method", "endpoint", "httpStatus"})
+HAR_LOG_REQUIRED_FIELDS = frozenset({"version", "creator", "entries"})
+HAR_ENTRY_REQUIRED_FIELDS = frozenset(
+    {"startedDateTime", "time", "request", "response", "cache", "timings"}
+)
+HAR_REQUEST_REQUIRED_FIELDS = frozenset(
+    {
+        "method",
+        "url",
+        "httpVersion",
+        "headers",
+        "queryString",
+        "cookies",
+        "headersSize",
+        "bodySize",
+    }
+)
+HAR_RESPONSE_REQUIRED_FIELDS = frozenset(
+    {
+        "status",
+        "statusText",
+        "httpVersion",
+        "headers",
+        "cookies",
+        "content",
+        "redirectURL",
+        "headersSize",
+        "bodySize",
+    }
+)
+HAR_CONTENT_REQUIRED_FIELDS = frozenset({"size", "mimeType", "text"})
 RESOLUTION_FIELDS = frozenset({"widthPx", "heightPx"})
 EVIDENCE_LEVELS = frozenset(
     {
@@ -97,10 +134,25 @@ ARTIFACT_KINDS = frozenset(
         "log",
         "media",
         "portal-receipt",
+        "capture",
     }
 )
 DEVICE_ARTIFACT_KINDS = frozenset({"ui-tree", "screenshot", "video", "log"})
-ONLINE_ARTIFACT_KINDS = frozenset({"diagnostic", "log", "portal-receipt"})
+ONLINE_ARTIFACT_KINDS = frozenset(
+    {"diagnostic", "log", "portal-receipt", "capture"}
+)
+GOLDEN_DEMO_CHECK_IDS = frozenset(
+    {
+        "demo.d01.release-identity",
+        "demo.d02.manual-reminder",
+        "demo.d03.topic-context",
+        "demo.d04.live-chat",
+        "demo.d05.live-quiz",
+        "demo.d06.arkdata-persistence",
+        "demo.d07.evidence-close",
+    }
+)
+GOLDEN_DEMO_LEVELS = frozenset({"模拟器通过", "真机通过", "未验证"})
 WEB_ONLINE_CHECK_IDS = frozenset(
     {
         "health.status",
@@ -141,6 +193,19 @@ WEB_REQUEST_METHODS_AND_PATHS = {
     "plan": ("POST", "/api/plan"),
     "quiz": ("POST", "/api/quiz"),
 }
+CAPTURE_CONTENT_TYPES = {
+    "health": "application/json",
+    "chat": "text/event-stream",
+    "plan": "application/json",
+    "quiz": "application/json",
+}
+RESERVED_ONLINE_HOST_SUFFIXES = (
+    ".invalid",
+    ".example",
+    ".test",
+    ".localhost",
+    ".local",
+)
 
 
 class DuplicateJsonKeyError(ValueError):
@@ -151,6 +216,26 @@ class EvidenceIndexMetrics(NamedTuple):
     records: int
     verified_records: int
     unverified_records: int
+
+
+class ArtifactBinding(NamedTuple):
+    byte_count: int
+    sha256: str
+    role: str
+    content: bytes | None
+
+
+class EvidenceRecordBinding(NamedTuple):
+    level: str
+    artifact_paths: frozenset[str]
+    artifact_references: frozenset[tuple[str, str]]
+
+
+class OnlineCapture(NamedTuple):
+    captured_at: str
+    deployment_version: str
+    requests: tuple[dict[str, object], ...]
+    business_checks: dict[str, object]
 
 
 def _strict_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -239,6 +324,23 @@ def _command_arguments(
         if argument is not None:
             arguments.append(argument)
     return arguments, errors
+
+
+def _online_hostname_error(hostname: str) -> str | None:
+    normalized = hostname.casefold().rstrip(".")
+    if not normalized or "." not in normalized:
+        return "必须使用可核验的公网主机名"
+    if normalized in {"example.com", "example.org", "example.net"} or normalized.endswith(
+        RESERVED_ONLINE_HOST_SUFFIXES
+    ):
+        return "不得使用示例、测试或本地主机名"
+    try:
+        address = ipaddress.ip_address(normalized)
+    except ValueError:
+        return None
+    if not address.is_global:
+        return "不得使用非公网 IP 地址"
+    return None
 
 
 def _environment(
@@ -344,6 +446,13 @@ def _environment(
                             f"{request_label}.endpoint 必须为无凭证、query 和 fragment 的 HTTPS URL"
                         )
                     else:
+                        hostname_error = _online_hostname_error(
+                            parsed_endpoint.hostname
+                        )
+                        if hostname_error is not None:
+                            errors.append(
+                                f"{request_label}.endpoint {hostname_error}"
+                            )
                         request_origins.add(
                             (
                                 parsed_endpoint.scheme,
@@ -434,8 +543,9 @@ def _artifacts(
 
 def _artifact_binding_errors(
     artifacts: list[dict[str, object]],
-    available_artifacts: dict[str, bytes] | None,
+    available_artifacts: dict[str, ArtifactBinding] | None,
     label: str,
+    level: str | None,
 ) -> list[str]:
     if not artifacts:
         return []
@@ -446,14 +556,33 @@ def _artifact_binding_errors(
         path = artifact.get("path")
         if not isinstance(path, str):
             continue
-        content = available_artifacts.get(path)
-        if content is None:
+        binding = available_artifacts.get(path)
+        if binding is None:
             errors.append(f"{label}[{index}] 未绑定实际发布包条目")
             continue
-        if artifact.get("bytes") != len(content):
+        if not isinstance(binding, ArtifactBinding):
+            errors.append(f"{label}[{index}] 实际发布包条目元数据类型无效")
+            continue
+        if artifact.get("bytes") != binding.byte_count:
             errors.append(f"{label}[{index}].bytes 与实际发布包条目不一致")
-        if artifact.get("sha256") != hashlib.sha256(content).hexdigest():
+        if artifact.get("sha256") != binding.sha256:
             errors.append(f"{label}[{index}].sha256 与实际发布包条目不一致")
+        kind = artifact.get("kind")
+        if binding.role == "git-source" and not (
+            level == "源码确认" and kind == "source"
+        ):
+            errors.append(f"{label}[{index}] 运行证据不得来自 Git 源文件")
+        if level in RUNTIME_LEVELS and binding.role != "evidence-artifact":
+            errors.append(
+                f"{label}[{index}] {level}必须绑定 evidence-artifact 角色"
+            )
+        if binding.role == "evidence-artifact" and not path.startswith(
+            EVIDENCE_ARTIFACT_PREFIX
+        ):
+            errors.append(
+                f"{label}[{index}] evidence-artifact 必须位于 "
+                f"{EVIDENCE_ARTIFACT_PREFIX}"
+            )
     return errors
 
 
@@ -492,6 +621,16 @@ def _business_checks(
         )
         if item.get("passed") is not True:
             errors.append(f"{item_label}.passed 在通过记录中必须为 true")
+        artifact_path, artifact_path_errors = _nonempty_text(
+            item.get("artifactPath"),
+            f"{item_label}.artifactPath",
+            MAX_SHORT_TEXT_CHARACTERS,
+        )
+        errors.extend(artifact_path_errors)
+        if artifact_path is not None:
+            path_reason = _artifact_path_reason(artifact_path)
+            if path_reason is not None:
+                errors.append(f"{item_label}.artifactPath {path_reason}")
         actual = item.get("actual")
         if check_id in WEB_BOOLEAN_CHECK_IDS or check_id == "plan.date":
             if actual is not True:
@@ -536,6 +675,577 @@ def _business_checks(
     return parsed, errors
 
 
+def _json_response_object(
+    body: str,
+    label: str,
+) -> tuple[dict[str, object] | None, list[str]]:
+    try:
+        value = json.loads(body, object_pairs_hook=_strict_object)
+    except DuplicateJsonKeyError:
+        return None, [f"{label} JSON 包含重复键"]
+    except (json.JSONDecodeError, RecursionError, ValueError):
+        return None, [f"{label} 不是有效 JSON 对象"]
+    if not isinstance(value, dict):
+        return None, [f"{label} 顶层必须为对象"]
+    return value, []
+
+
+def _health_business_checks(
+    body: str,
+    deployment_version: str,
+    label: str,
+) -> tuple[dict[str, object], list[str]]:
+    document, errors = _json_response_object(body, label)
+    if document is None:
+        return {}, errors
+    checks: dict[str, object] = {}
+    if document.get("status") != "ready":
+        errors.append(f"{label}.status 必须精确为 ready")
+    else:
+        checks["health.status"] = "ready"
+    model = document.get("model")
+    if not isinstance(model, dict) or model.get("configured") is not True:
+        errors.append(f"{label}.model 必须是 configured=true 的对象")
+    else:
+        model_name, model_errors = _nonempty_text(
+            model.get("name"),
+            f"{label}.model.name",
+            MAX_SHORT_TEXT_CHARACTERS,
+        )
+        errors.extend(model_errors)
+        if model_name is not None:
+            checks["health.model"] = model_name
+    version, version_errors = _nonempty_text(
+        document.get("version"),
+        f"{label}.version",
+        MAX_SHORT_TEXT_CHARACTERS,
+    )
+    errors.extend(version_errors)
+    if version is not None:
+        if version != deployment_version:
+            errors.append(f"{label}.version 必须等于 capture deploymentVersion")
+        checks["health.deployment"] = version
+    return checks, errors
+
+
+def _chat_business_checks(
+    body: str,
+    label: str,
+) -> tuple[dict[str, object], list[str]]:
+    errors: list[str] = []
+    if "\r" in body.replace("\r\n", ""):
+        return {}, [f"{label} 包含无效裸 CR"]
+    normalized = body.replace("\r\n", "\n")
+    blocks = [block for block in normalized.split("\n\n") if block]
+    events: list[dict[str, object]] = []
+    for index, block in enumerate(blocks):
+        event_label = f"{label}.events[{index}]"
+        lines = block.split("\n")
+        if len(lines) != 1 or not lines[0].startswith("data: "):
+            errors.append(f"{event_label} 必须是单行 data SSE 事件")
+            continue
+        event, event_errors = _json_response_object(
+            lines[0][6:],
+            event_label,
+        )
+        errors.extend(event_errors)
+        if event is not None:
+            events.append(event)
+
+    allowed_types = {"thinking", "delta", "citation", "trace", "error", "done"}
+    event_types: list[str] = []
+    body_characters = 0
+    citations = 0
+    done_sessions: list[str] = []
+    for index, event in enumerate(events):
+        event_label = f"{label}.events[{index}]"
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or event_type not in allowed_types:
+            errors.append(f"{event_label}.type 不是当前 StreamEvent 类型")
+            continue
+        event_types.append(event_type)
+        if event_type == "delta":
+            content = event.get("content")
+            if not isinstance(content, str):
+                errors.append(f"{event_label}.content 必须为字符串")
+            else:
+                body_characters += len(content)
+        elif event_type == "citation":
+            if not isinstance(event.get("source"), dict):
+                errors.append(f"{event_label}.source 必须为对象")
+            else:
+                citations += 1
+        elif event_type == "done":
+            session_id, session_errors = _nonempty_text(
+                event.get("sessionId"),
+                f"{event_label}.sessionId",
+                MAX_SHORT_TEXT_CHARACTERS,
+            )
+            errors.extend(session_errors)
+            if session_id is not None:
+                done_sessions.append(session_id)
+
+    if body_characters <= 0:
+        errors.append(f"{label} 必须包含非空 delta 正文")
+    if "error" in event_types:
+        errors.append(f"{label} 不得包含 error 事件")
+    if len(done_sessions) != 1 or done_sessions[0] == "error":
+        errors.append(f"{label} 必须包含唯一非 error done sessionId")
+    if not event_types or event_types[-1] != "done":
+        errors.append(f"{label} done 必须是最后一个事件")
+    checks = {
+        "chat.body": body_characters,
+        "chat.event-order": bool(event_types and event_types[-1] == "done"),
+        "chat.no-error-event": "error" not in event_types,
+        "chat.done": len(done_sessions) == 1 and done_sessions[0] != "error",
+        "chat.citations-as-returned": citations,
+    }
+    return checks, errors
+
+
+def _plan_business_checks(
+    body: str,
+    label: str,
+) -> tuple[dict[str, object], list[str]]:
+    document, errors = _json_response_object(body, label)
+    if document is None:
+        return {}, errors
+    tasks = document.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        return {}, [*errors, f"{label}.tasks 必须为非空对象数组"]
+    allowed_types = {"review", "practice", "reading", "quiz"}
+    dates_valid = True
+    shapes_valid = True
+    for index, task in enumerate(tasks):
+        task_label = f"{label}.tasks[{index}]"
+        if not isinstance(task, dict):
+            errors.append(f"{task_label} 必须为对象")
+            dates_valid = False
+            shapes_valid = False
+            continue
+        for field in ("id", "title"):
+            _, field_errors = _nonempty_text(
+                task.get(field),
+                f"{task_label}.{field}",
+                MAX_SHORT_TEXT_CHARACTERS,
+            )
+            if field_errors:
+                shapes_valid = False
+            errors.extend(field_errors)
+        date_value = task.get("date")
+        if not isinstance(date_value, str):
+            dates_valid = False
+            errors.append(f"{task_label}.date 必须为 YYYY-MM-DD")
+        else:
+            try:
+                datetime.strptime(date_value, "%Y-%m-%d")
+            except ValueError:
+                dates_valid = False
+                errors.append(f"{task_label}.date 必须为 YYYY-MM-DD")
+        estimated = task.get("estimatedMin")
+        if not isinstance(estimated, int) or isinstance(estimated, bool) or estimated <= 0:
+            shapes_valid = False
+            errors.append(f"{task_label}.estimatedMin 必须为正整数")
+        if task.get("type") not in allowed_types:
+            shapes_valid = False
+            errors.append(f"{task_label}.type 不是当前 PlanTask 类型")
+    return {
+        "plan.date": dates_valid,
+        "plan.task-count": len(tasks),
+        "plan.task-shape": shapes_valid,
+        "plan.safety": True,
+    }, errors
+
+
+def _quiz_business_checks(
+    body: str,
+    label: str,
+) -> tuple[dict[str, object], list[str]]:
+    document, errors = _json_response_object(body, label)
+    if document is None:
+        return {}, errors
+    questions = document.get("questions")
+    grading = document.get("grading")
+    if not isinstance(questions, list) or not questions:
+        errors.append(f"{label}.questions 必须为非空对象数组")
+        questions = []
+    if not isinstance(grading, list) or not grading:
+        errors.append(f"{label}.grading 必须为非空对象数组")
+        grading = []
+    no_answer_leak = all(
+        isinstance(question, dict) and "answer" not in question
+        for question in questions
+    )
+    no_explanation_leak = all(
+        isinstance(question, dict) and "explanation" not in question
+        for question in questions
+    )
+    question_ids = [
+        question.get("id")
+        for question in questions
+        if isinstance(question, dict) and isinstance(question.get("id"), str)
+    ]
+    grading_ids = [
+        item.get("questionId")
+        for item in grading
+        if isinstance(item, dict) and isinstance(item.get("questionId"), str)
+    ]
+    grading_shape = (
+        len(question_ids) == len(questions)
+        and len(grading_ids) == len(grading)
+        and question_ids == grading_ids
+        and len(set(question_ids)) == len(question_ids)
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("answer"), str)
+            and bool(item.get("answer"))
+            and isinstance(item.get("explanation"), str)
+            and bool(item.get("explanation"))
+            and isinstance(item.get("tags"), list)
+            for item in grading
+        )
+    )
+    if not no_answer_leak:
+        errors.append(f"{label}.questions 泄露 answer")
+    if not no_explanation_leak:
+        errors.append(f"{label}.questions 泄露 explanation")
+    if len(questions) != len(grading):
+        errors.append(f"{label}.questions 与 grading 数量不一致")
+    if not grading_shape:
+        errors.append(f"{label}.grading 结构或 questionId 对应关系无效")
+    return {
+        "quiz.no-answer-leak": no_answer_leak,
+        "quiz.no-explanation-leak": no_explanation_leak,
+        "quiz.grading-separated": isinstance(document.get("grading"), list),
+        "quiz.grading-shape": grading_shape,
+    }, errors
+
+
+def _missing_har_fields(
+    value: dict[str, object],
+    required: frozenset[str],
+    label: str,
+) -> list[str]:
+    missing = sorted(required - set(value))
+    return [f"{label} 缺少 HAR 1.2 字段: {','.join(missing)}"] if missing else []
+
+
+def _har_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _har_response_text(
+    content: dict[str, object],
+    label: str,
+) -> tuple[str | None, list[str]]:
+    errors = _missing_har_fields(content, HAR_CONTENT_REQUIRED_FIELDS, label)
+    raw_text = content.get("text")
+    if not isinstance(raw_text, str):
+        return None, [*errors, f"{label}.text 必须为 HAR 原始响应字符串"]
+    encoding = content.get("encoding")
+    try:
+        raw_bytes = (
+            base64.b64decode(raw_text, validate=True)
+            if encoding == "base64"
+            else raw_text.encode("utf-8")
+        )
+    except (UnicodeEncodeError, binascii.Error, ValueError):
+        return None, [*errors, f"{label}.text 无法按 HAR encoding 解码"]
+    if encoding not in {None, "base64"}:
+        errors.append(f"{label}.encoding 只接受 base64 或省略")
+    size = content.get("size")
+    if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+        errors.append(f"{label}.size 必须为非负整数")
+    elif size != len(raw_bytes):
+        errors.append(f"{label}.size 与原始响应字节数不一致")
+    try:
+        return raw_bytes.decode("utf-8"), errors
+    except UnicodeDecodeError:
+        return None, [*errors, f"{label}.text 必须解码为 UTF-8 API 响应"]
+
+
+def parse_online_capture(
+    content: bytes,
+    label: str,
+) -> tuple[OnlineCapture | None, list[str]]:
+    if len(content) > MAX_ONLINE_CAPTURE_BYTES:
+        return None, [f"{label} 超过内部上限 {MAX_ONLINE_CAPTURE_BYTES} 字节"]
+    try:
+        document = json.loads(content, object_pairs_hook=_strict_object)
+    except DuplicateJsonKeyError:
+        return None, [f"{label} HAR JSON 包含重复键"]
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, ValueError):
+        return None, [f"{label} 必须为 UTF-8 HAR JSON"]
+    if not isinstance(document, dict) or set(document) != {"log"}:
+        return None, [f"{label} 必须为 HAR 1.2 顶层 log 对象"]
+    log = document.get("log")
+    if not isinstance(log, dict):
+        return None, [f"{label}.log 必须为 HAR 1.2 对象"]
+
+    errors = _missing_har_fields(log, HAR_LOG_REQUIRED_FIELDS, f"{label}.log")
+    if log.get("version") != "1.2":
+        errors.append(f"{label}.log.version 必须为 HAR 1.2")
+    creator = log.get("creator")
+    if not isinstance(creator, dict) or not all(
+        isinstance(creator.get(field), str) and bool(creator[field].strip())
+        for field in ("name", "version")
+    ):
+        errors.append(f"{label}.log.creator 必须包含非空 name/version")
+    raw_entries = log.get("entries")
+    if not isinstance(raw_entries, list):
+        return None, [*errors, f"{label}.log.entries 必须为 HAR 对象数组"]
+    if len(raw_entries) != len(WEB_ONLINE_REQUEST_IDS):
+        errors.append(
+            f"{label}.log.entries 必须恰好包含四个 API 原始响应"
+        )
+
+    summaries: list[dict[str, object]] = []
+    bodies: dict[str, str] = {}
+    timestamps: list[datetime] = []
+    for index, entry in enumerate(raw_entries):
+        entry_label = f"{label}.log.entries[{index}]"
+        if not isinstance(entry, dict):
+            errors.append(f"{entry_label} 必须为 HAR 对象")
+            continue
+        errors.extend(_missing_har_fields(entry, HAR_ENTRY_REQUIRED_FIELDS, entry_label))
+        captured = _har_timestamp(entry.get("startedDateTime"))
+        if captured is None:
+            errors.append(f"{entry_label}.startedDateTime 必须为含时区 RFC 3339 时间")
+        else:
+            timestamps.append(captured)
+
+        request = entry.get("request")
+        response = entry.get("response")
+        if not isinstance(request, dict) or not isinstance(response, dict):
+            errors.append(f"{entry_label} 必须包含 HAR request/response 对象")
+            continue
+        errors.extend(
+            _missing_har_fields(request, HAR_REQUEST_REQUIRED_FIELDS, f"{entry_label}.request")
+        )
+        errors.extend(
+            _missing_har_fields(response, HAR_RESPONSE_REQUIRED_FIELDS, f"{entry_label}.response")
+        )
+        method = request.get("method")
+        endpoint = request.get("url")
+        request_id = None
+        if isinstance(method, str) and isinstance(endpoint, str):
+            parsed = urlsplit(endpoint)
+            request_id = next(
+                (
+                    item_id
+                    for item_id, expected in WEB_REQUEST_METHODS_AND_PATHS.items()
+                    if method == expected[0] and parsed.path == expected[1]
+                ),
+                None,
+            )
+        if request_id is None:
+            errors.append(f"{entry_label}.request method/url 不属于四个固定 API")
+            continue
+        if request_id in bodies:
+            errors.append(f"{label} HAR API 请求重复: {request_id}")
+
+        status = response.get("status")
+        if not isinstance(status, int) or isinstance(status, bool):
+            errors.append(f"{entry_label}.response.status 必须为整数")
+            status = None
+        raw_content = response.get("content")
+        if not isinstance(raw_content, dict):
+            errors.append(f"{entry_label}.response.content 必须为 HAR 对象")
+            continue
+        content_type = raw_content.get("mimeType")
+        expected_content_type = CAPTURE_CONTENT_TYPES[request_id]
+        normalized_content_type = (
+            content_type.split(";", 1)[0].strip().casefold()
+            if isinstance(content_type, str)
+            else None
+        )
+        if normalized_content_type != expected_content_type:
+            errors.append(
+                f"{entry_label}.response.content.mimeType 必须为 {expected_content_type}"
+            )
+        header_values = [
+            header.get("value")
+            for header in response.get("headers", [])
+            if isinstance(header, dict)
+            and isinstance(header.get("name"), str)
+            and header["name"].casefold() == "content-type"
+            and isinstance(header.get("value"), str)
+        ] if isinstance(response.get("headers"), list) else []
+        if len(header_values) != 1 or header_values[0].split(";", 1)[0].strip().casefold() != expected_content_type:
+            errors.append(f"{entry_label}.response.headers 缺少唯一匹配的 Content-Type")
+        response_body, body_errors = _har_response_text(
+            raw_content,
+            f"{entry_label}.response.content",
+        )
+        errors.extend(body_errors)
+        if response_body is not None:
+            bodies[request_id] = response_body
+        summaries.append(
+            {
+                "id": request_id,
+                "method": method,
+                "endpoint": endpoint,
+                "httpStatus": status,
+            }
+        )
+
+    request_ids = {
+        item.get("id") for item in summaries if isinstance(item.get("id"), str)
+    }
+    missing_requests = sorted(WEB_ONLINE_REQUEST_IDS - request_ids)
+    unexpected_requests = sorted(request_ids - WEB_ONLINE_REQUEST_IDS)
+    if missing_requests:
+        errors.append(f"{label} 缺少 HAR 原始请求: {','.join(missing_requests)}")
+    if unexpected_requests:
+        errors.append(f"{label} 包含未定义 HAR 请求: {','.join(unexpected_requests)}")
+    if any(item.get("httpStatus") != 200 for item in summaries):
+        errors.append(f"{label} capture 四类请求必须全部为 HTTP 200")
+
+    captured_at = ""
+    if len(timestamps) == len(raw_entries) and timestamps:
+        earliest = min(timestamps)
+        latest = max(timestamps)
+        if (latest - earliest).total_seconds() > MAX_ONLINE_CAPTURE_SPAN_SECONDS:
+            errors.append(f"{label} 四个 HAR 请求时间跨度超过 15 分钟")
+        captured_at = earliest.replace(microsecond=0).isoformat()
+
+    deployment_version = ""
+    if "health" in bodies:
+        health_document, health_errors = _json_response_object(
+            bodies["health"],
+            f"{label}.health.responseBody",
+        )
+        errors.extend(health_errors)
+        if health_document is not None:
+            raw_version = health_document.get("version")
+            if isinstance(raw_version, str) and raw_version.strip():
+                deployment_version = raw_version
+            else:
+                errors.append(f"{label}.health.responseBody.version 必须为非空字符串")
+    environment, environment_errors = _environment(
+        {"deploymentVersion": deployment_version, "requests": summaries},
+        f"{label}.environment",
+        "线上通过",
+    )
+    errors.extend(environment_errors)
+
+    checks: dict[str, object] = {}
+    if "health" in bodies and deployment_version:
+        derived, derived_errors = _health_business_checks(
+            bodies["health"], deployment_version, f"{label}.health.responseBody"
+        )
+        checks.update(derived)
+        errors.extend(derived_errors)
+    if "chat" in bodies:
+        derived, derived_errors = _chat_business_checks(
+            bodies["chat"], f"{label}.chat.responseBody"
+        )
+        checks.update(derived)
+        errors.extend(derived_errors)
+    if "plan" in bodies:
+        derived, derived_errors = _plan_business_checks(
+            bodies["plan"], f"{label}.plan.responseBody"
+        )
+        checks.update(derived)
+        errors.extend(derived_errors)
+    if "quiz" in bodies:
+        derived, derived_errors = _quiz_business_checks(
+            bodies["quiz"], f"{label}.quiz.responseBody"
+        )
+        checks.update(derived)
+        errors.extend(derived_errors)
+    return OnlineCapture(
+        captured_at,
+        deployment_version,
+        tuple(summaries),
+        checks,
+    ), errors
+
+
+def artifact_reference_owners(
+    content: bytes,
+) -> tuple[dict[str, set[str]], list[str]]:
+    if len(content) > MAX_EVIDENCE_INDEX_BYTES:
+        return {}, ["发布证据索引过大，无法收集 artifact 引用"]
+    try:
+        document = json.loads(content, object_pairs_hook=_strict_object)
+    except DuplicateJsonKeyError:
+        return {}, ["发布证据索引 JSON 包含重复键，无法收集 artifact 引用"]
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, ValueError):
+        return {}, ["发布证据索引无法解析 artifact 引用"]
+    if not isinstance(document, dict) or not isinstance(document.get("records"), list):
+        return {}, ["发布证据索引缺少 records，无法收集 artifact 引用"]
+    owners: dict[str, set[str]] = {}
+    for record in document["records"]:
+        if not isinstance(record, dict):
+            continue
+        record_id = record.get("id")
+        artifacts = record.get("artifacts")
+        if not isinstance(record_id, str) or not isinstance(artifacts, list):
+            continue
+        for artifact in artifacts:
+            if not isinstance(artifact, dict):
+                continue
+            path = artifact.get("path")
+            if isinstance(path, str):
+                owners.setdefault(path, set()).add(record_id)
+    return owners, []
+
+
+def evidence_record_bindings(
+    content: bytes,
+) -> tuple[dict[str, EvidenceRecordBinding], list[str]]:
+    if len(content) > MAX_EVIDENCE_INDEX_BYTES:
+        return {}, ["发布证据索引过大，无法收集记录绑定"]
+    try:
+        document = json.loads(content, object_pairs_hook=_strict_object)
+    except DuplicateJsonKeyError:
+        return {}, ["发布证据索引 JSON 包含重复键，无法收集记录绑定"]
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, ValueError):
+        return {}, ["发布证据索引无法解析记录绑定"]
+    if not isinstance(document, dict) or not isinstance(document.get("records"), list):
+        return {}, ["发布证据索引缺少 records，无法收集记录绑定"]
+
+    bindings: dict[str, EvidenceRecordBinding] = {}
+    errors: list[str] = []
+    for index, record in enumerate(document["records"]):
+        if not isinstance(record, dict):
+            errors.append(f"发布证据索引 records[{index}] 无法收集记录绑定")
+            continue
+        record_id = record.get("id")
+        level = record.get("level")
+        artifacts = record.get("artifacts")
+        if (
+            not isinstance(record_id, str)
+            or not isinstance(level, str)
+            or not isinstance(artifacts, list)
+        ):
+            errors.append(f"发布证据索引 records[{index}] 记录绑定字段无效")
+            continue
+        if record_id in bindings:
+            errors.append(f"发布证据索引记录绑定 ID 重复: {record_id}")
+            continue
+        artifact_references = frozenset(
+            (artifact["path"], artifact["kind"])
+            for artifact in artifacts
+            if isinstance(artifact, dict)
+            and isinstance(artifact.get("path"), str)
+            and isinstance(artifact.get("kind"), str)
+        )
+        bindings[record_id] = EvidenceRecordBinding(
+            level,
+            frozenset(path for path, _ in artifact_references),
+            artifact_references,
+        )
+    return bindings, errors
+
+
 def _valid_recorded_at(value: object) -> bool:
     if not isinstance(value, str) or RFC3339_PATTERN.fullmatch(value) is None:
         return False
@@ -550,7 +1260,7 @@ def validate_release_evidence(
     content: bytes,
     expected_source_commit: str,
     expected_hap_sha256: str,
-    available_artifacts: dict[str, bytes] | None = None,
+    available_artifacts: dict[str, ArtifactBinding] | None = None,
 ) -> tuple[EvidenceIndexMetrics, list[str]]:
     empty_metrics = EvidenceIndexMetrics(0, 0, 0)
     if len(content) > MAX_EVIDENCE_INDEX_BYTES:
@@ -610,6 +1320,7 @@ def validate_release_evidence(
     seen_ids: set[str] = set()
     level_counts: Counter[str] = Counter()
     for index, raw_record in enumerate(raw_records):
+        record_error_start = len(errors)
         label = f"发布证据索引 records[{index}]"
         if not isinstance(raw_record, dict):
             errors.append(f"{label} 必须为对象")
@@ -646,8 +1357,6 @@ def validate_release_evidence(
         if not isinstance(level, str) or level not in EVIDENCE_LEVELS:
             errors.append(f"{record_label}.level 不是七种精确证据等级之一")
             level = None
-        else:
-            level_counts[level] += 1
 
         if not _valid_recorded_at(raw_record.get("recordedAt")):
             errors.append(f"{record_label}.recordedAt 必须为含时区的 RFC 3339 秒级时间")
@@ -683,6 +1392,7 @@ def validate_release_evidence(
                 artifacts,
                 available_artifacts,
                 f"{record_label}.artifacts",
+                level,
             )
         )
         business_checks, item_errors = _business_checks(
@@ -694,6 +1404,11 @@ def validate_release_evidence(
         artifact_kinds = {
             item.get("kind") for item in artifacts if isinstance(item.get("kind"), str)
         }
+        artifact_paths = {
+            item.get("path")
+            for item in artifacts
+            if isinstance(item.get("path"), str)
+        }
         business_check_ids = {
             item.get("id")
             for item in business_checks
@@ -704,6 +1419,14 @@ def validate_release_evidence(
             for item in business_checks
             if isinstance(item.get("id"), str)
         }
+        for check in business_checks:
+            check_id = check.get("id")
+            artifact_path = check.get("artifactPath")
+            if isinstance(artifact_path, str) and artifact_path not in artifact_paths:
+                errors.append(
+                    f"{record_label}：业务检查 {check_id} 的 artifactPath "
+                    "未在本记录 artifacts 中声明"
+                )
         raw_online_requests = environment.get("requests")
         online_request_ids = (
             {
@@ -747,14 +1470,106 @@ def validate_release_evidence(
                 errors.append(f"{record_label}：{level}必须记录至少一个证据文件")
             if not business_checks:
                 errors.append(f"{record_label}：{level}必须记录业务字段或流程检查")
+        if record_id == "golden-demo" and level not in GOLDEN_DEMO_LEVELS:
+            errors.append(
+                f"{record_label}：golden-demo 只接受未验证、模拟器通过或真机通过"
+            )
         if level in {"模拟器通过", "真机通过"} and not (
             artifact_kinds & DEVICE_ARTIFACT_KINDS
         ):
             errors.append(f"{record_label}：{level}必须记录 UI 树、截图、视频或日志")
+        if level in {"模拟器通过", "真机通过"} and record_id == "golden-demo":
+            missing_demo_checks = sorted(GOLDEN_DEMO_CHECK_IDS - business_check_ids)
+            unexpected_demo_checks = sorted(business_check_ids - GOLDEN_DEMO_CHECK_IDS)
+            if missing_demo_checks:
+                errors.append(
+                    f"{record_label}：黄金演示缺少 D01-D07 固定检查: "
+                    + ",".join(missing_demo_checks)
+                )
+            if unexpected_demo_checks:
+                errors.append(
+                    f"{record_label}：黄金演示包含未定义检查: "
+                    + ",".join(unexpected_demo_checks)
+                )
+            if "ui-tree" not in artifact_kinds or "video" not in artifact_kinds:
+                errors.append(
+                    f"{record_label}：黄金演示必须同时绑定 ui-tree 与 video 证据"
+                )
         if level == "线上通过":
             if not artifact_kinds & ONLINE_ARTIFACT_KINDS:
                 errors.append(f"{record_label}：线上通过必须记录诊断、日志或门户回执")
             if record_id == "web-validation":
+                capture_artifacts = [
+                    item for item in artifacts if item.get("kind") == "capture"
+                ]
+                if len(capture_artifacts) != 1:
+                    errors.append(
+                        f"{record_label}：线上通过必须绑定唯一 capture"
+                    )
+                else:
+                    capture_path = capture_artifacts[0].get("path")
+                    if (
+                        not isinstance(capture_path, str)
+                        or PurePosixPath(capture_path).suffix.casefold() != ".har"
+                    ):
+                        errors.append(
+                            f"{record_label}：capture artifactPath 必须使用 .har 后缀"
+                        )
+                    capture_binding = (
+                        available_artifacts.get(capture_path)
+                        if available_artifacts is not None
+                        and isinstance(capture_path, str)
+                        else None
+                    )
+                    if (
+                        not isinstance(capture_binding, ArtifactBinding)
+                        or capture_binding.content is None
+                    ):
+                        errors.append(
+                            f"{record_label}：capture 必须绑定可解析的实际原始响应字节"
+                        )
+                    else:
+                        capture, capture_errors = parse_online_capture(
+                            capture_binding.content,
+                            f"{record_label}.capture",
+                        )
+                        errors.extend(capture_errors)
+                        if capture is not None:
+                            if raw_record.get("recordedAt") != capture.captured_at:
+                                errors.append(
+                                    f"{record_label}：recordedAt 必须等于 capture capturedAt"
+                                )
+                            if environment.get("deploymentVersion") != capture.deployment_version:
+                                errors.append(
+                                    f"{record_label}：deploymentVersion 必须来自 capture"
+                                )
+                            captured_requests = {
+                                item.get("id"): item for item in capture.requests
+                            }
+                            declared_requests = {
+                                item.get("id"): item
+                                for item in raw_online_requests
+                                if isinstance(item, dict)
+                            } if isinstance(raw_online_requests, list) else {}
+                            if declared_requests != captured_requests:
+                                errors.append(
+                                    f"{record_label}：requests 必须与 capture 请求元数据一致"
+                                )
+                            declared_checks = {
+                                check_id: item.get("actual")
+                                for check_id, item in business_checks_by_id.items()
+                            }
+                            if declared_checks != capture.business_checks:
+                                errors.append(
+                                    f"{record_label}：businessChecks 必须由 capture 原始响应推导"
+                                )
+                            if any(
+                                item.get("artifactPath") != capture_path
+                                for item in business_checks
+                            ):
+                                errors.append(
+                                    f"{record_label}：线上业务检查必须逐项引用唯一 capture"
+                                )
                 missing_requests = sorted(WEB_ONLINE_REQUEST_IDS - online_request_ids)
                 unexpected_requests = sorted(online_request_ids - WEB_ONLINE_REQUEST_IDS)
                 if missing_requests:
@@ -804,6 +1619,8 @@ def validate_release_evidence(
                 or business_checks
             ):
                 errors.append(f"{record_label}：未验证状态不得夹带通过证据")
+        if level is not None and len(errors) == record_error_start:
+            level_counts[level] += 1
 
     missing_records = sorted(REQUIRED_RECORD_IDS - seen_ids)
     if missing_records:

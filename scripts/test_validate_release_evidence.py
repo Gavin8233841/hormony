@@ -16,6 +16,8 @@ SOURCE_COMMIT = "a" * 40
 HAP_SHA256 = "b" * 64
 RECORDED_AT = "2026-07-17T12:00:00+08:00"
 ARTIFACT_CONTENT = b"fixed schema evidence; not product runtime evidence"
+ONLINE_CAPTURE_PATH = "evidence/artifacts/web-online-capture.har"
+FIXED_ORIGIN = "https://fixed-input.hongxueban.cn"
 
 
 def record(record_id: str, level: str = "未验证") -> dict[str, object]:
@@ -49,7 +51,7 @@ def environment_for_online() -> dict[str, object]:
                 "id": request_id,
                 "method": MODULE.WEB_REQUEST_METHODS_AND_PATHS[request_id][0],
                 "endpoint": (
-                    "https://service.example.invalid"
+                    FIXED_ORIGIN
                     + MODULE.WEB_REQUEST_METHODS_AND_PATHS[request_id][1]
                 ),
                 "httpStatus": 200,
@@ -72,7 +74,11 @@ def artifact(
     }
 
 
-def business_check(check_id: str, actual: object | None = None) -> dict[str, object]:
+def business_check(
+    check_id: str,
+    actual: object | None = None,
+    artifact_path: str = ONLINE_CAPTURE_PATH,
+) -> dict[str, object]:
     if actual is None:
         if check_id == "health.status":
             actual = "ready"
@@ -81,17 +87,18 @@ def business_check(check_id: str, actual: object | None = None) -> dict[str, obj
         elif check_id == "health.deployment":
             actual = "deployment-20260717"
         elif check_id == "chat.body":
-            actual = 128
+            actual = 19
         elif check_id == "chat.citations-as-returned":
             actual = 2
         elif check_id == "plan.task-count":
-            actual = 3
+            actual = 1
         else:
             actual = True
     return {
         "id": check_id,
         "passed": True,
         "actual": actual,
+        "artifactPath": artifact_path,
     }
 
 
@@ -105,21 +112,187 @@ def valid_document() -> dict[str, object]:
     }
 
 
-def online_web_document() -> tuple[dict[str, object], dict[str, bytes]]:
+def online_response_bodies() -> tuple[dict[str, str], dict[str, str]]:
+    health = {
+        "status": "ready",
+        "timestamp": "2026-07-17T12:00:00+08:00",
+        "uptime": 42,
+        "model": {
+            "configured": True,
+            "mode": "production",
+            "provider": "provider",
+            "name": "exact-model-id",
+        },
+        "deploymentMode": "production",
+        "version": "deployment-20260717",
+    }
+    chat = "".join(
+        (
+            'data: {"type":"thinking","agent":"Router"}\n\n',
+            'data: {"type":"delta","content":"fixed response body"}\n\n',
+            'data: {"type":"citation","source":{"doc":"fixed-source"}}\n\n',
+            'data: {"type":"citation","source":{"doc":"fixed-source-2"}}\n\n',
+            'data: {"type":"done","sessionId":"fixed-session"}\n\n',
+        )
+    )
+    plan = {
+        "planId": "fixed-plan",
+        "userId": "fixed-user",
+        "goal": "fixed goal",
+        "tasks": [
+            {
+                "id": "task-1",
+                "title": "fixed task",
+                "date": "2026-07-18",
+                "estimatedMin": 25,
+                "type": "review",
+            }
+        ],
+    }
+    quiz = {
+        "quizId": "fixed-quiz",
+        "courseId": "cs101",
+        "topic": "fixed topic",
+        "questions": [
+            {
+                "id": "q1",
+                "type": "choice",
+                "stem": "fixed stem",
+                "options": ["A", "B", "C", "D"],
+                "tags": ["fixed"],
+            }
+        ],
+        "grading": [
+            {
+                "questionId": "q1",
+                "answer": "A",
+                "explanation": "fixed explanation",
+                "tags": ["fixed"],
+            }
+        ],
+    }
+    response_bodies = {
+        "health": json.dumps(health, separators=(",", ":")),
+        "chat": chat,
+        "plan": json.dumps(plan, separators=(",", ":")),
+        "quiz": json.dumps(quiz, separators=(",", ":")),
+    }
+    content_types = {
+        "health": "application/json",
+        "chat": "text/event-stream",
+        "plan": "application/json",
+        "quiz": "application/json",
+    }
+    return response_bodies, content_types
+
+
+def self_reported_capture_bytes() -> bytes:
+    response_bodies, content_types = online_response_bodies()
+    document = {
+        "schemaVersion": 1,
+        "capturedAt": RECORDED_AT,
+        "deploymentVersion": "deployment-20260717",
+        "requests": [
+            {
+                "id": request_id,
+                "method": MODULE.WEB_REQUEST_METHODS_AND_PATHS[request_id][0],
+                "endpoint": FIXED_ORIGIN
+                + MODULE.WEB_REQUEST_METHODS_AND_PATHS[request_id][1],
+                "httpStatus": 200,
+                "contentType": content_types[request_id],
+                "responseBody": response_bodies[request_id],
+            }
+            for request_id in sorted(MODULE.WEB_ONLINE_REQUEST_IDS)
+        ],
+    }
+    return json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
+
+
+def online_capture_bytes() -> bytes:
+    response_bodies, content_types = online_response_bodies()
+    entries = []
+    for request_id in sorted(MODULE.WEB_ONLINE_REQUEST_IDS):
+        method, path = MODULE.WEB_REQUEST_METHODS_AND_PATHS[request_id]
+        response_body = response_bodies[request_id]
+        response_bytes = response_body.encode("utf-8")
+        entries.append(
+            {
+                "startedDateTime": RECORDED_AT,
+                "time": 1,
+                "request": {
+                    "method": method,
+                    "url": FIXED_ORIGIN + path,
+                    "httpVersion": "HTTP/2",
+                    "headers": [],
+                    "queryString": [],
+                    "cookies": [],
+                    "headersSize": -1,
+                    "bodySize": -1,
+                },
+                "response": {
+                    "status": 200,
+                    "statusText": "OK",
+                    "httpVersion": "HTTP/2",
+                    "headers": [
+                        {"name": "content-type", "value": content_types[request_id]}
+                    ],
+                    "cookies": [],
+                    "content": {
+                        "size": len(response_bytes),
+                        "mimeType": content_types[request_id],
+                        "text": response_body,
+                    },
+                    "redirectURL": "",
+                    "headersSize": -1,
+                    "bodySize": len(response_bytes),
+                },
+                "cache": {},
+                "timings": {"send": 0, "wait": 1, "receive": 0},
+            }
+        )
+    document = {
+        "log": {
+            "version": "1.2",
+            "creator": {"name": "fixed-fixture", "version": "1"},
+            "entries": entries,
+        }
+    }
+    return json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
+
+
+def binding(
+    content: bytes,
+    role: str = "evidence-artifact",
+) -> object:
+    return MODULE.ArtifactBinding(
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+        role,
+        content,
+    )
+
+
+def online_web_document() -> tuple[dict[str, object], dict[str, object]]:
     document = valid_document()
     records = document["records"]
     assert isinstance(records, list)
     web = next(item for item in records if item["id"] == "web-validation")
-    artifact_path = "evidence/web-online.log"
+    artifact_path = ONLINE_CAPTURE_PATH
+    capture = online_capture_bytes()
     web["level"] = "线上通过"
     web["command"] = ["node", "scripts/test-chat.mjs"]
     web["exitCode"] = 0
     web["environment"] = environment_for_online()
-    web["artifacts"] = [artifact(artifact_path, "log")]
+    web["artifacts"] = [artifact(artifact_path, "capture", capture)]
     web["businessChecks"] = [
-        business_check(check_id) for check_id in sorted(MODULE.WEB_ONLINE_CHECK_IDS)
+        business_check(check_id, artifact_path=artifact_path)
+        for check_id in sorted(MODULE.WEB_ONLINE_CHECK_IDS)
     ]
-    return document, {artifact_path: ARTIFACT_CONTENT}
+    return document, {artifact_path: binding(capture)}
 
 
 def encoded(document: dict[str, object]) -> bytes:
@@ -132,7 +305,7 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
     def check(
         self,
         document: dict[str, object],
-        available_artifacts: dict[str, bytes] | None = None,
+        available_artifacts: dict[str, object] | None = None,
     ) -> tuple[MODULE.EvidenceIndexMetrics, list[str]]:
         return MODULE.validate_release_evidence(
             encoded(document),
@@ -153,13 +326,13 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
         document = valid_document()
         document["sourceCommit"] = "c" * 40
         document["hapSha256"] = "d" * 64
-        document["schemaVersion"] = 1
+        document["schemaVersion"] = 2
         document["extra"] = True
 
         _, errors = self.check(document)
         output = "\n".join(errors)
 
-        self.assertIn("schemaVersion 必须为 2", output)
+        self.assertIn("schemaVersion 必须为 3", output)
         self.assertIn("sourceCommit 与 release-manifest.json 不一致", output)
         self.assertIn("hapSha256 与实际 HAP 字节不一致", output)
         self.assertIn("包含未定义字段: extra", output)
@@ -237,14 +410,17 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
             "scripts/validate-competition-content.py",
         ]
         record_item["exitCode"] = 0
-        record_item["artifacts"] = [artifact("evidence/report.txt", "diagnostic")]
-        record_item["businessChecks"] = [business_check("structure.pass")]
+        artifact_path = "evidence/artifacts/report.txt"
+        record_item["artifacts"] = [artifact(artifact_path, "diagnostic")]
+        record_item["businessChecks"] = [
+            business_check("structure.pass", artifact_path=artifact_path)
+        ]
 
         _, errors = self.check(document)
 
         self.assertTrue(any("未验证状态不得夹带通过证据" in error for error in errors))
 
-    def test_v1_free_text_runtime_evidence_is_rejected(self) -> None:
+    def test_old_schema_and_free_text_runtime_evidence_are_rejected(self) -> None:
         document = valid_document()
         records = document["records"]
         assert isinstance(records, list)
@@ -255,10 +431,12 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
         web["environment"] = "HTTP 200"
         web["artifacts"] = ["output"]
         web["businessChecks"] = ["ok"]
+        document["schemaVersion"] = 2
 
         _, errors = self.check(document)
         output = "\n".join(errors)
 
+        self.assertIn("schemaVersion 必须为 3", output)
         self.assertIn("command 必须为 argv 字符串数组或 null", output)
         self.assertIn("environment 必须为对象", output)
         self.assertIn("artifacts[0] 必须为对象", output)
@@ -301,7 +479,11 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
 
         _, invalid_errors = self.check(
             invalid,
-            {"evidence/web-online.log": b"different artifact bytes"},
+            {
+                ONLINE_CAPTURE_PATH: binding(
+                    b"different artifact bytes",
+                )
+            },
         )
         output = "\n".join(invalid_errors)
 
@@ -320,7 +502,8 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
         records = document["records"]
         assert isinstance(records, list)
         demo = next(item for item in records if item["id"] == "golden-demo")
-        artifact_path = "evidence/device-ui-tree.json"
+        ui_tree_path = "evidence/artifacts/device-ui-tree.json"
+        video_path = "evidence/artifacts/golden-demo.mp4"
         demo["level"] = "真机通过"
         demo["command"] = ["hdc", "shell", "uitest", "dumpLayout"]
         demo["exitCode"] = 0
@@ -330,10 +513,20 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
             "orientation": "portrait",
             "resolution": {"widthPx": 1260, "heightPx": 2720},
         }
-        demo["artifacts"] = [artifact(artifact_path, "ui-tree")]
-        demo["businessChecks"] = [business_check("demo.flow-complete")]
+        demo["artifacts"] = [
+            artifact(ui_tree_path, "ui-tree"),
+            artifact(video_path, "video"),
+        ]
+        demo["businessChecks"] = [
+            business_check(check_id, artifact_path=video_path)
+            for check_id in sorted(MODULE.GOLDEN_DEMO_CHECK_IDS)
+        ]
 
-        _, errors = self.check(document, {artifact_path: ARTIFACT_CONTENT})
+        bindings = {
+            ui_tree_path: binding(ARTIFACT_CONTENT),
+            video_path: binding(ARTIFACT_CONTENT),
+        }
+        _, errors = self.check(document, bindings)
         self.assertEqual([], errors)
 
         invalid = deepcopy(document)
@@ -346,8 +539,105 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
         assert isinstance(invalid_environment, dict)
         invalid_environment["resolution"] = "1260x2720"
 
-        _, invalid_errors = self.check(invalid, {artifact_path: ARTIFACT_CONTENT})
+        _, invalid_errors = self.check(invalid, bindings)
         self.assertTrue(any("resolution 必须为对象" in error for error in invalid_errors))
+
+        record_bindings, binding_errors = MODULE.evidence_record_bindings(
+            encoded(document)
+        )
+        self.assertEqual([], binding_errors)
+        self.assertEqual("真机通过", record_bindings["golden-demo"].level)
+        self.assertEqual(
+            frozenset({ui_tree_path, video_path}),
+            record_bindings["golden-demo"].artifact_paths,
+        )
+
+    def test_golden_demo_rejects_non_device_pass_levels(self) -> None:
+        document = valid_document()
+        records = document["records"]
+        assert isinstance(records, list)
+        demo = next(item for item in records if item["id"] == "golden-demo")
+        demo["level"] = "线上通过"
+        demo["command"] = ["fixed-tool", "verify-demo"]
+        demo["exitCode"] = 0
+        demo["environment"] = environment_for_online()
+        demo["artifacts"] = [artifact(ONLINE_CAPTURE_PATH, "log")]
+        demo["businessChecks"] = [
+            business_check("demo.fixed", artifact_path=ONLINE_CAPTURE_PATH)
+        ]
+
+        _, errors = self.check(
+            document,
+            {ONLINE_CAPTURE_PATH: binding(ARTIFACT_CONTENT)},
+        )
+
+        self.assertTrue(
+            any("golden-demo 只接受未验证、模拟器通过或真机通过" in error for error in errors)
+        )
+
+    def test_online_level_requires_parsed_capture_and_rejects_git_source(self) -> None:
+        document, bindings = online_web_document()
+        capture = online_capture_bytes()
+
+        _, git_source_errors = self.check(
+            document,
+            {ONLINE_CAPTURE_PATH: binding(capture, role="git-source")},
+        )
+        self.assertTrue(
+            any("运行证据不得来自 Git 源文件" in error for error in git_source_errors)
+        )
+
+        log_only = deepcopy(document)
+        records = log_only["records"]
+        assert isinstance(records, list)
+        web = next(item for item in records if item["id"] == "web-validation")
+        web["artifacts"] = [artifact(ONLINE_CAPTURE_PATH, "log")]
+        _, log_errors = self.check(log_only, bindings)
+        self.assertTrue(any("线上通过必须绑定唯一 capture" in error for error in log_errors))
+
+        wrong_suffix = deepcopy(document)
+        wrong_records = wrong_suffix["records"]
+        assert isinstance(wrong_records, list)
+        wrong_web = next(item for item in wrong_records if item["id"] == "web-validation")
+        json_path = "evidence/artifacts/web-online-capture.json"
+        wrong_web["artifacts"][0]["path"] = json_path
+        for check in wrong_web["businessChecks"]:
+            check["artifactPath"] = json_path
+        _, suffix_errors = self.check(
+            wrong_suffix,
+            {json_path: binding(capture)},
+        )
+        self.assertTrue(any("必须使用 .har 后缀" in error for error in suffix_errors))
+
+        capture_document = json.loads(capture)
+        capture_document["log"]["entries"][0]["response"]["status"] = 204
+        tampered_capture = json.dumps(
+            capture_document,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        tampered_document = deepcopy(document)
+        tampered_records = tampered_document["records"]
+        assert isinstance(tampered_records, list)
+        tampered_web = next(
+            item for item in tampered_records if item["id"] == "web-validation"
+        )
+        tampered_web["artifacts"] = [
+            artifact(ONLINE_CAPTURE_PATH, "capture", tampered_capture)
+        ]
+        _, capture_errors = self.check(
+            tampered_document,
+            {ONLINE_CAPTURE_PATH: binding(tampered_capture)},
+        )
+        self.assertTrue(any("capture 四类请求必须全部为 HTTP 200" in error for error in capture_errors))
+
+    def test_custom_self_reported_capture_cannot_grant_online_pass(self) -> None:
+        capture, errors = MODULE.parse_online_capture(
+            self_reported_capture_bytes(),
+            "fixed self-reported capture",
+        )
+
+        self.assertIsNone(capture)
+        self.assertTrue(any("HAR 1.2" in error for error in errors))
 
     def test_timestamp_lists_duplicate_keys_and_size_limits_are_rejected(self) -> None:
         document = valid_document()
