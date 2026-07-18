@@ -98,7 +98,12 @@ class CompetitionReleasePreflightTests(unittest.TestCase):
             stages[1].command,
         )
         self.assertEqual(
-            (sys.executable, "-B", str(MODULE.CONTENT_GATE_PATH)),
+            (
+                sys.executable,
+                "-B",
+                str(MODULE.CONTENT_GATE_PATH),
+                "--require-notice-ready",
+            ),
             stages[2].command,
         )
         self.assertEqual(

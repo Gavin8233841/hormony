@@ -1018,3 +1018,52 @@ exit 0 时向 stderr 报告错误也会被忽略。包内黄金视频已有更�
   音画同步、隐私处理、五分钟教学叙事或门户上传通过。
 - **未验证**：本批只修改 Python 门禁和测试，没有重复 Web 四项或 HAP 构建；批次 17
   的 Web/HAP 记录属于前一提交，不自动升级为本批提交证据。
+
+## 批次 19：NOTICE 人工阻断项的正式预检严格模式
+
+背景：日常内容门禁允许源码 manifest 中的 `docs/COMPETITION-NOTICE.md` 保留
+`CHECK-BEFORE-SUBMISSION`，以便在团队信息、许可证与签署事实未知时继续做静态审计。
+但统一正式发布入口沿用同一宽松命令，会把未就绪 NOTICE 的内容阶段报告为通过，直到
+最终 ZIP 深层门禁才失败，不能在正式材料准备开始时尽早暴露阻断项。
+
+文件：
+
+- `scripts/validate-competition-content.py`
+- `scripts/test_validate_competition_content.py`
+- `scripts/validate-competition-release.py`
+- `scripts/test_validate_competition_release.py`
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `docs/SUBMISSION-SOURCE-MANIFEST.md`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 内容门禁新增显式 `--require-notice-ready`。默认源码审计仍允许待处理标记并输出
+  **未验证**，避免开发期要求代理猜写团队身份、权利、原创或 AI 使用事实。
+- 严格模式对同一源码集合复用既有待处理标记检查；只要 NOTICE 仍含标记，源码提交
+  集合阶段失败并返回 exit 1，不新增另一套 NOTICE schema 或重复清单。
+- 统一正式发布入口固定给内容阶段追加 `--require-notice-ready`，因此正式预检不能在
+  NOTICE、原创声明和 AI 使用说明尚未由真实团队确认时获得全绿。
+- 操作手册明确区分日常源码审计与正式预检，并同步实际帧计数、尺寸、编码字段和
+  exit 0 + stderr 媒体失败边界；没有新增未经官方 PDF 支持的编码或分辨率硬门槛。
+
+验证：
+
+- **静态诊断通过**：内容固定输入 exit 0，30/30；新增同一 NOTICE 固定输入证明默认
+  模式 exit 0、严格模式 exit 1。统一入口固定输入 exit 0，13/13，并断言内容阶段
+  精确 argv 含 `--require-notice-ready`。
+- **静态诊断通过**：真实仓库默认内容命令 exit 0，明确打印 NOTICE **未验证**；同一
+  命令追加严格参数 exit 1，唯一源码包错误为
+  `docs/COMPETITION-NOTICE.md (CHECK-BEFORE-SUBMISSION)`，其余 165/147/36/33 内容门禁
+  继续通过。
+- **静态诊断通过**：评分测试 11/11、依赖测试 8/8；两个真实门禁均 exit 0，评分
+  `13/7/285/480`，依赖 `18/7/11/7/7`，文档与统一入口没有漂移。
+
+未验证：
+
+- **未验证**：NOTICE 当前仍有真实人工阻断项；本批没有删除标记，也没有填写队伍、
+  成员、指导老师、资产作者、许可证全文、原创签字或 AI 工具使用事实。
+- **未验证**：最终三文件、签名 HAP、真实 evidence index、完整播放和门户提交仍缺失；
+  统一入口在这些外部条件齐备前不应通过。
+- **未验证**：本批仅修改 Python 门禁、测试和交付文档，没有重复 Web/HAP 构建或设备
+  流程；HDC 连通不证明应用路径通过。

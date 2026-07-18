@@ -292,6 +292,7 @@ python -B scripts/validate-competition-release.py `
 ```
 
 运行前后都必须确认工作树干净且 `HEAD` 未改变，确保 PDF、MP4、ZIP、HAP 和发布证据索引绑定同一提交。正式媒体失败只记录结构化原因，不回显子进程正文或秘密。
+总入口对内容阶段固定启用 `--require-notice-ready`：日常审计可以把 NOTICE 待处理项保留为**未验证**，但正式预检只要 `docs/COMPETITION-NOTICE.md` 仍含 `CHECK-BEFORE-SUBMISSION` 就必须失败；脚本不能替团队填写身份、权利、原创或 AI 使用事实。
 
 ### 1. 内容与数据
 
