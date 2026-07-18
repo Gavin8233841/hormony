@@ -94,10 +94,6 @@ struct Index {
         }, 0);
         return;
       }
-      if (currentPage === targetPage) {
-        this.completeProactiveNavigation(launchVersion, targetPage);
-        return;
-      }
       const navigation = currentPage === 'pages/Index' ?
         appRouter.pushUrl({ url: targetPage }) : appRouter.replaceUrl({ url: targetPage });
       navigation.then((): void => {

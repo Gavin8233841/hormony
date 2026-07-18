@@ -26,7 +26,7 @@
 - 通知授权请求完成后再次读取系统开关；仍未授权时不发布通知，并在首页保留明确错误和重试操作。API 12 不调用 API 13 才提供的应用内通知设置接口。
 - `EntryAbility.ets` 在 `onCreate` 与 `onNewWant` 消费卡片/通知参数；合法外壳通过目录校验后重新解析当前 ArkData 行动，单调序号保证连续 Want 只执行最后一次，无关 Want 不清除已排队入口。
 - `EntryAbility.ets` 对重算后的当前行动生成前台周期稳定键；相同来源和行动的重复 Want 只发布一次，进入后台后释放去重状态，后续真实触达仍可再次执行。
-- `Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动；嵌套页上的课程入口使用 API 12 `Router.back({ url: 'pages/Index' })` 返回根页，其他目标按当前路由栈执行 `pushUrl/replaceUrl`，只在导航确认成功后消费目标。
+- `Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动；嵌套页上的课程入口使用 API 12 `Router.back({ url: 'pages/Index' })` 返回根页，其他目标按当前路由栈执行 `pushUrl/replaceUrl`，只在导航确认成功后消费目标。通知或卡片再次指向当前子页面时也执行 `replaceUrl`，让页面重新消费新的课程、Topic 与动作，不再把仍显示旧任务的页面误判为已回流。
 - `EntryAbility.ets` 先完成内容仓库与 ArkData 课程目录同步，再校验来源、128 字符长度上限、动作/页面映射、课程和精确 Topic；外部 `courseTitle` 被忽略，标题从本地目录推导，非法 Want 不写 `AppStorage`。
 - `LearningFormUpdater.ets` 与 `LearningPlanCard.ets` 展示同一行动、依据、进度和 CTA，`FormLink` 传递精确目标页面及学习上下文。
 - `LearningFormUpdater.refreshAll()` 每批只解析一次 next-best-action，再更新全部卡片；显式快照刷新不重复读取状态，单卡系统更新仍读取最新本机状态。
@@ -122,3 +122,19 @@
 第二批提交：`c6697ef fix: 修正主动学习状态与入口边界`。
 第三批提交：`17057cc fix: 强化主动触达幂等与失败恢复`，主线集成时保留最新行动重算与成功后消费状态机。
 第四批提交：`d54e2d5 feat: 强化真实画像与记录无障碍`；产品与契约文件已在集成主线保持字节级一致。
+
+## 2026-07-18 主线同路由回流复核
+
+- 主线采用 WS04 `196d938` 的同路由重建修复：当前子页与主动入口目标相同时不再提前消费，而是调用 API 12 `Router.replaceUrl()` 重建页面，并等待其 `Promise<void>` 成功后清除目标。
+- 导航失败时保留入口并按同一 launch version 只安排一次重试；旧导航 Promise 完成时若已有更新版本，不会消费新目标，而是释放导航锁并调度最新版本继续处理。
+- API 12 SDK `@ohos.arkui.UIContext.d.ts` 已确认 `Router.replaceUrl()` 会销毁当前页并返回 `Promise<void>`。
+
+主线验证：
+
+- `node --test scripts/test-proactive-delivery-contracts.mjs`：exit 0，25/25；覆盖同路由成功后消费、失败保留与单次重试、旧 Promise 不消费新目标并调度最新版本。
+- 主线现有六个 WS04 Node 契约脚本合并执行：exit 0，66/66。支线使用的 `test-achievements-milestone-routing-contracts.mjs` 不在当前主线，因此未沿用支线 74/74 口径。
+- `python -m unittest scripts.test_learning_map_navigation_contract scripts.test_validate_topic_relations -v`：exit 0，13/13。
+- `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`：exit 0，API 12 HAP 构建通过，`BUILD SUCCESSFUL in 7 s 980 ms`；仍未配置正式签名。
+- `hdc list targets -v`：exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+
+证据边界：WS04 支线曾在同一模拟器安装其 HAP，并以 PID 18915、两份 UI 树和 1256 x 2760 截图证明合法 Want 可触发同路由页面重建；这些是支线设备证据，不是本次主线构建后的重新安装与 UI 复验。本次主线只确认源码、契约、API 12 构建和 HDC 连接。通知面板实际点击、服务卡片桌面点击、屏幕阅读器与字体放大、正式签名、真机完整学习回流仍未验证。
