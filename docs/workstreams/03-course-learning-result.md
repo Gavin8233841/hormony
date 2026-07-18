@@ -1009,3 +1009,37 @@
 
 - 初次新解释中的“剩余空间”触发通用标签器的复杂度规则，随后题面“以下说法正确”又触发概念辨析规则；改成“页框内未使用的字节”并直接询问碎片特征后重新生成，最终三个派生标签与 HEAD 完全相同。未修改共享标签器。
 - **未验证**：当前无模拟器、手机、平板或真机；新题面、四个选项和长解释的实际布局未验证。本批未调用线上 API。
+
+## 批次三十五：AVL 双旋基本操作计数边界
+
+### 行为
+
+- `cs101_q41` 明确把一次左旋或右旋定义为 1 次基本旋转，不再把“一次双旋修复”与“一次基本旋转”混为同一计数单位。
+- 正确答案由 A 改为 B：LL/RR 型需要一次基本旋转，LR/RL 型依次执行两个方向的两次基本旋转，因此一次 AVL 插入恢复平衡最多执行两次基本旋转。
+- 新增可执行 AVL 插入模型，覆盖六个三键排列：无需旋转的两种排列计 0，LL/RR 各计 1，LR/RL 各计 2。契约同时拒绝旧答案 A、“双旋只算一次基本旋转”和否定句包含关键词误绿。
+
+### 文件与生成边界
+
+- 题库唯一源为 `apps/web/src/lib/data/quizzes.ts`；`scripts/generate-quizzes-json.mjs` 生成 HarmonyOS `quizzes.json` 并校验 165 道选择题逐字段一致。
+- 端侧精确变化仅为 `$[24].question`、`$[24].answer`、`$[24].explanation`（`id=cs101_q41`）。四个选项、`difficulty=medium` 和标签 `平衡树机制/复杂度分析/应用推理` 均不变。
+- 本批未修改主动学习规格、知识切片或受保护的 `lesson-experiences.json`，也未修改 `DEVLOG.md`。AVL Lesson 既有活动已经真实执行“对 60 右旋，再对 50 左旋”，无需生成 Lesson 产物。
+
+### 证据
+
+- **源码确认**：Virginia Tech OpenDSA《The AVL Tree》官方 source `AVL.rst.txt` 本轮读取 HTTP 200；第 125-130 行明确 Cases 1/4 使用 single rotation、Cases 2/3 使用 double rotation，第 162-170 行定义 left-right 及对称 right-left double rotation，第 180-184 行再次说明 Case 2 requires a double rotation。
+- **源码确认**：修正前目标契约退出码 1，生产 q41 缺少基本旋转计数单位、答案仍为 A，四个事实约束红灯；只改 Web 源且尚未生成端侧 JSON 时，4 项中 3 项通过，唯一失败是 Web/raw q41 不一致。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0，165 道端侧选择题与 Web 唯一源完全一致。
+- **静态诊断通过**：最终 `python -m unittest scripts.test_cs101_complexity_lesson_facts -v` 退出码 0，4 项通过；包含六个三键排列、旧文案、错误答案和否定句误绿固定输入。
+- **静态诊断通过**：17 个已跟踪脚本测试模块加本批新契约，退出码 0；124 项运行，123 项通过，1 项跨 WS02 reducer 契约为预期失败。
+- **静态诊断通过**：`python scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 切片、165 题和 33 experience 的 schema、引用、DAG、层级与 Lesson 路由闭环通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；13 个测试文件、167 项测试通过。
+- **构建通过**：Web `pnpm build` 退出码 0，Next.js 生产构建成功并生成 10/10 静态页面；HarmonyOS API 12 增量 `assembleHap --no-daemon` 退出码 0，ArkTS 与资源重新编译，`BUILD SUCCESSFUL in 25 s 500 ms`，仍提示未配置 `signingConfigs`。
+- **模拟器通过**：SDK `hdc.exe` 位于 `C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe`；目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。当前 unsigned HAP 安装返回 `install bundle successfully`，`EntryAbility` 启动返回 `start ability successfully`。竖屏 UI 根 bounds 为 `[0,137][1256,2760]`。
+- **模拟器通过**：所有点击均由实时 UI 树 bounds 计算中心。已走通 `pages/Index` 课程 Tab -> 数据结构 `pages/CourseDetail` -> `AVL树与红黑树` -> `pages/Lesson`，知识切片从 1/4 推进到 4/4，并打开主动练习 1/2。退出 Lesson 后课程页真实显示“上次学到 · AVL树与红黑树”，详情显示“继续 · AVL树与红黑树”，证明未完成 Topic 的最近学习语义能由真实断点恢复，不依赖种子进度。
+
+### 失败与未验证
+
+- 第一项活动已显示 AVL 插入 55 的固定状态推演；向上滚动后 UI 树出现“开始逐步推演”和“提交并对照答案”。本轮没有输入、提交或自评，不能记为互动完成，`lesson_self_assessment` 也未被当作客观掌握度。
+- **未验证**：未进入同标签 Quiz，因此新 `cs101_q41` 的端侧实际题面、选择与反馈显示未验证；Course -> Topic -> Lesson -> 互动 -> 同标签练习的完整运行闭环本批未通过。运行态随后被切换到其他 Tab，且一次内联 PowerShell UI 辅助命令因 `throw` 后缺少空格产生错误，未将该失败计为产品通过。
+- DevEco 会话 `ses_08ba7c7b2ffeHBxmS1eMIZSuiB` 未设置 `DEVECO_HOME`，`check_ets_files/build_project` 均返回 `DEVECO_HOME environment variable is not configured`；校准后的 `ses_08ba6a8b9ffeEMtXoMllguKjxO` 显式设置 `DEVECO_HOME`、Alibaba 模型和授权参数，但约 70 秒无输出后被终止。两次均不构成 DevEco check/start 通过；本批静态、构建和 UI 证据分别来自 Web/Hvigor/HDC。
+- **未验证**：手机、平板、真机和线上 API 未验证。本批未创建或提交截图、HAP、日志及本地 IDE 文件。
