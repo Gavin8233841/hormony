@@ -963,3 +963,58 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
   HAP；schema 与解析器通过不证明模拟器/真机/线上/门户业务已经通过。
 - **未验证**：`pdfinfo`/`ffprobe` 尚未对最终三文件联合执行，最终 PDF 页数、MP4 完整
   解码与时长、ZIP/HAP 同版绑定和门户上传仍须材料生成后重跑统一入口。
+
+## 批次 18：正式 MP4 实际帧、尺寸、编码与工具 stderr 门禁
+
+背景：正式三文件门禁此前对独立 MP4 只读取容器时长、格式名和视频流数量，没有传递
+`-count_frames`。带有合法容器元数据但视频帧不可解码的文件仍可能通过；外部工具在
+exit 0 时向 stderr 报告错误也会被忽略。包内黄金视频已有更严格解码合同，正式成片
+不应比包内证据宽松。
+
+文件：
+
+- `scripts/validate-official-deliverables.py`
+- `scripts/test_validate_official_deliverables.py`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 正式 MP4 的 `ffprobe` 参数增加 `-count_frames`，读取每个视频流的 `codec_name`、
+  `width`、`height`、`nb_read_frames`，并保留容器 `format_name` 与 `duration`。
+- 每个视频流必须报告 ASCII 正整数帧数、正且有上限的解码尺寸以及非空 ASCII 编码名；
+  `N/A`、零帧、零/布尔/越界尺寸、空白或超长编码名均结构化失败。
+- 通过证据摘要加入实际 `decodedFrames`、`dimensions` 与 `codecs`；这些字段证明解析器
+  读到实际解码结果，不等于人工确认字幕、音画同步、教学内容或主观清晰度。
+- 通用外部工具边界同时校验 stdout/stderr 类型与 1 MiB 上限；exit 0 但 stderr 非空
+  明确失败。摘要只返回 `pdfinfo.output-invalid` 或 `ffprobe.output-invalid`，不回显
+  stderr、媒体路径或敏感正文。
+- 没有把 720p、H.264、帧率或音轨写成官方硬门槛；仓库两份官方 PDF 只确认 MP4 与
+  5 分钟上限。导出兼容性、字幕可读性、音画与完整播放继续留在人工验收清单。
+
+验证：
+
+- **静态诊断通过**：`python -B -m unittest scripts/test_validate_official_deliverables.py -v`
+  exit 0，23/23 通过；正例绑定 1425 帧、1256 x 2760 与编码名，`N/A`、零尺寸、空编码
+  和 exit 0 + stderr 四类负例互不依赖。
+- **静态诊断通过**：七组发布/内容测试按单文件分别执行，全部 exit 0，共 136 项：
+  内容 29、评分 11、发布证据 13、发布包 39、正式三文件 23、依赖 8、统一入口 13。
+- **静态诊断通过**：内容、评分与依赖三个真实仓库门禁均 exit 0；依赖闭包仍为
+  `directFiles=18; testFiles=7; runtimeEdges=11; testEdges=7; planCommands=7`。
+- **源码确认**：`hdc list targets -v` exit 0，返回
+  `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；本批没有运行或修改应用。
+
+失败后纠正：
+
+- 七组并行聚合工具会话两次丢失结果，未把聚合会话记为通过；改为七个独立进程后
+  分别取得退出码和数量，避免单一工具会话影响整批证据。
+- 只读统一入口红队子 agent 被系统安全过滤拦截，没有结果且没有文件修改；本批不把
+  该任务写成独立复核通过。
+
+未验证：
+
+- **未验证**：仓库仍无最终 MP4、作品说明 PDF、Demo/源码 ZIP、真实队名和作品名，
+  未执行正式三文件联合入口或真实 `ffprobe` 成片解码。
+- **未验证**：固定输入只证明参数、解析与失败边界，不证明成片帧完整、字幕可读、
+  音画同步、隐私处理、五分钟教学叙事或门户上传通过。
+- **未验证**：本批只修改 Python 门禁和测试，没有重复 Web 四项或 HAP 构建；批次 17
+  的 Web/HAP 记录属于前一提交，不自动升级为本批提交证据。

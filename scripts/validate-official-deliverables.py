@@ -81,6 +81,9 @@ class VideoProbe(NamedTuple):
     duration_seconds: Decimal
     video_stream_count: int
     format_names: tuple[str, ...]
+    decoded_frame_count: int
+    dimensions: tuple[str, ...]
+    codecs: tuple[str, ...]
 
 
 def failure_reason_codes(errors: list[str]) -> tuple[str, ...]:
@@ -93,7 +96,7 @@ def failure_reason_codes(errors: list[str]) -> tuple[str, ...]:
                 codes.add("pdfinfo.timeout")
             elif "非零退出码" in error:
                 codes.add("pdfinfo.nonzero")
-            elif "输出" in error:
+            elif "输出" in error or "报告错误" in error:
                 codes.add("pdfinfo.output-invalid")
             else:
                 codes.add("pdfinfo.unavailable")
@@ -110,7 +113,7 @@ def failure_reason_codes(errors: list[str]) -> tuple[str, ...]:
                 codes.add("ffprobe.timeout")
             elif "非零退出码" in error:
                 codes.add("ffprobe.nonzero")
-            elif "输出" in error:
+            elif "输出" in error or "报告错误" in error:
                 codes.add("ffprobe.output-invalid")
             else:
                 codes.add("ffprobe.unavailable")
@@ -255,10 +258,15 @@ def run_tool(
 
     if result.returncode != 0:
         return None, [f"{label}工具返回非零退出码: {result.returncode}"]
-    if not isinstance(result.stdout, bytes):
+    if not isinstance(result.stdout, bytes) or not isinstance(result.stderr, bytes):
         return None, [f"{label}工具输出类型无效"]
-    if len(result.stdout) > MAX_TOOL_OUTPUT_BYTES:
+    if (
+        len(result.stdout) > MAX_TOOL_OUTPUT_BYTES
+        or len(result.stderr) > MAX_TOOL_OUTPUT_BYTES
+    ):
         return None, [f"{label}工具输出超过内部解析上限"]
+    if result.stderr.strip():
+        return None, [f"{label}工具报告错误"]
     return result.stdout, []
 
 
@@ -309,18 +317,68 @@ def parse_ffprobe_output(output: bytes) -> tuple[VideoProbe | None, list[str]]:
     if not duration.is_finite() or duration <= 0:
         return None, ["MP4 时长必须是大于 0 的有限数值"]
 
-    video_stream_count = sum(
-        stream.get("codec_type") == "video" for stream in streams
-    )
+    video_streams = [
+        stream for stream in streams if stream.get("codec_type") == "video"
+    ]
+    video_stream_count = len(video_streams)
     format_names = tuple(format_name_value.split(","))
     errors: list[str] = []
     if video_stream_count < 1:
         errors.append("MP4 至少需要一个视频流")
+
+    decoded_frame_count = 0
+    dimensions: list[str] = []
+    codecs: list[str] = []
+    for stream in video_streams:
+        frame_count = stream.get("nb_read_frames")
+        if (
+            not isinstance(frame_count, str)
+            or not frame_count.isascii()
+            or not frame_count.isdigit()
+            or len(frame_count) > 12
+            or int(frame_count) < 1
+        ):
+            errors.append("MP4 视频流未解码出正帧数")
+        else:
+            decoded_frame_count += int(frame_count)
+
+        width = stream.get("width")
+        height = stream.get("height")
+        if (
+            not isinstance(width, int)
+            or isinstance(width, bool)
+            or not isinstance(height, int)
+            or isinstance(height, bool)
+            or not (0 < width <= RELEASE_GATE.MAX_IMAGE_DIMENSION_PX)
+            or not (0 < height <= RELEASE_GATE.MAX_IMAGE_DIMENSION_PX)
+        ):
+            errors.append("MP4 视频流缺少有效解码尺寸")
+        else:
+            dimensions.append(f"{width}x{height}")
+
+        codec_name = stream.get("codec_name")
+        if (
+            not isinstance(codec_name, str)
+            or not codec_name.isascii()
+            or not (1 <= len(codec_name) <= 64)
+            or codec_name.strip() != codec_name
+        ):
+            errors.append("MP4 视频流缺少有效编码名称")
+        else:
+            codecs.append(codec_name)
+
     if not format_names or any(not name for name in format_names) or "mp4" not in format_names:
         errors.append("ffprobe format_name 必须包含精确的 mp4 token")
     if duration > VIDEO_DURATION_LIMIT_SECONDS:
         errors.append("MP4 时长不得超过 300 秒")
-    return VideoProbe(duration, video_stream_count, format_names), errors
+    return VideoProbe(
+        duration,
+        video_stream_count,
+        format_names,
+        decoded_frame_count,
+        tuple(dimensions),
+        tuple(codecs),
+    ), errors
 
 
 def probe_pdf(
@@ -347,8 +405,9 @@ def probe_video(
         [
             "-v",
             "error",
+            "-count_frames",
             "-show_entries",
-            "stream=codec_type:format=format_name,duration",
+            "stream=codec_type,codec_name,width,height,nb_read_frames:format=format_name,duration",
             "-of",
             "json",
             str(path),
@@ -459,10 +518,13 @@ def validate_official_deliverables(
             )
         else:
             detected_formats = ",".join(video_probe.format_names) or "unavailable"
+            dimensions = ",".join(video_probe.dimensions) or "unavailable"
+            codecs = ",".join(video_probe.codecs) or "unavailable"
             details = (
                 f"duration={format(video_probe.duration_seconds, 'f')}s; "
                 f"videoStreams={video_probe.video_stream_count}; "
-                f"format={detected_formats}"
+                f"decodedFrames={video_probe.decoded_frame_count}; "
+                f"dimensions={dimensions}; codecs={codecs}; format={detected_formats}"
             )
         item, hash_errors = _hash_evidence(video_path, "MP4", details)
         errors.extend(hash_errors)

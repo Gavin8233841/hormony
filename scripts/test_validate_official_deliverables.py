@@ -24,9 +24,23 @@ def ffprobe_output(
     codec_types: list[str],
     format_name: str = "mov,mp4,m4a,3gp,3g2,mj2",
 ) -> bytes:
+    streams: list[dict[str, object]] = []
+    for codec_type in codec_types:
+        if codec_type == "video":
+            streams.append(
+                {
+                    "codec_type": "video",
+                    "codec_name": "h264",
+                    "width": 1256,
+                    "height": 2760,
+                    "nb_read_frames": "1425",
+                }
+            )
+        else:
+            streams.append({"codec_type": codec_type, "codec_name": "aac"})
     return json.dumps(
         {
-            "streams": [{"codec_type": codec_type} for codec_type in codec_types],
+            "streams": streams,
             "format": {"duration": duration, "format_name": format_name},
         }
     ).encode("utf-8")
@@ -218,6 +232,9 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
                 Decimal("299.999"),
                 1,
                 ("mov", "mp4", "m4a", "3gp", "3g2", "mj2"),
+                1425,
+                ("1256x2760",),
+                ("h264",),
             ),
             below,
         )
@@ -234,6 +251,32 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
         )
         self.assertIsNone(zero)
         self.assertIn("MP4 时长必须是大于 0 的有限数值", zero_errors)
+
+    def test_video_requires_decoded_frames_dimensions_and_codec_name(self) -> None:
+        document = json.loads(ffprobe_output("285", ["video"]))
+        stream = document["streams"][0]
+
+        for field, invalid_value, expected_error in (
+            ("nb_read_frames", "N/A", "MP4 视频流未解码出正帧数"),
+            ("width", 0, "MP4 视频流缺少有效解码尺寸"),
+            ("codec_name", "", "MP4 视频流缺少有效编码名称"),
+        ):
+            with self.subTest(field=field):
+                mutated = json.loads(json.dumps(document))
+                mutated["streams"][0][field] = invalid_value
+                probe, errors = MODULE.parse_ffprobe_output(
+                    json.dumps(mutated).encode("utf-8")
+                )
+                self.assertIsNotNone(probe)
+                self.assertIn(expected_error, errors)
+
+        probe, errors = MODULE.parse_ffprobe_output(
+            json.dumps(document).encode("utf-8")
+        )
+        self.assertEqual([], errors)
+        self.assertEqual(1425, probe.decoded_frame_count)
+        self.assertEqual(("1256x2760",), probe.dimensions)
+        self.assertEqual(("h264",), probe.codecs)
 
     def test_ffprobe_malformed_outputs_are_rejected(self) -> None:
         cases = (
@@ -342,6 +385,59 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
         self.assertEqual("C", kwargs["env"]["LANG"])
         self.assertIs(False, kwargs["shell"])
 
+    def test_success_exit_with_stderr_is_rejected_without_echo(self) -> None:
+        secret = b"MODEL_API_KEY=do-not-print"
+        completed = subprocess.CompletedProcess(
+            ["ffprobe"],
+            0,
+            stdout=ffprobe_output("285", ["video"]),
+            stderr=secret,
+        )
+        with mock.patch.object(MODULE, "tool_path_errors", return_value=[]), mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=completed,
+        ):
+            output, errors = MODULE.run_tool(
+                Path("C:/tools/ffprobe.exe"),
+                ["artifact.mp4"],
+                "ffprobe",
+                1,
+            )
+
+        self.assertIsNone(output)
+        self.assertEqual(["ffprobe工具报告错误"], errors)
+        self.assertEqual(("ffprobe.output-invalid",), MODULE.failure_reason_codes(errors))
+        self.assertNotIn(secret.decode("ascii"), "\n".join(errors))
+
+    def test_video_probe_requests_actual_frame_count_and_decoded_fields(self) -> None:
+        video = Path("02-演示视频+鸿学队.mp4")
+        tool = Path("C:/tools/ffprobe.exe")
+        with mock.patch.object(
+            MODULE,
+            "run_tool",
+            return_value=(ffprobe_output("285", ["video"]), []),
+        ) as runner:
+            probe, errors = MODULE.probe_video(video, tool, 9.5)
+
+        self.assertEqual([], errors)
+        self.assertEqual(1425, probe.decoded_frame_count)
+        runner.assert_called_once_with(
+            tool,
+            [
+                "-v",
+                "error",
+                "-count_frames",
+                "-show_entries",
+                "stream=codec_type,codec_name,width,height,nb_read_frames:format=format_name,duration",
+                "-of",
+                "json",
+                str(video),
+            ],
+            "ffprobe",
+            9.5,
+        )
+
     def test_tool_output_limit_is_a_structured_failure(self) -> None:
         completed = subprocess.CompletedProcess(
             ["tool"],
@@ -404,7 +500,14 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
             MODULE,
             "probe_video",
             return_value=(
-                MODULE.VideoProbe(Decimal("299.999"), 1, ("mov", "mp4")),
+                MODULE.VideoProbe(
+                    Decimal("299.999"),
+                    1,
+                    ("mov", "mp4"),
+                    1425,
+                    ("1256x2760",),
+                    ("h264",),
+                ),
                 [],
             ),
         ), mock.patch.object(
@@ -426,7 +529,8 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
         self.assertEqual(["PDF", "MP4", "ZIP"], [item.label for item in evidence])
         self.assertEqual("pages=20; encrypted=no", evidence[0].details)
         self.assertEqual(
-            "duration=299.999s; videoStreams=1; format=mov,mp4",
+            "duration=299.999s; videoStreams=1; decodedFrames=1425; "
+            "dimensions=1256x2760; codecs=h264; format=mov,mp4",
             evidence[1].details,
         )
         self.assertEqual("releaseBundleGate=passed", evidence[2].details)
@@ -444,7 +548,14 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
             MODULE,
             "probe_video",
             return_value=(
-                MODULE.VideoProbe(Decimal("42"), 1, ("matroska", "webm")),
+                MODULE.VideoProbe(
+                    Decimal("42"),
+                    1,
+                    ("matroska", "webm"),
+                    210,
+                    ("1920x1080",),
+                    ("hevc",),
+                ),
                 ["ffprobe format_name 必须包含精确的 mp4 token"],
             ),
         ), mock.patch.object(
@@ -465,7 +576,8 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
         video_evidence = next(item for item in evidence if item.label == "MP4")
         self.assertIn("ffprobe format_name 必须包含精确的 mp4 token", errors)
         self.assertEqual(
-            "duration=42s; videoStreams=1; format=matroska,webm",
+            "duration=42s; videoStreams=1; decodedFrames=210; dimensions=1920x1080; "
+            "codecs=hevc; format=matroska,webm",
             video_evidence.details,
         )
 
