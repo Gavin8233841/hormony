@@ -398,3 +398,31 @@
 
 - **未验证**：真实反向代理/Node socket 半包断连是否在当前 Next 14 适配层触发 Request.signal、线上断流后的连接释放、当前分支线上发布。自定义 WHATWG stream 证据只记为路由实现回归，不冒充网络层通过。
 - 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Safety 规则、RAG、生产模型 ID、秘密或端侧状态。
+
+## 18. 无状态禁用端点的限流顺序
+
+### 18.1 源码确认与行为
+
+- 旧 middleware 在 production/stateless 模式下先返回 `404/ENDPOINT_DISABLED`，实际禁用端点请求不会进入 60 秒 30 次的 API 限流；远程客户端可无限请求 Profile、Stats、Plan Save 等禁用路径。
+- middleware 现在保持 OPTIONS 预检最先返回 204，随后让所有实际 API 请求进入既有路由 bucket 限流，再执行无状态端点拦截。同一 runtime IP 与 Profile bucket 的前 30 个实际请求保持 `404/ENDPOINT_DISABLED`，第 31 个返回 `429/RATE_LIMITED`。
+- 本批没有改变 12 个顶层 API bucket、1000 键容量、可信 `req.ip` 边界、60 秒窗口、CORS 白名单、六项安全头、`Retry-After`、无状态端点集合或 `{ error, code }` 错误结构。
+
+### 18.2 路由级回归与安全边界复核
+
+- 新增 middleware 组合回归，证明 30 个禁用端点响应会消耗窗口，第 31 个被限流；连续 31 个 OPTIONS 及窗口耗尽后的 OPTIONS 均为 204，且不消耗实际请求额度。
+- 与既有 middleware 契约联合验证：`ENDPOINT_DISABLED`、`RATE_LIMITED` 和 OPTIONS 均保留允许 Origin 的精确回显、`Vary: Origin`、`private`/`no-store` 缓存指令、六项安全头；不可信 Origin 不返回 `Access-Control-Allow-Origin`。
+- 源码确认 Chat 的流前错误通过 `modelErrorResponse` 返回稳定 JSON 摘要，流中错误只向客户端发送稳定摘要，原始异常仅写服务端日志；模型 Key 仅在服务端模型配置中读取且不在 Health/Model Status 的响应对象中。`/api/model/status` 仍会返回配置的 `baseURL`，其中 URL 凭据或查询参数的公开边界尚未形成路由级反例，本批没有把该项写成已关闭。
+
+### 18.3 验证
+
+- 定向回归：`pnpm exec vitest run src/middleware-stateless-rate-limit.test.ts src/middleware-cardinality.test.ts src/middleware.test.ts` exit 0，3 个测试文件、44 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，34 个测试文件、377 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成 10 个静态页面、全部 dynamic API route 与 26.9 kB middleware 的 production 构建。
+- 本地 production 黑盒通过：`127.0.0.1:4327`，显式 stateless 且无模型密钥；31 个预检均为 204，前 30 个 Profile 请求均为 `404/ENDPOINT_DISABLED`，第 31 个为 `429/RATE_LIMITED` 且 `Retry-After=60`。production 将缓存头规范化为 `no-store, private`，两项指令均存在；允许 Origin、`Vary: Origin` 与安全头通过。Health 为 HTTP 503、`status=degraded`、`persistence.mode=stateless`；Chat 为 JSON HTTP 503、`MODEL_UNAVAILABLE`，未建立 SSE；不可信 Origin 未回显，Model Status 未出现 Key/Authorization 字段名。实例 PID 42900 已停止，端口监听已关闭。
+
+### 18.4 委派、失败与未验证
+
+- 子 agent `ws05_prod_blackbox` 只执行黑盒、未修改文件。首轮汇总错误地把多值响应头直接强转数字，证据未采用；第二轮超过约定时限后被中断，遗留的精确 Next 监听 PID 已停止。主线程使用新构建产物重新执行完整断言后才记录通过。
+- 主线程首次黑盒严格比较 `Cache-Control` 字符串顺序，实际 production 返回等价的 `no-store, private`，因此该轮 exit 1 未计作通过；重启干净实例后改为校验指令集合，完整序列 exit 0。
+- **未验证**：多实例间全局限流一致性、线上代理的可信 IP 注入、真实 CDN/WAF 联合限流、已配置真实模型时的 SSE 正文与流中错误、`MODEL_BASE_URL` 包含 URL 凭据或查询参数时的公开响应、当前分支线上发布。
+- 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Safety、RAG、生产模型 ID、服务端秘密或端侧状态。

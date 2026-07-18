@@ -122,20 +122,7 @@ export function middleware(req: NextRequest) {
     return res;
   }
 
-  if (
-    isStatelessDeployment() &&
-    STATEFUL_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
-  ) {
-    const res = NextResponse.json(
-      { error: "该接口在无状态部署中不可用", code: "ENDPOINT_DISABLED" },
-      { status: 404 }
-    );
-    addSecurityHeaders(res);
-    applyCorsHeaders(res, req);
-    return res;
-  }
-
-  // 仅对 API 路由执行速率限制
+  // 所有实际 API 请求先进入限流，避免禁用端点成为无预算的远程请求面。
   if (pathname.startsWith("/api/")) {
     // 只信任运行时提供的 IP；自托管环境缺失可信 IP 时进入共享受限桶。
     // 直接采用 X-Forwarded-For 会让客户端轮换伪造值绕过限流并撑大 Map。
@@ -163,6 +150,19 @@ export function middleware(req: NextRequest) {
       rateLimitMap.set(key, { count: 1, resetTime });
       nextRateLimitExpiry = Math.min(nextRateLimitExpiry, resetTime);
     }
+  }
+
+  if (
+    isStatelessDeployment() &&
+    STATEFUL_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  ) {
+    const res = NextResponse.json(
+      { error: "该接口在无状态部署中不可用", code: "ENDPOINT_DISABLED" },
+      { status: 404 }
+    );
+    addSecurityHeaders(res);
+    applyCorsHeaders(res, req);
+    return res;
   }
 
   // 对所有响应添加安全头
