@@ -35,6 +35,7 @@ const course = source('apps/harmonyos/entry/src/main/ets/pages/Course.ets');
 const detail = source('apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets');
 const lesson = source('apps/harmonyos/entry/src/main/ets/pages/Lesson.ets');
 const chat = source('apps/harmonyos/entry/src/main/ets/pages/Chat.ets');
+const plan = source('apps/harmonyos/entry/src/main/ets/pages/Plan.ets');
 const builders = source('apps/harmonyos/entry/src/main/ets/common/Builders.ets');
 const constants = source('apps/harmonyos/entry/src/main/ets/common/Constants.ets');
 
@@ -252,6 +253,73 @@ test('Chat 核心操作在大字号与读屏下保留 48vp 和对象化语义', 
   assert.match(markdown, /Button\('解释这段'\)/);
   assert.match(markdown, /\.accessibilityText\('让学伴解释当前代码片段'\)/);
   assert.doesNotMatch(markdown, /\.height\(28\)/);
+});
+
+test('Plan 制定与恢复操作在大字号和读屏下保持完整', () => {
+  const suggestions = methodBlock(plan, 'GoalSuggestions');
+  const loading = methodBlock(plan, 'PlanLoadingState');
+  const evidence = methodBlock(plan, 'AgentTraceCard');
+  const checkpoint = methodBlock(plan, 'PlanCheckpoint');
+  const checkpointName = methodBlock(plan, 'checkpointAccessibilityText');
+  const build = methodBlock(plan, 'build');
+
+  assert.match(suggestions, /Button\(suggestion\)[\s\S]*?\.constraintSize\(\{ minHeight: 48 \}\)/);
+  assert.match(suggestions, /\.accessibilityText\('使用建议目标：' \+ suggestion\)/);
+  assert.match(suggestions, /\.enabled\(!this\.loading && !this\.planLoading && this\.retryAction !== 'save'\)/);
+  assert.doesNotMatch(suggestions, /\.height\(34\)/);
+  assert.match(loading, /Button\('取消'\)[\s\S]*?\.constraintSize\(\{ minHeight: 48 \}\)/);
+  assert.match(loading, /\.accessibilityText\('取消生成学习计划'\)/);
+  assert.doesNotMatch(loading, /\.maxLines\(2\)|TextOverflow\.Ellipsis/);
+  assert.match(evidence, /\.constraintSize\(\{ minHeight: 48 \}\)/);
+  assert.match(evidence, /\.focusable\(true\)/);
+  assert.match(evidence, /'展开'\) \+ '规划依据，共 '/);
+  assert.match(checkpoint, /\.accessibilityGroup\(true\)\s*\.accessibilityText\(this\.checkpointAccessibilityText\(title, detail, index\)\)/);
+  for (const state of ['已完成', '进行中', '未开始']) {
+    assert.match(checkpointName, new RegExp(`'${state}'`));
+  }
+
+  assert.match(build, /TextInput\(\{[\s\S]*?\.constraintSize\(\{ minHeight: 48 \}\)[\s\S]*?\.accessibilityText\('输入学习目标'\)/);
+  assert.match(build, /Button\(option\.toString\(\) \+ ' 天'\)[\s\S]*?\.constraintSize\(\{ minHeight: 48 \}\)[\s\S]*?\.accessibilityText\(this\.durationAccessibilityText\(option\)\)/);
+  assert.match(build, /\.accessibilityText\(this\.generateAccessibilityText\(\)\)/);
+  assert.match(build, /\.accessibilityText\(this\.retryAccessibilityText\(\)\)/);
+  assert.match(build, /'展开计划错误详情'/);
+  assert.match(build, /\.focusable\(true\)/);
+  assert.doesNotMatch(build, /\.height\((?:28|32|38|44)\)/);
+  assert.match(plan, /@State editorExpanded: boolean = false;/);
+  assert.match(build, /if \(!this\.loading && !this\.planLoading\) \{/);
+  assert.match(build, /if \(this\.tasks\.length === 0 \|\| this\.editorExpanded\)/);
+  assert.match(build, /Button\('调整目标与周期'\)/);
+  assert.match(build, /this\.editorExpanded = true;/);
+  assert.match(build, /Button\('收起编辑'\)/);
+  assert.match(build, /this\.editorExpanded = false;/);
+  assert.match(build, /Button\('收起编辑'\)[\s\S]*?\.constraintSize\(\{ minHeight: 48 \}\)/);
+  assert.match(build, /Button\('调整目标与周期'\)[\s\S]*?\.constraintSize\(\{ minHeight: 48 \}\)/);
+  assert.match(build, /\.enabled\(this\.canGenerate && this\.retryAction !== 'save'\)/);
+  const saveGuards = build.match(/this\.retryAction !== 'save'/g) ?? [];
+  assert.ok(saveGuards.length >= 4, 'Plan input, duration, generation and adjustment must lock during save retry');
+  assert.match(build, /this\.retryAction === 'save' \? '保存刚生成的计划'/);
+  assert.match(build, /else if \(this\.shouldAdjustPlanInput\(\)\) this\.beginPlanAdjustment\(\);/);
+  assert.match(build, /Text\(this\.errorExpanded \? '收起错误详情' : '查看错误详情'\)[\s\S]*?\.focusable\(true\)[\s\S]*?'展开计划错误详情'/);
+  assert.match(plan, /if \(this\.retryAction === 'save'\) return '请先保存刚生成的计划';/);
+  assert.match(plan, /if \(this\.errorCode === 'SAFETY_BLOCKED' \|\| this\.errorCode === 'INPUT_REJECTED'/);
+  assert.match(methodBlock(plan, 'beginPlanAdjustment'), /this\.retryAction = 'none';[\s\S]*?this\.clearErrorEvidence\(\);/);
+  const loadingScrolls = build.match(/Scroll\(\) \{/g) ?? [];
+  assert.equal(loadingScrolls.length, 2, 'Plan loading and restore states must scroll independently');
+});
+
+test('Plan 任务文本和宽屏阅读层级不会依赖省略', () => {
+  const build = methodBlock(plan, 'build');
+  const taskName = methodBlock(plan, 'taskAccessibilityText');
+
+  assert.doesNotMatch(build, /TextOverflow\.Ellipsis|\.maxLines\(/);
+  assert.match(build, /Flex\(\{ wrap: FlexWrap\.Wrap \}\)/);
+  assert.match(build, /\.accessibilityGroup\(true\)\s*\.accessibilityText\(this\.taskAccessibilityText\(t\)\)/);
+  assert.match(build, /\.accessibilityText\(this\.taskAccessibilityText\(t\)\)[\s\S]*?Column\(\{ space: 6 \}\) \{[\s\S]*?Button\(this\.actionLabel\(t\)\)/);
+  assert.match(taskName, /task\.title/);
+  assert.match(taskName, /this\.taskReason\(task\)/);
+  assert.match(taskName, /task\.estimatedMin\.toString\(\)/);
+  const contentLimits = build.match(/\.constraintSize\(\{ maxWidth: 760 \}\)/g) ?? [];
+  assert.ok(contentLimits.length >= 6, 'Plan must constrain form, status and task reading width');
 });
 
 test('正文辅助色和语义小字在实际浅色表面达到 WCAG AA', () => {

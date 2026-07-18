@@ -96,6 +96,17 @@
 - 发送状态、生成过程和 Agent 说明移除单行或双行省略；欢迎区、消息列表、连接状态和输入栏限制最大内容宽度 760 vp，窄屏保持全宽，宽屏避免阅读行过长。
 - 本批只修改 `Chat.ets` 展示与无障碍属性；未修改 SSE、请求身份、取消、历史持久化、路由、Repository 或 Plan 状态机。
 
+### 批次 H：计划制定与任务执行层级
+
+- 建议目标、目标输入、周期选择、生成/取消、失败重试、错误详情和规划依据统一保留至少 48 vp；周期、生成、重试、展开/收起均提供状态化对象名称。
+- 规划依据和错误详情可聚焦；五个生成检查点将完成、进行中和未开始状态与说明组合为读屏文本，不再只依赖符号与颜色。
+- 任务标题、课程/Topic 和规划理由移除固定行数省略，日期、时长和任务类型改为可换行元数据；任务信息组合为单个对象化名称，原“学习/练习/测验/复盘”和“完成/恢复”按钮保持独立焦点与既有写入守卫。
+- 已有计划默认把大表单收束为“当前计划 + 调整目标与周期”，让真实任务成为首屏主体；调整入口展开完整编辑器，已有任务在新计划保存前保持不变，收起后回到任务列表。
+- 已生成计划写入 ArkData 失败时，目标、周期、生成和调整入口会锁定，唯一恢复动作明确为“保存刚生成的计划”，避免屏幕输入与实际待保存产物错配；需要修改输入的安全/4xx 错误则进入“调整目标”，不盲目重复旧请求。
+- 生成和本机恢复期间不再同时占用编辑卡；加载内容使用独立可滚动区域，使长目标和字体放大时取消、检查点及等待说明仍可到达。
+- 表单、消息、加载、依据、任务列表和空态限制最大内容宽度 760 vp；窄屏仍使用可用全宽，宽屏避免长行和卡片无限拉伸。
+- 本批只修改 `Plan.ets` 展示状态与 Builder；未修改计划读取代次、请求参数、HTTP、校验、取消、ArkData 保存、任务串行写入、服务卡片更新、Repository 或 `pageTransition()`。
+
 ## 四、文件
 
 - `DESIGN.md`
@@ -107,6 +118,7 @@
 - `apps/harmonyos/entry/src/main/ets/pages/CourseDetail.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Lesson.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
 - `scripts/test-product-experience-contracts.mjs`
 - `scripts/test-proactive-learning-service.mjs`
 - `scripts/test-proactive-delivery-contracts.mjs`
@@ -121,8 +133,8 @@
 node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs
 ```
 
-- 主线融合批次 G 后复跑 exit 0，62/62 通过。
-- 覆盖首页真实状态门禁、提醒/任务写回互斥、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、提交后输入与选项冻结、后续动作路由失败、Chat 动态操作语义与 48 vp、长文本、返回语义和实际颜色对比度。
+- 批次 G 融合后为 62/62；批次 H 合入后的最终数字以整条 WS08 主线复跑为准。
+- 覆盖首页真实状态门禁、提醒/任务写回互斥、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、提交后输入与选项冻结、Chat/Plan 动态操作语义与 48 vp、Plan 编辑层级与完整任务文本、长文本、返回语义和实际颜色对比度。
 
 ```powershell
 python -m unittest scripts.test_course_resume_contract scripts.test_lesson_activity_resume_contract
@@ -147,10 +159,10 @@ cd apps/harmonyos
 .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon
 ```
 
-- 主线批次 F 独立审查后的源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`；WS08 分支学伴无障碍批次首次 `BUILD SUCCESSFUL in 19 s 885 ms`，最终复核 `BUILD SUCCESSFUL in 6 s 863 ms`。
+- 主线批次 F 独立审查后的源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`；WS08 分支学伴无障碍批次最终复核 `BUILD SUCCESSFUL in 6 s 863 ms`，Plan 失败恢复反例修正后最终 `BUILD SUCCESSFUL in 27 s 288 ms`。
 - `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，多项任务显示 `UP-TO-DATE`。
 - 项目没有 `signingConfigs`，Hvigor 跳过签名；该结果只记为**构建通过**。
-- 最终 HAP：`apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap`；SHA-256 为 `F31EF1965DCA92436288FD6DA1AB315600B6F4140B6EBD446ADA46AB0CA24DF3`。
+- 最终 HAP：`apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap`；SHA-256 为 `82106E2EEFB71B2191EF30E6508A0E7C6764C1114ADEEB92B5BAC28F6881C2B7`。
 - 早期通用 `assembleHap --no-daemon` 构建虽 exit 0，但日志内部出现 `:entry:clean`；最终证据以上述显式增量构建为准。
 
 ### 设备
@@ -170,12 +182,17 @@ cd apps/harmonyos
 - `uitest dumpLayout` 不导出源码中的 `accessibilityText`；尝试 `-e accessibilityText` 和 `-e focusable` 均返回 `Invalid attribute name, currently supported names are 'uniqueId'.`，因此对象化语义只记为**源码确认/源契约通过**，屏幕朗读与设备焦点行为仍为**未验证**。
 - 已按 DisplayManagerService 帮助执行 `-rotationlock,0` 与 `-motion,1`，等待后 DMS 仍显示旋转 0、`1256 x 2760`；横屏未取得有效证据，明确记为**未验证**。最大字体、平板、减少动效和动态安全区同样未取得对应设备证据。
 - 本次主线融合时 `hdc list targets -v` 输出 `[Empty] / hdc`；上述历史支线证据不代表当前主线重新安装或设备通过。
+- WS08 分支 Plan 最终 HAP 中，从根页 UI 树进入 `pages/Plan`；修复前任务 List 高 267 px（约 76 vp），收起编辑器后高 992 px（约 283 vp），可视高度约为原来的 3.7 倍。
+- 收束态中“调整目标与周期” bounds 为 `[56,878][1200,1046]`；以中心 `(628,962)` 展开后，“收起编辑”、目标输入、三枚建议、三枚周期和生成按钮高度均为 168 px，即 48 vp。以“收起编辑”实时 bounds `[933,601][1200,769]` 中心 `(1066,685)` 返回任务优先视图成功。
+- Plan 截图人工复核：收束态首项任务完整显示标题、课程/Topic、规划理由、日期、时长、类型和两枚操作，第二项露出并可继续滚动；展开态建议自动换行，输入、周期和生成控件无相互遮挡，任务操作需先用顶部“收起编辑”返回任务优先视图。
+- 失败恢复反例修正后的最终 HAP 再次重装，`17-plan-final2-ui.json` 仍确认 `pages/Plan`、调整按钮 `[56,878][1200,1046]` 和任务 List `[0,1670][1256,2662]`；`17-plan-final2.jpeg` 人工复核任务优先层级无回退。
+- 保存失败锁定与加载区滚动已达**源码确认/源契约通过/构建通过**；本批不伪造 ArkData 故障、不调用模型制造慢请求，因此这两条异常流程的模拟器交互仍为**未验证**。
 
 ## 六、仍未验证与下一缺口
 
 1. 仓库没有 API 12 系统“减少动效”信号的精确使用依据，本批未猜写接口；减少动效仍为**未验证**。
 2. `Index` 已响应式订阅安全区，但公共二级页标题仍通过静态 getter 读取顶部安全区；旋转时的即时重排需有效横屏设备证据和统一 Builder 参数设计。
-3. Chat 当前在线失败时保留真实重连，但屏幕朗读、硬件键盘焦点顺序和最大字体下的回答卡展开仍需对应设备能力验证。
+3. Chat 当前在线失败时保留真实重连，但 Chat/Plan 的屏幕朗读、硬件键盘焦点顺序和最大字体下的展开内容仍需对应设备能力验证。
 4. 课程路径仍使用现有 `router`。迁移到 `Navigation` 影响全部子页和回流契约，不属于本批安全范围。
 5. Lesson 底部“上一篇 / 继续互动”横向操作组的大字号折行仍需设备证据。
 6. 本批未调用线上 API、模型、通知或服务卡片；不声明线上通过、真机通过、屏幕朗读通过或横屏通过。
@@ -186,4 +203,5 @@ cd apps/harmonyos
 - 主线提交前多轮独立审查发现发布等待、卡片部分失败后切任务、任务写回尾部窗口中的旧提醒重试路径，以及两个条件颜色表达式绕过对比度契约、busy 禁用态与读屏文案不一致；均已修正并重新通过 58/58、16/16 与最终 API 12 HAP。
 - 独立 diff 审查尝试因本机没有 CodeRabbit CLI 和后续并发连接中断而未形成审查结论；未将其记为通过证据。
 - Chat 批次恢复后未重复请求 DevEco Agent；已知 Alibaba `qwen3-coder-plus` 返回 403 `AllocationQuota.FreeTierOnly`，`deveco/glm-5` 返回 401 `Token refresh failed`，按任务要求停止重试并使用本地契约、Hvigor 与 HDC 完成验证。
-- 本次融合后的产品契约为 62/62；API 12 与设备结论须以整条 WS08 合并后的主线复跑为准，历史支线记录不提升当前主线证据等级。
+- Plan 批次另有两条只读委派：一条核对 WS03/04/06/07/09 refs、结果文档和页面归属，一条逐行审计 Plan 大字号、读屏、48 vp、截断和宽屏层级；均确认只改 Plan 展示层且必须保留 `be0bc17` 状态契约，委派代理未修改文件或操作设备。
+- API 12 与设备结论须以整条 WS08 合并后的主线复跑为准，历史支线记录不提升当前主线证据等级。
