@@ -66,8 +66,12 @@ class CourseResumeContractTest(unittest.TestCase):
         progress_label = compact(extract_method(self.course_source, "courseProgressLabel"))
 
         self.assertIn(
-            "this.lessonProgress = await LocalLearningRepository.getLessonProgress();",
+            "lessonProgress = await LocalLearningRepository.getLessonProgress();",
             load_courses,
+        )
+        self.assertLess(
+            load_courses.find("if (this.loadRunId !== runId) return"),
+            load_courses.find("this.lessonProgress = lessonProgress"),
         )
         self.assertIn("hasCourseStarted(this.resumeState(course))", action_label)
         self.assertIn("? '继续课程' : '进入课程'", action_label)
@@ -99,11 +103,19 @@ class CourseResumeContractTest(unittest.TestCase):
         next_hint = compact(extract_method(self.detail_source, "nextTopicHint"))
 
         self.assertIn(
-            "this.lessonProgress = await "
+            "const lessonProgress = await "
             "LocalLearningRepository.getLessonProgress(this.courseId);",
             load_progress,
         )
-        self.assertIn("for (const topic of this.resumeState().completedTopics)", load_progress)
+        self.assertIn(
+            "const resumeState = resolveCourseResumeState(this.courseId, this.topics, lessonProgress)",
+            load_progress,
+        )
+        self.assertIn("for (const topic of resumeState.completedTopics)", load_progress)
+        self.assertLess(
+            load_progress.find("if (this.loadRunId !== runId) return"),
+            load_progress.find("this.lessonProgress = lessonProgress"),
+        )
         self.assertIn("resolveNextTopic(this.topics, this.completedTopics", next_topic)
         self.assertIn("this.resumeState().recentTopic", next_hint)
         self.assertIn("? '继续 · ' + topic : '下一步 · ' + topic", next_hint)
