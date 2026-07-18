@@ -186,12 +186,50 @@ globalThis.__EntryAbility = EntryAbility;
   return stripTypeScriptTypes(source, { mode: 'transform', sourceMap: false });
 }
 
+function compileIndexNavigation() {
+  const source = readSource(indexPath);
+  const navigateStart = source.indexOf('  private navigateProactiveLaunch(');
+  const selectTabStart = source.indexOf('  private selectTab(', navigateStart);
+  assert.notEqual(navigateStart, -1, 'Index.navigateProactiveLaunch missing');
+  assert.notEqual(selectTabStart, -1, 'Index navigation method boundary changed');
+  const methods = source.slice(navigateStart, selectTabStart);
+  const harness = `class IndexNavigationHarness {
+  proactiveLaunchVersion: number = 0;
+  consumedLaunchVersion: number = -1;
+  navigatingLaunchVersion: number = -1;
+  retryLaunchVersion: number = -1;
+  retryCalls: number = 0;
+  router: object;
+
+  constructor(router: object) {
+    this.router = router;
+  }
+
+  getUIContext(): object {
+    return { getRouter: (): object => this.router };
+  }
+
+  selectTab(_index: number): void {
+  }
+
+  consumeProactiveLaunch(): void {
+    this.retryCalls += 1;
+  }
+
+${methods}
+}
+globalThis.__IndexNavigationHarness = IndexNavigationHarness;
+`;
+  return stripTypeScriptTypes(harness, { mode: 'transform', sourceMap: false });
+}
+
 const compiledService = compileService();
 const compiledReminder = compileReminder();
 const compiledFormUpdater = compileFormUpdater();
 const compiledLearningContentRepository = compileLearningContentRepository();
 const compiledEntryFormAbility = compileEntryFormAbility();
 const compiledEntryAbility = compileEntryAbility();
+const compiledIndexNavigation = compileIndexNavigation();
 
 function serviceRepository() {
   return {
@@ -228,6 +266,33 @@ function createStorage() {
     get: (key) => values.get(key),
     navigationSnapshot: () => Object.fromEntries(navigationKeys.map((key) => [key, values.get(key)]))
   };
+}
+
+function createIndexNavigationHarness(router, targetPage = 'pages/Quiz', launchVersion = 7) {
+  const values = new Map([
+    ['proactiveTargetPage', targetPage]
+  ]);
+  const scheduled = [];
+  const context = vm.createContext({
+    __router: router,
+    AppStorage: {
+      get: (key) => values.get(key),
+      setOrCreate: (key, value) => values.set(key, value)
+    },
+    ProactiveLearningService: {
+      isTargetPage: (page) => page === targetPage || page === 'pages/Index'
+    },
+    hilog: { error: () => {} },
+    Constants: { HILOG_DOMAIN: 0, HILOG_TAG: 'test' },
+    setTimeout: (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    }
+  });
+  vm.runInContext(compiledIndexNavigation, context, { filename: indexPath });
+  const instance = new context.__IndexNavigationHarness(router);
+  instance.proactiveLaunchVersion = launchVersion;
+  return { instance, values, scheduled };
 }
 
 function loadService(repository = serviceRepository(), storage = createStorage()) {
@@ -954,8 +1019,65 @@ test('Index 按当前栈导航并只在成功后消费目标', () => {
     'root-to-subpage launch must push a route');
   assert.equal(navigate.includes('appRouter.replaceUrl({ url: targetPage })'), true,
     'nested-to-subpage launch must replace the current child route');
+  assert.equal(navigate.includes('if (currentPage === targetPage)'), false,
+    'same-route launch must rebuild the current child page before consuming new action state');
   assert.equal(complete.includes(clearTarget), true, 'successful navigation must consume the target');
   assert.equal(fail.includes(clearTarget), false, 'failed navigation must retain the target for retry');
+});
+
+test('Index 同路由主动入口在 replaceUrl 成功后才消费目标', async () => {
+  let resolveNavigation;
+  const navigation = new Promise((resolve) => {
+    resolveNavigation = resolve;
+  });
+  const replaceCalls = [];
+  const router = {
+    getState: () => ({ path: 'pages/Quiz' }),
+    pushUrl: () => Promise.reject(new Error('same-route launch must not push')),
+    replaceUrl: (options) => {
+      replaceCalls.push(options);
+      return navigation;
+    }
+  };
+  const harness = createIndexNavigationHarness(router);
+
+  harness.instance.navigateProactiveLaunch(7, 'pages/Quiz');
+
+  assert.equal(replaceCalls.length, 1);
+  assert.equal(replaceCalls[0].url, 'pages/Quiz');
+  assert.equal(harness.values.get('proactiveTargetPage'), 'pages/Quiz');
+  assert.equal(harness.instance.consumedLaunchVersion, -1);
+
+  resolveNavigation();
+  await settleAsyncWork();
+
+  assert.equal(harness.values.get('proactiveTargetPage'), '');
+  assert.equal(harness.instance.consumedLaunchVersion, 7);
+  assert.equal(harness.scheduled.length, 0);
+});
+
+test('Index 同路由 replaceUrl 失败时保留目标并安排一次重试', async () => {
+  const replaceCalls = [];
+  const router = {
+    getState: () => ({ path: 'pages/Practice' }),
+    pushUrl: () => Promise.reject(new Error('same-route launch must not push')),
+    replaceUrl: (options) => {
+      replaceCalls.push(options);
+      return Promise.reject(new Error('replace failed'));
+    }
+  };
+  const harness = createIndexNavigationHarness(router, 'pages/Practice', 11);
+
+  harness.instance.navigateProactiveLaunch(11, 'pages/Practice');
+  await settleAsyncWork();
+
+  assert.equal(replaceCalls.length, 1);
+  assert.equal(replaceCalls[0].url, 'pages/Practice');
+  assert.equal(harness.values.get('proactiveTargetPage'), 'pages/Practice');
+  assert.equal(harness.instance.consumedLaunchVersion, -1);
+  assert.equal(harness.instance.retryLaunchVersion, 11);
+  assert.equal(harness.scheduled.length, 1);
+  assert.equal(harness.scheduled[0].delay, 200);
 });
 
 test('首页提醒以 loading 防并发并在错误态提供可执行重试', () => {

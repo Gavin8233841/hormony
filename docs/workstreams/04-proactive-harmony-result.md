@@ -26,7 +26,7 @@
 - 通知授权请求完成后再次读取系统开关；仍未授权时不发布通知，并在首页保留明确错误和重试操作。API 12 不调用 API 13 才提供的应用内通知设置接口。
 - `EntryAbility.ets` 在 `onCreate` 与 `onNewWant` 消费卡片/通知参数；合法外壳通过目录校验后重新解析当前 ArkData 行动，单调序号保证连续 Want 只执行最后一次，无关 Want 不清除已排队入口。
 - `EntryAbility.ets` 对重算后的当前行动生成前台周期稳定键；相同来源和行动的重复 Want 只发布一次，进入后台后释放去重状态，后续真实触达仍可再次执行。
-- `Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动；嵌套页上的课程入口使用 API 12 `Router.back({ url: 'pages/Index' })` 返回根页，其他目标按当前路由栈执行 `pushUrl/replaceUrl`，只在导航确认成功后消费目标。
+- `Index.ets` 通过 `@StorageLink + @Watch` 覆盖冷启动和热启动；嵌套页上的课程入口使用 API 12 `Router.back({ url: 'pages/Index' })` 返回根页，其他目标按当前路由栈执行 `pushUrl/replaceUrl`，只在导航确认成功后消费目标。通知或卡片再次指向当前子页面时也执行 `replaceUrl`，让页面重新消费新的课程、Topic 与动作，不再把仍显示旧任务的页面误判为已回流。
 - `EntryAbility.ets` 先完成内容仓库与 ArkData 课程目录同步，再校验来源、128 字符长度上限、动作/页面映射、课程和精确 Topic；外部 `courseTitle` 被忽略，标题从本地目录推导，非法 Want 不写 `AppStorage`。
 - `LearningFormUpdater.ets` 与 `LearningPlanCard.ets` 展示同一行动、依据、进度和 CTA，`FormLink` 传递精确目标页面及学习上下文。
 - `LearningFormUpdater.refreshAll()` 每批只解析一次 next-best-action，再更新全部卡片；显式快照刷新不重复读取状态，单卡系统更新仍读取最新本机状态。
@@ -111,6 +111,7 @@
 | 等级 | 命令或依据 | 结果 |
 |---|---|---|
 | **源码确认** | DevEco Studio API 12 SDK 类型声明 | 已确认 `NotificationRequest.wantAgent`、`wantAgent.getWantAgent()`、`UIAbility.onNewWant()`、`@Watch`、`FormLink` 的 `router/params` |
+| **源码确认** | DevEco Studio API 12 `@ohos.arkui.UIContext.d.ts` | `Router.replaceUrl()` 会销毁当前页并返回 `Promise<void>`；同路由主动入口据此在成功后消费目标，失败时保留目标并按既有状态机重试 |
 | **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
 | **源码确认** | schema 12 学习状态契约 | 标签洞察按 `courseId + topic + tag` 隔离；画像继续使用课程目录校验后的 `TopicMastery` |
 | **源码确认** | 四个 WS04 契约脚本合并执行 | exit 0，55/55 通过；覆盖主动行动、提醒/卡片、Form 冷启动、画像真实 Topic、记录一致快照、双错误态恢复、窄屏与无障碍 |
@@ -119,11 +120,12 @@
 | **源码确认** | `pnpm test -- src/lib/data/quiz-learning-state.test.ts` | exit 0，39/39 通过；真实 reducer 证明第 501 条事件压缩后长期掌握里程碑仍保留 |
 | **源码确认** | `python scripts/validate-topic-relations.py` | exit 0；33 Topic、147 切片、165 道题与 33 份课程体验的 DAG、引用和 Topic 一致性全部通过 |
 | **源码确认** | `node --test scripts/test-learning-map-contracts.mjs` | 最终源码 exit 0，6/6 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，覆盖多层后继、分支汇合前置动作、独立掌握但关系锁定、页面返回刷新、课程选择保持、旧课程回调隔离、精确路由、动态读屏与 48 vp |
-| **源码确认** | WS04 Profile、ActivityRecords、Achievements、LearningMap 与主动触达七个相关契约脚本 | 最终源码 exit 0，72/72 通过；覆盖两阶段快照、旧回调隔离、消费页返回刷新、精确恢复、500 条页面窗口、完成节点语义、长期里程碑与分支级星图行动 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 最终源码 exit 0，API 12 增量任务与当前 HAP 状态一致，`BUILD SUCCESSFUL in 8 s 456 ms` |
+| **源码确认** | WS04 Profile、ActivityRecords、Achievements、LearningMap 与主动触达七个相关契约脚本 | 最终源码 exit 0，74/74 通过；新增执行同路由 `replaceUrl` 成功与失败分支，证明成功前不消费入口、失败后保留入口并只安排一次重试；同时覆盖两阶段快照、旧回调隔离、消费页返回刷新、精确恢复、500 条页面窗口、完成节点语义、长期里程碑与分支级星图行动 |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 最终源码 exit 0，API 12 ArkTS 编译与 HAP 打包通过，`BUILD SUCCESSFUL in 25 s 102 ms` |
 | **静态诊断通过** | DevEco build agent `check_ets_files`，会话 `ses_08b973018ffe09UP9Ypjm6iO9d` | 对 `5fe90b7` 的 `LearningMap.ets` 返回 `no diagnostics`；当前页面返回刷新批次因模型不可用未重跑 DevEco 专属诊断，以 API 12 HAP 构建作为当前 ArkTS 证据 |
 | **模拟器通过** | `hdc list targets -v`、HAP 安装、`aa force-stop`、`aa start`、`aa dump` | `5fe90b7` 批次目标为 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；当时 HAP 安装、旧进程强停和 `entry/EntryAbility` PID 5344 前台启动成功 |
 | **模拟器通过** | `hdc uitest dumpLayout/uiInput` 与 `snapshot_display` | `5fe90b7` 的 1256 x 2760 竖屏流程：Profile bounds 导航成功；ActivityRecords 显示“本页近期 93 条 · 最多展示 500 条”、可见选中勾选、“4 天有完成节点”及完成节点图例；计算机网络星图从锁定“物理层与数据链路层”解析并实际进入精确前置 `OSI与TCP/IP模型` 的 `pages/Lesson`。证据位于 `screenshots/ws04-learning-map-20260718-165422/`，不纳入 Git |
+| **模拟器通过** | HAP 安装、`aa start --ps`、`aa dump`、`uitest dumpLayout` 与 `snapshot_display` | 当前批次在 `127.0.0.1:5555` 安装本分支 HAP，强停旧实例后启动 PID 18915。合法提醒外壳按当前 ArkData 重算到 `cs101 / 数组与线性表 / review / pages/MistakeBook`；应用进入后台再发送同一 Want，PID 与页面路径不变，页面文本节点从 `60:324/326/356` 重建为 `60:457/459/489`，证明同路由使用 `replaceUrl` 重建消费页。前后 UI 树为 `/data/local/tmp/layout_17547252687.json` 与 `/data/local/tmp/layout_17658493878.json`；1256 x 2760 截图位于 `screenshots/ws04-same-route-return-20260718-205504/same-route-after.jpeg`，不纳入 Git |
 | **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前连接模拟器未执行这些系统流程 |
 | **未验证** | DevEco Agent `start_app` 最终调用 | 会话 `ses_08b9515ddffeBfIe2lRMHp5Or1` 在工具调用前返回 HTTP 403 `AllocationQuota.FreeTierOnly`；这不否定随后 HDC 安装启动成功。当前内置 `deveco/glm-5` 登录态为 401 `Token refresh failed`，未回落到 `openai/*` |
 
@@ -131,13 +133,13 @@
 
 ## 未验证与后续
 
-- 首页、记录、成就、提醒和卡片已在源码中共享同一真实状态，但缺少设备上的“计划保存/答题事件 -> 首页和卡片刷新 -> 通知或卡片点击回流”证据。
+- 首页、记录、成就、提醒和卡片已在源码中共享同一真实状态；合法 Want 的热启动同路由重建已在设备通过，但仍缺少“计划保存/答题事件 -> 首页和卡片刷新 -> 系统通知或桌面卡片实际点击”的完整设备证据。
 - 按课程/Topic/标签隔离的主动标签推荐当前明确未启用；schema 已具备精确数据，但产品还需补可解释证据和下一动作设计。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
 - Profile、ActivityRecords 与 LearningMap 的 1256 x 2760 竖屏视觉和 bounds 导航已通过模拟器；屏幕阅读器实际播报顺序、系统字体放大、横屏、平板布局与失败恢复聚焦仍未验证。
 - Achievements 的动态屏幕阅读器播报、字体放大换行和 48 vp 实际触控尚无设备证据。
 - Achievements 与 LearningMap 的“消费页写回 -> Router 返回 -> 同一页面实例刷新”当前为源码、竞态契约和 API 12 HAP 通过；共享模拟器随后被其他 worktree 的同 Bundle 安装覆盖，本批按指令未反复争抢设备，因此真实返回刷新仍未验证。
-- 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
+- 通知权限首次请求、用户拒绝后的错误态与重试，以及通知面板实际点击的冷热启动 `onNewWant` 幂等仍未取得设备证据；当前仅以合法 `aa start --ps` 证明热启动同路由回流状态机。
 - 正式签名 HAP、横屏、平板和真机仍未验证；当前只完成未签名 debug HAP 的模拟器安装运行。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。
 
