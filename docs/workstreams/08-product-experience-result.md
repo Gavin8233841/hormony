@@ -75,6 +75,12 @@
 - 活动切换、断点恢复和输入重置时同步收起提示，避免上一项练习的帮助状态污染下一项。
 - 揭示按钮保持 48 vp 和动态无障碍名称；未修改 `lesson-experiences.json`、答案、评分或学习事件结构。
 
+### 批次 E：真实后续动作失败恢复
+
+- Lesson 的“同标签测验”和末节“完成主题并练习”不再在路由失败时静默；页面保留当前上下文并显示可见重试反馈。
+- 主题练习失败文案明确本节进度已经保存，避免学习者因重复操作担心进度丢失；原操作保持为重试入口。
+- 复用既有 `message` 区、`router` 和幂等课程进度写入，不修改路由目标、课程事实、学习事件或 Repository。
+
 ## 四、文件
 
 - `apps/harmonyos/entry/src/main/ets/common/Builders.ets`
@@ -98,8 +104,8 @@
 node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs
 ```
 
-- exit 0，54/54 通过。
-- 覆盖首页真实状态门禁、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、长文本、48 vp、返回语义和实际颜色对比度。
+- exit 0，55/55 通过。
+- 覆盖首页真实状态门禁、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、后续动作路由失败、长文本、48 vp、返回语义和实际颜色对比度。
 
 ```powershell
 python -m unittest scripts.test_course_resume_contract scripts.test_lesson_activity_resume_contract
@@ -117,7 +123,7 @@ cd apps/harmonyos
 .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon
 ```
 
-- 首批 exit 0，`BUILD SUCCESSFUL in 23 s 216 ms`；渐进提示批次重新构建 exit 0，`BUILD SUCCESSFUL in 25 s 664 ms`。
+- 首批 exit 0，`BUILD SUCCESSFUL in 23 s 216 ms`；渐进提示批次 exit 0，`BUILD SUCCESSFUL in 25 s 664 ms`；后续动作失败恢复批次 exit 0，`BUILD SUCCESSFUL in 31 s 639 ms`。
 - `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，多项任务显示 `UP-TO-DATE`。
 - 项目没有 `signingConfigs`，Hvigor 跳过签名；该结果只记为**构建通过**。
 - 早期通用 `assembleHap --no-daemon` 构建虽 exit 0，但日志内部出现 `:entry:clean`；最终证据以上述显式增量构建为准。
@@ -136,10 +142,11 @@ cd apps/harmonyos
 1. 仓库没有 API 12 系统“减少动效”信号的精确使用依据，本批未猜写接口；减少动效仍为**未验证**。
 2. `Index` 已响应式订阅安全区，但公共二级页标题仍通过静态 getter 读取顶部安全区；旋转时的即时重排需设备证据和统一 Builder 参数设计。
 3. 课程路径仍使用现有 `router`。迁移到 `Navigation` 影响全部子页和回流契约，不属于本批安全范围。
-4. 本批未调用线上 API、模型、通知或服务卡片，不声明线上通过、模拟器通过或真机通过。
+4. Lesson 底部“上一篇 / 继续互动”仍是固定 48 vp 横向操作组；窄屏和字体放大下的实际增高与折行仍需设备证据。
+5. 本批未调用线上 API、模型、通知或服务卡片，不声明线上通过、模拟器通过或真机通过。
 
 ## 七、审计说明
 
-- 三条只读委派分别完成成熟学习产品/开源实现基准、窄屏/字体/动效契约审计和首页-课程-Lesson 产品流程审计；委派代理未修改文件。
+- 四条只读委派分别完成成熟学习产品/开源实现基准、窄屏/字体/动效契约审计、首页-课程-Lesson 产品流程审计和 Lesson 后续动作状态反例复核；委派代理未修改文件。
 - 独立 diff 审查尝试因本机没有 CodeRabbit CLI 和后续并发连接中断而未形成审查结论；未将其记为通过证据。
-- 交付结论以当前源码、54 项 Node 契约、16 项 Python 契约、API 12 显式增量构建和设备空列表为准。
+- 交付结论以当前源码、55 项 Node 契约、16 项 Python 契约、API 12 显式增量构建和设备空列表为准。

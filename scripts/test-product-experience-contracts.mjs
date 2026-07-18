@@ -128,6 +128,16 @@ test('Lesson 底部主操作推进到首个未完成互动', () => {
   assert.match(focus, /this\.goToActivity\(nextIndex\);/);
 });
 
+test('Lesson 真实后续动作路由失败时保留可见重试反馈', () => {
+  const quiz = methodBlock(lesson, 'openFocusedQuizForActivity');
+  const practice = methodBlock(lesson, 'openPractice');
+
+  assert.match(quiz, /pushUrl\(\{ url: 'pages\/Quiz' \}\)/);
+  assert.match(quiz, /this\.message = '同标签测验打开失败，请重试';/);
+  assert.match(practice, /pushUrl\(\{ url: 'pages\/Practice' \}\)/);
+  assert.match(practice, /this\.message = '本节进度已保存，但主题练习打开失败，请重试';/);
+});
+
 test('Lesson 单选先选择再由明确提交动作写入证据', () => {
   const choose = methodBlock(lesson, 'chooseSingle');
   const submit = methodBlock(lesson, 'submitSingle');
