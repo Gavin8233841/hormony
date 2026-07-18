@@ -43,6 +43,7 @@ struct PlanPage {
   @State progressTick: number = 0;
   @State savedPlanGoal: string = '';
   @State evidenceExpanded: boolean = false;
+  @State editorExpanded: boolean = false;
   @State errorHttpStatus: number = 0;
   @State errorCode: string = '';
   @State errorExpanded: boolean = false;
@@ -290,13 +291,16 @@ struct PlanPage {
     Flex({ wrap: FlexWrap.Wrap }) {
       ForEach(this.goalSuggestions, (suggestion: string): void => {
         Button(suggestion)
-          .height(34)
+          .constraintSize({ minHeight: 48 })
+          .padding({ left: 14, right: 14, top: 10, bottom: 10 })
           .fontSize(12)
           .fontColor(Constants.COLOR_BRAND)
           .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-          .borderRadius(17)
+          .borderRadius(Constants.RADIUS_MD)
           .margin({ right: 6, bottom: 6 })
-          .enabled(!this.loading && !this.planLoading)
+          .enabled(!this.loading && !this.planLoading && this.retryAction !== 'save')
+          .accessibilityText('使用建议目标：' + suggestion)
+          .accessibilityDescription('填入学习目标输入框')
           .onClick((): void => { this.goal = suggestion; })
       })
     }
@@ -306,6 +310,55 @@ struct PlanPage {
   private taskReason(task: PlanTask): string {
     const reason = (task as AgentPlanTask).reason ?? '';
     return reason.trim().length > 0 ? reason.trim() : '学伴根据目标拆出的可执行下一步';
+  }
+
+  private durationAccessibilityText(option: number): string {
+    return (this.days === option ? '已选择学习周期：' : '选择学习周期：') + option.toString() + ' 天';
+  }
+
+  private generateAccessibilityText(): string {
+    if (this.loading) return '正在生成学习计划';
+    if (this.planLoading) return '正在恢复本机计划';
+    if (this.updatingTaskId.length > 0) return '任务状态保存中，暂不能生成学习计划';
+    if (this.retryAction === 'save') return '请先保存刚生成的计划';
+    if (this.goal.trim().length === 0) return '请先输入学习目标';
+    return '生成学习计划';
+  }
+
+  private shouldAdjustPlanInput(): boolean {
+    if (this.errorCode === 'SAFETY_BLOCKED' || this.errorCode === 'INPUT_REJECTED' ||
+      this.errorCode === 'GOAL_TOO_LONG' || this.errorCode === 'INVALID_DURATION' ||
+      this.errorCode === 'INVALID_DAILY_MINUTES') return true;
+    return this.errorHttpStatus >= 400 && this.errorHttpStatus < 500 && this.errorHttpStatus !== 429;
+  }
+
+  private retryAccessibilityText(): string {
+    if (this.retryAction === 'load') return '重新读取本机计划';
+    if (this.retryAction === 'save') return '保存刚生成的学习计划';
+    if (this.retryAction === 'generate' && this.shouldAdjustPlanInput()) return '调整学习目标后重新生成';
+    if (this.retryAction === 'generate') return '重新生成学习计划';
+    return '重试学习计划操作';
+  }
+
+  private beginPlanAdjustment(): void {
+    this.editorExpanded = true;
+    this.message = '';
+    this.hasError = false;
+    this.retryAction = 'none';
+    this.clearErrorEvidence();
+  }
+
+  private checkpointAccessibilityText(title: string, detail: string, index: number): string {
+    const state = this.progressStep > index ? '已完成' : (this.progressStep === index ? '进行中' : '未开始');
+    return title + '，' + state + '。' + detail;
+  }
+
+  private taskAccessibilityText(task: PlanTask): string {
+    const state = task.done ? '已完成' : '待完成';
+    const target = this.hasTaskTarget(task) ?
+      this.courseTitle(task.courseId) + '，' + (task.topic ?? '') : '学习入口需要重新生成';
+    return state + '计划任务：' + task.title + '。' + target + '。' + this.taskReason(task) + '。' +
+      task.date + '，预计 ' + task.estimatedMin.toString() + ' 分钟，' + this.taskTypeLabel(task.type);
   }
 
   private savedPlanLabel(): string {
@@ -649,6 +702,8 @@ struct PlanPage {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
+    .accessibilityGroup(true)
+    .accessibilityText(this.checkpointAccessibilityText(title, detail, index))
   }
 
   @Builder
@@ -671,18 +726,19 @@ struct PlanPage {
             .fontSize(12)
             .lineHeight(18)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .maxLines(2)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         Button('取消')
-          .height(34)
+          .constraintSize({ minHeight: 48 })
+          .padding({ left: 14, right: 14 })
           .fontSize(12)
           .fontColor(Constants.COLOR_ERROR)
           .backgroundColor(Constants.COLOR_ERROR_LIGHT)
-          .borderRadius(Constants.RADIUS_SM)
+          .borderRadius(Constants.RADIUS_MD)
           .enabled(this.progressStep < 3)
+          .accessibilityText('取消生成学习计划')
+          .accessibilityDescription(this.tasks.length > 0 ? '保留上一版计划并停止本次生成' : '停止本次计划生成')
           .onClick((): void => { this.cancelPlanGeneration(); })
       }
       .width('100%')
@@ -767,7 +823,12 @@ struct PlanPage {
           .fontColor([Constants.COLOR_BRAND])
       }
       .width('100%')
+      .constraintSize({ minHeight: 48 })
       .alignItems(VerticalAlign.Center)
+      .focusable(true)
+      .accessibilityText((this.evidenceExpanded ? '收起' : '展开') + '规划依据，共 ' +
+        this.agentTrace.length.toString() + ' 条')
+      .accessibilityDescription('查看学习状态、课程主题和任务入口的检查结果')
       .onClick((): void => { this.evidenceExpanded = !this.evidenceExpanded; })
       if (this.evidenceExpanded) {
         ForEach(this.agentTrace, (trace: string, index: number): void => {
@@ -796,98 +857,165 @@ struct PlanPage {
     .borderRadius(Constants.RADIUS_LG)
     .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
     .margin({ left: 16, right: 16, bottom: 16 })
+    .constraintSize({ maxWidth: 760 })
   }
 
   build() {
     Column() {
       GradientHeader('学习计划', '输入目标，自动拆解为每日任务', () => this.goBack())
 
-      Column({ space: 14 }) {
-        Column({ space: 8 }) {
-          Text('学习目标')
-            .fontSize(13)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            .width('100%')
-          TextInput({
-            text: $$this.goal,
-            controller: this.goalInputController,
-            placeholder: '例如：两周复习数据结构'
-          })
-            .width('100%')
-            .height(44)
-            .fontSize(14)
-            .backgroundColor(Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_MD)
-            .enabled(!this.loading && !this.planLoading)
-            .maxLength(500)
-            .enterKeyType(EnterKeyType.Done)
-            .onChange((v: string) => { this.goal = v; })
-            .onSubmit((_enterKey: EnterKeyType, event: SubmitEvent): void => {
-              this.goal = event.text;
-              this.generate();
-            })
-          this.GoalSuggestions()
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-
-        Column({ space: 8 }) {
-          Text('学习周期')
-            .fontSize(13)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            .width('100%')
-          Row({ space: 8 }) {
-            ForEach(this.durationOptions, (option: number) => {
-              Button(option.toString() + ' 天')
+      if (!this.loading && !this.planLoading) {
+        if (this.tasks.length === 0 || this.editorExpanded) {
+          Column({ space: 14 }) {
+          Column({ space: 8 }) {
+            Row({ space: 8 }) {
+              Text('学习目标')
                 .layoutWeight(1)
-                .height(38)
                 .fontSize(13)
-                .fontColor(this.days === option ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
-                .backgroundColor(this.days === option ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
-                .borderRadius(Constants.RADIUS_MD)
-                .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0)
-                .onClick(() => {
-                  this.days = option;
-                })
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              if (this.tasks.length > 0) {
+                Button('收起编辑')
+                  .constraintSize({ minHeight: 48 })
+                  .padding({ left: 14, right: 14 })
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_BRAND)
+                  .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                  .borderRadius(Constants.RADIUS_MD)
+                  .accessibilityText('收起计划目标与周期编辑')
+                  .accessibilityDescription('返回当前任务列表')
+                  .onClick((): void => { this.editorExpanded = false; })
+              }
+            }
+            .width('100%')
+            TextInput({
+              text: $$this.goal,
+              controller: this.goalInputController,
+              placeholder: '例如：两周复习数据结构'
             })
+              .width('100%')
+              .constraintSize({ minHeight: 48 })
+              .fontSize(14)
+              .backgroundColor(Constants.COLOR_SURFACE_TINT)
+              .borderRadius(Constants.RADIUS_MD)
+              .enabled(!this.loading && !this.planLoading && this.retryAction !== 'save')
+              .accessibilityText('输入学习目标')
+              .accessibilityDescription('最多 500 字，输入后可生成每日学习任务')
+              .maxLength(500)
+              .enterKeyType(EnterKeyType.Done)
+              .onChange((v: string) => { this.goal = v; })
+              .onSubmit((_enterKey: EnterKeyType, event: SubmitEvent): void => {
+                this.goal = event.text;
+                this.generate();
+                this.editorExpanded = false;
+              })
+          this.GoalSuggestions()
           }
           .width('100%')
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
+          .alignItems(HorizontalAlign.Start)
 
-        Button() {
-          Row({ space: 8 }) {
-            if (this.loading) {
-              LoadingProgress().width(18).height(18).color(Constants.COLOR_TEXT_SECONDARY)
-            } else {
-              SymbolGlyph($r('sys.symbol.rays'))
-                .fontSize(18)
-                .fontColor([this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT])
-            }
-            Text(this.loading ? '正在生成计划' : '生成学习计划')
-              .fontSize(14)
+          Column({ space: 8 }) {
+            Text('学习周期')
+              .fontSize(13)
               .fontWeight(FontWeight.Medium)
-              .fontColor(this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              .width('100%')
+            Row({ space: 8 }) {
+              ForEach(this.durationOptions, (option: number) => {
+                Button(option.toString() + ' 天')
+                  .layoutWeight(1)
+                  .constraintSize({ minHeight: 48 })
+                  .fontSize(13)
+                  .fontColor(this.days === option ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
+                  .backgroundColor(this.days === option ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+                  .borderRadius(Constants.RADIUS_MD)
+                  .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0 &&
+                    this.retryAction !== 'save')
+                  .accessibilityText(this.durationAccessibilityText(option))
+                  .accessibilityDescription(this.days === option ? '当前已选择' : '选择该学习周期')
+                  .onClick(() => {
+                    this.days = option;
+                  })
+              })
+            }
+            .width('100%')
           }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+
+          Button() {
+            Row({ space: 8 }) {
+              if (this.loading) {
+                LoadingProgress().width(18).height(18).color(Constants.COLOR_TEXT_SECONDARY)
+              } else {
+                SymbolGlyph($r('sys.symbol.rays'))
+                  .fontSize(18)
+                  .fontColor([this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT])
+              }
+              Text(this.loading ? '正在生成计划' : '生成学习计划')
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.canGenerate ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
+            }
+          }
+          .width('100%')
+          .constraintSize({ minHeight: 48 })
+          .backgroundColor(this.canGenerate ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
+          .borderRadius(Constants.RADIUS_MD)
+          .enabled(this.canGenerate && this.retryAction !== 'save')
+          .accessibilityText(this.generateAccessibilityText())
+          .accessibilityDescription('根据目标和学习周期生成可执行任务并保存到本机')
+          .onClick(() => {
+            this.editorExpanded = false;
+            this.generate();
+          })
+          }
+          .width('100%')
+          .padding(16)
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .borderRadius(Constants.RADIUS_LG)
+          .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
+          .margin({ left: 16, right: 16, bottom: 16 })
+          .constraintSize({ maxWidth: 760 })
+        } else {
+          Column({ space: 10 }) {
+          Text('当前计划')
+            .width('100%')
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.savedPlanGoal.trim().length > 0 ? this.savedPlanGoal : this.goal)
+            .width('100%')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.tasks.length.toString() + ' 项任务，可从下方继续执行')
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Button('调整目标与周期')
+            .width('100%')
+            .constraintSize({ minHeight: 48 })
+            .fontSize(13)
+            .fontColor(Constants.COLOR_BRAND)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(Constants.RADIUS_MD)
+            .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0 &&
+              this.retryAction !== 'save')
+            .accessibilityText('调整当前计划的目标与周期')
+            .accessibilityDescription('展开计划编辑器，当前任务在保存新计划前保持不变')
+            .onClick((): void => { this.editorExpanded = true; })
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+          .padding(16)
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .borderRadius(Constants.RADIUS_LG)
+          .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
+          .margin({ left: 16, right: 16, bottom: 16 })
+          .constraintSize({ maxWidth: 760 })
         }
-        .width('100%')
-        .height(44)
-        .backgroundColor(this.canGenerate ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
-        .borderRadius(22)
-        .enabled(this.canGenerate)
-        .onClick(() => { this.generate(); })
       }
-      .width('100%')
-      .padding(16)
-      .backgroundColor(Constants.COLOR_BG_CARD)
-      .borderRadius(Constants.RADIUS_LG)
-      .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
-      .margin({ left: 16, right: 16, bottom: 16 })
 
       if (this.message.length > 0) {
         Column({ space: 6 }) {
@@ -901,16 +1029,21 @@ struct PlanPage {
               .fontColor(this.hasError ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
             if (this.retryAction !== 'none') {
               Button(this.retryAction === 'load' ? '重新读取' :
-                (this.retryAction === 'save' ? '重试保存' : '重试'))
-                .height(32)
+                (this.retryAction === 'save' ? '保存刚生成的计划' :
+                  (this.shouldAdjustPlanInput() ? '调整目标' : '重新生成')))
+                .constraintSize({ minHeight: 48 })
+                .padding({ left: 14, right: 14 })
                 .fontSize(12)
                 .fontColor(Constants.COLOR_BRAND)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                .borderRadius(Constants.RADIUS_SM)
+                .borderRadius(Constants.RADIUS_MD)
                 .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0)
+                .accessibilityText(this.retryAccessibilityText())
+                .accessibilityDescription(this.message)
                 .onClick(() => {
                   if (this.retryAction === 'load') this.loadPlan();
                   else if (this.retryAction === 'save') this.retryPendingPlanSave();
+                  else if (this.shouldAdjustPlanInput()) this.beginPlanAdjustment();
                   else this.generate();
                 })
             }
@@ -926,7 +1059,10 @@ struct PlanPage {
                 .fontSize(11)
                 .fontColor([Constants.COLOR_TEXT_SECONDARY])
             }
-            .height(28)
+            .constraintSize({ minHeight: 48 })
+            .focusable(true)
+            .accessibilityText(this.errorExpanded ? '收起计划错误详情' : '展开计划错误详情')
+            .accessibilityDescription('查看 HTTP 状态和错误代码')
             .onClick((): void => { this.errorExpanded = !this.errorExpanded; })
 
             if (this.errorExpanded) {
@@ -953,6 +1089,7 @@ struct PlanPage {
         }
         .width('100%')
         .padding({ left: 18, right: 18, bottom: 10 })
+        .constraintSize({ maxWidth: 760 })
       }
 
       if (this.hasError && (this.retryAction === 'generate' || this.retryAction === 'save') &&
@@ -970,30 +1107,41 @@ struct PlanPage {
         }
         .width('100%')
         .padding({ left: 18, right: 18, bottom: 12 })
+        .constraintSize({ maxWidth: 760 })
       }
 
       if (this.loading) {
-        Column() {
-          this.PlanLoadingState()
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
-      } else if (this.planLoading) {
-        Column({ space: 12 }) {
-          Row({ space: 8 }) {
-            LoadingProgress()
-              .width(18)
-              .height(18)
-              .color(Constants.COLOR_BRAND)
-            Text('正在恢复本机计划')
-              .fontSize(12)
-              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Scroll() {
+          Column() {
+            this.PlanLoadingState()
           }
           .width('100%')
-          this.PlanSkeleton()
+          .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
+          .constraintSize({ maxWidth: 760 })
         }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
+        .layoutWeight(1)
+        .scrollBar(BarState.Off)
+      } else if (this.planLoading) {
+        Scroll() {
+          Column({ space: 12 }) {
+            Row({ space: 8 }) {
+              LoadingProgress()
+                .width(18)
+                .height(18)
+                .color(Constants.COLOR_BRAND)
+              Text('正在恢复本机计划')
+                .fontSize(12)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            }
+            .width('100%')
+            this.PlanSkeleton()
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
+          .constraintSize({ maxWidth: 760 })
+        }
+        .layoutWeight(1)
+        .scrollBar(BarState.Off)
       } else if (this.tasks.length > 0) {
         if (this.agentTrace.length > 0) {
           this.AgentTraceCard()
@@ -1017,6 +1165,7 @@ struct PlanPage {
         }
         .width('100%')
         .padding({ left: 18, right: 18, bottom: 10 })
+        .constraintSize({ maxWidth: 760 })
 
         List({ space: 8 }) {
           ForEach(this.tasks, (t: PlanTask, i: number) => {
@@ -1045,39 +1194,38 @@ struct PlanPage {
                     .fontSize(14)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(t.done ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_PRIMARY)
-                    .maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
                   Text((this.hasTaskTarget(t) ? this.courseTitle(t.courseId) + ' · ' + (t.topic ?? '') : '重新生成后可直达学习环节'))
                     .fontSize(11)
                     .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_WARNING)
                     .margin({ top: 5 })
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
                   Text(this.taskReason(t))
                     .fontSize(11)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
                     .lineHeight(17)
                     .margin({ top: 5 })
-                    .maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Row({ space: 8 }) {
+                  Flex({ wrap: FlexWrap.Wrap }) {
                     Text(t.date)
                       .fontSize(11)
                       .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .margin({ right: 8, bottom: 4 })
                     Text(t.estimatedMin.toString() + ' 分钟')
                       .fontSize(11)
                       .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                      .margin({ right: 8, bottom: 4 })
                     Text(this.taskTypeLabel(t.type))
                       .fontSize(11)
                       .fontColor(Constants.COLOR_BRAND)
                       .padding({ left: 7, right: 7, top: 2, bottom: 2 })
                       .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                       .borderRadius(7)
+                      .margin({ bottom: 4 })
                   }
                   .margin({ top: 5 })
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
+                .accessibilityGroup(true)
+                .accessibilityText(this.taskAccessibilityText(t))
 
                 Column({ space: 6 }) {
                   Button(this.actionLabel(t))
@@ -1117,6 +1265,7 @@ struct PlanPage {
         .cachedCount(5)
         .scrollBar(BarState.Off)
         .padding({ left: 16, right: 16, bottom: 16 + SafeAreaInsets.bottomVp() })
+        .constraintSize({ maxWidth: 760 })
       } else {
         Column({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.calendar'))
@@ -1135,6 +1284,7 @@ struct PlanPage {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
         .padding({ left: 28, right: 28, bottom: 24 + SafeAreaInsets.bottomVp() })
+        .constraintSize({ maxWidth: 760 })
       }
     }
     .width('100%')
