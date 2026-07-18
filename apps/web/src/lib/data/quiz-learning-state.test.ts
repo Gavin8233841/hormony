@@ -55,6 +55,8 @@ interface RuntimeReviewItem {
   resolved: boolean;
   intervalDays: number;
   nextReviewAt: string;
+  updatedAt: string;
+  difficulty?: string;
   options?: string[];
 }
 
@@ -66,6 +68,8 @@ interface RuntimeTagInsight {
   correctQuestions: number;
   accuracy: number;
   wrongQuestions: number;
+  lastPracticedAt: string;
+  lastDifficulty: string;
 }
 
 interface RuntimeLegacyQuizTopicHistorySnapshot {
@@ -2941,6 +2945,66 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     expect(source).not.toContain("getStudyEvents");
     expect(source).not.toMatch(/\.slice\s*\(/);
     expect(source).not.toContain("for (const event");
+  });
+
+  it("首次 pending 写失败后的旧提交重试不回退较新复习状态", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const seed = result("retry-order-seed", "2026-07-01T08:00:00.000Z", false);
+    seed.details[0].questionId = "retry-order-question";
+    await loaded.repository.appendQuizResult(seed);
+    const reviewId = rowValue<RuntimeState>(rows, "quiz_learning_state").reviewItems[0].id;
+
+    const stale = result(
+      "retry-order-stale",
+      "2026-07-02T07:00:00.000Z",
+      false,
+      "二叉树与BST",
+      reviewId
+    );
+    stale.difficulty = "hard";
+    stale.details[0].difficulty = "hard";
+    stale.details[0].stem = "迟到的旧错题";
+    loaded.store.failWrite("quiz_learning_state");
+    await expect(loaded.repository.appendQuizResult(stale)).rejects.toThrow(
+      "ArkData fixture 写入失败: quiz_learning_state"
+    );
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").pendingResults).toEqual([]);
+
+    const latest = result(
+      "retry-order-latest",
+      "2026-07-02T08:00:00.000Z",
+      true,
+      "二叉树与BST",
+      reviewId
+    );
+    latest.difficulty = "easy";
+    latest.details[0].difficulty = "easy";
+    latest.details[0].stem = "较新的正确复习题";
+    await loaded.repository.appendQuizResult(latest);
+    await loaded.repository.appendQuizResult(stale);
+
+    const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(persisted.stats).toMatchObject({ totalAttempts: 3, totalQuestions: 3, correctQuestions: 1 });
+    expect(persisted.reviewItems[0]).toMatchObject({
+      id: reviewId,
+      questionId: latest.details[0].questionId,
+      stem: "较新的正确复习题",
+      attempts: 3,
+      intervalDays: 3,
+      nextReviewAt: "2026-07-05T08:00:00.000Z",
+      updatedAt: latest.submittedAt,
+      difficulty: "easy",
+      resolved: false,
+    });
+    expect(persisted.topicMastery[0].lastPracticedAt).toBe(latest.submittedAt);
+    expect(persisted.tagInsights[0]).toMatchObject({
+      totalQuestions: 3,
+      correctQuestions: 1,
+      lastPracticedAt: latest.submittedAt,
+      lastDifficulty: "easy",
+    });
   });
 });
 
