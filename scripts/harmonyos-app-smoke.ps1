@@ -33,6 +33,8 @@ $HAP_PATH = Join-Path $HARMONYOS_DIR "entry\build\default\outputs\default\entry-
 $KNOWLEDGE_CHUNKS_PATH = Join-Path $HARMONYOS_DIR "entry\src\main\resources\rawfile\learning\knowledge-chunks.json"
 $TIMESTAMP = Get-Date -Format "yyyyMMdd-HHmmss"
 $SCREENSHOT_DIR = Join-Path $PROJECT_ROOT "screenshots\trae-smoke-$TIMESTAMP"
+$COURSE_NAMES = @('数据结构', '操作系统', '计算机网络')
+$COURSE_CTA_TEXTS = @('进入课程', '继续课程')
 
 $script:passCount = 0
 $script:failCount = 0
@@ -161,6 +163,16 @@ function Test-UiNodeClickable($node) {
     return ($clickableProperty.Value -is [string] -and $clickableProperty.Value -ceq 'true')
 }
 
+function Test-UiNodeScrollable($node) {
+    if ($null -eq $node -or $null -eq $node.PSObject.Properties['attributes']) {
+        return $false
+    }
+    $scrollableProperty = $node.attributes.PSObject.Properties['scrollable']
+    if ($null -eq $scrollableProperty) { return $false }
+    if ($scrollableProperty.Value -is [bool]) { return $scrollableProperty.Value }
+    return ($scrollableProperty.Value -is [string] -and $scrollableProperty.Value -ceq 'true')
+}
+
 function Get-UiNodes($node) {
     if ($null -eq $node) { return }
     Write-Output $node
@@ -186,6 +198,71 @@ function Get-PagePath($uiTree) {
         }
     }
     return $null
+}
+
+function Invoke-ReturnToPage(
+    [string]$expectedPagePath,
+    [scriptblock]$getPagePathAction,
+    [scriptblock]$backAction,
+    [int]$maxBacks = 8,
+    [int]$pollsPerBack = 8,
+    [int]$pollDelayMilliseconds = 500
+) {
+    if ([string]::IsNullOrWhiteSpace($expectedPagePath)) {
+        throw 'Expected page path must be non-empty'
+    }
+    if ($maxBacks -lt 0 -or $pollsPerBack -lt 1 -or $pollDelayMilliseconds -lt 0) {
+        throw 'Return-to-page limits are invalid'
+    }
+
+    $backs = 0
+    $lastPath = $null
+    for ($poll = 0; $poll -lt $pollsPerBack; $poll++) {
+        $lastPath = & $getPagePathAction
+        if ($lastPath -ceq $expectedPagePath) {
+            return [PSCustomObject]@{ PagePath = $lastPath; BackCount = $backs }
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$lastPath)) { break }
+        if ($poll -lt ($pollsPerBack - 1) -and $pollDelayMilliseconds -gt 0) {
+            Start-Sleep -Milliseconds $pollDelayMilliseconds
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$lastPath)) {
+        throw "Unable to obtain a non-empty page path before returning to $expectedPagePath"
+    }
+
+    while ($lastPath -cne $expectedPagePath) {
+        if ($backs -ge $maxBacks) {
+            throw "Unable to return to $expectedPagePath after $backs Back events; last=$lastPath"
+        }
+
+        $pathBeforeBack = [string]$lastPath
+        & $backAction | Out-Null
+        $backs++
+        $transitionSettled = $false
+        for ($poll = 0; $poll -lt $pollsPerBack; $poll++) {
+            $lastPath = & $getPagePathAction
+            if ($lastPath -ceq $expectedPagePath) {
+                return [PSCustomObject]@{ PagePath = $lastPath; BackCount = $backs }
+            }
+            if (-not [string]::IsNullOrWhiteSpace([string]$lastPath) -and
+                $lastPath -cne $pathBeforeBack) {
+                $transitionSettled = $true
+                break
+            }
+            if ($poll -lt ($pollsPerBack - 1) -and $pollDelayMilliseconds -gt 0) {
+                Start-Sleep -Milliseconds $pollDelayMilliseconds
+            }
+        }
+        if (-not $transitionSettled) {
+            throw (
+                "Back transition did not leave $pathBeforeBack after $pollsPerBack polls; " +
+                "last=$lastPath"
+            )
+        }
+    }
+
+    return [PSCustomObject]@{ PagePath = $lastPath; BackCount = $backs }
 }
 
 function Get-SourceTopicTexts() {
@@ -288,6 +365,17 @@ function Get-BoundsCenter($bounds) {
     }
 }
 
+function Test-BoundsRectangleEqual($left, $right) {
+    return (
+        $null -ne $left -and
+        $null -ne $right -and
+        $left.Left -eq $right.Left -and
+        $left.Top -eq $right.Top -and
+        $left.Right -eq $right.Right -and
+        $left.Bottom -eq $right.Bottom
+    )
+}
+
 function Get-ExactTextClickableTargets(
     $node,
     [string[]]$texts,
@@ -335,6 +423,264 @@ function Get-BoundedExactTextTargets($uiTree, [string[]]$texts) {
         @{ Expression = { $_.Center.Rectangle.Left }; Ascending = $true }
     )
     return @($targets | Sort-Object -Property $sortProperties)
+}
+
+function Get-BoundedScrollableTargets($uiTree, [string[]]$anchorTexts) {
+    if ($anchorTexts.Count -eq 0) { return @() }
+
+    $targets = @(
+        foreach ($node in @(Get-UiNodes $uiTree)) {
+            if (-not (Test-UiNodeVisible $node) -or -not (Test-UiNodeScrollable $node)) {
+                continue
+            }
+            $boundsProperty = $node.attributes.PSObject.Properties['bounds']
+            if ($null -eq $boundsProperty) { continue }
+            $rectangle = Get-BoundsRectangle $boundsProperty.Value
+            if ($null -eq $rectangle) { continue }
+
+            $matchedTexts = @(
+                foreach ($anchorText in $anchorTexts) {
+                    if (@(Find-ElementByText $node $anchorText).Count -gt 0) {
+                        Write-Output $anchorText
+                    }
+                }
+            )
+
+            Write-Output ([PSCustomObject]@{
+                Element = $node
+                Rectangle = $rectangle
+                MatchedTexts = $matchedTexts
+                HasAnchor = $matchedTexts.Count -gt 0
+                Area = [long]($rectangle.Right - $rectangle.Left) * [long]($rectangle.Bottom - $rectangle.Top)
+            })
+        }
+    )
+    $sortProperties = @(
+        @{ Expression = { $_.HasAnchor }; Descending = $true },
+        @{ Expression = { $_.Area }; Ascending = $true },
+        @{ Expression = { $_.Rectangle.Top }; Ascending = $true },
+        @{ Expression = { $_.Rectangle.Left }; Ascending = $true }
+    )
+    return @($targets | Sort-Object -Property $sortProperties)
+}
+
+function Get-CourseScrollableTarget(
+    $uiTree,
+    [string[]]$anchorTexts,
+    $expectedRectangle = $null
+) {
+    $targets = @(Get-BoundedScrollableTargets $uiTree $anchorTexts)
+    if ($targets.Count -eq 0) {
+        throw "No visible scrollable node with valid bounds is available for the course list"
+    }
+
+    if ($null -ne $expectedRectangle) {
+        $matchingTargets = @(
+            $targets | Where-Object {
+                Test-BoundsRectangleEqual $_.Rectangle $expectedRectangle
+            }
+        )
+        if ($matchingTargets.Count -eq 1) {
+            return $matchingTargets[0]
+        }
+        if ($matchingTargets.Count -eq 0) {
+            throw "Course list scrollable no longer matches its initial bounds"
+        }
+        throw "Course list scrollable initial bounds match multiple visible nodes"
+    }
+
+    $anchoredTargets = @($targets | Where-Object { $_.HasAnchor })
+    if ($anchoredTargets.Count -gt 0) {
+        $target = $anchoredTargets[0]
+    } elseif ($targets.Count -eq 1) {
+        $target = $targets[0]
+    } else {
+        throw "Multiple visible scrollable nodes with valid bounds have no exact course or CTA anchor"
+    }
+    return $target
+}
+
+function Get-ScrollableSwipeCoordinates(
+    $uiTree,
+    [string[]]$anchorTexts,
+    [string]$direction,
+    $expectedRectangle = $null
+) {
+    if ($direction -cne 'up' -and $direction -cne 'down') {
+        throw "Scrollable swipe direction must be up or down"
+    }
+
+    $target = Get-CourseScrollableTarget $uiTree $anchorTexts $expectedRectangle
+    $rectangle = $target.Rectangle
+    $height = $rectangle.Bottom - $rectangle.Top
+    $upperY = [int][math]::Floor($rectangle.Top + ($height * 0.25))
+    $lowerY = [int][math]::Floor($rectangle.Top + ($height * 0.75))
+    if ($lowerY -le $upperY) {
+        throw "Scrollable node bounds are too small for a bounded swipe"
+    }
+
+    return [PSCustomObject]@{
+        Direction = $direction
+        X = [int][math]::Floor(($rectangle.Left + $rectangle.Right) / 2)
+        FromY = if ($direction -ceq 'up') { $lowerY } else { $upperY }
+        ToY = if ($direction -ceq 'up') { $upperY } else { $lowerY }
+        Rectangle = $rectangle
+    }
+}
+
+function Invoke-ScrollableSwipe(
+    $uiTree,
+    [string[]]$anchorTexts,
+    [string]$direction,
+    $expectedRectangle = $null
+) {
+    $swipe = Get-ScrollableSwipeCoordinates $uiTree $anchorTexts $direction $expectedRectangle
+    Invoke-HdcShell -arguments @(
+        'uitest', 'uiInput', 'swipe', [string]$swipe.X, [string]$swipe.FromY,
+        [string]$swipe.X, [string]$swipe.ToY, '600'
+    ) | Out-Null
+    Start-Sleep -Milliseconds 700
+    $rectangle = $swipe.Rectangle
+    Write-Step "Course list scroll: $direction" "PASS" (
+        "scrollableBounds=[$($rectangle.Left),$($rectangle.Top)][$($rectangle.Right),$($rectangle.Bottom)] " +
+        "from=($($swipe.X),$($swipe.FromY)) to=($($swipe.X),$($swipe.ToY))"
+    )
+}
+
+function Invoke-CourseListTraversal(
+    [string[]]$courseNames,
+    [string[]]$ctaTexts,
+    [scriptblock]$getUiTreeAction,
+    [scriptblock]$swipeAction,
+    [int]$maxForwardScrolls = 4
+) {
+    if ($courseNames.Count -eq 0) { throw "No exact course names were supplied" }
+    if ($ctaTexts.Count -eq 0) { throw "No exact course CTA texts were supplied" }
+    if ($maxForwardScrolls -lt 1) { throw "Course list maxForwardScrolls must be at least 1" }
+
+    $anchorTexts = @($courseNames) + @($ctaTexts)
+    $seenCourseNames = @()
+    $seenCtaTexts = @()
+    $swipeResults = @()
+    $forwardScrolls = 0
+    $currentTree = & $getUiTreeAction
+    $courseRectangle = $null
+
+    while ($true) {
+        $currentScrollable = Get-CourseScrollableTarget $currentTree $anchorTexts $courseRectangle
+        if ($null -eq $courseRectangle) {
+            $courseRectangle = $currentScrollable.Rectangle
+        }
+        foreach ($courseName in $courseNames) {
+            if (-not ($seenCourseNames -ccontains $courseName) -and
+                @(Find-ElementByText $currentScrollable.Element $courseName).Count -gt 0) {
+                $seenCourseNames += $courseName
+            }
+        }
+        foreach ($ctaTarget in @(Get-BoundedExactTextTargets $currentScrollable.Element $ctaTexts)) {
+            if (-not ($seenCtaTexts -ccontains $ctaTarget.Text)) {
+                $seenCtaTexts += [string]$ctaTarget.Text
+            }
+        }
+
+        $missingCourseNames = @($courseNames | Where-Object { -not ($seenCourseNames -ccontains $_) })
+        if ($missingCourseNames.Count -eq 0) { break }
+        if ($forwardScrolls -ge $maxForwardScrolls) {
+            throw (
+                "Course list scan exhausted $maxForwardScrolls forward scrolls; " +
+                "missing exact texts: $($missingCourseNames -join ', ')"
+            )
+        }
+
+        $swipeResults += @(& $swipeAction $currentTree 'up' $anchorTexts $courseRectangle)
+        $forwardScrolls++
+        $currentTree = & $getUiTreeAction
+    }
+
+    $recoveryScrolls = 0
+    $maxRecoveryScrolls = $forwardScrolls + 1
+    while ($true) {
+        $currentScrollable = Get-CourseScrollableTarget $currentTree $anchorTexts $courseRectangle
+        $firstCourseVisible = @(
+            Find-ElementByText $currentScrollable.Element $courseNames[0]
+        ).Count -gt 0
+        $visibleCtaTargets = @(
+            Get-BoundedExactTextTargets $currentScrollable.Element $ctaTexts
+        )
+        if ($firstCourseVisible -and $visibleCtaTargets.Count -gt 0) { break }
+        if ($forwardScrolls -eq 0 -or $recoveryScrolls -ge $maxRecoveryScrolls) {
+            throw (
+                "Course list recovery did not restore the first exact course text and a visible bounded CTA " +
+                "after $recoveryScrolls reverse scrolls"
+            )
+        }
+
+        $swipeResults += @(& $swipeAction $currentTree 'down' $anchorTexts $courseRectangle)
+        $recoveryScrolls++
+        $currentTree = & $getUiTreeAction
+    }
+
+    return [PSCustomObject]@{
+        CourseNamesSeen = @($seenCourseNames)
+        CtaTextsSeen = @($seenCtaTexts)
+        ForwardScrolls = $forwardScrolls
+        RecoveryScrolls = $recoveryScrolls
+        SwipeResults = @($swipeResults)
+        VisibleCtaTargets = @($visibleCtaTargets)
+        ScrollableRectangle = $courseRectangle
+    }
+}
+
+function Get-CourseScrollableCtaTargets(
+    $uiTree,
+    [string[]]$courseNames,
+    [string[]]$ctaTexts,
+    $expectedRectangle
+) {
+    $anchorTexts = @($courseNames) + @($ctaTexts)
+    $scrollable = Get-CourseScrollableTarget $uiTree $anchorTexts $expectedRectangle
+    return [PSCustomObject]@{
+        Scrollable = $scrollable
+        Targets = @(Get-BoundedExactTextTargets $scrollable.Element $ctaTexts)
+    }
+}
+
+function Click-FirstVisibleCourseCta(
+    [string[]]$courseNames,
+    [string[]]$ctaTexts,
+    $expectedRectangle,
+    [int]$maxAttempts = 6
+) {
+    $scope = $null
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            $scope = Get-CourseScrollableCtaTargets (Get-UiTree) `
+                $courseNames $ctaTexts $expectedRectangle
+            if ($scope.Targets.Count -gt 0) { break }
+        } catch {
+            if ($attempt -eq $maxAttempts) { throw }
+        }
+        if ($attempt -lt $maxAttempts) { Start-Sleep -Milliseconds 500 }
+    }
+    if ($null -eq $scope -or $scope.Targets.Count -eq 0) {
+        Write-Step "Click: First visible course CTA" "FAIL" (
+            "No visible bounded course CTA exists inside the initial course scrollable"
+        )
+        return $null
+    }
+
+    $target = $scope.Targets[0]
+    $x = [string]$target.Center.X
+    $y = [string]$target.Center.Y
+    Invoke-HdcShell -arguments @('uitest', 'uiInput', 'click', $x, $y) | Out-Null
+    Start-Sleep -Milliseconds 500
+    $rectangle = $target.Center.Rectangle
+    Write-Step "Click: First visible course CTA" "PASS" (
+        "exactText=$($target.Text) " +
+        "clickableBounds=[$($rectangle.Left),$($rectangle.Top)]" +
+        "[$($rectangle.Right),$($rectangle.Bottom)] center=($x,$y)"
+    )
+    return [string]$target.Text
 }
 
 function Click-FirstVisibleExactText(
@@ -565,9 +911,53 @@ function Invoke-SelfTest() {
             }
         },
         @{
+            Name = 'root recovery waits through empty transition paths'
+            Run = {
+                $paths = [System.Collections.Queue]::new()
+                foreach ($path in @('', 'pages/Practice', '', 'pages/Plan', '', 'pages/Index')) {
+                    $paths.Enqueue($path)
+                }
+                $backCount = 0
+                $getPath = {
+                    if ($paths.Count -eq 0) { throw 'Synthetic page path queue is empty' }
+                    return $paths.Dequeue()
+                }.GetNewClosure()
+                $goBack = { $script:syntheticBackCount++ }
+                $script:syntheticBackCount = 0
+                $result = Invoke-ReturnToPage 'pages/Index' $getPath $goBack 4 3 0
+                Assert-SelfTest ($result.PagePath -ceq 'pages/Index') 'Root page was not recovered'
+                Assert-SelfTest ($result.BackCount -eq 2) 'Unexpected returned Back count'
+                Assert-SelfTest ($script:syntheticBackCount -eq 2) 'Transition polling sent an extra Back event'
+                $script:syntheticBackCount = $null
+            }
+        },
+        @{
+            Name = 'root recovery ignores the old non-empty path after Back'
+            Run = {
+                $paths = [System.Collections.Queue]::new()
+                foreach ($path in @(
+                    'pages/Practice', 'pages/Practice', '', 'pages/Plan',
+                    'pages/Plan', '', 'pages/Index'
+                )) {
+                    $paths.Enqueue($path)
+                }
+                $getPath = {
+                    if ($paths.Count -eq 0) { throw 'Synthetic page path queue is empty' }
+                    return $paths.Dequeue()
+                }.GetNewClosure()
+                $goBack = { $script:syntheticBackCount++ }
+                $script:syntheticBackCount = 0
+                $result = Invoke-ReturnToPage 'pages/Index' $getPath $goBack 4 3 0
+                Assert-SelfTest ($result.PagePath -ceq 'pages/Index') 'Root page was not recovered'
+                Assert-SelfTest ($result.BackCount -eq 2) 'Old paths caused extra returned Back events'
+                Assert-SelfTest ($script:syntheticBackCount -eq 2) 'Old paths caused extra Back input events'
+                $script:syntheticBackCount = $null
+            }
+        },
+        @{
             Name = 'course CTA entry and continue states'
             Run = {
-                foreach ($ctaText in @('进入课程', '继续课程')) {
+                foreach ($ctaText in $COURSE_CTA_TEXTS) {
                     $tree = [PSCustomObject]@{
                         attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[0,0][100,200]' }
                         children = @(
@@ -590,7 +980,7 @@ function Invoke-SelfTest() {
                             }
                         )
                     }
-                    $targets = @(Get-BoundedExactTextTargets $tree @('进入课程', '继续课程'))
+                    $targets = @(Get-BoundedExactTextTargets $tree $COURSE_CTA_TEXTS)
                     Assert-SelfTest ($targets.Count -eq 1) "Wrong target count for course CTA: $ctaText"
                     Assert-SelfTest ($targets[0].Text -ceq $ctaText) "Wrong exact course CTA selected: $ctaText"
                     Assert-SelfTest (
@@ -600,6 +990,231 @@ function Invoke-SelfTest() {
                         $targets[0].Center.Rectangle.Bottom -eq 160
                     ) "Course CTA did not use the clickable button bounds: $ctaText"
                 }
+            }
+        },
+        @{
+            Name = 'course list finite scroll scan and recovery'
+            Run = {
+                $newCourseTree = {
+                    param(
+                        [string[]]$courseTexts,
+                        [string]$ctaText,
+                        [object]$scrollBounds,
+                        [object]$scrollableValue
+                    )
+                    $children = [System.Collections.ArrayList]::new()
+                    $top = 30
+                    foreach ($courseText in $courseTexts) {
+                        [void]$children.Add([PSCustomObject]@{
+                            attributes = [PSCustomObject]@{
+                                visible = 'true'
+                                text = $courseText
+                                bounds = "[20,$top][80,$($top + 20)]"
+                            }
+                            children = @()
+                        })
+                        $top += 35
+                    }
+                    [void]$children.Add([PSCustomObject]@{
+                        attributes = [PSCustomObject]@{
+                            visible = 'true'
+                            clickable = 'true'
+                            bounds = '[10,110][90,150]'
+                        }
+                        children = @(
+                            [PSCustomObject]@{
+                                attributes = [PSCustomObject]@{
+                                    visible = 'true'
+                                    text = $ctaText
+                                    bounds = '[25,120][75,140]'
+                                }
+                                children = @()
+                            }
+                        )
+                    })
+
+                    $scrollAttributes = [ordered]@{
+                        visible = 'true'
+                        scrollable = $scrollableValue
+                    }
+                    if ($null -ne $scrollBounds) {
+                        $scrollAttributes['bounds'] = $scrollBounds
+                    }
+                    return [PSCustomObject]@{
+                        attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[0,0][100,200]' }
+                        children = @(
+                            [PSCustomObject]@{
+                                attributes = [PSCustomObject]$scrollAttributes
+                                children = @($children)
+                            }
+                        )
+                    }
+                }
+
+                $initialTree = & $newCourseTree @('数据结构', '操作系统') '进入课程' '[10,20][90,180]' 'true'
+                $scrolledTree = & $newCourseTree @('操作系统', '计算机网络') '继续课程' '[10,20][90,180]' $true
+                $initialTree.children += [PSCustomObject]@{
+                    attributes = [PSCustomObject]@{
+                        visible = 'true'
+                        text = '计算机网络'
+                        bounds = '[5,5][95,18]'
+                    }
+                    children = @()
+                }
+                $initialTree.children += [PSCustomObject]@{
+                    attributes = [PSCustomObject]@{
+                        visible = 'true'
+                        clickable = 'true'
+                        bounds = '[1,1][99,19]'
+                    }
+                    children = @(
+                        [PSCustomObject]@{
+                            attributes = [PSCustomObject]@{
+                                visible = 'true'
+                                text = '继续课程'
+                                bounds = '[20,2][80,18]'
+                            }
+                            children = @()
+                        }
+                    )
+                }
+                $middleTree = [PSCustomObject]@{
+                    attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[0,0][100,200]' }
+                    children = @(
+                        [PSCustomObject]@{
+                            attributes = [PSCustomObject]@{
+                                visible = 'true'
+                                scrollable = $true
+                                bounds = '[10,20][90,180]'
+                            }
+                            children = @(
+                                [PSCustomObject]@{
+                                    attributes = [PSCustomObject]@{
+                                        visible = 'true'
+                                        text = '学习进度'
+                                        bounds = '[20,80][80,100]'
+                                    }
+                                    children = @()
+                                }
+                            )
+                        },
+                        [PSCustomObject]@{
+                            attributes = [PSCustomObject]@{
+                                visible = 'true'
+                                scrollable = 'true'
+                                bounds = '[1,1][99,19]'
+                            }
+                            children = @()
+                        }
+                    )
+                }
+                $initialScrollable = Get-CourseScrollableTarget $initialTree `
+                    (@($COURSE_NAMES) + @($COURSE_CTA_TEXTS))
+                Assert-SelfTest (
+                    @(Find-ElementByText $initialTree '计算机网络').Count -eq 1 -and
+                    @(Find-ElementByText $initialScrollable.Element '计算机网络').Count -eq 0
+                ) 'Off-list third course fixture was not isolated from the course scrollable'
+                $initialCtaScope = Get-CourseScrollableCtaTargets $initialTree `
+                    $COURSE_NAMES $COURSE_CTA_TEXTS $initialScrollable.Rectangle
+                Assert-SelfTest (
+                    @(Get-BoundedExactTextTargets $initialTree $COURSE_CTA_TEXTS).Count -eq 2 -and
+                    $initialCtaScope.Targets.Count -eq 1 -and
+                    $initialCtaScope.Targets[0].Text -ceq '进入课程'
+                ) 'Off-list CTA was not isolated from the course scrollable'
+                Assert-SelfTest (@(Find-ElementByText $scrolledTree '计算机网络').Count -eq 1) 'Third course was absent after scrolling'
+                Assert-SelfTest (
+                    @(Find-ElementByText $middleTree '数据结构').Count -eq 0 -and
+                    @(Find-ElementByText $middleTree '操作系统').Count -eq 0 -and
+                    @(Find-ElementByText $middleTree '计算机网络').Count -eq 0 -and
+                    @(Get-BoundedExactTextTargets $middleTree $COURSE_CTA_TEXTS).Count -eq 0
+                ) 'Synthetic middle viewport unexpectedly contains a course or CTA anchor'
+
+                $trees = [System.Collections.Queue]::new()
+                $trees.Enqueue($initialTree)
+                $trees.Enqueue($middleTree)
+                $trees.Enqueue($scrolledTree)
+                $trees.Enqueue($middleTree)
+                $trees.Enqueue($initialTree)
+                $getUiTreeAction = {
+                    if ($trees.Count -eq 0) { throw 'Synthetic UI tree queue is empty' }
+                    return $trees.Dequeue()
+                }.GetNewClosure()
+                $swipeAction = {
+                    param($uiTree, [string]$direction, [string[]]$anchorTexts, $expectedRectangle)
+                    return Get-ScrollableSwipeCoordinates $uiTree $anchorTexts `
+                        $direction $expectedRectangle
+                }
+
+                $scan = Invoke-CourseListTraversal $COURSE_NAMES $COURSE_CTA_TEXTS `
+                    $getUiTreeAction $swipeAction 3
+                Assert-SelfTest ($trees.Count -eq 0) 'Course scan did not consume the expected live UI trees'
+                Assert-SelfTest ($scan.CourseNamesSeen.Count -eq 3) 'Course scan did not verify all exact course names'
+                foreach ($courseName in $COURSE_NAMES) {
+                    Assert-SelfTest ($scan.CourseNamesSeen -ccontains $courseName) "Course scan missed: $courseName"
+                }
+                Assert-SelfTest ($scan.CtaTextsSeen -ccontains '进入课程') 'Entry CTA was not observed'
+                Assert-SelfTest ($scan.CtaTextsSeen -ccontains '继续课程') 'Continue CTA was not observed'
+                Assert-SelfTest ($scan.ForwardScrolls -eq 2 -and $scan.RecoveryScrolls -eq 2) 'Unexpected finite scroll counts'
+                Assert-SelfTest ($scan.SwipeResults.Count -eq 4) 'Unexpected bounded swipe count'
+                Assert-SelfTest (
+                    $scan.SwipeResults[0].Direction -ceq 'up' -and
+                    $scan.SwipeResults[0].X -eq 50 -and
+                    $scan.SwipeResults[0].FromY -eq 140 -and
+                    $scan.SwipeResults[0].ToY -eq 60
+                ) 'Forward swipe was not derived from scrollable bounds'
+                Assert-SelfTest (
+                    $scan.SwipeResults[1].Direction -ceq 'up' -and
+                    $scan.SwipeResults[1].X -eq 50 -and
+                    $scan.SwipeResults[1].FromY -eq 140 -and
+                    $scan.SwipeResults[1].ToY -eq 60
+                ) 'Anchor-free forward swipe did not use the unique scrollable bounds'
+                Assert-SelfTest (
+                    $scan.SwipeResults[2].Direction -ceq 'down' -and
+                    $scan.SwipeResults[2].X -eq 50 -and
+                    $scan.SwipeResults[2].FromY -eq 60 -and
+                    $scan.SwipeResults[2].ToY -eq 140
+                ) 'Recovery swipe was not derived from scrollable bounds'
+                Assert-SelfTest (
+                    $scan.SwipeResults[3].Direction -ceq 'down' -and
+                    $scan.SwipeResults[3].X -eq 50 -and
+                    $scan.SwipeResults[3].FromY -eq 60 -and
+                    $scan.SwipeResults[3].ToY -eq 140
+                ) 'Anchor-free recovery swipe did not use the unique scrollable bounds'
+                Assert-SelfTest ($scan.VisibleCtaTargets.Count -eq 1) 'Recovered viewport has no single visible bounded CTA'
+                Assert-SelfTest ($scan.VisibleCtaTargets[0].Text -ceq '进入课程') 'First recovered legal CTA was not selected'
+            }
+        },
+        @{
+            Name = 'course list rejects missing scrollable bounds'
+            Run = {
+                $tree = [PSCustomObject]@{
+                    attributes = [PSCustomObject]@{ visible = 'true'; bounds = '[0,0][100,200]' }
+                    children = @(
+                        [PSCustomObject]@{
+                            attributes = [PSCustomObject]@{ visible = 'true'; scrollable = $true }
+                            children = @(
+                                [PSCustomObject]@{
+                                    attributes = [PSCustomObject]@{ visible = 'true'; text = '数据结构'; bounds = '[20,30][80,50]' }
+                                    children = @()
+                                },
+                                [PSCustomObject]@{
+                                    attributes = [PSCustomObject]@{ visible = 'true'; text = '操作系统'; bounds = '[20,65][80,85]' }
+                                    children = @()
+                                }
+                            )
+                        }
+                    )
+                }
+                $getUiTreeAction = { return $tree }.GetNewClosure()
+                $swipeAction = {
+                    param($uiTree, [string]$direction, [string[]]$anchorTexts, $expectedRectangle)
+                    Get-ScrollableSwipeCoordinates $uiTree $anchorTexts `
+                        $direction $expectedRectangle | Out-Null
+                }
+                Assert-SelfTestThrows {
+                    Invoke-CourseListTraversal $COURSE_NAMES $COURSE_CTA_TEXTS `
+                        $getUiTreeAction $swipeAction 1
+                } 'No visible scrollable node with valid bounds'
             }
         },
         @{
@@ -830,12 +1445,17 @@ if ($startOutput -cnotmatch 'start ability successfully') {
 }
 Write-Step "App start" "PASS" "$BUNDLE_NAME/EntryAbility"
 Start-Sleep -Seconds 3
-for ($attempt = 0; $attempt -lt 8; $attempt++) {
-    if ((Get-PagePath (Get-UiTree)) -eq 'pages/Index') { break }
-    Invoke-HdcShell -arguments @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
-    Start-Sleep -Milliseconds 500
+try {
+    $rootRecovery = Invoke-ReturnToPage 'pages/Index' `
+        { Get-PagePath (Get-UiTree) } `
+        { Invoke-HdcShell -arguments @('uitest', 'uiInput', 'keyEvent', 'Back') } `
+        8 8 500
+} catch {
+    Write-Step "Page: Root recovery" "FAIL" $_.Exception.Message
+    exit 1
 }
 if (-not (Verify-Page "pages/Index" "Root")) { exit 1 }
+Write-Step "Root recovery" "PASS" "backEvents=$($rootRecovery.BackCount)"
 if (Test-Path -LiteralPath $SCREENSHOT_DIR) {
     throw "Refusing to overwrite an existing screenshot directory: $SCREENSHOT_DIR"
 }
@@ -854,17 +1474,29 @@ Take-Screenshot "02-course-tab"
 
 # 6. 验证课程列表
 Write-Output "`n[INFO] Verifying course list..."
-foreach ($courseName in @("数据结构", "操作系统", "计算机网络")) {
-    if (-not (Verify-TextExists $courseName "Course list: $courseName")) { exit 1 }
+try {
+    $courseScan = Invoke-CourseListTraversal $COURSE_NAMES $COURSE_CTA_TEXTS `
+        { Get-UiTree } `
+        { param($uiTree, [string]$direction, [string[]]$anchorTexts, $expectedRectangle)
+            Invoke-ScrollableSwipe $uiTree $anchorTexts $direction $expectedRectangle
+        }
+} catch {
+    Write-Step "Verify: Course list" "FAIL" $_.Exception.Message
+    exit 1
 }
+foreach ($courseName in $COURSE_NAMES) {
+    Write-Step "Verify: Course list: $courseName" "PASS" "Found exact text across live scrollable viewports"
+}
+Write-Step "Course list viewport recovery" "PASS" (
+    "forwardScrolls=$($courseScan.ForwardScrolls) recoveryScrolls=$($courseScan.RecoveryScrolls)"
+)
 
 # 7. 进入课程详情与精确 Topic 行
 Write-Output "`n[INFO] Entering course detail and a source-backed Topic row..."
-$courseCta = Click-FirstVisibleExactText @('进入课程', '继续课程') 'First visible course CTA'
+$courseCta = Click-FirstVisibleCourseCta $COURSE_NAMES $COURSE_CTA_TEXTS `
+    $courseScan.ScrollableRectangle
 if ([string]::IsNullOrWhiteSpace($courseCta)) { exit 1 }
 if (-not (Verify-Page "pages/CourseDetail" "Course detail")) { exit 1 }
-if (-not (Verify-TextExists "课程进度" "Course progress")) { exit 1 }
-if (-not (Verify-TextExists "主题路径" "Course Topic path")) { exit 1 }
 Take-Screenshot "03-course-detail"
 $sourceTopics = @(Get-SourceTopicTexts)
 $selectedTopic = Click-FirstVisibleExactText $sourceTopics 'Topmost visible source Topic row'

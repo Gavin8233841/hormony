@@ -810,3 +810,61 @@ ZIP 的自解压前缀和 EOCD 后尾随数据，并在 `read(info)` 前缺少 o
   Chat、Plan、Quiz 当前在线、业务成功或错误边界通过。
 - **未验证**：本批没有修改应用源码，因此未重复 Web/HAP 构建；签名 HAP、模拟器、
   真机、最终 PDF/MP4/ZIP、完整播放、NOTICE/签署声明和门户上传仍未验证。
+
+## 批次 16：课程列表跨视口与转场安全的实时 UI 树冒烟门禁
+
+背景：已连接模拟器上的原脚本在课程列表直接断言三门课程，第三张卡片不在首屏时
+失败；第一次改为滚动后，转场期空 `pagePath` 会触发连续 Back，且整棵 UI 树中的
+同名课程或 CTA 可以劫持列表验收。上述行为会使五分钟演示在不同学习进度和列表
+位置下不稳定，也可能把错误控件点击写成通过。
+
+文件：
+
+- `scripts/harmonyos-app-smoke.ps1`
+- `docs/workstreams/06-competition-release-result.md`
+
+行为变化：
+
+- 课程 CTA 精确接受当前源码确认的 `进入课程` 和主线集成态的 `继续课程`；三门课程
+  在有限实时视口内累计核验，不再要求同时出现在首屏。
+- 首次通过精确课程/CTA 锚点识别课程 `scrollable`，保存其实时 bounds；后续前向滚动、
+  反向恢复和最终 CTA 点击均只接受同一 bounds 的子树。bounds 消失、重复匹配、缺失
+  或越界时明确失败，不回退到整棵 UI 树或固定设备坐标。
+- 最终 CTA 从恢复后的新 UI 树重新取得，但只在已绑定课程列表子树内选择可见、可点击
+  祖先 bounds；列表外更靠上的同文案按钮不能劫持点击。
+- 根页恢复在每次 Back 后同时忽略空路径与 Back 前的旧非空路径，只在页面真正迁移到
+  新非空路径后才允许下一次 Back；有限轮询内未迁移则失败，避免越过 `pages/Index`。
+- 课程详情不再依赖易漂移的中间标题文案，真实合同收束为 `pages/CourseDetail`、来自
+  `knowledge-chunks.json` 的精确 Topic 可点击行及最终 `pages/Lesson`。
+- 独立红队以旧非空路径、多滚动区、列表外 CTA 和媒体帧计数固定输入复核旧实现，
+  复现多发 Back 与 CTA 越界；子 agent 全程只读，未修改文件或 Git。
+
+验证：
+
+- **静态诊断通过**：PowerShell 7.6.3 执行
+  `pwsh -NoProfile -File .\scripts\harmonyos-app-smoke.ps1 -SelfTest`，exit 0，
+  17/17 通过；Windows PowerShell 5.1 同一 `-SelfTest`，exit 0，17/17 通过。
+- **静态诊断通过**：PowerShell AST `ParseFile`，exit 0，`AST_PARSE=PASS`。
+- **构建通过**：`scripts\harmonyos-app-smoke.ps1 -DeviceTarget 127.0.0.1:5555`
+  内部 API 12 增量构建 exit 0，`BUILD SUCCESSFUL in 8 s 497 ms`；未执行 clean。
+- **模拟器通过**：设备 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`，竖屏
+  1256 x 2760。HAP 安装、EntryAbility 启动、`pages/Index`、首页、课程 Tab、三门课程
+  跨一个前向视口和一个恢复视口、列表内 `进入课程`、`pages/CourseDetail` 均通过。
+  三张本地截图位于 `screenshots/trae-smoke-20260718-203708/`，哈希互不相同；截图
+  属于本地验收证据，未加入 Git。
+
+失败后纠正：
+
+- 第一轮设备实跑在首次滚动后遇到多个无锚点 `scrollable`，exit 1；改为首次列表
+  bounds 贯穿后，第二、三轮均稳定完成三门课程跨视口与恢复。
+- 第二轮在旧 `课程进度` 文案断言处 exit 1；从当前 `CourseDetail.ets` 与 WS03
+  `4fd5bef` 精确核对后移除中间文案依赖，第三轮到达真实 Topic 点击合同。
+
+未验证：
+
+- **未验证**：第三轮设备命令整体 exit 1，精确停在“Topmost visible source Topic
+  row”没有可点击祖先 bounds；失败后没有运行 `pages/Lesson` 及其后续流程。
+- **源码确认**：`git merge-base --is-ancestor 4fd5bef HEAD` exit 1；当前 WS06 分支未含
+  WS03 的 Topic 整行进入 Lesson 改动，当前 `CourseDetail.ets` 仍把“学习内容”作为
+  独立按钮。不得把本批局部模拟器证据写成完整黄金路径通过；主线集成 WS03 后需重跑。
+- **未验证**：未配置正式签名，未执行真机、线上 API、最终 MP4/PDF/ZIP 或门户上传。
