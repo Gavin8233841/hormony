@@ -54,10 +54,8 @@ struct MistakeBookPage {
   }
 
   private courseTitle(courseId: string): string {
-    if (courseId === 'cs101') return '数据结构';
-    if (courseId === 'cs102') return '操作系统';
-    if (courseId === 'cs103') return '计算机网络';
-    return '课程';
+    const title = LearningContentRepository.getCourseTitle(courseId);
+    return title.length > 0 ? title : '课程';
   }
 
   private isDue(item: ReviewItem): boolean {

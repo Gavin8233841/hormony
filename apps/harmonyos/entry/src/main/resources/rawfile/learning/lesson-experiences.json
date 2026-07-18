@@ -314,6 +314,78 @@
   },
   {
     "schemaVersion": 2,
+    "courseId": "acc101",
+    "topic": "会计要素与会计等式",
+    "visualTitle": "一笔业务如何保持等式平衡",
+    "visualSteps": [
+      "期初：资产100 = 负债0 + 权益100",
+      "借款30：资产130 = 负债30 + 权益100",
+      "购设备20：资产内部变化，总额仍为130",
+      "还款10：资产120 = 负债20 + 权益100"
+    ],
+    "caseTitle": "校园咖啡店的第一天账目",
+    "caseBody": "店主先投入100万元现金，再向银行借入30万元；随后用20万元现金购买设备，并用10万元现金归还部分借款。每一步都先判断受影响的会计要素，再更新余额并验算等式。",
+    "workedExampleTitle": "按要素、方向、平衡三步分析",
+    "workedExampleSteps": [
+      "识别业务：用现金偿还应付账款5万元",
+      "确定方向：现金资产减少5万元，应付账款负债减少5万元",
+      "验算结果：资产与负债等额减少，所有者权益不变"
+    ],
+    "activities": [
+      {
+        "id": "acc101-会计要素与会计等式-1",
+        "type": "state_trace",
+        "title": "状态推演",
+        "focusTag": "会计等式",
+        "prompt": "期初资产50万元、负债10万元、所有者权益40万元。企业借入银行存款8万元后，又用现金3万元偿还应付账款。请写出两步交易后的资产、负债和所有者权益余额，并说明等式为何仍成立。",
+        "content": "",
+        "language": "会计余额表",
+        "interactionMode": "free_response",
+        "options": [],
+        "answerIndexes": [],
+        "answer": "借款后为资产58万元、负债18万元、所有者权益40万元；还款后为资产55万元、负债15万元、所有者权益40万元。两步分别使资产与负债等额增加、再等额减少，所以55 = 15 + 40。",
+        "feedback": "先逐笔更新，不要把两笔业务直接抵销。借款不增加所有者权益，还款也不直接减少所有者权益；每一步都应单独验算资产 = 负债 + 所有者权益。",
+        "source": "财政部《2026年度初级会计专业技术资格考试大纲（初级）》第3页；《企业会计准则——基本准则》第二十条、第二十三条、第二十六条、第二十八条；原创状态推演",
+        "provenance": "original_instructional_content",
+        "sourceResourceIds": [
+          "acc101_outline_pdf_2026",
+          "acc101_basic_accounting_standard"
+        ]
+      },
+      {
+        "id": "acc101-会计要素与会计等式-2",
+        "type": "step_order",
+        "title": "步骤排序",
+        "focusTag": "会计等式",
+        "prompt": "把分析一笔经济业务的步骤排列为可复核的正确顺序。",
+        "content": "",
+        "language": "分析步骤卡",
+        "interactionMode": "ordered_choice",
+        "options": [
+          "核验资产是否仍等于负债加所有者权益",
+          "识别业务影响的会计要素",
+          "确定各要素增加、减少或内部转换",
+          "将变化计入业务发生前的余额"
+        ],
+        "answerIndexes": [
+          1,
+          2,
+          3,
+          0
+        ],
+        "answer": "B → C → D → A",
+        "feedback": "先识别要素，再判断方向，然后更新余额，最后验算平衡。若跳过要素识别，容易把现金减少误判为所有者权益减少。",
+        "source": "财政部《2026年度初级会计专业技术资格考试大纲（初级）》第3页；原创步骤活动",
+        "provenance": "original_instructional_content",
+        "sourceResourceIds": [
+          "acc101_outline_pdf_2026",
+          "acc101_basic_accounting_standard"
+        ]
+      }
+    ]
+  },
+  {
+    "schemaVersion": 2,
     "courseId": "cs101",
     "topic": "二叉树与BST",
     "visualTitle": "在 BST 中依次插入 50, 30, 70, 40, 60 并查找 60",
@@ -1313,7 +1385,7 @@
       "进程 A 写入数据"
     ],
     "caseTitle": "现实案例：公司内部的五种沟通方式",
-    "caseBody": "公司不同部门间的沟通方式恰好对应五种进程间通信机制。管道像两人之间的传话筒：单向传递、缓冲区有限，只能用于关系密切的同事（父子进程）。消息队列像公司邮件系统：每封邮件有类型和正文，收件人可按类型筛选，发送者离开后邮件仍保存。共享内存像办公室的公共公告板：所有人直接看同一块板子，速度最快但需要排队规则（同步机制）防止同时涂改。信号像公司的警报铃：简单快速但信息量有限，只能通知\"发生了什么事\"（如火灾、下班），无法传递详细内容。Socket像跨地域的视频电话：既能用于同一楼层也能跨城市沟通，是分布式协作的基础，但需经过网络协议栈开销较大。",
+    "caseBody": "公司不同部门间的沟通方式恰好对应五种进程间通信机制。管道像两人共用的单向传话筒：常见做法是在 fork 后由亲缘进程继承端点，但能否使用取决于是否持有描述符，而不是亲缘关系本身。消息队列像公司邮件系统：System V 以 mtype/msgtyp 做类型选择；POSIX 以 msg_prio 选择最高优先级、同优先级最早消息；两者均保留消息边界。共享内存像办公室的公共公告板：所有人直接看同一块板子，速度最快但需要排队规则（同步机制）防止同时涂改。信号像公司的警报铃：简单快速但信息量有限，只能通知\"发生了什么事\"（如火灾、下班），无法传递详细内容。Socket像跨地域的视频电话：既能用于同一楼层也能跨城市沟通，是分布式协作的基础，但需经过网络协议栈开销较大。",
     "workedExampleTitle": "共享内存配合信号量实现进程间数据交换的完整流程",
     "workedExampleSteps": [
       "创建共享内存 → 进程 A 调用 shmget(IPC_KEY, 4096, IPC_CREAT|0666) 创建 4KB 共享内存段，内核返回标识符 shmid",
@@ -1330,13 +1402,13 @@
         "title": "代码填空",
         "focusTag": "IPC机制",
         "prompt": "以下代码实现父子进程通过匿名管道通信：子进程写入消息，父进程读取消息。请填写空缺部分",
-        "content": "代码：\n#include <unistd.h>\nint fd[2];\npipe(fd);  // fd[0] = 读端, fd[1] = 写端\n\nif (fork() == 0) {\n    // 子进程：写入数据\n    close(fd[0]);  // 关闭不使用的读端\n    char msg[] = \"hello parent\";\n    ________;  // 填空：通过管道写端写入消息\n    close(fd[1]);\n} else {\n    // 父进程：读取数据\n    close(fd[1]);  // 关闭不使用的写端\n    char buf[64];\n    read(fd[0], buf, sizeof(buf));\n    printf(\"received: %s\\n\", buf);\n    close(fd[0]);\n}",
+        "content": "代码：\n#include <unistd.h>\n#include <stdio.h>\nint fd[2];\npipe(fd);  // fd[0] = 读端, fd[1] = 写端\n\nif (fork() == 0) {\n    // 子进程：写入数据\n    close(fd[0]);  // 关闭不使用的读端\n    char msg[] = \"hello parent\";\n    ________;  // 填空：通过管道写端写入消息\n    close(fd[1]);\n} else {\n    // 父进程：读取数据\n    close(fd[1]);  // 关闭不使用的写端\n    char buf[64];\n    read(fd[0], buf, sizeof(buf));\n    printf(\"received: %s\\n\", buf);\n    close(fd[0]);\n}",
         "language": "代码阅读",
         "interactionMode": "free_response",
         "options": [],
         "answerIndexes": [],
         "answer": "write(fd[1], msg, sizeof(msg))",
-        "feedback": "管道是半双工通信机制（知识切片 cs102_k44），fd[0] 为读端、fd[1] 为写端。子进程写入数据使用 write(fd[1], msg, sizeof(msg)) 通过写端发送。父进程通过 read(fd[0], buf, sizeof(buf)) 从读端接收。注意每个进程应关闭不使用的端：子进程关闭读端 fd[0]，父进程关闭写端 fd[1]。如果父进程不关闭写端，当子进程写完关闭后，父进程的 read 会一直阻塞（因为写端未全部关闭，read 不会返回 EOF）。管道缓冲区有限（通常 64KB），写满时写入端阻塞，读空时读取端阻塞",
+        "feedback": "普通匿名管道是单向、无消息边界的字节流，fd[0] 为读端、fd[1] 为写端。fork 继承描述符是父子进程共享端点的常见方式，但不是接口对亲缘关系的限制；Linux 还可通过 Unix 域套接字的 SCM_RIGHTS 传递描述符引用。子进程使用 write(fd[1], msg, sizeof(msg)) 写入，父进程使用 read(fd[0], buf, sizeof(buf)) 读取，并各自关闭不使用的端。父进程未关闭自身写端不会让已有数据的本次 read 一直阻塞：read 先返回已到达的数据；只有管道读空且仍有写端打开时，阻塞式 read 才等待；所有写端关闭后，读空管道的 read 返回 0（EOF）。容量也不固定为 64KB，应使用 F_GETPIPE_SZ 查询实际容量，用 F_SETPIPE_SZ 请求调整并检查返回的实际容量",
         "source": "操作系统概念（Silberschatz）；知识切片 cs102_k44"
       },
       {

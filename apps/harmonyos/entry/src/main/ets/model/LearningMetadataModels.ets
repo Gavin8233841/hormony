@@ -54,6 +54,8 @@ export interface LearningReviewItem extends ReviewItem {
 export interface LearningCuratedQuestion extends CuratedQuestion {
   difficulty?: string;
   tags?: string[];
+  provenance?: string;
+  sourceResourceIds?: string[];
 }
 
 export interface QuizLearningStats {

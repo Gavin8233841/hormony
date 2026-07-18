@@ -52,15 +52,20 @@ struct PracticePage {
   @State writeBackTopicAccuracy: number = 0;
   @State writeBackActivityCount: number = 0;
   @State writeBackCourseProgress: number = 0;
+  @State baselineDiagnostic: boolean = false;
   private reviewItemIds: string[] = [];
   private selectedReviewItemId: string = '';
   private attemptId: string = '';
   private attemptSubmittedAt: string = '';
+  private pendingPlanGoal: string = '';
 
   aboutToAppear(): void {
     this.resetPageState();
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
+    this.baselineDiagnostic = AppStorage.get<boolean>('baselineDiagnosticActive') ?? false;
+    this.pendingPlanGoal = (AppStorage.get<string>('pendingPlanGoal') ?? '').trim();
+    AppStorage.setOrCreate<boolean>('baselineDiagnosticActive', false);
     const selectedTopic = (AppStorage.get<string>('selectedPracticeTopic') ?? '').trim();
     this.selectedReviewItemId = (AppStorage.get<string>('selectedReviewItemId') ?? '').trim();
     AppStorage.setOrCreate<string>('selectedReviewItemId', '');
@@ -99,6 +104,8 @@ struct PracticePage {
     this.writeBackTopicAccuracy = 0;
     this.writeBackActivityCount = 0;
     this.writeBackCourseProgress = 0;
+    this.baselineDiagnostic = false;
+    this.pendingPlanGoal = '';
   }
 
   private async reloadQuestions(): Promise<void> {
@@ -277,6 +284,23 @@ struct PracticePage {
       this.hasError = true;
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'PracticePage mistake book navigation failed: %{public}s', err.message);
+    });
+  }
+
+  private openPersonalPlan(): void {
+    const course = LearningContentRepository.getCourse(this.courseId);
+    const goal = this.pendingPlanGoal.length > 0 ? this.pendingPlanGoal : (course?.goalSuggestion ?? '');
+    if (goal.length === 0) {
+      this.message = '当前课程缺少可用的计划目标';
+      this.hasError = true;
+      return;
+    }
+    AppStorage.setOrCreate<string>('pendingPlanGoal', goal);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Plan' }).catch((err: Error): void => {
+      this.message = '无法打开个性计划，请重试';
+      this.hasError = true;
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'PracticePage personal plan navigation failed: %{public}s', err.message);
     });
   }
 
@@ -569,6 +593,15 @@ struct PracticePage {
       .width('100%')
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
+      if (this.baselineDiagnostic) {
+        Button('根据诊断生成个性计划')
+          .width('100%')
+          .height(48)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.openPersonalPlan(); })
+      }
       Row({ space: 10 }) {
         Button('返回课程')
           .layoutWeight(1)
@@ -595,7 +628,8 @@ struct PracticePage {
 
   build() {
     Column() {
-      GradientHeader('精选练习', this.courseTitle + (this.topic.length > 0 ? ' · ' + this.topic : ''),
+      GradientHeader(this.baselineDiagnostic ? '基线诊断' : '精选练习',
+        this.courseTitle + (this.topic.length > 0 ? ' · ' + this.topic : ''),
         () => this.getUIContext().getRouter().back())
       if (this.message.length > 0) {
         Text(this.message)

@@ -229,5 +229,12 @@
     "topic": "网络安全基础",
     "prerequisiteIds": ["cs103_https_tls", "cs103_dns"],
     "level": 6
+  },
+  {
+    "id": "acc101_accounting_equation",
+    "courseId": "acc101",
+    "topic": "会计要素与会计等式",
+    "prerequisiteIds": [],
+    "level": 0
   }
 ]

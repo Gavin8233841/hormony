@@ -2,7 +2,7 @@
 // 使用 globalThis 单例，避免 Next.js 开发模式下模块多实例导致数据丢失
 
 import type { UserProfile, Course, StudyPlan, Quiz, KnowledgeChunk, QuizResult, ConversationRecord, DashboardStats, RecentActivity, ExternalResource } from "@/lib/types";
-import { allKnowledgeChunks, allQuizzes, externalResources } from "@/lib/data";
+import { allKnowledgeChunks, allQuizzes, courseCatalog, externalResources } from "@/lib/data";
 import { loadPersistedState, savePersistedState } from "@/lib/store/persistence";
 
 interface DB {
@@ -75,29 +75,21 @@ function seedDemoData() {
   };
   db.profiles.set("demo", demoUser);
 
-  const demoCourses: Course[] = [
-    {
-      id: "cs101",
-      title: "数据结构",
-      progress: 0.65,
-      docCount: 52,
-      topics: ["数组与线性表", "链表", "栈与队列", "二叉树与BST", "AVL树与红黑树", "图的遍历", "最短路径算法", "排序算法", "动态规划", "贪心算法与分治", "哈希表", "堆与优先队列"],
-    },
-    {
-      id: "cs102",
-      title: "操作系统",
-      progress: 0.42,
-      docCount: 48,
-      topics: ["进程与线程", "CPU调度算法", "内存管理基础", "虚拟内存与分页", "分段与段页式", "文件系统", "I/O系统与磁盘调度", "死锁", "同步与互斥", "进程间通信"],
-    },
-    {
-      id: "cs103",
-      title: "计算机网络",
-      progress: 0.30,
-      docCount: 47,
-      topics: ["OSI与TCP/IP模型", "物理层与数据链路层", "网络层与IP协议", "TCP握手与挥手", "流量控制与拥塞控制", "UDP协议", "HTTP协议", "HTTPS与TLS", "DNS系统", "路由算法与协议", "网络安全基础"],
-    },
-  ];
+  const demoProgress: Record<string, number> = {
+    cs101: 0.65,
+    cs102: 0.42,
+    cs103: 0.30,
+    acc101: 0,
+  };
+  const demoCourses: Course[] = courseCatalog.map((course) => ({
+    id: course.id,
+    title: course.title,
+    progress: demoProgress[course.id] ?? 0,
+    docCount: allKnowledgeChunks.filter((chunk) => chunk.courseId === course.id).length,
+    topics: Array.from(new Set(
+      allQuizzes.filter((quiz) => quiz.courseId === course.id).map((quiz) => quiz.topic)
+    )),
+  }));
   db.courses.set("demo", demoCourses);
 
   // 演示学习计划
@@ -182,7 +174,7 @@ function seedDemoData() {
   db.quizResults.push(demoQuizResult);
 }
 
-const CURRICULUM_DATA_VERSION = "2026-06-30-1";
+const CURRICULUM_DATA_VERSION = "2026-07-18-acc101";
 const seedChunkIds = new Set(allKnowledgeChunks.map((chunk) => chunk.id));
 const seedQuizIds = new Set(allQuizzes.map((quiz) => quiz.quizId));
 
@@ -197,6 +189,25 @@ function syncCurriculumData(): void {
   }
 
   db.externalResources = [...externalResources];
+  for (const [userId, courses] of db.courses.entries()) {
+    const synchronized = courseCatalog.map((catalogItem): Course => {
+      const existing = courses.find((course) => course.id === catalogItem.id);
+      return {
+        id: catalogItem.id,
+        title: catalogItem.title,
+        progress: existing?.progress ?? 0,
+        docCount: allKnowledgeChunks.filter(
+          (chunk) => chunk.courseId === catalogItem.id
+        ).length,
+        topics: Array.from(new Set(
+          allQuizzes
+            .filter((quiz) => quiz.courseId === catalogItem.id)
+            .map((quiz) => quiz.topic)
+        )),
+      };
+    });
+    db.courses.set(userId, synchronized);
+  }
   db.curriculumDataVersion = CURRICULUM_DATA_VERSION;
 }
 

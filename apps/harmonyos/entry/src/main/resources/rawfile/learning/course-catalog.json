@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cs101",
+    "title": "数据结构",
+    "domain": "computer_science",
+    "goalType": "course",
+    "goalLabel": "数据结构课程",
+    "goalSuggestion": "两周复习数据结构",
+    "baselineTopic": "数组与线性表",
+    "diagnosticFirst": false
+  },
+  {
+    "id": "cs102",
+    "title": "操作系统",
+    "domain": "computer_science",
+    "goalType": "course",
+    "goalLabel": "操作系统课程",
+    "goalSuggestion": "三周准备操作系统考试",
+    "baselineTopic": "进程与线程",
+    "diagnosticFirst": false
+  },
+  {
+    "id": "cs103",
+    "title": "计算机网络",
+    "domain": "computer_science",
+    "goalType": "course",
+    "goalLabel": "计算机网络课程",
+    "goalSuggestion": "一周掌握 TCP 基础",
+    "baselineTopic": "OSI与TCP/IP模型",
+    "diagnosticFirst": false
+  },
+  {
+    "id": "acc101",
+    "title": "初级会计实务",
+    "domain": "accounting",
+    "goalType": "professional_exam",
+    "goalLabel": "初级会计职称 · 基线诊断",
+    "goalSuggestion": "两周掌握初级会计实务基础",
+    "baselineTopic": "会计要素与会计等式",
+    "diagnosticFirst": true
+  }
+]

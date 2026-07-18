@@ -6,6 +6,7 @@ import type { QuizCatalogItem, QuizPackage, QuizResult } from "@/lib/types";
 import { requestJson, getErrorMessage, isEndpointDisabled } from "@/lib/client-api";
 import { DeviceDataNotice } from "@/components/device-data-notice";
 import { parseQuizPackage, scoreQuizLocally } from "./local-scoring";
+import { courseCatalog } from "@/lib/data/course-catalog";
 
 class QuizResponseContractError extends Error {
   constructor() {
@@ -253,9 +254,11 @@ export default function QuizPage() {
                 onChange={(e) => changeCourse(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-sm outline-none focus:border-brand-500/50"
               >
-                <option value="cs101">数据结构 (cs101)</option>
-                <option value="cs102">操作系统 (cs102)</option>
-                <option value="cs103">计算机网络 (cs103)</option>
+                {courseCatalog.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.title} ({course.id})
+                  </option>
+                ))}
               </select>
             </div>
             <div>

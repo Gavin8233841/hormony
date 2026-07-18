@@ -2,7 +2,7 @@
 
 import { callModel, extractJsonPayload, ModelInvalidResponseError } from "./model";
 import { getProfileContext } from "./profile-agent";
-import { allQuizzes } from "@/lib/data";
+import { allQuizzes, courseCatalog } from "@/lib/data";
 import { generateId } from "@/lib/utils";
 import type { LearningProfileSnapshot, PlanTask, StudyPlan } from "@/lib/types";
 
@@ -23,12 +23,6 @@ interface ParsedPlanItem {
   reason: string;
   estimatedMin: number;
 }
-
-const COURSE_TITLES: Record<string, string> = {
-  cs101: "数据结构",
-  cs102: "操作系统",
-  cs103: "计算机网络",
-};
 
 const ACTIONS: PlanAction[] = ["lesson", "practice", "quiz", "review"];
 const MAX_PLAN_TASKS = 10;
@@ -177,14 +171,14 @@ function getTopicOptions(): TopicOption[] {
   const seen = new Set<string>();
   const options: TopicOption[] = [];
   for (const quiz of allQuizzes) {
-    const courseTitle = COURSE_TITLES[quiz.courseId];
-    if (!courseTitle) continue;
+    const course = courseCatalog.find((item) => item.id === quiz.courseId);
+    if (course === undefined) continue;
     const key = `${quiz.courseId}:${quiz.topic}`;
     if (seen.has(key)) continue;
     seen.add(key);
     options.push({
       courseId: quiz.courseId,
-      courseTitle,
+      courseTitle: course.title,
       topic: quiz.topic,
     });
   }
@@ -192,12 +186,12 @@ function getTopicOptions(): TopicOption[] {
 }
 
 function formatTopicCatalog(options: TopicOption[]): string {
-  return Object.entries(COURSE_TITLES).map(([courseId, title]) => {
+  return courseCatalog.map((course) => {
     const topics = options
-      .filter((option) => option.courseId === courseId)
+      .filter((option) => option.courseId === course.id)
       .map((option) => option.topic)
       .join("、");
-    return `${courseId} ${title}：${topics}`;
+    return `${course.id} ${course.title}：${topics}`;
   }).join("\n");
 }
 

@@ -36,6 +36,17 @@ export interface Course {
   topics: string[];
 }
 
+export interface CourseCatalogItem {
+  id: string;
+  title: string;
+  domain: string;
+  goalType: string;
+  goalLabel: string;
+  goalSuggestion: string;
+  baselineTopic: string;
+  diagnosticFirst: boolean;
+}
+
 export interface PlanTask {
   id: string;
   title: string;
@@ -236,6 +247,8 @@ export interface CuratedKnowledgeChunk {
   source: string;
   courseId: string;
   topic: string;
+  provenance?: string;
+  sourceResourceIds?: string[];
 }
 
 export interface LessonExperience {
@@ -265,6 +278,8 @@ export interface LearningActivity {
   answer: string;
   feedback: string;
   source: string;
+  provenance?: string;
+  sourceResourceIds?: string[];
 }
 
 export interface CuratedQuestion {
@@ -285,6 +300,22 @@ export interface ExternalLearningResource {
   description: string;
   courseId: string;
   tags: string[];
+  evidence?: ResourceEvidence;
+}
+
+export interface ResourceEvidence {
+  publisher: string;
+  publishedAt: string;
+  accessedAt: string;
+  version: string;
+  sha256: string;
+  rightsStatus: string;
+  license: string;
+  allowModification: boolean;
+  allowRedistribution: boolean;
+  accessibility: string;
+  packagePolicy: string;
+  api12Rendering: string;
 }
 
 // SSE 流式事件

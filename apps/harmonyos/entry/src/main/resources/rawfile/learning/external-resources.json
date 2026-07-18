@@ -528,5 +528,86 @@
       "开发工具",
       "接口调试"
     ]
+  },
+  {
+    "id": "acc101_outline_notice_2026",
+    "title": "2026年度全国会计专业技术资格考试大纲发布页",
+    "type": "documentation",
+    "url": "https://kjs.mof.gov.cn/gongzuodongtai/202512/t20251225_3980176.htm",
+    "description": "财政部会计司发布2026年度初级与高级会计专业技术资格考试大纲的官方页面，本课程仅保留链接、访问记录和哈希，不复制页面正文。",
+    "courseId": "acc101",
+    "tags": [
+      "初级会计",
+      "考试大纲",
+      "官方来源"
+    ],
+    "evidence": {
+      "publisher": "财政部会计司",
+      "publishedAt": "2025-12-25",
+      "accessedAt": "2026-07-18",
+      "version": "2026年度考试大纲发布页",
+      "sha256": "69A5E7421473F4E0DB892C81EFE0E02F8DB12795E7DDDF2B547DF8A167E86D58",
+      "rightsStatus": "link_only",
+      "license": "未发现允许修改或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "HTML 页面可提取文本；未发现独立字幕或转写资源",
+      "packagePolicy": "HAP 仅保存 URL、发布者和校验元数据，不打包页面正文",
+      "api12Rendering": "API 12 端通过系统浏览器打开 HTTPS；离线仅显示来源元数据"
+    }
+  },
+  {
+    "id": "acc101_outline_pdf_2026",
+    "title": "2026年度初级会计专业技术资格考试大纲（初级）",
+    "type": "standard",
+    "url": "https://kjs.mof.gov.cn/gongzuodongtai/202512/P020251225378678530611.pdf",
+    "description": "财政部官方初级会计考试大纲PDF，共23页；本课程依据第3页确定首个掌握级主题，仅链接引用，不把PDF或受保护题目打包进应用。",
+    "courseId": "acc101",
+    "tags": [
+      "初级会计",
+      "考试范围",
+      "官方PDF"
+    ],
+    "evidence": {
+      "publisher": "财政部会计司",
+      "publishedAt": "2025-12-25",
+      "accessedAt": "2026-07-18",
+      "version": "2026年度初级大纲，23页，166463字节",
+      "sha256": "F892ACF5D23CC72BC55A123FBCBC42D1A3CF22E52AFC59E6570D2C1CE4B35961",
+      "rightsStatus": "link_only",
+      "license": "未发现允许修改或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "PDF文本提取已核验；官方页面未提供字幕或独立转写",
+      "packagePolicy": "HAP 不打包PDF，仅保存 URL、版本、大小和 SHA-256",
+      "api12Rendering": "API 12 端交由系统浏览器处理PDF；离线不缓存正文"
+    }
+  },
+  {
+    "id": "acc101_basic_accounting_standard",
+    "title": "企业会计准则——基本准则",
+    "type": "standard",
+    "url": "https://www.gov.cn/gongbao/content/2007/content_549050.htm",
+    "description": "中国政府网国务院公报公开的企业会计基本准则页面，用于核验资产、负债、所有者权益及其计量关系；课程内容为原创讲解，不复制页面段落。",
+    "courseId": "acc101",
+    "tags": [
+      "会计准则",
+      "会计要素",
+      "官方来源"
+    ],
+    "evidence": {
+      "publisher": "中国政府网国务院公报",
+      "publishedAt": "2007",
+      "accessedAt": "2026-07-18",
+      "version": "国务院公报公开页面版本",
+      "sha256": "0562D5291659A6E6EAFE299B315907CB0B3B8FAF82F7D1170A9E1DDCC92AC948",
+      "rightsStatus": "link_only",
+      "license": "未发现允许修改或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "HTML 页面可提取文本；未发现独立字幕或转写资源",
+      "packagePolicy": "HAP 仅保存 URL 与事实核验元数据，不打包准则正文",
+      "api12Rendering": "API 12 端通过系统浏览器打开 HTTPS；离线仅显示来源元数据"
+    }
   }
 ]

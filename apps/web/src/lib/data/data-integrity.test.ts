@@ -4,18 +4,31 @@ import { describe, expect, it } from "vitest";
 import {
   COURSE_IDS,
   EXTERNAL_RESOURCE_TYPES,
+  accountingLessonExperiences,
+  accountingTopicRelations,
   allKnowledgeChunks,
   allQuizzes,
+  courseCatalog,
   externalResources,
 } from "@/lib/data";
+import type { CourseId } from "@/lib/data";
+import type {
+  CourseCatalogItem,
+  ExternalResource,
+  KnowledgeChunk,
+  LessonExperienceSeed,
+} from "@/lib/types";
 
-const MINIMUM_COUNTS = {
+const MINIMUM_COUNTS: Record<CourseId, {
+  chunks: number;
+  questions: number;
+  choices: number;
+}> = {
   cs101: { chunks: 40, questions: 20, choices: 20 },
   cs102: { chunks: 40, questions: 20, choices: 20 },
   cs103: { chunks: 40, questions: 20, choices: 20 },
+  acc101: { chunks: 5, questions: 5, choices: 5 },
 };
-
-type CourseId = (typeof COURSE_IDS)[number];
 
 const EXPECTED_TOPICS_BY_COURSE: Record<CourseId, readonly string[]> = {
   cs101: [
@@ -57,9 +70,10 @@ const EXPECTED_TOPICS_BY_COURSE: Record<CourseId, readonly string[]> = {
     "路由算法与协议",
     "网络安全基础",
   ],
+  acc101: ["会计要素与会计等式"],
 };
 
-const EXPECTED_RAW_QUIZ_FIELDS = [
+const EXPECTED_RAW_QUIZ_BASE_FIELDS = [
   "answer",
   "courseId",
   "difficulty",
@@ -108,6 +122,8 @@ interface RawQuizQuestion {
   explanation: string;
   difficulty: string;
   tags: string[];
+  provenance?: "original_instructional_content";
+  sourceResourceIds?: string[];
 }
 
 interface TopicRelation {
@@ -139,11 +155,152 @@ const rawQuizQuestions = JSON.parse(
   readFileSync(fileURLToPath(harmonyResourceUrl("quizzes.json")), "utf8")
 ) as RawQuizQuestion[];
 
+const rawCourseCatalog = JSON.parse(
+  readFileSync(fileURLToPath(harmonyResourceUrl("course-catalog.json")), "utf8")
+) as CourseCatalogItem[];
+
+const rawKnowledgeChunks = JSON.parse(
+  readFileSync(fileURLToPath(harmonyResourceUrl("knowledge-chunks.json")), "utf8")
+) as KnowledgeChunk[];
+
+const rawExternalResources = JSON.parse(
+  readFileSync(fileURLToPath(harmonyResourceUrl("external-resources.json")), "utf8")
+) as ExternalResource[];
+
+const rawLessonExperiences = JSON.parse(
+  readFileSync(fileURLToPath(harmonyResourceUrl("lesson-experiences.json")), "utf8")
+) as LessonExperienceSeed[];
+
 const topicRelations = JSON.parse(
   readFileSync(fileURLToPath(harmonyResourceUrl("topic-relations.json")), "utf8")
 ) as TopicRelation[];
 
 describe("课程数据资产完整性", () => {
+  it("课程目录与生成资产应保持单一来源", () => {
+    expect(rawCourseCatalog).toEqual(courseCatalog);
+    expect(rawKnowledgeChunks).toEqual(allKnowledgeChunks);
+    expect(rawExternalResources).toEqual(externalResources);
+    expect(
+      topicRelations.filter((relation) => relation.courseId === "acc101")
+    ).toEqual(accountingTopicRelations);
+    expect(
+      rawLessonExperiences.filter((experience) => experience.courseId === "acc101")
+    ).toEqual(accountingLessonExperiences);
+  });
+
+  it("acc101 原创内容应通过同课程资源 ID 形成可校验证据链", () => {
+    const expectedResourceIds = [
+      "acc101_outline_pdf_2026",
+      "acc101_basic_accounting_standard",
+    ];
+    const resourcesById = new Map(
+      externalResources.map((resource) => [resource.id, resource])
+    );
+    const expectEvidenceChain = (
+      courseId: string,
+      provenance: string | undefined,
+      sourceResourceIds: string[] | undefined
+    ) => {
+      expect(provenance).toBe("original_instructional_content");
+      expect(sourceResourceIds).toEqual(expectedResourceIds);
+      expect(new Set(sourceResourceIds).size).toBe(sourceResourceIds?.length);
+      for (const resourceId of sourceResourceIds ?? []) {
+        const resource = resourcesById.get(resourceId);
+        expect(resource).toBeDefined();
+        expect(resource?.courseId).toBe(courseId);
+      }
+    };
+
+    const accountingChunks = allKnowledgeChunks.filter(
+      (chunk) => chunk.courseId === "acc101"
+    );
+    expect(accountingChunks).toHaveLength(5);
+    for (const chunk of accountingChunks) {
+      expectEvidenceChain(
+        chunk.courseId,
+        chunk.provenance,
+        chunk.sourceResourceIds
+      );
+    }
+
+    const accountingQuestions = allQuizzes
+      .filter((quiz) => quiz.courseId === "acc101")
+      .flatMap((quiz) => quiz.questions);
+    expect(accountingQuestions).toHaveLength(5);
+    for (const question of accountingQuestions) {
+      expectEvidenceChain(
+        "acc101",
+        question.provenance,
+        question.sourceResourceIds
+      );
+    }
+
+    const accountingActivities = accountingLessonExperiences.flatMap(
+      (experience) => experience.activities
+    );
+    expect(accountingActivities).toHaveLength(2);
+    for (const activity of accountingActivities) {
+      expectEvidenceChain(
+        "acc101",
+        activity.provenance,
+        activity.sourceResourceIds
+      );
+    }
+  });
+
+  it("进程间通信案例应精确区分 System V 与 POSIX 消息选择语义", () => {
+    const experience = rawLessonExperiences.find(
+      (item) => item.courseId === "cs102" && item.topic === "进程间通信"
+    );
+    expect(experience?.caseBody).toContain(
+      "System V 以 mtype/msgtyp 做类型选择"
+    );
+    expect(experience?.caseBody).toContain(
+      "POSIX 以 msg_prio 选择最高优先级、同优先级最早消息"
+    );
+    expect(experience?.caseBody).toContain("两者均保留消息边界");
+    expect(experience?.caseBody).toContain(
+      "能否使用取决于是否持有描述符，而不是亲缘关系本身"
+    );
+    expect(experience?.caseBody).not.toContain("收件人可按类型筛选");
+    expect(experience?.caseBody).not.toContain("只能用于关系密切的同事");
+
+    const messageQueueKnowledge = rawKnowledgeChunks.find(
+      (item) => item.id === "cs102_k45"
+    );
+    expect(messageQueueKnowledge?.text).toContain(
+      "System V 消息携带 mtype，接收方用 msgtyp 做类型选择"
+    );
+    expect(messageQueueKnowledge?.text).toContain(
+      "POSIX 消息携带 msg_prio，接收方优先取得最高优先级消息，同优先级取最早消息"
+    );
+    expect(messageQueueKnowledge?.text).toContain("两种接口都保留消息边界");
+    expect(messageQueueKnowledge?.text).not.toContain("每个消息有类型");
+  });
+
+  it("匿名管道知识与活动应保留精确描述符、容量和 EOF 语义", () => {
+    const chunk = rawKnowledgeChunks.find((item) => item.id === "cs102_k44");
+    const experience = rawLessonExperiences.find(
+      (item) => item.courseId === "cs102" && item.topic === "进程间通信"
+    );
+    const activity = experience?.activities.find(
+      (item) => item.id === "cs102-进程间通信-1"
+    );
+    const knowledgeAndFeedback = `${chunk?.text ?? ""}\n${activity?.feedback ?? ""}`;
+
+    expect(knowledgeAndFeedback).toContain("单向、无消息边界");
+    expect(knowledgeAndFeedback).toContain("SCM_RIGHTS");
+    expect(knowledgeAndFeedback).toContain("F_GETPIPE_SZ");
+    expect(knowledgeAndFeedback).toContain("F_SETPIPE_SZ");
+    expect(activity?.feedback).toContain("read 先返回已到达的数据");
+    expect(activity?.feedback).toContain("读空且仍有写端打开时");
+    expect(activity?.feedback).toContain("read 返回 0（EOF）");
+    expect(activity?.content).toContain("#include <stdio.h>");
+    expect(knowledgeAndFeedback).not.toContain("仅用于有亲缘关系");
+    expect(knowledgeAndFeedback).not.toMatch(/通常\s*64KB/i);
+    expect(activity?.feedback).not.toContain("父进程的 read 会一直阻塞");
+  });
+
   it("知识切片应满足课程覆盖、长度和唯一性约束", () => {
     const ids = new Set<string>();
 
@@ -211,7 +368,7 @@ describe("课程数据资产完整性", () => {
     }
   });
 
-  it("每门课程选择题数量应不少于 20 道", () => {
+  it("每门课程选择题数量应达到目录约束", () => {
     for (const courseId of COURSE_IDS) {
       const choiceCount = allQuizzes
         .filter((quiz) => quiz.courseId === courseId)
@@ -221,7 +378,7 @@ describe("课程数据资产完整性", () => {
     }
   });
 
-  it("Web 与 HarmonyOS 题库应同源并完整覆盖 33 个 Topic", () => {
+  it("Web 与 HarmonyOS 题库应同源并完整覆盖正式 Topic", () => {
     const webQuestions: RawQuizQuestion[] = allQuizzes.flatMap((quiz) =>
       quiz.questions
         .filter((q) => q.type === "choice")
@@ -235,6 +392,10 @@ describe("课程数据资产完整性", () => {
           explanation: question.explanation,
           difficulty: question.difficulty ?? "",
           tags: question.tags ?? [],
+          ...(question.provenance !== undefined ?
+            { provenance: question.provenance } : {}),
+          ...(question.sourceResourceIds !== undefined ?
+            { sourceResourceIds: question.sourceResourceIds } : {}),
         }))
     );
 
@@ -258,8 +419,12 @@ describe("课程数据资产完整性", () => {
       (chunk) => `${chunk.courseId}:${chunk.topic}`
     ))).sort();
 
-    expect(expectedTopicKeys).toHaveLength(33);
-    expect(new Set(expectedTopicTitles).size).toBe(33);
+    const computerScienceTopicKeys = expectedTopicKeys.filter(
+      (key) => key.startsWith("cs")
+    );
+    expect(computerScienceTopicKeys).toHaveLength(33);
+    expect(expectedTopicKeys).toHaveLength(34);
+    expect(new Set(expectedTopicTitles).size).toBe(34);
     expect(relationTopics).toEqual(expectedTopicKeys);
     expect(rawTopics).toEqual(expectedTopicKeys);
     expect(webTopics).toEqual(expectedTopicKeys);
@@ -267,7 +432,12 @@ describe("课程数据资产完整性", () => {
     expect(knowledgeTopics).toEqual(expectedTopicKeys);
 
     for (const question of rawQuizQuestions) {
-      expect(Object.keys(question).sort()).toEqual(EXPECTED_RAW_QUIZ_FIELDS);
+      const expectedFields = EXPECTED_RAW_QUIZ_BASE_FIELDS.slice();
+      if (question.provenance !== undefined) expectedFields.push("provenance");
+      if (question.sourceResourceIds !== undefined) {
+        expectedFields.push("sourceResourceIds");
+      }
+      expect(Object.keys(question).sort()).toEqual(expectedFields.sort());
     }
 
     for (const relation of topicRelations) {
@@ -295,7 +465,7 @@ describe("课程数据资产完整性", () => {
     }
   });
 
-  it("HarmonyOS 测验与练习入口只能写入 33 个正式 Topic", () => {
+  it("HarmonyOS 测验与练习入口只能写入目录中的正式 Topic", () => {
     for (const fileName of HARMONY_TOPIC_ENTRY_FILES) {
       const source = readFileSync(fileURLToPath(harmonyPageUrl(fileName)), "utf8");
       const lines = source.split(/\r?\n/);
@@ -344,6 +514,16 @@ describe("课程数据资产完整性", () => {
       expect(resource.tags.length).toBeGreaterThan(0);
       if (resource.courseId) {
         expect(COURSE_IDS).toContain(resource.courseId);
+      }
+      if (resource.courseId === "acc101") {
+        expect(resource.evidence).toBeDefined();
+        expect(resource.evidence?.rightsStatus).toBe("link_only");
+        expect(resource.evidence?.allowModification).toBe(false);
+        expect(resource.evidence?.allowRedistribution).toBe(false);
+        expect(resource.evidence?.sha256).toMatch(/^[A-F0-9]{64}$/);
+        expect(resource.evidence?.accessibility.trim().length).toBeGreaterThan(0);
+        expect(resource.evidence?.packagePolicy).toContain("HAP");
+        expect(resource.evidence?.api12Rendering).toContain("API 12");
       }
     }
 

@@ -40,6 +40,25 @@ function readRetrievedChunk(
   ) {
     return undefined;
   }
+  if (
+    chunk.provenance !== undefined &&
+    chunk.provenance !== "original_instructional_content"
+  ) {
+    return undefined;
+  }
+  if (chunk.sourceResourceIds !== undefined) {
+    if (
+      !Array.isArray(chunk.sourceResourceIds) ||
+      chunk.sourceResourceIds.length < 1 ||
+      chunk.sourceResourceIds.length > 8 ||
+      chunk.sourceResourceIds.some((id) =>
+        typeof id !== "string" || id.trim().length === 0 || id.length > 128
+      ) ||
+      new Set(chunk.sourceResourceIds).size !== chunk.sourceResourceIds.length
+    ) {
+      return undefined;
+    }
+  }
 
   return {
     id: chunk.id,
@@ -48,6 +67,10 @@ function readRetrievedChunk(
     courseId: chunk.courseId,
     ...(typeof chunk.topic === "string" ? { topic: chunk.topic } : {}),
     ...(typeof chunk.score === "number" ? { score: chunk.score } : {}),
+    ...(chunk.provenance === "original_instructional_content" ?
+      { provenance: chunk.provenance } : {}),
+    ...(Array.isArray(chunk.sourceResourceIds) ?
+      { sourceResourceIds: chunk.sourceResourceIds as string[] } : {}),
   };
 }
 

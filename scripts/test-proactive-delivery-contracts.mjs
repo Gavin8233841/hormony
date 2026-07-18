@@ -133,6 +133,7 @@ function compileLearningContentRepository() {
   const localizationImport = "import { resourceManager } from '@kit.LocalizationKit';";
   const arkTsImport = "import { util } from '@kit.ArkTS';";
   const dataModelsImport = `import {
+  CourseCatalogItem,
   CuratedKnowledgeChunk,
   ExternalLearningResource,
   LessonExperience,
@@ -160,7 +161,7 @@ function compileEntryAbility() {
     "import { Constants } from '../common/Constants';",
     "import { LocalLearningRepository } from '../common/LocalLearningRepository';",
     "import { HttpClient } from '../common/HttpClient';",
-    "import { Course, HealthResponse } from '../model/DataModels';",
+    "import { Course, CourseCatalogItem, HealthResponse } from '../model/DataModels';",
     "import { LearningContentRepository } from '../common/LearningContentRepository';",
     "import { SafeAreaInsets } from '../common/SafeArea';",
     "import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';"
@@ -308,6 +309,9 @@ function loadLearningContentRepository() {
 
 function contentFixture(pathName) {
   const values = {
+    'learning/course-catalog.json': [
+      { id: 'cs101', title: '数据结构', goalSuggestion: '复习数据结构' }
+    ],
     'learning/knowledge-chunks.json': [
       { id: 'knowledge-1', courseId: 'cs101', topic: '二叉树' }
     ],
@@ -369,6 +373,7 @@ function createEntryHarness() {
     __httpClient: { get: async () => ({ status: 'ready' }) },
     __contentRepository: {
       initialize: async () => {},
+      getCourseCatalog: () => catalog,
       getKnowledge: (courseId) => new Array(catalog.find((course) => course.id === courseId)?.docCount ?? 0),
       getTopics: (courseId) => catalog.find((course) => course.id === courseId)?.topics ?? []
     },
@@ -736,7 +741,7 @@ test('课程内容仓储并发初始化共享同一任务且只读取一轮资�
   releaseFirstRead();
   await Promise.all([first, second]);
 
-  assert.equal(reads.length, 5);
+  assert.equal(reads.length, 6);
   assert.equal(secondSettled, true);
   assert.deepEqual(Array.from(repository.getTopics('cs101')), ['二叉树']);
 });
@@ -744,6 +749,7 @@ test('课程内容仓储并发初始化共享同一任务且只读取一轮资�
 test('课程内容仓储读取失败后清空半成品并允许同进程重试', async () => {
   const repository = loadLearningContentRepository();
   const expectedPaths = [
+    'learning/course-catalog.json',
     'learning/knowledge-chunks.json',
     'learning/quizzes.json',
     'learning/external-resources.json',
@@ -764,14 +770,14 @@ test('课程内容仓储读取失败后清空半成品并允许同进程重试',
   };
 
   await assert.rejects(repository.initialize(manager), /课程内容仓储初始化失败/);
-  assert.deepEqual(reads, expectedPaths.slice(0, 3));
+  assert.deepEqual(reads, expectedPaths.slice(0, 4));
   assert.deepEqual(Array.from(repository.getKnowledge('cs101')), []);
   assert.deepEqual(Array.from(repository.getQuestions('cs101')), []);
   assert.deepEqual(Array.from(repository.getResources('cs101')), []);
   assert.deepEqual(Array.from(repository.getTopics('cs101')), []);
 
   await repository.initialize(manager);
-  assert.deepEqual(reads, [...expectedPaths.slice(0, 3), ...expectedPaths]);
+  assert.deepEqual(reads, [...expectedPaths.slice(0, 4), ...expectedPaths]);
   assert.deepEqual(Array.from(repository.getTopics('cs101')), ['二叉树']);
 });
 

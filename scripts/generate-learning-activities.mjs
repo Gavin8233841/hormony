@@ -2,7 +2,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = resolve(
@@ -206,6 +206,8 @@ function normalizeExperience(item, focusTags, knowledge) {
       answer: activity.answer,
       feedback: activity.feedback,
       source: activity.source === LEGACY_MIGRATION_SOURCE ? legacySource : activity.source,
+      ...(activity.provenance !== undefined ? { provenance: activity.provenance } : {}),
+      ...(activity.sourceResourceIds !== undefined ? { sourceResourceIds: activity.sourceResourceIds } : {}),
     })),
   };
 }
@@ -277,36 +279,43 @@ function migrateExistingExperience(item) {
   };
 }
 
-const current = JSON.parse(readFileSync(outputPath, 'utf8'));
-const knowledge = JSON.parse(readFileSync(knowledgePath, 'utf8'));
-const quizzes = JSON.parse(readFileSync(quizzesPath, 'utf8'));
-const focusTags = buildTopicFocusTags(quizzes);
-const generated = specFiles.flatMap(([courseId, relativePath]) => parseSpec(courseId, relativePath));
-const generatedKeys = new Set(generated.map((item) => `${item.courseId}\u0000${item.topic}`));
-const existing = current
-  .filter((item) => !generatedKeys.has(`${item.courseId}\u0000${item.topic}`))
-  .map((item) => item.schemaVersion === 2 ? item : migrateExistingExperience(item));
-if (existing.length !== 7) {
-  throw new Error(`预期迁移 7 个既有体验，实际 ${existing.length} 个；请检查源数据状态`);
-}
-const all = [...existing, ...generated].map((item) => normalizeExperience(item, focusTags, knowledge));
-const expectedTopics = new Set(knowledge.map((item) => `${item.courseId}\u0000${item.topic}`));
-const actualTopics = new Set(all.map((item) => `${item.courseId}\u0000${item.topic}`));
-const activityCounts = { code_fill: 0, step_order: 0, state_trace: 0, output_predict: 0 };
-for (const experience of all) {
-  if (!expectedTopics.has(`${experience.courseId}\u0000${experience.topic}`)) {
-    throw new Error(`体验引用了未知 Topic: ${experience.courseId}/${experience.topic}`);
+export function generateLearningActivities() {
+  const current = JSON.parse(readFileSync(outputPath, 'utf8'));
+  const knowledge = JSON.parse(readFileSync(knowledgePath, 'utf8'));
+  const quizzes = JSON.parse(readFileSync(quizzesPath, 'utf8'));
+  const focusTags = buildTopicFocusTags(quizzes);
+  const generated = specFiles.flatMap(([courseId, relativePath]) => parseSpec(courseId, relativePath));
+  const generatedKeys = new Set(generated.map((item) => `${item.courseId}\u0000${item.topic}`));
+  const expectedTopics = new Set(knowledge.map((item) => `${item.courseId}\u0000${item.topic}`));
+  const existing = current
+    .filter((item) => !generatedKeys.has(`${item.courseId}\u0000${item.topic}`))
+    .map((item) => item.schemaVersion === 2 ? item : migrateExistingExperience(item));
+  const expectedExistingCount = expectedTopics.size - generatedKeys.size;
+  if (existing.length !== expectedExistingCount) {
+    throw new Error(`预期迁移 ${expectedExistingCount} 个既有体验，实际 ${existing.length} 个；请检查源数据状态`);
   }
-  for (const activity of experience.activities) activityCounts[activity.type] += 1;
-}
-if (actualTopics.size !== expectedTopics.size || actualTopics.size !== 33) {
-  throw new Error(`Topic 覆盖不完整: ${actualTopics.size}/${expectedTopics.size}`);
-}
-if (generated.length !== 26 || generated.reduce((sum, item) => sum + item.activities.length, 0) !== 52) {
-  throw new Error('Trae 规格应转换为 26 个 Topic、52 个活动');
+  const all = [...existing, ...generated].map((item) => normalizeExperience(item, focusTags, knowledge));
+  const actualTopics = new Set(all.map((item) => `${item.courseId}\u0000${item.topic}`));
+  const activityCounts = { code_fill: 0, step_order: 0, state_trace: 0, output_predict: 0 };
+  for (const experience of all) {
+    if (!expectedTopics.has(`${experience.courseId}\u0000${experience.topic}`)) {
+      throw new Error(`体验引用了未知 Topic: ${experience.courseId}/${experience.topic}`);
+    }
+    for (const activity of experience.activities) activityCounts[activity.type] += 1;
+  }
+  if (actualTopics.size !== expectedTopics.size) {
+    throw new Error(`Topic 覆盖不完整: ${actualTopics.size}/${expectedTopics.size}`);
+  }
+  if (generated.length !== 26 || generated.reduce((sum, item) => sum + item.activities.length, 0) !== 52) {
+    throw new Error('Trae 规格应转换为 26 个 Topic、52 个活动');
+  }
+
+  writeFileSync(outputPath, `${JSON.stringify(all, null, 2)}\n`, 'utf8');
+  console.log(`[PASS] LearningActivity v2: ${all.length}/${expectedTopics.size} Topic，${all.reduce((sum, item) => sum + item.activities.length, 0)} 个活动`);
+  console.log('[PASS] Trae 52 个活动实际分布: code_fill=13, step_order=16, state_trace=17, output_predict=6');
+  console.log(`[INFO] 全量分布（含 ${existing.length} 个既有体验）: ${JSON.stringify(activityCounts)}`);
 }
 
-writeFileSync(outputPath, `${JSON.stringify(all, null, 2)}\n`, 'utf8');
-console.log(`[PASS] LearningActivity v2: ${all.length}/33 Topic，${all.reduce((sum, item) => sum + item.activities.length, 0)} 个活动`);
-console.log('[PASS] Trae 52 个活动实际分布: code_fill=13, step_order=16, state_trace=17, output_predict=6');
-console.log(`[INFO] 全量分布（含 7 个既有 output_predict）: ${JSON.stringify(activityCounts)}`);
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  generateLearningActivities();
+}

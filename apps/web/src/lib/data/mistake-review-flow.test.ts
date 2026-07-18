@@ -343,6 +343,10 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(retrySource).toContain(
       "LearningContentRepository.getTopics(item.courseId).includes(item.topic)"
     );
+    expect(mistakeBookSource).toContain(
+      "LearningContentRepository.getCourseTitle(courseId)"
+    );
+    expect(mistakeBookSource).not.toContain("if (courseId === 'cs101')");
 
     const courseWrite = retrySource.indexOf("'selectedCourseId', item.courseId");
     const topicWrite = retrySource.indexOf("'selectedPracticeTopic', item.topic");

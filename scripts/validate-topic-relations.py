@@ -15,7 +15,7 @@ RELATIONS_PATH = ROOT / "apps/harmonyos/entry/src/main/resources/rawfile/learnin
 CHUNKS_PATH = ROOT / "apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json"
 QUIZZES_PATH = ROOT / "apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json"
 LESSON_EXPERIENCES_PATH = ROOT / "apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json"
-COURSE_IDS = {"cs101", "cs102", "cs103"}
+COURSE_CATALOG_PATH = ROOT / "apps/harmonyos/entry/src/main/resources/rawfile/learning/course-catalog.json"
 ACTIVITY_TYPES = {"code_fill", "step_order", "state_trace", "output_predict"}
 INTERACTION_MODES = {"single_choice", "ordered_choice", "free_response"}
 ACTIVITY_MODES = {
@@ -29,6 +29,15 @@ MAX_FOCUS_TAG_LENGTH = 12
 def load_json(path):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+COURSE_CATALOG = load_json(COURSE_CATALOG_PATH)
+COURSE_IDS = {
+    item.get("id")
+    for item in COURSE_CATALOG
+    if isinstance(item, dict)
+    and isinstance(item.get("id"), str)
+    and bool(item.get("id").strip())
+}
 
 def is_non_empty_string(value):
     return isinstance(value, str) and bool(value.strip())

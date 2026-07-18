@@ -3298,5 +3298,130 @@
       "机制解释",
       "基础识别"
     ]
+  },
+  {
+    "id": "acc101_q01",
+    "courseId": "acc101",
+    "topic": "会计要素与会计等式",
+    "question": "企业收到投资者投入的现金20万元。在不考虑其他事项时，这笔业务对基本会计等式的影响是什么？",
+    "options": [
+      "A. 资产和所有者权益同时增加20万元",
+      "B. 资产和负债同时增加20万元",
+      "C. 资产内部一增一减，总额不变",
+      "D. 负债和所有者权益同时减少20万元"
+    ],
+    "answer": "A",
+    "explanation": "企业取得现金使资产增加20万元，投资者投入形成的所有者权益也增加20万元。等式两边等额增加，仍然保持平衡。",
+    "difficulty": "easy",
+    "tags": [
+      "会计等式",
+      "交易分析",
+      "基础识别"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "acc101_outline_pdf_2026",
+      "acc101_basic_accounting_standard"
+    ]
+  },
+  {
+    "id": "acc101_q02",
+    "courseId": "acc101",
+    "topic": "会计要素与会计等式",
+    "question": "企业从银行借入30万元并存入银行账户，尚未归还。下列判断正确的是哪一项？",
+    "options": [
+      "A. 资产增加30万元，所有者权益增加30万元",
+      "B. 资产增加30万元，负债增加30万元",
+      "C. 资产减少30万元，负债减少30万元",
+      "D. 只增加银行存款，不影响等式右边"
+    ],
+    "answer": "B",
+    "explanation": "银行存款增加使资产增加30万元，未归还的借款形成同额现时义务，使负债增加30万元。该业务不会因为现金流入而直接增加所有者权益。",
+    "difficulty": "easy",
+    "tags": [
+      "会计等式",
+      "负债确认",
+      "基础识别"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "acc101_outline_pdf_2026",
+      "acc101_basic_accounting_standard"
+    ]
+  },
+  {
+    "id": "acc101_q03",
+    "courseId": "acc101",
+    "topic": "会计要素与会计等式",
+    "question": "企业用银行存款8万元购买一台立即投入使用的设备，不考虑税费。这笔业务发生后资产总额如何变化？",
+    "options": [
+      "A. 增加8万元",
+      "B. 减少8万元",
+      "C. 保持不变",
+      "D. 是否变化取决于负债余额"
+    ],
+    "answer": "C",
+    "explanation": "银行存款减少8万元，同时设备这一资产增加8万元，属于资产内部一增一减。资产总额不变，负债和所有者权益也不因该业务发生变化。",
+    "difficulty": "medium",
+    "tags": [
+      "会计等式",
+      "资产构成",
+      "应用推理"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "acc101_outline_pdf_2026",
+      "acc101_basic_accounting_standard"
+    ]
+  },
+  {
+    "id": "acc101_q04",
+    "courseId": "acc101",
+    "topic": "会计要素与会计等式",
+    "question": "某企业期末资产总额为90万元，所有者权益为54万元。根据基本会计等式，负债总额是多少？",
+    "options": [
+      "A. 36万元",
+      "B. 54万元",
+      "C. 90万元",
+      "D. 144万元"
+    ],
+    "answer": "A",
+    "explanation": "由资产 = 负债 + 所有者权益可得，负债 = 90 - 54 = 36万元。计算后再代回36 + 54 = 90，可以核验等式保持平衡。",
+    "difficulty": "medium",
+    "tags": [
+      "会计等式",
+      "余额计算",
+      "数值计算"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "acc101_outline_pdf_2026",
+      "acc101_basic_accounting_standard"
+    ]
+  },
+  {
+    "id": "acc101_q05",
+    "courseId": "acc101",
+    "topic": "会计要素与会计等式",
+    "question": "企业用现金5万元偿还此前确认的应付账款。在不考虑其他事项时，哪一组变化正确？",
+    "options": [
+      "A. 资产减少5万元，负债减少5万元",
+      "B. 资产减少5万元，所有者权益减少5万元",
+      "C. 负债减少5万元，所有者权益增加5万元",
+      "D. 资产内部一增一减，总额不变"
+    ],
+    "answer": "A",
+    "explanation": "支付现金使资产减少5万元，清偿应付账款使负债减少5万元。两边等额减少，所有者权益保持不变。",
+    "difficulty": "medium",
+    "tags": [
+      "会计等式",
+      "负债清偿",
+      "应用推理"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "acc101_outline_pdf_2026",
+      "acc101_basic_accounting_standard"
+    ]
   }
 ]

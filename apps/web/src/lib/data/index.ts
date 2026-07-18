@@ -6,15 +6,30 @@ export { cs101KnowledgeChunks } from "./cs101-knowledge";
 export { cs102KnowledgeChunks } from "./cs102-knowledge";
 export { cs103KnowledgeChunks } from "./cs103-knowledge";
 export { cs101Quizzes, cs102Quizzes, cs103Quizzes } from "./quizzes";
-export { externalResources } from "./external-resources";
+export { courseCatalog } from "./course-catalog";
+export type { CourseId } from "./course-catalog";
+export {
+  accountingExternalResources,
+  accountingKnowledgeChunks,
+  accountingLessonExperiences,
+  accountingQuizzes,
+  accountingTopicRelations,
+} from "./accounting";
 
 import { cs101KnowledgeChunks } from "./cs101-knowledge";
 import { cs102KnowledgeChunks } from "./cs102-knowledge";
 import { cs103KnowledgeChunks } from "./cs103-knowledge";
 import { cs101Quizzes, cs102Quizzes, cs103Quizzes } from "./quizzes";
-import { externalResources } from "./external-resources";
+import { externalResources as computerScienceExternalResources } from "./external-resources";
+import { courseCatalog } from "./course-catalog";
+import type { CourseId } from "./course-catalog";
+import {
+  accountingExternalResources,
+  accountingKnowledgeChunks,
+  accountingQuizzes,
+} from "./accounting";
 
-export const COURSE_IDS = ["cs101", "cs102", "cs103"] as const;
+export const COURSE_IDS: readonly CourseId[] = courseCatalog.map((course) => course.id);
 export const EXTERNAL_RESOURCE_TYPES = [
   "textbook",
   "documentation",
@@ -38,6 +53,7 @@ export const allKnowledgeChunks = [
   ...cs101KnowledgeChunks,
   ...cs102KnowledgeChunks,
   ...cs103KnowledgeChunks,
+  ...accountingKnowledgeChunks,
 ];
 
 // 全部题库（33个Quiz对象，186道题目）
@@ -45,20 +61,17 @@ export const allQuizzes = [
   ...cs101Quizzes,
   ...cs102Quizzes,
   ...cs103Quizzes,
+  ...accountingQuizzes,
+];
+
+export const externalResources = [
+  ...computerScienceExternalResources,
+  ...accountingExternalResources,
 ];
 
 // 按课程ID获取题库
 export function getQuizzesByCourse(courseId: string) {
-  switch (courseId) {
-    case "cs101":
-      return cs101Quizzes;
-    case "cs102":
-      return cs102Quizzes;
-    case "cs103":
-      return cs103Quizzes;
-    default:
-      return [];
-  }
+  return allQuizzes.filter((quiz) => quiz.courseId === courseId);
 }
 
 export function isCourseTopic(courseId: string, topic: string): boolean {

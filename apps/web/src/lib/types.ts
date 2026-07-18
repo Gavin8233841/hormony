@@ -34,6 +34,17 @@ export interface Course {
   topics: string[];
 }
 
+export interface CourseCatalogItem {
+  id: string;
+  title: string;
+  domain: "computer_science" | "accounting" | "language";
+  goalType: "course" | "professional_exam" | "language_exam";
+  goalLabel: string;
+  goalSuggestion: string;
+  baselineTopic: string;
+  diagnosticFirst: boolean;
+}
+
 export type QuizDifficulty = "easy" | "medium" | "hard";
 
 export interface PlanTask {
@@ -66,6 +77,8 @@ export interface QuizQuestion {
   explanation: string;
   difficulty?: QuizDifficulty;
   tags?: string[];
+  provenance?: "original_instructional_content";
+  sourceResourceIds?: string[];
 }
 
 export interface Quiz {
@@ -119,6 +132,8 @@ export interface KnowledgeChunk {
   courseId: string;
   topic?: string;
   score?: number;
+  provenance?: "original_instructional_content";
+  sourceResourceIds?: string[];
 }
 
 export interface Citation {
@@ -267,6 +282,61 @@ export interface ExternalResource {
   description: string;
   courseId?: string;
   tags: string[];
+  evidence?: ResourceEvidence;
+}
+
+export interface ResourceEvidence {
+  publisher: string;
+  publishedAt: string;
+  accessedAt: string;
+  version: string;
+  sha256: string;
+  rightsStatus: "link_only" | "open_licensed";
+  license: string;
+  allowModification: boolean;
+  allowRedistribution: boolean;
+  accessibility: string;
+  packagePolicy: string;
+  api12Rendering: string;
+}
+
+export interface TopicRelationSeed {
+  id: string;
+  courseId: string;
+  topic: string;
+  prerequisiteIds: string[];
+  level: number;
+}
+
+export interface LearningActivitySeed {
+  id: string;
+  type: "code_fill" | "step_order" | "state_trace" | "output_predict";
+  title: string;
+  focusTag: string;
+  prompt: string;
+  content: string;
+  language: string;
+  interactionMode: "single_choice" | "ordered_choice" | "free_response";
+  options: string[];
+  answerIndexes: number[];
+  answer: string;
+  feedback: string;
+  source: string;
+  provenance?: "original_instructional_content";
+  sourceResourceIds?: string[];
+}
+
+export interface LessonExperienceSeed {
+  schemaVersion: 2;
+  courseId: string;
+  topic: string;
+  visualTitle: string;
+  visualSteps: string[];
+  caseTitle: string;
+  caseBody: string;
+  workedExampleTitle: string;
+  workedExampleSteps: string[];
+  activities: LearningActivitySeed[];
 }
 
 // ========== 计划任务打卡 ==========

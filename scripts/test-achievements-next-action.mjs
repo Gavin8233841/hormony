@@ -347,8 +347,7 @@ check('achievement definitions and minimum-action ordering truth table', () => {
     'remainingCount must clamp target minus current at zero');
 });
 
-check('33 topics provide practice questions and an unmastered quiz target', () => {
-  equal(experiences.length, 33, 'lesson experience count');
+check('all catalog topics provide practice questions and an unmastered quiz target', () => {
   const orderedTopics = experiences.map((item) => {
     invariant(typeof item.courseId === 'string' && item.courseId.length > 0,
       'lesson experience must have a courseId');
@@ -357,10 +356,11 @@ check('33 topics provide practice questions and an unmastered quiz target', () =
     return { courseId: item.courseId, topic: item.topic };
   });
   const experienceKeys = orderedTopics.map((item) => topicKey(item.courseId, item.topic));
-  equal(new Set(experienceKeys).size, 33, 'lesson experience course/topic pairs must be unique');
+  equal(new Set(experienceKeys).size, experiences.length,
+    'lesson experience course/topic pairs must be unique');
 
   const questionsByTopic = questionBuckets(quizzes);
-  equal(questionsByTopic.size, 33, 'quiz course/topic coverage');
+  equal(questionsByTopic.size, experiences.length, 'quiz course/topic coverage');
   for (const key of experienceKeys) {
     invariant(questionsByTopic.has(key), `missing quiz questions for ${key.replace('\u0000', '/')}`);
     invariant((questionsByTopic.get(key)?.length ?? 0) >= 5,
@@ -398,7 +398,7 @@ check('33 topics provide practice questions and an unmastered quiz target', () =
     'LearningContentRepository.getQuestions must use the course/topic index');
 });
 
-check('59 unique activity ids preserve a growth target while active_learning_3 is locked', () => {
+check('unique activity ids preserve a growth target while active_learning_3 is locked', () => {
   const flattened = [];
   const firstActivities = [];
   for (const experience of experiences) {
@@ -419,10 +419,12 @@ check('59 unique activity ids preserve a growth target while active_learning_3 i
       activityId: experience.activities[0].id,
     });
   }
-  equal(flattened.length, 59, 'learning activity count');
-  equal(new Set(flattened.map((item) => item.activityId)).size, 59, 'learning activity ids must be unique');
-  equal(firstActivities.length, 33, 'first activity count');
-  equal(new Set(firstActivities.map((item) => item.activityId)).size, 33,
+  invariant(flattened.length >= experiences.length,
+    'every lesson experience must expose at least one learning activity');
+  equal(new Set(flattened.map((item) => item.activityId)).size, flattened.length,
+    'learning activity ids must be unique');
+  equal(firstActivities.length, experiences.length, 'first activity count');
+  equal(new Set(firstActivities.map((item) => item.activityId)).size, experiences.length,
     'each topic must expose a unique first activity id');
 
   deepEqual(findIncompleteFirstActivity(experiences, []), firstActivities[0],

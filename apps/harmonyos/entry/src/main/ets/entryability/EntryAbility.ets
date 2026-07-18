@@ -8,7 +8,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { HttpClient } from '../common/HttpClient';
-import { Course, HealthResponse } from '../model/DataModels';
+import { Course, CourseCatalogItem, HealthResponse } from '../model/DataModels';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
@@ -95,11 +95,8 @@ export default class EntryAbility extends UIAbility {
   private async initializeRepositories(): Promise<void> {
     await LearningContentRepository.initialize(this.context.resourceManager);
     await LocalLearningRepository.initialize(this.context);
-    const catalog: Course[] = [
-      this.buildCourse('cs101', '数据结构'),
-      this.buildCourse('cs102', '操作系统'),
-      this.buildCourse('cs103', '计算机网络')
-    ];
+    const catalog: Course[] = LearningContentRepository.getCourseCatalog()
+      .map((item: CourseCatalogItem): Course => this.buildCourse(item.id, item.title));
     await LocalLearningRepository.syncCourseCatalog(catalog);
   }
 

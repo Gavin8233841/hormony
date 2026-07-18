@@ -74,4 +74,36 @@ describe("Planner Agent 模型输出边界", () => {
 
     expect(plan.tasks[0]?.date).toBe("2032-02-29");
   });
+
+  it("接受目录中的初级会计正式 Topic 并生成可执行任务", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([{
+      courseId: "acc101",
+      topic: "会计要素与会计等式",
+      action: "lesson",
+      title: "复盘会计等式交易影响",
+      reason: "基线诊断后先补齐交易分析",
+      estimatedMin: 30,
+    }]);
+
+    const plan = await runPlannerAgent(
+      "planner_test",
+      "两周掌握初级会计实务基础",
+      7,
+      90,
+      START_DATE,
+      {
+        stage: "本科二年级",
+        weakTopics: ["会计要素与会计等式"],
+        strongTopics: [],
+        learningStyle: "图文结合",
+        stats: { totalQuestions: 5, accuracy: 0.4, studyDays: 1 },
+      }
+    );
+
+    expect(plan.tasks[0]).toMatchObject({
+      courseId: "acc101",
+      topic: "会计要素与会计等式",
+      action: "lesson",
+    });
+  });
 });

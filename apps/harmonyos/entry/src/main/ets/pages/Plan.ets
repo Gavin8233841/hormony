@@ -8,7 +8,13 @@ import { GradientHeader, StagedProgress, WorkStep } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
-import { StudyPlan, PlanTask, PlanRequest, PlanTaskUpdateReceipt } from '../model/DataModels';
+import {
+  CourseCatalogItem,
+  StudyPlan,
+  PlanTask,
+  PlanRequest,
+  PlanTaskUpdateReceipt
+} from '../model/DataModels';
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
@@ -48,6 +54,7 @@ struct PlanPage {
   @State errorExpanded: boolean = false;
   @State retryAction: string = 'none';
   @State updatingTaskId: string = '';
+  @State goalOptions: CourseCatalogItem[] = [];
   private activeRequest: HttpRequestCancellation | null = null;
   private generationRunId: number = 0;
   private planReadRunId: number = 0;
@@ -56,7 +63,6 @@ struct PlanPage {
   private hasLoadedPlanOnce: boolean = false;
   private pendingPlan: AgentStudyPlan | null = null;
   private durationOptions: number[] = [7, 14, 21];
-  private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
   private planSteps: WorkStep[] = [
     { title: '准备', description: '读取本机学习状态' },
     { title: '规划', description: '等待在线学伴安排节奏' },
@@ -68,6 +74,12 @@ struct PlanPage {
   onPageShow(): void {
     this.lifecycleRunId += 1;
     this.pageActive = true;
+    this.goalOptions = LearningContentRepository.getCourseCatalog();
+    const pendingGoal = (AppStorage.get<string>('pendingPlanGoal') ?? '').trim();
+    if (pendingGoal.length > 0) {
+      this.goal = pendingGoal;
+      AppStorage.setOrCreate<string>('pendingPlanGoal', '');
+    }
     this.loadPlan();
   }
 
@@ -109,9 +121,35 @@ struct PlanPage {
   }
 
   private courseTitle(courseId?: string): string {
-    if (courseId === 'cs102') return '操作系统';
-    if (courseId === 'cs103') return '计算机网络';
-    return '数据结构';
+    const title = LearningContentRepository.getCourseTitle(courseId ?? '');
+    return title.length > 0 ? title : '数据结构';
+  }
+
+  private selectGoalOption(option: CourseCatalogItem): void {
+    this.goal = option.goalSuggestion;
+    if (!option.diagnosticFirst) return;
+    if (!LearningContentRepository.getTopics(option.id).includes(option.baselineTopic)) {
+      this.message = '该目标的基线诊断内容尚未就绪';
+      this.hasError = true;
+      return;
+    }
+    AppStorage.setOrCreate<string>('selectedCourseId', option.id);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', option.title);
+    AppStorage.setOrCreate<string>('selectedPracticeTopic', option.baselineTopic);
+    AppStorage.setOrCreate<string>('pendingPlanGoal', option.goalSuggestion);
+    AppStorage.setOrCreate<boolean>('baselineDiagnosticActive', true);
+    this.openBaselineDiagnostic();
+  }
+
+  private openBaselineDiagnostic(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((): void => {
+      AppStorage.setOrCreate<string>('pendingPlanGoal', '');
+      AppStorage.setOrCreate<boolean>('baselineDiagnosticActive', false);
+      this.message = '无法打开基线诊断，请稍后重试';
+      this.hasError = true;
+      this.retryAction = 'none';
+      this.clearErrorEvidence();
+    });
   }
 
   private actionLabel(task: PlanTask): string {
@@ -191,7 +229,7 @@ struct PlanPage {
       const plan = await LocalLearningRepository.getPlan();
       if (this.planReadRunId !== readRunId || this.loading) return;
       if (plan !== null) {
-        if (!this.hasLoadedPlanOnce) {
+        if (!this.hasLoadedPlanOnce && this.goal.trim().length === 0) {
           this.goal = plan.goal;
         }
         this.savedPlanGoal = plan.goal;
@@ -288,8 +326,8 @@ struct PlanPage {
   @Builder
   GoalSuggestions() {
     Flex({ wrap: FlexWrap.Wrap }) {
-      ForEach(this.goalSuggestions, (suggestion: string): void => {
-        Button(suggestion)
+      ForEach(this.goalOptions, (option: CourseCatalogItem): void => {
+        Button(option.goalLabel)
           .height(34)
           .fontSize(12)
           .fontColor(Constants.COLOR_BRAND)
@@ -297,7 +335,7 @@ struct PlanPage {
           .borderRadius(17)
           .margin({ right: 6, bottom: 6 })
           .enabled(!this.loading && !this.planLoading)
-          .onClick((): void => { this.goal = suggestion; })
+          .onClick((): void => { this.selectGoalOption(option); })
       })
     }
     .width('100%')
@@ -439,7 +477,7 @@ struct PlanPage {
   }
 
   private validCourseId(courseId: string): boolean {
-    return courseId === 'cs101' || courseId === 'cs102' || courseId === 'cs103';
+    return LearningContentRepository.hasCourse(courseId);
   }
 
   private validTaskType(type: string): boolean {

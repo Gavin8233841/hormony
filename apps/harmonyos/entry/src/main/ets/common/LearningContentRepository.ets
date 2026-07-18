@@ -1,6 +1,7 @@
 import { resourceManager } from '@kit.LocalizationKit';
 import { util } from '@kit.ArkTS';
 import {
+  CourseCatalogItem,
   CuratedKnowledgeChunk,
   ExternalLearningResource,
   LessonExperience,
@@ -8,6 +9,7 @@ import {
 } from '../model/DataModels';
 import { LearningCuratedQuestion as CuratedQuestion } from '../model/LearningMetadataModels';
 
+const COURSE_CATALOG_PATH: string = 'learning/course-catalog.json';
 const KNOWLEDGE_PATH: string = 'learning/knowledge-chunks.json';
 const QUIZZES_PATH: string = 'learning/quizzes.json';
 const RESOURCES_PATH: string = 'learning/external-resources.json';
@@ -39,6 +41,7 @@ interface LessonExperienceIndex {
 export class LearningContentRepository {
   private static manager: resourceManager.ResourceManager | null = null;
   private static initializationTask: Promise<void> | null = null;
+  private static courseCatalog: CourseCatalogItem[] = [];
   private static knowledge: CuratedKnowledgeChunk[] = [];
   private static questions: CuratedQuestion[] = [];
   private static resources: ExternalLearningResource[] = [];
@@ -71,11 +74,13 @@ export class LearningContentRepository {
   private static async initializeContent(manager: resourceManager.ResourceManager): Promise<void> {
     LearningContentRepository.manager = manager;
     try {
+      const courseCatalog = await LearningContentRepository.readJson<CourseCatalogItem[]>(COURSE_CATALOG_PATH);
       const knowledge = await LearningContentRepository.readJson<CuratedKnowledgeChunk[]>(KNOWLEDGE_PATH);
       const questions = await LearningContentRepository.readJson<CuratedQuestion[]>(QUIZZES_PATH);
       const resources = await LearningContentRepository.readJson<ExternalLearningResource[]>(RESOURCES_PATH);
       const topicRelations = await LearningContentRepository.readJson<TopicRelation[]>(TOPIC_RELATIONS_PATH);
       const lessonExperiences = await LearningContentRepository.readJson<LessonExperience[]>(LESSON_EXPERIENCES_PATH);
+      LearningContentRepository.courseCatalog = courseCatalog;
       LearningContentRepository.knowledge = knowledge;
       LearningContentRepository.questions = questions;
       LearningContentRepository.resources = resources;
@@ -90,6 +95,7 @@ export class LearningContentRepository {
 
   private static reset(): void {
     LearningContentRepository.manager = null;
+    LearningContentRepository.courseCatalog = [];
     LearningContentRepository.knowledge = [];
     LearningContentRepository.questions = [];
     LearningContentRepository.resources = [];
@@ -232,6 +238,23 @@ export class LearningContentRepository {
       );
     }
     return LearningContentRepository.findCourseItems(LearningContentRepository.knowledgeByCourse, courseId);
+  }
+
+  static getCourseCatalog(): CourseCatalogItem[] {
+    return LearningContentRepository.courseCatalog.slice();
+  }
+
+  static getCourse(courseId: string): CourseCatalogItem | null {
+    return LearningContentRepository.courseCatalog.find((item: CourseCatalogItem): boolean =>
+      item.id === courseId) ?? null;
+  }
+
+  static getCourseTitle(courseId: string): string {
+    return LearningContentRepository.getCourse(courseId)?.title ?? '';
+  }
+
+  static hasCourse(courseId: string): boolean {
+    return LearningContentRepository.getCourse(courseId) !== null;
   }
 
   static getQuestions(courseId: string, topic?: string): CuratedQuestion[] {

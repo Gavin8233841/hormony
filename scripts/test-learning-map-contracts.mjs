@@ -10,6 +10,8 @@ const learningMapPath = path.join(repositoryRoot,
   'apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets');
 const relationsPath = path.join(repositoryRoot,
   'apps/harmonyos/entry/src/main/resources/rawfile/learning/topic-relations.json');
+const courseCatalogPath = path.join(repositoryRoot,
+  'apps/harmonyos/entry/src/main/resources/rawfile/learning/course-catalog.json');
 
 function readSource(filePath) {
   return readFileSync(filePath, 'utf8').replaceAll('\r\n', '\n');
@@ -53,6 +55,7 @@ function firstActionablePrerequisite(node, nodes) {
 
 const learningMapSource = readSource(learningMapPath);
 const relations = JSON.parse(readSource(relationsPath));
+const courseCatalog = JSON.parse(readSource(courseCatalogPath));
 
 test('课程切换只提交最新请求的完整本机快照', () => {
   const selectCourse = sourceSection(learningMapSource,
@@ -84,10 +87,13 @@ test('课程切换只提交最新请求的完整本机快照', () => {
     'an incomplete request must not publish partial map nodes');
 });
 
-test('真实 33 Topic DAG 的每个锁定节点都能解析到未掌握且已解锁的前置动作', () => {
-  assert.equal(relations.length, 33, 'topic relation asset must contain the real 33 Topics');
+test('目录中真实 Topic DAG 的每个锁定节点都能解析到未掌握且已解锁的前置动作', () => {
+  const catalogCourseIds = courseCatalog.map((item) => item.id).sort();
   const courseIds = [...new Set(relations.map((item) => item.courseId))];
-  assert.equal(courseIds.length, 3, 'topic relation asset must cover the three local courses');
+  assert.deepEqual(courseIds.sort(), catalogCourseIds,
+    'topic relation asset must cover every catalog course');
+  assert.equal(relations.filter((item) => item.courseId.startsWith('cs')).length, 33,
+    'the original 33 computer-science Topics must remain intact');
 
   let checkedLockedStates = 0;
   for (const courseId of courseIds) {
