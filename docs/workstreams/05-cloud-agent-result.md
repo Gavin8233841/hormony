@@ -338,3 +338,37 @@
 
 - **未验证**：线上部署环境当前 `MODEL_TIMEOUT_MS` 的实际值、真实上游在 100 秒时的网络级取消、当前分支线上发布。
 - 本批未修改 DEVLOG、HarmonyOS、任何生产模型 ID、API Key、RAG、缓存或端侧状态。
+
+## 16. Middleware 限流路径基数收敛
+
+### 16.1 源码确认与行为
+
+- 安全检查按远程输入 source、容量 control 与 429 sink 追踪到：旧限流键直接包含任意 API pathname。攻击者可轮换不存在的 `/api/*` 路径绕过单路径 30 次限制，并用 1000 个路径占满 Map，使首次访问合法 Health 的同一客户端进入容量 429。
+- middleware 现在按已部署的 12 个顶层 API 资源归一 bucket；Plan/Plan Save、Quiz/Quiz Submit、Knowledge Search/Upload 等同资源子路由共享额度。所有不存在的 API 资源统一进入 `/api/_unknown` bucket。
+- 同一客户端第 31 个未知路径立即 `RATE_LIMITED`，未知路径变体不再增长键基数，也不能占用 Health 的键；可信 runtime IP 仍各自拥有独立键。
+- 1000 键硬上限、60 秒窗口、可信 `req.ip`、伪造 X-Forwarded-For 防绕过、CORS、安全头、Retry-After 和无状态接口拦截保持不变。
+
+### 16.2 委派与反例
+
+- 子 agent `middleware_cardinality_counterexample` 只新增真实 middleware/NextRequest 反例。修复前目标测试 exit 1、2/2 失败：第 31 个不同未知路径实际为 200；1000 个未知路径后首次 Health 实际为 429。
+- 修复后未知路径两条反例与既有 middleware 契约联合为 2 个文件、42 项通过。既有容量测试改用 1000 个不同可信 runtime IP，继续证明容量上限和窗口到期恢复，而不是依赖攻击者可控 pathname 撑大 Map。
+- 首轮联合为 40/42：两个旧测试复用前序模块 Map，归一后的 `_unknown` bucket 导致测试间提前 429；每条限流测试改为动态加载独立 middleware 后 42/42 通过，该失败未计作通过。
+
+### 16.3 Safety 结构与数量负向收口
+
+- 子 agent 完整复核 `/api/safety-review`、请求读取和 Safety 实现后没有发现可诚实复现的新结构/数量绕过，因此未新增伪红测或生产改动。
+- 现有源码与测试已约束：实际 UTF-8 JSON 256 KiB、content 10000 字符、citations 20 项、doc 200 字符、snippet 1000 字符；顶层非对象、`[null]`、非法字段类型和超限数量均返回明确 400/413。
+- Safety 同时扫描 content、citation.doc 与 citation.snippet。`pnpm test -- src/app/api/request-validation.test.ts src/lib/request-json.test.ts src/lib/agents/safety-agent.test.ts` exit 0，3 个文件、136 项通过；相关实现/测试 ESLint exit 0。
+- 未闭合自定义 ReadableStream 的 abort 行为缺少生产网络中断等价证据和既有错误码契约，本批没有猜测错误码或把测试流替身当作线上缺口。
+
+### 16.4 验证
+
+- 定向回归：`pnpm exec vitest run src/middleware-cardinality.test.ts src/middleware.test.ts` exit 0，2 个测试文件、42 项通过。
+- 静态诊断通过：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，32 个测试文件、373 项通过。
+- 构建通过：`pnpm build` exit 0；Next.js 14.2.18 完成生产构建，middleware 26.9 kB。
+- 本地 production 黑盒：`127.0.0.1:4325`，无模型秘密、stateless/off；前 30 个不同未知 API 路径均非 429，第 31 个为 `429/RATE_LIMITED`、`Retry-After=59`。随后首次 Health 仍为 HTTP 503、`status=degraded`、`persistence.mode=stateless`、`model.configured=false`。PID 42080 已停止，端口已关闭。
+
+### 16.5 未验证
+
+- **未验证**：多实例间全局限流一致性、线上代理是否提供可信 `req.ip`、真实 CDN/WAF 联合限流、当前分支线上发布。
+- 本批未修改 DEVLOG、HarmonyOS、Agent 编排、Chat/Plan/Quiz 预算、Safety 行为、RAG、生产模型 ID、秘密或端侧状态。

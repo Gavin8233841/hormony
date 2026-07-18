@@ -184,6 +184,8 @@ describe("middleware API gateway", () => {
 
   it("adds CORS and Retry-After headers to rate-limit errors", async () => {
     delete process.env.DEPLOYMENT_MODE;
+    vi.resetModules();
+    const { middleware: isolatedMiddleware } = await import("./middleware");
     const path = `/api/rate-limit-test-${Date.now()}`;
     const options = {
       origin: "http://localhost:3000",
@@ -191,9 +193,9 @@ describe("middleware API gateway", () => {
     };
 
     for (let index = 0; index < 30; index++) {
-      expect(middleware(apiRequest(path, options)).status).toBe(200);
+      expect(isolatedMiddleware(apiRequest(path, options)).status).toBe(200);
     }
-    const response = middleware(apiRequest(path, options));
+    const response = isolatedMiddleware(apiRequest(path, options));
 
     expect(response.status).toBe(429);
     expectCorsHeaders(response, "http://localhost:3000");
@@ -207,17 +209,19 @@ describe("middleware API gateway", () => {
 
   it("does not let a forged X-Forwarded-For bypass rate limiting when runtime IP is available", async () => {
     delete process.env.DEPLOYMENT_MODE;
+    vi.resetModules();
+    const { middleware: isolatedMiddleware } = await import("./middleware");
     const path = `/api/runtime-ip-rate-limit-test-${Date.now()}`;
 
     for (let index = 0; index < 30; index++) {
-      const response = middleware(apiRequest(path, {
+      const response = isolatedMiddleware(apiRequest(path, {
         forwardedFor: `198.51.100.${index + 1}`,
         runtimeIp: "203.0.113.10",
       }));
       expect(response.status).toBe(200);
     }
 
-    const response = middleware(apiRequest(path, {
+    const response = isolatedMiddleware(apiRequest(path, {
       forwardedFor: "198.51.100.31",
       runtimeIp: "203.0.113.10",
     }));
@@ -231,16 +235,18 @@ describe("middleware API gateway", () => {
 
   it("uses a shared limited bucket when only untrusted forwarded IPs are available", async () => {
     delete process.env.DEPLOYMENT_MODE;
+    vi.resetModules();
+    const { middleware: isolatedMiddleware } = await import("./middleware");
     const path = `/api/untrusted-forwarded-rate-limit-test-${Date.now()}`;
 
     for (let index = 0; index < 30; index++) {
-      const response = middleware(apiRequest(path, {
+      const response = isolatedMiddleware(apiRequest(path, {
         forwardedFor: `198.51.100.${index + 1}`,
       }));
       expect(response.status).toBe(200);
     }
 
-    const response = middleware(apiRequest(path, {
+    const response = isolatedMiddleware(apiRequest(path, {
       forwardedFor: "198.51.100.31",
     }));
 
@@ -251,11 +257,11 @@ describe("middleware API gateway", () => {
     });
   });
 
-  it("bounds rate-limit keys and accepts a new key after the window expires", async () => {
+  it("bounds trusted client keys and accepts a new client after the window expires", async () => {
     delete process.env.DEPLOYMENT_MODE;
     const baseTime = Date.now() + RATE_LIMIT_WINDOW_MS + 1;
-    const runtimeIp = "203.0.113.20";
-    const blockedPath = "/api/rate-limit-capacity-blocked";
+    const existingRuntimeIp = "2001:db8::0";
+    const blockedRuntimeIp = "2001:db8::ffff";
     vi.resetModules();
     const { middleware: isolatedMiddleware } = await import("./middleware");
     vi.useFakeTimers();
@@ -263,26 +269,26 @@ describe("middleware API gateway", () => {
 
     try {
       for (let index = 0; index < RATE_LIMIT_KEY_CAPACITY; index++) {
-        const response = isolatedMiddleware(apiRequest(`/api/rate-limit-capacity-${index}`, {
-          runtimeIp,
+        const response = isolatedMiddleware(apiRequest("/api/health", {
+          runtimeIp: `2001:db8::${index.toString(16)}`,
         }));
         expect(response.status).toBe(200);
       }
 
       for (let count = 1; count < 30; count++) {
-        const response = isolatedMiddleware(apiRequest("/api/rate-limit-capacity-0", {
-          runtimeIp,
+        const response = isolatedMiddleware(apiRequest("/api/health", {
+          runtimeIp: existingRuntimeIp,
         }));
         expect(response.status).toBe(200);
       }
-      expect(isolatedMiddleware(apiRequest("/api/rate-limit-capacity-0", {
-        runtimeIp,
+      expect(isolatedMiddleware(apiRequest("/api/health", {
+        runtimeIp: existingRuntimeIp,
       })).status).toBe(429);
 
       for (let attempt = 0; attempt < 2; attempt++) {
-        const response = isolatedMiddleware(apiRequest(blockedPath, {
+        const response = isolatedMiddleware(apiRequest("/api/health", {
           origin: "http://localhost:3000",
-          runtimeIp,
+          runtimeIp: blockedRuntimeIp,
         }));
 
         expect(response.status).toBe(429);
@@ -296,7 +302,9 @@ describe("middleware API gateway", () => {
       }
 
       vi.setSystemTime(baseTime + RATE_LIMIT_WINDOW_MS);
-      expect(isolatedMiddleware(apiRequest(blockedPath, { runtimeIp })).status).toBe(200);
+      expect(isolatedMiddleware(apiRequest("/api/health", {
+        runtimeIp: blockedRuntimeIp,
+      })).status).toBe(200);
     } finally {
       vi.useRealTimers();
       vi.resetModules();

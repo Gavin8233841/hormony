@@ -9,6 +9,20 @@ import { isStatelessDeployment } from "@/lib/deployment";
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 分钟窗口
 const RATE_LIMIT_MAX_REQUESTS = 30;  // 每窗口最大请求数
 const RATE_LIMIT_MAX_KEYS = 1000;
+const RATE_LIMIT_API_RESOURCES = new Set([
+  "chat",
+  "conversations",
+  "courses",
+  "health",
+  "knowledge",
+  "model",
+  "plan",
+  "profile",
+  "quiz",
+  "resources",
+  "safety-review",
+  "stats",
+]);
 
 const STATEFUL_API_PREFIXES = [
   "/api/conversations",
@@ -127,7 +141,7 @@ export function middleware(req: NextRequest) {
     // 直接采用 X-Forwarded-For 会让客户端轮换伪造值绕过限流并撑大 Map。
     const clientIp = req.ip?.trim() || "unknown";
     const now = Date.now();
-    const key = `${clientIp}:${pathname}`;
+    const key = `${clientIp}:${rateLimitRouteBucket(pathname)}`;
     const record = rateLimitMap.get(key);
 
     // 最早窗口尚未到期时不扫描，避免容量攻击让每次请求都遍历整个 Map。
@@ -161,6 +175,13 @@ export function middleware(req: NextRequest) {
   }
 
   return res;
+}
+
+function rateLimitRouteBucket(pathname: string): string {
+  const resource = pathname.split("/")[2] ?? "";
+  return RATE_LIMIT_API_RESOURCES.has(resource)
+    ? `/api/${resource}`
+    : "/api/_unknown";
 }
 
 function addSecurityHeaders(res: NextResponse) {
