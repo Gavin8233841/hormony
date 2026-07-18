@@ -41,6 +41,26 @@ export const courseCatalog = [
     baselineTopic: "会计要素与会计等式",
     diagnosticFirst: true,
   },
+  {
+    id: "cet4",
+    title: "大学英语四级（CET-4）",
+    domain: "language",
+    goalType: "language_exam",
+    goalLabel: "CET-4 · 基线诊断",
+    goalSuggestion: "四周强化CET-4短语听辨与转写复核",
+    baselineTopic: "CET-4连续短语听辨与转写复核",
+    diagnosticFirst: true,
+  },
+  {
+    id: "cet6",
+    title: "大学英语六级（CET-6）",
+    domain: "language",
+    goalType: "language_exam",
+    goalLabel: "CET-6 · 基线诊断",
+    goalSuggestion: "四周强化CET-6讲座关键词笔记",
+    baselineTopic: "CET-6讲座关键词骨架与延迟复述",
+    diagnosticFirst: true,
+  },
 ] as const satisfies readonly CourseCatalogItem[];
 
 export type CourseId = (typeof courseCatalog)[number]["id"];

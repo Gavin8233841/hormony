@@ -106,4 +106,41 @@ describe("Planner Agent 模型输出边界", () => {
       action: "lesson",
     });
   });
+
+  it("接受 CET-4 与 CET-6 的正式基线 Topic", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([
+      {
+        courseId: "cet4",
+        topic: "CET-4连续短语听辨与转写复核",
+        action: "practice",
+        title: "完成四级短语听辨复核",
+        reason: "先用开放词音定位漏词",
+        estimatedMin: 30,
+      },
+      {
+        courseId: "cet6",
+        topic: "CET-6讲座关键词骨架与延迟复述",
+        action: "lesson",
+        title: "提取六级讲座关键词骨架",
+        reason: "用延迟复述检查信息关系",
+        estimatedMin: 30,
+      },
+    ]);
+
+    const plan = await runPlannerAgent(
+      "planner_test",
+      "四周强化大学英语听力",
+      7,
+      90,
+      START_DATE
+    );
+
+    expect(plan.tasks.map((task) => ({
+      courseId: task.courseId,
+      topic: task.topic,
+    }))).toEqual([
+      { courseId: "cet4", topic: "CET-4连续短语听辨与转写复核" },
+      { courseId: "cet6", topic: "CET-6讲座关键词骨架与延迟复述" },
+    ]);
+  });
 });

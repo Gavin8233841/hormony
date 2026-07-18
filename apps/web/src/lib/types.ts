@@ -277,12 +277,32 @@ export interface KnowledgeUploadRequest {
 export interface ExternalResource {
   id: string;
   title: string;
-  type: "textbook" | "documentation" | "course" | "standard" | "tool";
+  type: "textbook" | "documentation" | "course" | "standard" | "tool" | "audio";
   url: string;
   description: string;
   courseId?: string;
+  courseIds?: string[];
   tags: string[];
   evidence?: ResourceEvidence;
+  media?: ExternalMediaMetadata;
+}
+
+export interface ExternalMediaMetadata {
+  mediaUrl: string;
+  mimeType: "audio/ogg";
+  byteLength: number;
+  durationMs: number;
+  transcript: string;
+  transcriptLanguage: "en-US";
+  transcriptTimed: boolean;
+  accent: string;
+  transcriptSource: string;
+  rawFilePath: string;
+  attribution: string;
+  licenseUrl: string;
+  modified: boolean;
+  shareAlike: boolean;
+  sourceSha1: string;
 }
 
 export interface ResourceEvidence {
@@ -336,6 +356,7 @@ export interface LessonExperienceSeed {
   caseBody: string;
   workedExampleTitle: string;
   workedExampleSteps: string[];
+  mediaResourceIds?: string[];
   activities: LearningActivitySeed[];
 }
 

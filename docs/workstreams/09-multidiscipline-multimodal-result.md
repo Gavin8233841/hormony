@@ -88,9 +88,42 @@
 - UI 树：`/data/local/tmp/layout_21838154262.json`（结果）、`/data/local/tmp/layout_21892896266.json`（错题本）、`/data/local/tmp/layout_21932292965.json`（计划预填）。
 - 截图：`screenshots/ws09-acc101-20260718-220602/01-plan-prefilled.jpeg`、`02-diagnostic-result.jpeg`；均已目视检查无重叠或截断，不提交版本库。
 
+## 批次二：CET-4 / CET-6 与开放词音
+
+### 内容与数据
+
+- 课程目录新增 `cet4` 与 `cet6`，各自具有唯一基线 Topic、诊断目标和计划建议，不把两级考试折叠成一个空目录。
+- 每门课程包含 5 个原创知识切片、5 道原创 A-D 题、1 个关系根节点、1 个 schema v2 Lesson experience 和 2 个主动学习活动。
+- CET-4 首主题为“连续短语听辨与转写复核”；CET-6 首主题为“讲座关键词骨架与延迟复述”。官方来源只限定考试结构，Commons 录音只用于原创词音/短语微练习。
+- 资源 schema 增加 `audio`、共享课程 `courseIds`、媒体本体 `media` 和体验侧 `mediaResourceIds`。共享官方页面只存一条记录，课程专属音频不跨课索引。
+- HAP rawfile 新增原始 `en-us-bookkeeper.ogg` 与 `en-us-one-could-hear-a-pin-drop.oga`。统一生成器读取本地字节并校验大小、SHA-256 后才写出六份学习资产。
+- 最新生成计数为：6 门课程、162 个知识切片、180 道选择题、46 条外部资源、36 个关系、36 个体验、65 个活动。
+
+### 来源与许可
+
+- CET 项目首页、考试大纲索引/PDF、笔试结构和 CET-4/CET-6 分级详情均由教育部教育考试院发布，作为考试规则事实为 ARS Level VII / Grade A；未发现开放许可，全部 `link_only`。
+- CET 根地址本次直接请求为 HTTP 403；可访问结论只适用于已逐项取得 HTTP 200 与哈希的具体页面，不外推根地址。
+- `En-us-one could hear a pin drop.oga`：89,071 B，SHA-256 `46975A7D62CC58CE59D2B02818D17127EB3C8E44D1BC543CFA99BF8B4191E8FE`，CC BY-SA 4.0，原始字节未修改，保留署名和相同方式共享记录。
+- `En-us-bookkeeper.ogg`：27,324 B，SHA-256 `10F0C4A6880A63B3D6F1CFCA38BE8B0F5274A3D5067682F087BDDE5F783CDD22`，CC BY 4.0，原始字节未修改并保留署名。
+- 两个文件只有文件级静态文本标签，没有 VTT/SRT 或时间码，本轮未完成人工听辨。完整来源矩阵、动态页面限制和 AI 披露见 `docs/workstreams/09-cet-media-license-draft.md`。
+
+### 验证
+
+- **静态诊断通过**：统一生成器输出 `6/162/180/46/36/36`，活动为 `36/36 Topic、65 个`；媒体本体大小和 SHA-256 门禁通过。
+- **静态诊断通过**：36 Topic 的 schema、唯一性、引用、DAG、6 课程连通性、单根、层级和 Lesson flow 全部通过；Python 11 项单测通过。
+- **静态诊断通过**：CET 目录、来源外键、媒体许可/哈希、Planner、Web/Harmony 共享仓储定向测试通过。
+- **静态诊断通过**：最终 `pnpm lint`、`pnpm typecheck` 均 exit 0；`pnpm test` 为 34 文件、444 项通过。
+- **构建通过**：最终 `pnpm build` exit 0；10/10 静态页面和全部 API 路由完成 production build。
+- **构建通过**：最终 API 12 增量 HAP `BUILD SUCCESSFUL in 23 s 85 ms`；两个媒体文件由 `CompileResource` 与 `PackageHap` 纳入产物，仅有既有签名警告。
+- **模拟器通过**：课程页显示“大学英语四级（CET-4）”“大学英语六级（CET-6）”、各 `5 份资料` 与唯一 Topic，UI 树 `/data/local/tmp/layout_24706049526.json`。
+- **模拟器通过**：Plan 同时显示 `CET-4 · 基线诊断` 和 `CET-6 · 基线诊断`，两者均进入对应 `1 / 5` Practice；UI 树 `/data/local/tmp/layout_24753209754.json`、`layout_24777221848.json`、`layout_24809137013.json`。
+- **模拟器通过**：完成 CET-6 5/5 诊断后显示掌握度 100%、画像累计 115 题、课程进度 100%；结果页回流 Plan 后目标为“四周强化CET-6讲座关键词笔记”。UI 树 `/data/local/tmp/layout_24930824687.json`、`layout_24972336816.json`。
+- **模拟器通过**：最终 HAP 再次 `install -r`、强停、启动均成功；递归 UI 树唯一页面为 `pages/Index`，路径 `/data/local/tmp/layout_25449094164.json`。
+- 截图：`screenshots/ws09-cet-20260718-230031/01-cet6-plan-prefilled.jpeg`、`02-cet6-result.jpeg`；已目视检查长标题、六个目标按钮、复盘与底部动作无重叠或截断，不提交版本库。
+
 ## 协作契约
 
-- WS08 / Lesson 展示域：在 `Lesson.ets` 读取 `LearningContentRepository.getResources(courseId)`，以非嵌套原生区块展示来源标题、发布者、`link_only`、离线状态和系统浏览器打开动作；不得在页面复制正文。验收要求 acc101 显示 3 条来源、断网仍显示元数据、失败不伪装成功。
+- WS08 / Lesson 展示域：在 `Lesson.ets` 读取 `LearningContentRepository.getResources(courseId)` 与 `experience.mediaResourceIds`。普通来源以非嵌套原生区块展示标题、发布者、许可和系统浏览器动作；音频必须使用 raw FD、显示文件级静态文本和署名，提供播放/暂停、加载/失败/离线、离页释放与可访问名称。验收要求 acc101 显示 3 条来源，CET 两条 OGG/OGA 分别完成 prepare/play/pause/complete，失败不伪装成功。
 - WS05 / Agent 与 RAG：消费知识、题目和活动的 `sourceResourceIds`，只把已命中的资源记录转成 citation；输出前验证资源 ID、课程 ID 和许可状态，未知 ID 拒绝引用。验收要求 Chat SSE citation 可回溯到 acc101 官方 URL，取消和安全前后置保持既有契约。
 - WS06 / 许可门禁：将 `provenance`、资源外键完整性、`link_only` 不入包和截图不提交纳入发布扫描；不得把原创练习写成官方真题。
 
@@ -100,5 +133,5 @@
 - **未验证**：acc101 的在线 Agent 实际解释正文与 citation；本批只验证真实入口、上下文和现有取消/安全架构未被绕过。
 - **未验证**：来源浏览器打开、断网降级和来源元数据的页面可见性；协调契约已交给 WS08 展示域。
 - **未验证**：acc101 错题到期后的重练标题设备路径；新增错题尚未到期，当前只有源码、定向测试和 API 12 构建证据。
-- **未验证**：音频、视频、字幕、TTS、横屏、平板和真机。首批只交付原生图文/状态推演，不宣称其他多模态能力。
-- CET-4/CET-6 官方大纲和开放音频许可审计保留在 `docs/workstreams/09-cet-media-license-draft.md`，不纳入 acc101 首批提交；下一批从该审计建立最小单一来源数据契约，不复制官方 PDF 或受保护题目。
+- **未验证**：两个 OGG/OGA 已校验并打包，但 AVPlayer 的 prepare/play/pause/complete、音频焦点、离页释放、离线重进和可访问名称仍未验证；不得写成音频播放通过。
+- **未验证**：视频、同步字幕、TTS、横屏、平板和真机。CET 官方 PDF、页面和受保护题目未进入 HAP。

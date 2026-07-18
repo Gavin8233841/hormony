@@ -3423,5 +3423,250 @@
       "acc101_outline_pdf_2026",
       "acc101_basic_accounting_standard"
     ]
+  },
+  {
+    "id": "cet4_q01",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "question": "教育部教育考试院列出的 CET-4 听力构成是哪一组？",
+    "options": [
+      "A. 短篇新闻、长对话、听力篇章",
+      "B. 长对话、口译、论文答辩",
+      "C. 讲话、报道、讲座、口试",
+      "D. 单词听写、短文翻译、演讲"
+    ],
+    "answer": "A",
+    "explanation": "官方笔试结构页列出的 CET-4 听力包括短篇新闻、长对话和听力篇章。本题为原创结构核验题，没有复用官方样题。",
+    "difficulty": "easy",
+    "tags": [
+      "短语听辨",
+      "听力结构",
+      "官方范围"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet4_official_content_2016"
+    ]
+  },
+  {
+    "id": "cet4_q02",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "question": "本课 Commons 短语音频对应的完整静态文本是哪一项？",
+    "options": [
+      "A. One could hear a pen drop.",
+      "B. One could hear a pin drop.",
+      "C. We could hear the pin drop.",
+      "D. No one could hear a pin drop."
+    ],
+    "answer": "B",
+    "explanation": "媒体文件元数据给出的完整文本是“one could hear a pin drop”。其余选项均为本课原创干扰项，不是 CET 真题。",
+    "difficulty": "easy",
+    "tags": [
+      "短语听辨",
+      "完整文本",
+      "主动回忆"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ]
+  },
+  {
+    "id": "cet4_q03",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "question": "为了留下独立听辨证据，第一次播放时最合适的操作是什么？",
+    "options": [
+      "A. 先背完整文本再播放",
+      "B. 隐藏文本，只记录听到的词",
+      "C. 同时看答案并循环抄写",
+      "D. 先看中文释义再猜英文"
+    ],
+    "answer": "B",
+    "explanation": "第一次播放隐藏文本，可以把真实听辨与阅读记忆分开。第二遍再揭示文本逐词对齐，才能定位遗漏和误听。",
+    "difficulty": "easy",
+    "tags": [
+      "短语听辨",
+      "听前控制",
+      "诊断证据"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ]
+  },
+  {
+    "id": "cet4_q04",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "question": "学生只记录了“hear ... pin drop”，最准确的错因标记是什么？",
+    "options": [
+      "A. 漏掉one could和a，其余词序正确",
+      "B. 所有内容词都听错",
+      "C. 只发生拼写错误",
+      "D. 完整听写正确"
+    ],
+    "answer": "A",
+    "explanation": "记录中保留了hear、pin和drop，但缺少one could与a。逐词对齐能把笼统的“没听懂”改成可复习的漏词证据。",
+    "difficulty": "medium",
+    "tags": [
+      "短语听辨",
+      "漏词诊断",
+      "错因分类"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ]
+  },
+  {
+    "id": "cet4_q05",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "question": "哪一个顺序构成完整的主动回忆与复核闭环？",
+    "options": [
+      "A. 看答案→播放→抄写→结束",
+      "B. 播放→直接评分→继续看答案",
+      "C. 隐藏文本→播放作答→揭示对照→针对遗漏重放",
+      "D. 翻译→背诵→看波形→跳过复习"
+    ],
+    "answer": "C",
+    "explanation": "主动回忆要求先在答案不可见时作答，再用完整文本核验。针对遗漏重放，才能把本次诊断连接到下一次练习。",
+    "difficulty": "medium",
+    "tags": [
+      "短语听辨",
+      "复核流程",
+      "间隔复习"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ]
+  },
+  {
+    "id": "cet6_q01",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "question": "哪一种材料明确属于 CET-6 听力结构，而不在 CET-4 对应列表中？",
+    "options": [
+      "A. 短篇新闻",
+      "B. 讲话、报道或讲座",
+      "C. 单词听写",
+      "D. 英汉口译"
+    ],
+    "answer": "B",
+    "explanation": "官方结构页为 CET-6 列出讲话、报道或讲座。该结构事实只限定训练方向，不表示本课案例是官方材料。",
+    "difficulty": "easy",
+    "tags": [
+      "讲座笔记",
+      "听力结构",
+      "官方范围"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet6_official_content_2016"
+    ]
+  },
+  {
+    "id": "cet6_q02",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "question": "本课开放词音文件对应的完整单词是什么？",
+    "options": [
+      "A. goalkeeper",
+      "B. shopkeeper",
+      "C. bookkeeper",
+      "D. timekeeper"
+    ],
+    "answer": "C",
+    "explanation": "Commons 文件元数据把音频内容标为bookkeeper。其他选项是本课原创干扰项，不是官方词汇题。",
+    "difficulty": "easy",
+    "tags": [
+      "讲座笔记",
+      "词音辨识",
+      "完整拼写"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet6_bookkeeper_audio"
+    ]
+  },
+  {
+    "id": "cet6_q03",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "question": "哪种图文标记能保留bookkeeper的完整字母顺序并辅助词形核验？",
+    "options": [
+      "A. book | keeper",
+      "B. boo | kkeeper",
+      "C. bookkeep | are",
+      "D. booking | peer"
+    ],
+    "answer": "A",
+    "explanation": "“book | keeper”保留了目标词的完整字母顺序，便于播放后核对。竖线是原创教学标注，不是官方考试规则。",
+    "difficulty": "medium",
+    "tags": [
+      "讲座笔记",
+      "词形预测",
+      "图文联动"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet6_bookkeeper_audio"
+    ]
+  },
+  {
+    "id": "cet6_q04",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "question": "原创短讲句“The bookkeeper checked the figures before the meeting.”对应哪条完整关键词骨架？",
+    "options": [
+      "A. meeting→cancelled",
+      "B. bookkeeper→checked→figures→before meeting",
+      "C. figures→printed→after meeting",
+      "D. keeper→booked→meeting room"
+    ],
+    "answer": "B",
+    "explanation": "B同时保留角色、动作、对象和时间关系。其余选项删除或改写了原创句子的关键信息。",
+    "difficulty": "medium",
+    "tags": [
+      "讲座笔记",
+      "信息骨架",
+      "原创短讲"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet6_official_content_2016",
+      "cet6_bookkeeper_audio"
+    ]
+  },
+  {
+    "id": "cet6_q05",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "question": "完成关键词笔记后，哪一步最能检查是否形成了可提取记忆？",
+    "options": [
+      "A. 一直看着原句朗读",
+      "B. 只重复播放单个词",
+      "C. 遮住原文，根据骨架复述，再对照缺失信息",
+      "D. 把所有词逐字抄三遍"
+    ],
+    "answer": "C",
+    "explanation": "遮住原文后的复述会暴露骨架中遗漏的角色、动作或对象。复述后再对照，才能把错误转成下一次复习目标。",
+    "difficulty": "hard",
+    "tags": [
+      "讲座笔记",
+      "延迟复述",
+      "自我诊断"
+    ],
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet6_official_content_2016"
+    ]
   }
 ]

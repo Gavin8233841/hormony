@@ -319,7 +319,8 @@ function contentFixture(pathName) {
       { id: 'question-1', courseId: 'cs101', topic: '二叉树' }
     ],
     'learning/external-resources.json': [
-      { id: 'resource-1', courseId: 'cs101' }
+      { id: 'resource-1', courseId: 'cs101' },
+      { id: 'resource-shared', courseIds: ['cs101', 'cs102'] }
     ],
     'learning/topic-relations.json': [
       { id: 'relation-1', courseId: 'cs101' }
@@ -744,6 +745,10 @@ test('课程内容仓储并发初始化共享同一任务且只读取一轮资�
   assert.equal(reads.length, 6);
   assert.equal(secondSettled, true);
   assert.deepEqual(Array.from(repository.getTopics('cs101')), ['二叉树']);
+  assert.deepEqual(Array.from(repository.getResources('cs101')).map((item) => item.id),
+    ['resource-1', 'resource-shared']);
+  assert.deepEqual(Array.from(repository.getResources('cs102')).map((item) => item.id),
+    ['resource-shared']);
 });
 
 test('课程内容仓储读取失败后清空半成品并允许同进程重试', async () => {

@@ -165,11 +165,20 @@ export class LearningContentRepository {
     }
 
     for (const item of LearningContentRepository.resources) {
-      LearningContentRepository.appendCourseItem(
-        LearningContentRepository.resourcesByCourse,
-        item.courseId,
-        item
-      );
+      if (item.courseId !== undefined) {
+        LearningContentRepository.appendCourseItem(
+          LearningContentRepository.resourcesByCourse,
+          item.courseId,
+          item
+        );
+      }
+      for (const courseId of item.courseIds ?? []) {
+        LearningContentRepository.appendCourseItem(
+          LearningContentRepository.resourcesByCourse,
+          courseId,
+          item
+        );
+      }
     }
 
     for (const item of LearningContentRepository.topicRelations) {

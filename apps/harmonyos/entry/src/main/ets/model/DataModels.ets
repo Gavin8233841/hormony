@@ -261,6 +261,7 @@ export interface LessonExperience {
   caseBody: string;
   workedExampleTitle: string;
   workedExampleSteps: string[];
+  mediaResourceIds?: string[];
   activities: LearningActivity[];
 }
 
@@ -298,9 +299,29 @@ export interface ExternalLearningResource {
   type: string;
   url: string;
   description: string;
-  courseId: string;
+  courseId?: string;
+  courseIds?: string[];
   tags: string[];
   evidence?: ResourceEvidence;
+  media?: ExternalMediaMetadata;
+}
+
+export interface ExternalMediaMetadata {
+  mediaUrl: string;
+  mimeType: string;
+  byteLength: number;
+  durationMs: number;
+  transcript: string;
+  transcriptLanguage: string;
+  transcriptTimed: boolean;
+  accent: string;
+  transcriptSource: string;
+  rawFilePath: string;
+  attribution: string;
+  licenseUrl: string;
+  modified: boolean;
+  shareAlike: boolean;
+  sourceSha1: string;
 }
 
 export interface ResourceEvidence {

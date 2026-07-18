@@ -192,6 +192,7 @@ function normalizeExperience(item, focusTags, knowledge) {
     caseBody: item.caseBody,
     workedExampleTitle: item.workedExampleTitle,
     workedExampleSteps,
+    ...(item.mediaResourceIds !== undefined ? { mediaResourceIds: item.mediaResourceIds } : {}),
     activities: item.activities.map((activity) => ({
       id: activity.id,
       type: activity.type,

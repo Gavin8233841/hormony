@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -15,6 +16,7 @@ const rawDirectory = resolve(
   root,
   "apps/harmonyos/entry/src/main/resources/rawfile/learning"
 );
+const rawFileDirectory = resolve(rawDirectory, "..");
 
 function loadTypeScriptModule(relativePath) {
   const sourcePath = resolve(root, relativePath);
@@ -89,6 +91,24 @@ function writeAndVerify(fileName, value, serialize = null) {
   console.log(`[PASS] ${fileName}: ${value.length} records`);
 }
 
+function verifyBundledMedia(resources) {
+  for (const resource of resources) {
+    if (resource.media === undefined) continue;
+    const rawFilePath = resource.media.rawFilePath;
+    if (!rawFilePath.startsWith("learning/media/") || rawFilePath.includes("..")) {
+      throw new Error(`${resource.id} rawFilePath 不在 learning/media`);
+    }
+    const bytes = readFileSync(resolve(rawFileDirectory, rawFilePath));
+    if (bytes.length !== resource.media.byteLength) {
+      throw new Error(`${resource.id} 媒体大小不一致`);
+    }
+    const sha256 = createHash("sha256").update(bytes).digest("hex").toUpperCase();
+    if (sha256 !== resource.evidence?.sha256) {
+      throw new Error(`${resource.id} 媒体 SHA-256 不一致`);
+    }
+  }
+}
+
 export function generateLearningContent() {
   const catalogModule = loadTypeScriptModule(
     "apps/web/src/lib/data/course-catalog.ts"
@@ -111,33 +131,53 @@ export function generateLearningContent() {
   const accountingModule = loadTypeScriptModule(
     "apps/web/src/lib/data/accounting.ts"
   );
+  const cetModule = loadTypeScriptModule(
+    "apps/web/src/lib/data/cet.ts"
+  );
 
   const knowledge = [
     ...cs101Module.cs101KnowledgeChunks,
     ...cs102Module.cs102KnowledgeChunks,
     ...cs103Module.cs103KnowledgeChunks,
     ...accountingModule.accountingKnowledgeChunks,
+    ...cetModule.cetKnowledgeChunks,
   ];
   const quizzes = [
     ...quizzesModule.cs101Quizzes,
     ...quizzesModule.cs102Quizzes,
     ...quizzesModule.cs103Quizzes,
     ...accountingModule.accountingQuizzes,
+    ...cetModule.cetQuizzes,
   ];
   const resources = [
     ...resourcesModule.externalResources,
     ...accountingModule.accountingExternalResources,
+    ...cetModule.cetExternalResources,
   ];
-  const relations = replaceCourseItems(
+  let relations = replaceCourseItems(
     readJson("topic-relations.json"),
     accountingModule.accountingTopicRelations,
     "acc101"
   );
-  const experiences = replaceCourseItems(
+  relations = replaceCourseItems(relations, cetModule.cetTopicRelations.filter(
+    (item) => item.courseId === "cet4"
+  ), "cet4");
+  relations = replaceCourseItems(relations, cetModule.cetTopicRelations.filter(
+    (item) => item.courseId === "cet6"
+  ), "cet6");
+  let experiences = replaceCourseItems(
     readJson("lesson-experiences.json"),
     accountingModule.accountingLessonExperiences,
     "acc101"
   );
+  experiences = replaceCourseItems(experiences, cetModule.cetLessonExperiences.filter(
+    (item) => item.courseId === "cet4"
+  ), "cet4");
+  experiences = replaceCourseItems(experiences, cetModule.cetLessonExperiences.filter(
+    (item) => item.courseId === "cet6"
+  ), "cet6");
+
+  verifyBundledMedia(resources);
 
   writeAndVerify("course-catalog.json", catalogModule.courseCatalog);
   writeAndVerify("knowledge-chunks.json", knowledge);

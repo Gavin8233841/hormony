@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { allKnowledgeChunks, courseCatalog } from "@/lib/data";
 
 const harmonySource = (relativePath: string) => readFileSync(fileURLToPath(new URL(
   `../../../../harmonyos/entry/src/main/ets/${relativePath}`,
@@ -12,7 +13,7 @@ const contentRepositorySource = harmonySource("common/LearningContentRepository.
 const planSource = harmonySource("pages/Plan.ets");
 const practiceSource = harmonySource("pages/Practice.ets");
 
-describe("acc101 多学科真实学习闭环", () => {
+describe("非计算机多学科真实学习闭环", () => {
   it("EntryAbility 从生成目录同步 ArkData 并保留仓储合并入口", () => {
     expect(contentRepositorySource).toContain(
       "const COURSE_CATALOG_PATH: string = 'learning/course-catalog.json'"
@@ -27,6 +28,35 @@ describe("acc101 多学科真实学习闭环", () => {
       "LocalLearningRepository.syncCourseCatalog(catalog)"
     );
     expect(entryAbilitySource).not.toContain("this.buildCourse('cs101'");
+  });
+
+  it("CET-4 与 CET-6 目标应进入同一目录并指向正式基线 Topic", () => {
+    for (const expected of [
+      {
+        id: "cet4",
+        title: "大学英语四级（CET-4）",
+        baselineTopic: "CET-4连续短语听辨与转写复核",
+      },
+      {
+        id: "cet6",
+        title: "大学英语六级（CET-6）",
+        baselineTopic: "CET-6讲座关键词骨架与延迟复述",
+      },
+    ]) {
+      const course = courseCatalog.find((item) => item.id === expected.id);
+      expect(course).toMatchObject({
+        ...expected,
+        domain: "language",
+        goalType: "language_exam",
+        diagnosticFirst: true,
+      });
+      expect(allKnowledgeChunks.some((chunk) =>
+        chunk.courseId === expected.id && chunk.topic === expected.baselineTopic
+      )).toBe(true);
+    }
+    expect(contentRepositorySource).toContain(
+      "for (const courseId of item.courseIds ?? [])"
+    );
   });
 
   it("目标选择先校验正式 Topic，再进入基线诊断", () => {

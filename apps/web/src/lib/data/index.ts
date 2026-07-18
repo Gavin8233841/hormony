@@ -15,6 +15,13 @@ export {
   accountingQuizzes,
   accountingTopicRelations,
 } from "./accounting";
+export {
+  cetExternalResources,
+  cetKnowledgeChunks,
+  cetLessonExperiences,
+  cetQuizzes,
+  cetTopicRelations,
+} from "./cet";
 
 import { cs101KnowledgeChunks } from "./cs101-knowledge";
 import { cs102KnowledgeChunks } from "./cs102-knowledge";
@@ -28,6 +35,11 @@ import {
   accountingKnowledgeChunks,
   accountingQuizzes,
 } from "./accounting";
+import {
+  cetExternalResources,
+  cetKnowledgeChunks,
+  cetQuizzes,
+} from "./cet";
 
 export const COURSE_IDS: readonly CourseId[] = courseCatalog.map((course) => course.id);
 export const EXTERNAL_RESOURCE_TYPES = [
@@ -36,6 +48,7 @@ export const EXTERNAL_RESOURCE_TYPES = [
   "course",
   "standard",
   "tool",
+  "audio",
 ] as const;
 
 export function isCourseId(value: string): boolean {
@@ -48,25 +61,28 @@ export function isExternalResourceType(
   return EXTERNAL_RESOURCE_TYPES.some((type) => type === value);
 }
 
-// 全部知识切片（147条）
+// 全部课程知识切片
 export const allKnowledgeChunks = [
   ...cs101KnowledgeChunks,
   ...cs102KnowledgeChunks,
   ...cs103KnowledgeChunks,
   ...accountingKnowledgeChunks,
+  ...cetKnowledgeChunks,
 ];
 
-// 全部题库（33个Quiz对象，186道题目）
+// 全部课程题库
 export const allQuizzes = [
   ...cs101Quizzes,
   ...cs102Quizzes,
   ...cs103Quizzes,
   ...accountingQuizzes,
+  ...cetQuizzes,
 ];
 
 export const externalResources = [
   ...computerScienceExternalResources,
   ...accountingExternalResources,
+  ...cetExternalResources,
 ];
 
 // 按课程ID获取题库

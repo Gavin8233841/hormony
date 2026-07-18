@@ -609,5 +609,237 @@
       "packagePolicy": "HAP 仅保存 URL 与事实核验元数据，不打包准则正文",
       "api12Rendering": "API 12 端通过系统浏览器打开 HTTPS；离线仅显示来源元数据"
     }
+  },
+  {
+    "id": "cet_official_outline_index_2016",
+    "title": "英语四、六级考试大纲索引",
+    "type": "documentation",
+    "url": "https://cet.neea.edu.cn/html1/folder/16113/1588-1.htm",
+    "description": "教育部教育考试院列出英语四、六级2016年修订版考试大纲的官方索引；只保存链接与核验元数据，不复制页面或PDF正文。",
+    "courseIds": [
+      "cet4",
+      "cet6"
+    ],
+    "tags": [
+      "CET",
+      "考试大纲",
+      "官方来源"
+    ],
+    "evidence": {
+      "publisher": "教育部教育考试院",
+      "publishedAt": "页面未标注",
+      "accessedAt": "2026-07-18",
+      "version": "英语四、六级考试大纲索引，21220字节",
+      "sha256": "E56B04ECD21E1EC28FD9ADE758FFB094153DF4DB3FD159227D1F9F635E8C0C90",
+      "rightsStatus": "link_only",
+      "license": "未发现允许修改或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "HTML可提取文本；页面未提供英语音频、VTT或SRT",
+      "packagePolicy": "HAP仅保存URL和核验元数据，不打包页面正文",
+      "api12Rendering": "API 12端交由系统浏览器打开；离线仅显示来源元数据"
+    }
+  },
+  {
+    "id": "cet_official_outline_pdf_2016",
+    "title": "英语四、六级考试大纲（2016年修订版）",
+    "type": "standard",
+    "url": "https://cet.neea.edu.cn/res/Home/1704/55b02330ac17274664f06d9d3db8249d.pdf",
+    "description": "教育部教育考试院官方大纲PDF；仅用于能力范围和术语边界核验，不复制PDF、样题或受保护内容。",
+    "courseIds": [
+      "cet4",
+      "cet6"
+    ],
+    "tags": [
+      "CET",
+      "官方PDF",
+      "能力范围"
+    ],
+    "evidence": {
+      "publisher": "教育部教育考试院",
+      "publishedAt": "2016",
+      "accessedAt": "2026-07-18",
+      "version": "2016年修订版，12070155字节",
+      "sha256": "9166D3C03B7BC43ABD9D9DF91BD2EF8085B4419286F1E5CA100DEA68F3CFD1F1",
+      "rightsStatus": "link_only",
+      "license": "未发现允许复制、改编或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "PDF文本可提取；未取得独立英语音频或字幕",
+      "packagePolicy": "HAP不打包PDF，只保存URL、版本、大小和SHA-256",
+      "api12Rendering": "API 12端交由系统浏览器处理PDF；离线不缓存正文"
+    }
+  },
+  {
+    "id": "cet_official_written_test_structure",
+    "title": "全国大学英语四、六级考试笔试结构",
+    "type": "standard",
+    "url": "https://cet.neea.edu.cn/html1/folder/16113/1586-1.htm",
+    "description": "教育部教育考试院官方笔试结构页，用于核验CET-4与CET-6听力材料类型和时长；本课案例与题目均为原创。",
+    "courseIds": [
+      "cet4",
+      "cet6"
+    ],
+    "tags": [
+      "CET",
+      "笔试结构",
+      "听力范围"
+    ],
+    "evidence": {
+      "publisher": "教育部教育考试院",
+      "publishedAt": "页面未标注",
+      "accessedAt": "2026-07-18",
+      "version": "CET笔试结构页，36168字节",
+      "sha256": "8CD20693E28C2BA8FA6CAAEE98910C2CB2C841B4BE5CDED5FC54D5520EF17CCC",
+      "rightsStatus": "link_only",
+      "license": "未发现允许修改或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "HTML可提取文本；没有可打包英语音频或字幕",
+      "packagePolicy": "HAP仅保存URL和结构事实核验元数据",
+      "api12Rendering": "API 12端交由系统浏览器打开；离线仅显示来源元数据"
+    }
+  },
+  {
+    "id": "cet4_official_content_2016",
+    "title": "CET-4考核内容官方说明",
+    "type": "documentation",
+    "url": "https://cet.neea.edu.cn/html1/report/16123/196-1.htm",
+    "description": "教育部教育考试院CET-4考核内容详情页；仅作为四级训练目标的一手来源，不复制页面、样题或录音。",
+    "courseId": "cet4",
+    "tags": [
+      "CET-4",
+      "考核内容",
+      "官方来源"
+    ],
+    "evidence": {
+      "publisher": "教育部教育考试院",
+      "publishedAt": "2016-12-08",
+      "accessedAt": "2026-07-18",
+      "version": "CET-4考核内容页，23431字节",
+      "sha256": "28A0BB1481E53EC39593CED17F4E0677DF610D84B1436ABD4A9AAA42C45C05D5",
+      "rightsStatus": "link_only",
+      "license": "未发现允许修改或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "HTML可提取文本；未提供独立英语音频或字幕",
+      "packagePolicy": "HAP仅保存URL和核验元数据，不打包页面正文",
+      "api12Rendering": "API 12端交由系统浏览器打开；离线仅显示来源元数据"
+    }
+  },
+  {
+    "id": "cet6_official_content_2016",
+    "title": "CET-6考核内容官方说明",
+    "type": "documentation",
+    "url": "https://cet.neea.edu.cn/html1/report/16123/201-1.htm",
+    "description": "教育部教育考试院CET-6考核内容详情页；仅作为六级训练目标的一手来源，不复制页面、样题或录音。",
+    "courseId": "cet6",
+    "tags": [
+      "CET-6",
+      "考核内容",
+      "官方来源"
+    ],
+    "evidence": {
+      "publisher": "教育部教育考试院",
+      "publishedAt": "2016-12-08",
+      "accessedAt": "2026-07-18",
+      "version": "CET-6考核内容页，23501字节",
+      "sha256": "8D4F5966174EEB6D99AE45DAA3D7242420F031951E2D45C1A005ACADCFB0F35B",
+      "rightsStatus": "link_only",
+      "license": "未发现允许修改或再分发的开放许可",
+      "allowModification": false,
+      "allowRedistribution": false,
+      "accessibility": "HTML可提取文本；未提供独立英语音频或字幕",
+      "packagePolicy": "HAP仅保存URL和核验元数据，不打包页面正文",
+      "api12Rendering": "API 12端交由系统浏览器打开；离线仅显示来源元数据"
+    }
+  },
+  {
+    "id": "cet4_pin_drop_audio",
+    "title": "one could hear a pin drop开放词音",
+    "type": "audio",
+    "url": "https://commons.wikimedia.org/wiki/File:En-us-one_could_hear_a_pin_drop.oga",
+    "description": "Wikimedia Commons文件级CC BY-SA 4.0短语录音，用于原创短语听辨与转写复核；不是CET官方录音或真题。",
+    "courseId": "cet4",
+    "tags": [
+      "CET-4",
+      "开放音频",
+      "短语听辨"
+    ],
+    "evidence": {
+      "publisher": "Wikimedia Commons / Paul2520",
+      "publishedAt": "2022-02-23",
+      "accessedAt": "2026-07-18",
+      "version": "原始OGA，89071字节，2763毫秒",
+      "sha256": "46975A7D62CC58CE59D2B02818D17127EB3C8E44D1BC543CFA99BF8B4191E8FE",
+      "rightsStatus": "open_licensed",
+      "license": "CC BY-SA 4.0；须署名，改编音频须使用兼容许可并标明修改",
+      "allowModification": true,
+      "allowRedistribution": true,
+      "accessibility": "文件级静态文本标签完整；无VTT/SRT或时间码；本轮未人工听辨",
+      "packagePolicy": "原始媒体按独立许可记录打包进HAP，不转码、不改编",
+      "api12Rendering": "API 12 SDK源码确认OGG支持；模拟器播放尚未验证"
+    },
+    "media": {
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f4/En-us-one_could_hear_a_pin_drop.oga",
+      "mimeType": "audio/ogg",
+      "byteLength": 89071,
+      "durationMs": 2763,
+      "transcript": "one could hear a pin drop",
+      "transcriptLanguage": "en-US",
+      "transcriptTimed": false,
+      "accent": "美式英语；文件自发布标注，未获机构背书",
+      "transcriptSource": "Commons文件描述与嵌入文本标签；本轮未人工听辨",
+      "rawFilePath": "learning/media/en-us-one-could-hear-a-pin-drop.oga",
+      "attribution": "one could hear a pin drop — Paul2520, CC BY-SA 4.0, Wikimedia Commons",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.en",
+      "modified": false,
+      "shareAlike": true,
+      "sourceSha1": "49ee6b08a64b91ac6e3faae71c65fd59cece11cb"
+    }
+  },
+  {
+    "id": "cet6_bookkeeper_audio",
+    "title": "bookkeeper开放词音",
+    "type": "audio",
+    "url": "https://commons.wikimedia.org/wiki/File:En-us-bookkeeper.ogg",
+    "description": "Wikimedia Commons文件级CC BY 4.0单词录音，用于原创词音核验与讲座关键词笔记；不是CET官方词汇录音。",
+    "courseId": "cet6",
+    "tags": [
+      "CET-6",
+      "开放音频",
+      "词音辨识"
+    ],
+    "evidence": {
+      "publisher": "Wikimedia Commons / Paul2520",
+      "publishedAt": "2026-05-13",
+      "accessedAt": "2026-07-18",
+      "version": "原始OGG，27324字节，778毫秒",
+      "sha256": "10F0C4A6880A63B3D6F1CFCA38BE8B0F5274A3D5067682F087BDDE5F783CDD22",
+      "rightsStatus": "open_licensed",
+      "license": "CC BY 4.0；须署名、附许可链接并标明修改",
+      "allowModification": true,
+      "allowRedistribution": true,
+      "accessibility": "文件级静态单词标签完整；无VTT/SRT或时间码；本轮未人工听辨",
+      "packagePolicy": "原始媒体按独立许可记录打包进HAP，不转码、不改编",
+      "api12Rendering": "API 12 SDK源码确认OGG支持；模拟器播放尚未验证"
+    },
+    "media": {
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/6/63/En-us-bookkeeper.ogg",
+      "mimeType": "audio/ogg",
+      "byteLength": 27324,
+      "durationMs": 778,
+      "transcript": "bookkeeper",
+      "transcriptLanguage": "en-US",
+      "transcriptTimed": false,
+      "accent": "美式英语；文件自发布标注，未获机构背书",
+      "transcriptSource": "Commons文件描述与嵌入文本标签；本轮未人工听辨",
+      "rawFilePath": "learning/media/en-us-bookkeeper.ogg",
+      "attribution": "bookkeeper pronunciation — Paul2520, CC BY 4.0, Wikimedia Commons",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode.en",
+      "modified": false,
+      "shareAlike": false,
+      "sourceSha1": "4975f04bb3b3367c536060d56de023da90e54d43"
+    }
   }
 ]

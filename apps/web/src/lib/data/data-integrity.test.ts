@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -8,6 +9,8 @@ import {
   accountingTopicRelations,
   allKnowledgeChunks,
   allQuizzes,
+  cetLessonExperiences,
+  cetTopicRelations,
   courseCatalog,
   externalResources,
 } from "@/lib/data";
@@ -28,6 +31,8 @@ const MINIMUM_COUNTS: Record<CourseId, {
   cs102: { chunks: 40, questions: 20, choices: 20 },
   cs103: { chunks: 40, questions: 20, choices: 20 },
   acc101: { chunks: 5, questions: 5, choices: 5 },
+  cet4: { chunks: 5, questions: 5, choices: 5 },
+  cet6: { chunks: 5, questions: 5, choices: 5 },
 };
 
 const EXPECTED_TOPICS_BY_COURSE: Record<CourseId, readonly string[]> = {
@@ -71,6 +76,8 @@ const EXPECTED_TOPICS_BY_COURSE: Record<CourseId, readonly string[]> = {
     "网络安全基础",
   ],
   acc101: ["会计要素与会计等式"],
+  cet4: ["CET-4连续短语听辨与转写复核"],
+  cet6: ["CET-6讲座关键词骨架与延迟复述"],
 };
 
 const EXPECTED_RAW_QUIZ_BASE_FIELDS = [
@@ -143,6 +150,15 @@ const harmonyPageUrl = (fileName: string) =>
     import.meta.url
   );
 
+const harmonyRawFileUrl = (fileName: string) =>
+  new URL(
+    `../../../../harmonyos/entry/src/main/resources/rawfile/${fileName}`,
+    import.meta.url
+  );
+
+const resourceCourseIds = (resource: ExternalResource): string[] =>
+  resource.courseId !== undefined ? [resource.courseId] : (resource.courseIds ?? []);
+
 const expectedTopicKeys = COURSE_IDS.flatMap((courseId) =>
   EXPECTED_TOPICS_BY_COURSE[courseId].map((topic) => `${courseId}:${topic}`)
 ).sort();
@@ -186,6 +202,58 @@ describe("课程数据资产完整性", () => {
     expect(
       rawLessonExperiences.filter((experience) => experience.courseId === "acc101")
     ).toEqual(accountingLessonExperiences);
+    expect(
+      topicRelations.filter((relation) => relation.courseId === "cet4" || relation.courseId === "cet6")
+    ).toEqual(cetTopicRelations);
+    expect(
+      rawLessonExperiences.filter((experience) =>
+        experience.courseId === "cet4" || experience.courseId === "cet6"
+      )
+    ).toEqual(cetLessonExperiences);
+  });
+
+  it("CET-4 与 CET-6 原创内容应完整关联同课程官方或开放媒体资源", () => {
+    const resourcesById = new Map(
+      externalResources.map((resource) => [resource.id, resource])
+    );
+    for (const courseId of ["cet4", "cet6"]) {
+      const chunks = allKnowledgeChunks.filter((chunk) => chunk.courseId === courseId);
+      const questions = allQuizzes
+        .filter((quiz) => quiz.courseId === courseId)
+        .flatMap((quiz) => quiz.questions);
+      const experiences = cetLessonExperiences.filter(
+        (experience) => experience.courseId === courseId
+      );
+      const activities = experiences.flatMap((experience) => experience.activities);
+      expect(chunks).toHaveLength(5);
+      expect(questions).toHaveLength(5);
+      expect(experiences).toHaveLength(1);
+      expect(activities).toHaveLength(2);
+
+      for (const item of [...chunks, ...questions, ...activities]) {
+        expect(item.provenance).toBe("original_instructional_content");
+        expect(item.sourceResourceIds?.length).toBeGreaterThan(0);
+        expect(new Set(item.sourceResourceIds).size).toBe(item.sourceResourceIds?.length);
+        for (const resourceId of item.sourceResourceIds ?? []) {
+          const resource = resourcesById.get(resourceId);
+          expect(resource, `${courseId} 引用了未知资源 ${resourceId}`).toBeDefined();
+          if (resource === undefined) {
+            throw new Error(`${courseId} 引用了未知资源 ${resourceId}`);
+          }
+          expect(resourceCourseIds(resource)).toContain(courseId);
+        }
+      }
+
+      const mediaResourceIds = experiences[0].mediaResourceIds ?? [];
+      expect(mediaResourceIds).toHaveLength(1);
+      const mediaResource = resourcesById.get(mediaResourceIds[0]);
+      expect(mediaResource?.type).toBe("audio");
+      expect(mediaResource?.media).toBeDefined();
+      if (mediaResource === undefined) {
+        throw new Error(`${courseId} 缺少媒体资源 ${mediaResourceIds[0]}`);
+      }
+      expect(resourceCourseIds(mediaResource)).toContain(courseId);
+    }
   });
 
   it("acc101 原创内容应通过同课程资源 ID 形成可校验证据链", () => {
@@ -423,8 +491,8 @@ describe("课程数据资产完整性", () => {
       (key) => key.startsWith("cs")
     );
     expect(computerScienceTopicKeys).toHaveLength(33);
-    expect(expectedTopicKeys).toHaveLength(34);
-    expect(new Set(expectedTopicTitles).size).toBe(34);
+    expect(expectedTopicKeys).toHaveLength(36);
+    expect(new Set(expectedTopicTitles).size).toBe(36);
     expect(relationTopics).toEqual(expectedTopicKeys);
     expect(rawTopics).toEqual(expectedTopicKeys);
     expect(webTopics).toEqual(expectedTopicKeys);
@@ -515,6 +583,14 @@ describe("课程数据资产完整性", () => {
       if (resource.courseId) {
         expect(COURSE_IDS).toContain(resource.courseId);
       }
+      if (resource.courseIds !== undefined) {
+        expect(resource.courseId).toBeUndefined();
+        expect(resource.courseIds.length).toBeGreaterThan(1);
+        expect(new Set(resource.courseIds).size).toBe(resource.courseIds.length);
+        for (const courseId of resource.courseIds) {
+          expect(COURSE_IDS).toContain(courseId);
+        }
+      }
       if (resource.courseId === "acc101") {
         expect(resource.evidence).toBeDefined();
         expect(resource.evidence?.rightsStatus).toBe("link_only");
@@ -524,6 +600,30 @@ describe("课程数据资产完整性", () => {
         expect(resource.evidence?.accessibility.trim().length).toBeGreaterThan(0);
         expect(resource.evidence?.packagePolicy).toContain("HAP");
         expect(resource.evidence?.api12Rendering).toContain("API 12");
+      }
+      if (resource.type === "audio") {
+        expect(resource.courseId === "cet4" || resource.courseId === "cet6").toBe(true);
+        expect(resource.evidence?.rightsStatus).toBe("open_licensed");
+        expect(resource.evidence?.allowModification).toBe(true);
+        expect(resource.evidence?.allowRedistribution).toBe(true);
+        expect(resource.evidence?.sha256).toMatch(/^[A-F0-9]{64}$/);
+        expect(resource.media).toBeDefined();
+        expect(new URL(resource.media?.mediaUrl ?? "").protocol).toBe("https:");
+        expect(resource.media?.mimeType).toBe("audio/ogg");
+        expect(resource.media?.byteLength).toBeGreaterThan(0);
+        expect(resource.media?.durationMs).toBeGreaterThan(0);
+        expect(resource.media?.transcript.trim().length).toBeGreaterThan(0);
+        expect(resource.media?.transcriptTimed).toBe(false);
+        expect(resource.media?.attribution.trim().length).toBeGreaterThan(0);
+        expect(new URL(resource.media?.licenseUrl ?? "").protocol).toBe("https:");
+        const rawBytes = readFileSync(fileURLToPath(
+          harmonyRawFileUrl(resource.media?.rawFilePath ?? "")
+        ));
+        expect(rawBytes.byteLength).toBe(resource.media?.byteLength);
+        expect(createHash("sha256").update(rawBytes).digest("hex").toUpperCase())
+          .toBe(resource.evidence?.sha256);
+      } else {
+        expect(resource.media).toBeUndefined();
       }
     }
 

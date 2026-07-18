@@ -236,5 +236,19 @@
     "topic": "会计要素与会计等式",
     "prerequisiteIds": [],
     "level": 0
+  },
+  {
+    "id": "cet4_listening_baseline",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "prerequisiteIds": [],
+    "level": 0
+  },
+  {
+    "id": "cet6_lecture_baseline",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "prerequisiteIds": [],
+    "level": 0
   }
 ]

@@ -1087,5 +1087,120 @@
       "acc101_basic_accounting_standard"
     ],
     "text": "可以用连续余额表核验交易分析。假设企业期初资产100万元、负债0万元、所有者权益100万元；借入银行存款30万元后变为130 = 30 + 100；再用20万元现金购买设备，资产内部结构改变但仍为130 = 30 + 100；最后用10万元现金归还借款，变为120 = 20 + 100。每一步都同时更新受影响要素并重新验算等式，可减少只改一边的常见错误。"
+  },
+  {
+    "id": "cet4_k01",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "source": "教育部教育考试院 CET 笔试结构与分级考核内容页；原创训练说明",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet4_official_content_2016"
+    ],
+    "text": "教育部教育考试院公布的 CET-4 听力由短篇新闻、长对话和听力篇章构成，听力部分总时长为25分钟。本主题只训练进入这些任务前的连续短语辨音、转写复核和错因标注，不是官方样题或完整模拟听力。练习时应把考试结构事实与本课原创材料分开记录，避免把开放语音误称为官方录音。"
+  },
+  {
+    "id": "cet4_k02",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "source": "Wikimedia Commons: En-us-one could hear a pin drop.oga；原创听辨流程",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ],
+    "text": "本课开放音频的文件级静态文本标签是“one could hear a pin drop”，时长约2.763秒，没有VTT、SRT或逐词时间码。第一次播放前应隐藏文本，只写下确定听到的词；随后再揭示完整文本逐词对齐。静态文本可以核验最终答案，但不能伪装成逐词同步字幕。"
+  },
+  {
+    "id": "cet4_k03",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "source": "Wikimedia Commons: En-us-one could hear a pin drop.oga；原创意群标注",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ],
+    "text": "为了定位漏词，可以把短语作教学切分“one could hear | a pin drop”。竖线只是本课的复核标记，不表示媒体作者或官方大纲规定了唯一意群。学生先保留实际听到的顺序，再检查功能词one、could和a是否被遗漏，不应只凭中文意思补写没有听到的词。"
+  },
+  {
+    "id": "cet4_k04",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "source": "Wikimedia Commons: En-us-one could hear a pin drop.oga；原创错因分类",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ],
+    "text": "听写错误至少分为三类：未听到、听到但拼错、词序记错。例如记录为“hear ... pin drop”时，hear、pin、drop顺序正确，但one could和a缺失，应标为漏词。精确错因比笼统写“没听懂”更适合生成下一次主动回忆和间隔复习任务。"
+  },
+  {
+    "id": "cet4_k05",
+    "courseId": "cet4",
+    "topic": "CET-4连续短语听辨与转写复核",
+    "source": "Wikimedia Commons: En-us-one could hear a pin drop.oga；原创三遍复核法",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet4_pin_drop_audio"
+    ],
+    "text": "三遍复核法把一次播放变成可解释证据：第一遍隐藏文本并独立作答，第二遍揭示文本逐词标出遗漏、拼错和错序，第三遍只针对薄弱片段整句跟读。复习时先遮住答案再回忆，不能把反复看着文本朗读当成听辨掌握。完成后记录具体漏词，作为下一次复习的最小目标。"
+  },
+  {
+    "id": "cet6_k01",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "source": "教育部教育考试院 CET 笔试结构与分级考核内容页；原创训练说明",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet6_official_content_2016"
+    ],
+    "text": "教育部教育考试院公布的 CET-6 听力包含长对话、听力篇章以及讲话、报道或讲座，听力部分总时长为30分钟。本主题训练讲座型材料的关键词骨架和延迟复述，不复制官方录音或样题。本课词音与短讲都只作为原创微练习，不能据此声称完成了整套六级听力模拟。"
+  },
+  {
+    "id": "cet6_k02",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "source": "Wikimedia Commons: En-us-bookkeeper.ogg；原创词形核验",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet6_bookkeeper_audio"
+    ],
+    "text": "本课开放词音的文件级静态文本标签是“bookkeeper”，时长约0.778秒，没有逐词时间码。它只用于词音辨识、完整拼写和跟读校准。播放前可以先预测词形，播放后再对照完整单词；不得把这一词音描述为 CET 官方词汇录音。"
+  },
+  {
+    "id": "cet6_k03",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "source": "Wikimedia Commons: En-us-bookkeeper.ogg；原创图文标注",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet6_bookkeeper_audio"
+    ],
+    "text": "图文卡可把bookkeeper标成“book | keeper”，帮助检查完整字母顺序和重复字母。这个切分是教学记忆标注，不是媒体作者提供的形态分析。评分看完整拼写bookkeeper是否正确，竖线位置只用于自我说明，不应改变目标词本身。"
+  },
+  {
+    "id": "cet6_k04",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "source": "教育部教育考试院 CET 笔试结构与分级考核内容页；Wikimedia Commons: En-us-bookkeeper.ogg；原创短讲",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet6_official_content_2016",
+      "cet6_bookkeeper_audio"
+    ],
+    "text": "听讲座时可用“角色→动作→对象→结果或时间”压缩信息，避免逐句抄写。原创句子“The bookkeeper checked the figures before the meeting”可记为“bookkeeper→checked→figures→before meeting”。关键词骨架必须保留关系方向，不能为了缩短笔记而把动作或时间改成原句没有的信息。"
+  },
+  {
+    "id": "cet6_k05",
+    "courseId": "cet6",
+    "topic": "CET-6讲座关键词骨架与延迟复述",
+    "source": "教育部教育考试院 CET 笔试结构与分级考核内容页；原创延迟复述流程",
+    "provenance": "original_instructional_content",
+    "sourceResourceIds": [
+      "cet_official_written_test_structure",
+      "cet6_official_content_2016"
+    ],
+    "text": "延迟复述时先遮住原文，只看关键词骨架恢复一句话，再对照角色、动作、对象和结果是否齐全。若只能照着原句朗读，不能证明已经形成可提取的听力记忆。复述后应把缺失关系写成下一轮提示，例如“保留动作对象”或“补回时间顺序”，并安排稍后再次回忆。"
   }
 ]

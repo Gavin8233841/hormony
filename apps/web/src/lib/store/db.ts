@@ -174,7 +174,7 @@ function seedDemoData() {
   db.quizResults.push(demoQuizResult);
 }
 
-const CURRICULUM_DATA_VERSION = "2026-07-18-acc101";
+const CURRICULUM_DATA_VERSION = "2026-07-18-cet46";
 const seedChunkIds = new Set(allKnowledgeChunks.map((chunk) => chunk.id));
 const seedQuizIds = new Set(allQuizzes.map((quiz) => quiz.quizId));
 
@@ -389,7 +389,9 @@ export const store = {
   // ========== External Resources ==========
   getExternalResources(courseId?: string): ExternalResource[] {
     return courseId
-      ? db.externalResources.filter((r) => r.courseId === courseId)
+      ? db.externalResources.filter((r) =>
+        r.courseId === courseId || r.courseIds?.includes(courseId) === true
+      )
       : db.externalResources;
   },
   getExternalResourcesByType(type: ExternalResource["type"]): ExternalResource[] {

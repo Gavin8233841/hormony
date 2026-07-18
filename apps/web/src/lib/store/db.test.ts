@@ -75,6 +75,23 @@ describe("Store 数据存储", () => {
     });
   });
 
+  describe("External Resources 操作", () => {
+    it("共享官方来源应进入两门 CET 课程且专属音频不得串课", () => {
+      const cet4Resources = store.getExternalResources("cet4");
+      const cet6Resources = store.getExternalResources("cet6");
+      expect(cet4Resources.some((item) =>
+        item.id === "cet_official_written_test_structure"
+      )).toBe(true);
+      expect(cet6Resources.some((item) =>
+        item.id === "cet_official_written_test_structure"
+      )).toBe(true);
+      expect(cet4Resources.some((item) => item.id === "cet4_pin_drop_audio")).toBe(true);
+      expect(cet4Resources.some((item) => item.id === "cet6_bookkeeper_audio")).toBe(false);
+      expect(cet6Resources.some((item) => item.id === "cet6_bookkeeper_audio")).toBe(true);
+      expect(cet6Resources.some((item) => item.id === "cet4_pin_drop_audio")).toBe(false);
+    });
+  });
+
   describe("Plan 操作", () => {
     it("getPlan 应返回演示学习计划", () => {
       const plan = store.getPlan("demo");
