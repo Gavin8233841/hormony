@@ -330,7 +330,7 @@ export async function callModel(
   const client = getModelClient(config);
 
   if (!client) {
-    throw new ModelUnavailableError("MODEL_API_KEY 未配置");
+    throw new ModelUnavailableError();
   }
 
   try {
@@ -356,13 +356,9 @@ export async function callModel(
     if (error instanceof ModelInvalidResponseError) throw error;
     if (error instanceof ModelCancelledError) throw error;
     if (error instanceof ModelTimeoutError || isTimeoutLikeError(error)) {
-      throw new ModelTimeoutError(
-        error instanceof Error ? error.message : "模型请求超时"
-      );
+      throw new ModelTimeoutError();
     }
-    throw new ModelUnavailableError(
-      error instanceof Error ? `模型请求失败：${error.message}` : "模型请求失败"
-    );
+    throw new ModelUnavailableError();
   }
 }
 
@@ -380,7 +376,7 @@ export async function callModelWithHistory(
   const client = getModelClient(config);
 
   if (!client) {
-    throw new ModelUnavailableError("MODEL_API_KEY 未配置");
+    throw new ModelUnavailableError();
   }
 
   try {
@@ -413,13 +409,9 @@ export async function callModelWithHistory(
     if (error instanceof ModelInvalidResponseError) throw error;
     if (error instanceof ModelCancelledError) throw error;
     if (error instanceof ModelTimeoutError || isTimeoutLikeError(error)) {
-      throw new ModelTimeoutError(
-        error instanceof Error ? error.message : "模型请求超时"
-      );
+      throw new ModelTimeoutError();
     }
-    throw new ModelUnavailableError(
-      error instanceof Error ? `模型请求失败：${error.message}` : "模型请求失败"
-    );
+    throw new ModelUnavailableError();
   }
 }
 
