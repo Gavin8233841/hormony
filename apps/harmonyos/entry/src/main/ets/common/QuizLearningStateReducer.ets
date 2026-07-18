@@ -1,5 +1,6 @@
 import { TopicMastery } from '../model/DataModels';
 import {
+  AppliedQuizProof,
   LearningQuizResult as QuizResult,
   LearningQuizResultDetail as QuizResultDetail,
   LearningReviewItem as ReviewItem,
@@ -11,7 +12,7 @@ import {
   TopicMasteryMilestone
 } from '../model/LearningMetadataModels';
 
-const QUIZ_STATE_SCHEMA_VERSION: number = 2;
+const QUIZ_STATE_SCHEMA_VERSION: number = 3;
 const RECENT_RESULT_LIMIT: number = 20;
 const QUIZ_EVENT_LIMIT: number = 500;
 const RESOLVED_REVIEW_LIMIT: number = 200;
@@ -33,6 +34,7 @@ export class QuizLearningStateReducer {
       schemaVersion: QUIZ_STATE_SCHEMA_VERSION,
       pendingResults: [],
       appliedQuizIds: [],
+      appliedQuizProofs: [],
       appliedInsightEventIds: [],
       recentResults: [],
       stats: stats,
@@ -56,6 +58,13 @@ export class QuizLearningStateReducer {
       state.appliedInsightEventIds = [];
       changed = true;
     }
+    if (state.appliedQuizProofs === undefined) {
+      state.appliedQuizProofs = [];
+      changed = true;
+    }
+    if (QuizLearningStateReducer.normalizeAppliedQuizProofs(state)) {
+      changed = true;
+    }
     if (state.masteryMilestones === undefined) {
       state.masteryMilestones = [];
       changed = true;
@@ -74,20 +83,27 @@ export class QuizLearningStateReducer {
     return true;
   }
 
-  static applyPendingResults(state: QuizLearningState): number {
+  static applyPendingResults(state: QuizLearningState, proofs: AppliedQuizProof[]): number {
     const pending = state.pendingResults.slice();
     state.pendingResults = [];
     let appliedCount = 0;
     for (const result of pending) {
-      if (QuizLearningStateReducer.applyResult(state, result)) appliedCount += 1;
+      const proof = proofs.find((item: AppliedQuizProof): boolean => item.quizId === result.quizId);
+      if (proof === undefined) throw new Error('待写回答题记录缺少完整性摘要');
+      if (QuizLearningStateReducer.applyResult(state, result, proof)) appliedCount += 1;
     }
     return appliedCount;
   }
 
-  static applyResult(state: QuizLearningState, result: QuizResult): boolean {
+  static applyResult(state: QuizLearningState, result: QuizResult, proof: AppliedQuizProof): boolean {
     if (state.appliedQuizIds.includes(result.quizId)) return false;
+    if (proof.quizId !== result.quizId || proof.verification !== 'verified' ||
+      proof.fingerprintVersion <= 0 || proof.payloadSha256.length !== 64) {
+      throw new Error('答题记录完整性摘要无效');
+    }
 
     state.appliedQuizIds.push(result.quizId);
+    state.appliedQuizProofs.push(proof);
     state.recentResults.unshift(result);
     state.recentResults = state.recentResults.slice(0, RECENT_RESULT_LIMIT);
     state.stats.totalAttempts += 1;
@@ -107,6 +123,51 @@ export class QuizLearningStateReducer {
     state.quizEvents = QuizLearningStateReducer.compactQuizEvents(state.quizEvents);
     QuizLearningStateReducer.refreshProfileTopics(state);
     return true;
+  }
+
+  private static normalizeAppliedQuizProofs(state: QuizLearningState): boolean {
+    let changed = false;
+    const appliedQuizIds: string[] = [];
+    for (const quizId of state.appliedQuizIds) {
+      if (!appliedQuizIds.includes(quizId)) appliedQuizIds.push(quizId);
+    }
+    if (appliedQuizIds.length !== state.appliedQuizIds.length) {
+      state.appliedQuizIds = appliedQuizIds;
+      changed = true;
+    }
+    const normalized: AppliedQuizProof[] = [];
+    for (const quizId of state.appliedQuizIds) {
+      if (normalized.some((item: AppliedQuizProof): boolean => item.quizId === quizId)) continue;
+      const proof = state.appliedQuizProofs.find((item: AppliedQuizProof): boolean => item.quizId === quizId);
+      if (proof !== undefined && proof.quizId.trim().length > 0 &&
+        ((proof.verification === 'verified' && proof.fingerprintVersion > 0 &&
+          proof.payloadSha256.length === 64) ||
+        (proof.verification === 'legacy-unverifiable' && proof.fingerprintVersion === 0 &&
+          proof.payloadSha256.length === 0))) {
+        normalized.push(proof);
+      } else {
+        normalized.push({
+          quizId: quizId,
+          verification: 'legacy-unverifiable',
+          fingerprintVersion: 0,
+          payloadSha256: ''
+        });
+      }
+    }
+    if (normalized.length !== state.appliedQuizProofs.length) {
+      state.appliedQuizProofs = normalized;
+      return true;
+    }
+    for (let index = 0; index < normalized.length; index += 1) {
+      const left = normalized[index];
+      const right = state.appliedQuizProofs[index];
+      if (left.quizId !== right.quizId || left.verification !== right.verification ||
+        left.fingerprintVersion !== right.fingerprintVersion || left.payloadSha256 !== right.payloadSha256) {
+        state.appliedQuizProofs = normalized;
+        return true;
+      }
+    }
+    return changed;
   }
 
   static createReceipt(state: QuizLearningState, result: QuizResult, applied: boolean,

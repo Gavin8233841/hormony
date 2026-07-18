@@ -103,10 +103,18 @@ export interface TopicMasteryMilestone {
   masteredAt: string;
 }
 
+export interface AppliedQuizProof {
+  quizId: string;
+  verification: 'verified' | 'legacy-unverifiable';
+  fingerprintVersion: number;
+  payloadSha256: string;
+}
+
 export interface QuizLearningState {
   schemaVersion: number;
   pendingResults: LearningQuizResult[];
   appliedQuizIds: string[];
+  appliedQuizProofs: AppliedQuizProof[];
   appliedInsightEventIds: string[];
   recentResults: LearningQuizResult[];
   stats: QuizLearningStats;

@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { TextEncoder } from "node:util";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -69,8 +71,10 @@ interface RuntimeTagInsight {
 }
 
 interface RuntimeState {
+  schemaVersion: number;
   pendingResults: RuntimeResult[];
   appliedQuizIds: string[];
+  appliedQuizProofs: RuntimeAppliedQuizProof[];
   appliedInsightEventIds: string[];
   recentResults: RuntimeResult[];
   stats: {
@@ -128,6 +132,13 @@ interface RuntimeReceipt {
   dueReviewCount: number;
   activityCount: number;
   courseProgress: number;
+}
+
+interface RuntimeAppliedQuizProof {
+  quizId: string;
+  verification: "verified" | "legacy-unverifiable";
+  fingerprintVersion: number;
+  payloadSha256: string;
 }
 
 interface RuntimeAiQuizDraft {
@@ -191,8 +202,8 @@ interface ReducerRuntime {
   preparePersistentState(state: RuntimeState): boolean;
   mergeQuizEvents(state: RuntimeState, incomingEvents: RuntimeStudyEvent[]): void;
   enqueueResult(state: RuntimeState, result: RuntimeResult): boolean;
-  applyPendingResults(state: RuntimeState): number;
-  applyResult(state: RuntimeState, result: RuntimeResult): boolean;
+  applyPendingResults(state: RuntimeState, proofs: RuntimeAppliedQuizProof[]): number;
+  applyResult(state: RuntimeState, result: RuntimeResult, proof: RuntimeAppliedQuizProof): boolean;
   applyLearningInsightEvent(state: RuntimeState, event: RuntimeStudyEvent): boolean;
   createReceipt(state: RuntimeState, result: RuntimeResult, applied: boolean, now?: string): RuntimeReceipt;
   localDateKey(timestamp: string): string;
@@ -337,6 +348,14 @@ class MemoryRdbStore {
   }
 }
 
+class HarmonyTextEncoder {
+  constructor(_encoding?: string) {}
+
+  encodeInto(input: string): Uint8Array {
+    return new TextEncoder().encode(input);
+  }
+}
+
 interface LoadedRepository {
   repository: RepositoryRuntime;
   store: MemoryRdbStore;
@@ -391,6 +410,24 @@ function loadReducer(): ReducerRuntime {
 }
 
 const reducer = loadReducer();
+
+function appliedQuizProofFor(result: RuntimeResult): RuntimeAppliedQuizProof {
+  return {
+    quizId: result.quizId,
+    verification: "verified",
+    fingerprintVersion: 1,
+    payloadSha256: "a".repeat(64),
+  };
+}
+
+function applyReducerResult(state: RuntimeState, result: RuntimeResult): boolean {
+  return reducer.applyResult(state, result, appliedQuizProofFor(result));
+}
+
+function applyPendingReducerResults(state: RuntimeState): number {
+  return reducer.applyPendingResults(state, state.pendingResults.map(appliedQuizProofFor));
+}
+
 const repositorySource = readFileSync(
   fileURLToPath(
     new URL(
@@ -481,6 +518,19 @@ function loadRepository(rows: Map<string, ArkDataRow>): LoadedRepository {
         return [];
       },
     },
+    cryptoFramework: {
+      createMd: (algorithm: string) => {
+        if (algorithm !== "SHA256") throw new Error(`未实现的摘要算法: ${algorithm}`);
+        const hash = createHash("sha256");
+        return {
+          updateSync: (input: { data: Uint8Array }): void => {
+            hash.update(input.data);
+          },
+          digestSync: (): { data: Uint8Array } => ({ data: new Uint8Array(hash.digest()) }),
+        };
+      },
+    },
+    util: { TextEncoder: HarmonyTextEncoder },
     QuizLearningStateReducer: reducer,
   });
   const repository = runtimeExports.LocalLearningRepository;
@@ -831,7 +881,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
       enqueue
     );
     const applyPending = appendSource.indexOf(
-      "QuizLearningStateReducer.applyPendingResults(state)",
+      "LocalLearningRepository.applyPendingQuizResults(state)",
       pendingWrite
     );
     const completedWrite = appendSource.indexOf(
@@ -851,7 +901,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     const recoveryEnd = repositorySource.indexOf("static async getProfile", recoveryStart);
     const recoverySource = repositorySource.slice(recoveryStart, recoveryEnd);
     expect(recoverySource).toContain("if (state.pendingResults.length > 0)");
-    expect(recoverySource).toContain("QuizLearningStateReducer.applyPendingResults(state)");
+    expect(recoverySource).toContain("LocalLearningRepository.applyPendingQuizResults(state)");
     expect(recoverySource).toContain(
       "putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state)"
     );
@@ -1036,8 +1086,8 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
   it("v10 被旧版降到 v8 后产生的新答题与历史聚合按时间边界合并且重读稳定", async () => {
     const currentState = reducer.createEmptyState();
-    reducer.applyResult(currentState, result("post-v10-wrong", "2026-07-17T11:00:00.000Z", false));
-    reducer.applyResult(currentState, result("post-v10-correct", "2026-07-17T12:00:00.000Z", true));
+    applyReducerResult(currentState, result("post-v10-wrong", "2026-07-17T11:00:00.000Z", false));
+    applyReducerResult(currentState, result("post-v10-correct", "2026-07-17T12:00:00.000Z", true));
     const rows = v10Rows();
     rows.set("schema_version", { payload: JSON.stringify(8), updatedAt: 100 });
     rows.set("quiz_learning_state", { payload: JSON.stringify(currentState), updatedAt: 101 });
@@ -1137,8 +1187,8 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
   it("先错后对仍按累计正确率记为未掌握，保存重读后 milestone 与课程进度不突变", async () => {
     const state = reducer.createEmptyState();
-    reducer.applyResult(state, result("quiz-wrong-first", "2026-07-17T11:00:00.000Z", false));
-    reducer.applyResult(state, result("quiz-correct-second", "2026-07-17T12:00:00.000Z", true));
+    applyReducerResult(state, result("quiz-wrong-first", "2026-07-17T11:00:00.000Z", false));
+    applyReducerResult(state, result("quiz-correct-second", "2026-07-17T12:00:00.000Z", true));
 
     expect(state.topicMastery[0]).toMatchObject({
       attempts: 2,
@@ -1363,8 +1413,8 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
     expect(reducer.enqueueResult(state, attempt)).toBe(true);
     expect(state.pendingResults).toHaveLength(1);
-    expect(reducer.applyPendingResults(state)).toBe(1);
-    expect(reducer.applyResult(state, attempt)).toBe(false);
+    expect(applyPendingReducerResults(state)).toBe(1);
+    expect(applyReducerResult(state, attempt)).toBe(false);
 
     expect(state.stats).toMatchObject({ totalAttempts: 1, totalQuestions: 1, correctQuestions: 0 });
     expect(state.topicMastery[0]).toMatchObject({ attempts: 1, totalQuestions: 1, correctQuestions: 0 });
@@ -1385,8 +1435,8 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     reducer.enqueueResult(beforeRestart, attempt);
     const afterRestart = JSON.parse(JSON.stringify(beforeRestart)) as RuntimeState;
 
-    expect(reducer.applyPendingResults(afterRestart)).toBe(1);
-    expect(reducer.applyPendingResults(afterRestart)).toBe(0);
+    expect(applyPendingReducerResults(afterRestart)).toBe(1);
+    expect(applyPendingReducerResults(afterRestart)).toBe(0);
     expect(afterRestart.pendingResults).toEqual([]);
     expect(afterRestart.appliedQuizIds).toEqual(["quiz-restart"]);
 
@@ -1425,9 +1475,9 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
       "quiz_cs101_tree"
     );
 
-    expect(reducer.applyResult(state, first)).toBe(true);
-    expect(reducer.applyResult(state, second)).toBe(true);
-    expect(reducer.applyResult(state, second)).toBe(false);
+    expect(applyReducerResult(state, first)).toBe(true);
+    expect(applyReducerResult(state, second)).toBe(true);
+    expect(applyReducerResult(state, second)).toBe(false);
     expect(state.stats).toMatchObject({ totalAttempts: 2, totalQuestions: 2, correctQuestions: 1 });
     expect(state.appliedQuizIds).toEqual(["attempt-source-1", "attempt-source-2"]);
     expect(state.recentResults.map((item) => item.sourceQuizId)).toEqual([
@@ -1447,7 +1497,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     const state = reducer.createEmptyState();
     for (let index = 0; index < 605; index += 1) {
       const day = (index % 28 + 1).toString().padStart(2, "0");
-      reducer.applyResult(
+      applyReducerResult(
         state,
         result(`quiz-long-${index}`, `2026-06-${day}T06:00:00.000Z`, index % 2 === 0)
       );
@@ -1455,6 +1505,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
     expect(state.recentResults).toHaveLength(20);
     expect(state.appliedQuizIds).toHaveLength(605);
+    expect(state.appliedQuizProofs).toHaveLength(605);
     expect(state.stats.totalAttempts).toBe(605);
     expect(state.stats.totalQuestions).toBe(605);
     expect(state.stats.correctQuestions).toBe(303);
@@ -1475,16 +1526,16 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
   it("精确 reviewItemId 的连续正确复习按 1-3-7-14 天推进并最终解决", () => {
     const state = reducer.createEmptyState();
-    reducer.applyResult(state, result("quiz-wrong", "2026-07-01T08:00:00.000Z", false));
+    applyReducerResult(state, result("quiz-wrong", "2026-07-01T08:00:00.000Z", false));
     const reviewId = state.reviewItems[0].id;
 
-    reducer.applyResult(state, result("quiz-review-1", "2026-07-02T08:00:00.000Z", true, "二叉树与BST", reviewId));
+    applyReducerResult(state, result("quiz-review-1", "2026-07-02T08:00:00.000Z", true, "二叉树与BST", reviewId));
     expect(state.reviewItems[0]).toMatchObject({ intervalDays: 3, resolved: false });
-    reducer.applyResult(state, result("quiz-review-2", "2026-07-05T08:00:00.000Z", true, "二叉树与BST", reviewId));
+    applyReducerResult(state, result("quiz-review-2", "2026-07-05T08:00:00.000Z", true, "二叉树与BST", reviewId));
     expect(state.reviewItems[0]).toMatchObject({ intervalDays: 7, resolved: false });
-    reducer.applyResult(state, result("quiz-review-3", "2026-07-12T08:00:00.000Z", true, "二叉树与BST", reviewId));
+    applyReducerResult(state, result("quiz-review-3", "2026-07-12T08:00:00.000Z", true, "二叉树与BST", reviewId));
     expect(state.reviewItems[0]).toMatchObject({ intervalDays: 14, resolved: false });
-    reducer.applyResult(state, result("quiz-review-4", "2026-07-26T08:00:00.000Z", true, "二叉树与BST", reviewId));
+    applyReducerResult(state, result("quiz-review-4", "2026-07-26T08:00:00.000Z", true, "二叉树与BST", reviewId));
     expect(state.reviewItems[0]).toMatchObject({ intervalDays: 14, resolved: true, attempts: 5 });
     expect(state.strongTopics).toEqual(["二叉树与BST"]);
     expect(state.weakTopics).toEqual([]);
@@ -1492,11 +1543,11 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
   it("未到期提前答对只记录尝试，不推进复习间隔或 nextReviewAt", () => {
     const state = reducer.createEmptyState();
-    reducer.applyResult(state, result("quiz-early-wrong", "2026-07-01T08:00:00.000Z", false));
+    applyReducerResult(state, result("quiz-early-wrong", "2026-07-01T08:00:00.000Z", false));
     const reviewId = state.reviewItems[0].id;
     const scheduledAt = state.reviewItems[0].nextReviewAt;
 
-    reducer.applyResult(
+    applyReducerResult(
       state,
       result("quiz-early-correct", "2026-07-01T12:00:00.000Z", true, "二叉树与BST", reviewId)
     );
@@ -1511,7 +1562,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
   it("无效旧复习时间应按已到期恢复并写回合法的下一次时间", () => {
     const state = reducer.createEmptyState();
-    reducer.applyResult(state, result("quiz-invalid-schedule-wrong", "2026-07-01T08:00:00.000Z", false));
+    applyReducerResult(state, result("quiz-invalid-schedule-wrong", "2026-07-01T08:00:00.000Z", false));
     const reviewId = state.reviewItems[0].id;
     state.reviewItems[0].nextReviewAt = "invalid-review-time";
 
@@ -1523,7 +1574,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     );
     expect(receipt.dueReviewCount).toBe(1);
 
-    reducer.applyResult(
+    applyReducerResult(
       state,
       result("quiz-invalid-schedule-correct", "2026-07-02T08:00:00.000Z", true, "二叉树与BST", reviewId)
     );
@@ -1542,7 +1593,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     const aiWrong = result("ai-wrong", "2026-07-01T08:00:00.000Z", false);
     aiWrong.source = "ai";
     aiWrong.sourceQuizId = "ai-package-1";
-    reducer.applyResult(state, aiWrong);
+    applyReducerResult(state, aiWrong);
     const reviewId = state.reviewItems[0].id;
 
     const replacementCorrect = result(
@@ -1554,7 +1605,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     );
     replacementCorrect.details[0].questionId = "curated-fallback-1";
     replacementCorrect.details[0].stem = "同主题精选替代题";
-    reducer.applyResult(state, replacementCorrect);
+    applyReducerResult(state, replacementCorrect);
 
     expect(state.reviewItems).toHaveLength(1);
     expect(state.reviewItems[0]).toMatchObject({
@@ -1577,7 +1628,7 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
     );
     replacementWrong.details[0].questionId = "curated-fallback-1";
     replacementWrong.details[0].stem = "同主题精选替代题";
-    reducer.applyResult(state, replacementWrong);
+    applyReducerResult(state, replacementWrong);
     expect(state.reviewItems).toHaveLength(1);
     expect(state.reviewItems[0]).toMatchObject({
       id: reviewId,
@@ -1592,8 +1643,8 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
   it("首次掌握 milestone 在后续正确率下降后保留，成就读取持久 milestone", () => {
     const state = reducer.createEmptyState();
     const masteredAt = "2026-07-10T08:00:00.000Z";
-    reducer.applyResult(state, result("quiz-mastered-once", masteredAt, true));
-    reducer.applyResult(state, result("quiz-mastery-decline", "2026-07-11T08:00:00.000Z", false));
+    applyReducerResult(state, result("quiz-mastered-once", masteredAt, true));
+    applyReducerResult(state, result("quiz-mastery-decline", "2026-07-11T08:00:00.000Z", false));
 
     expect(state.topicMastery[0].mastered).toBe(false);
     expect(state.masteryMilestones).toEqual([
@@ -1618,8 +1669,8 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
 
   it("相同标签在不同精确 Topic 下分别累计", () => {
     const state = reducer.createEmptyState();
-    reducer.applyResult(state, result("quiz-topic-a", "2026-07-10T08:00:00.000Z", false));
-    reducer.applyResult(state, result("quiz-topic-b", "2026-07-11T08:00:00.000Z", true, "动态规划"));
+    applyReducerResult(state, result("quiz-topic-a", "2026-07-10T08:00:00.000Z", false));
+    applyReducerResult(state, result("quiz-topic-b", "2026-07-11T08:00:00.000Z", true, "动态规划"));
 
     expect(state.tagInsights).toHaveLength(2);
     expect(state.tagInsights.map((item) => `${item.courseId}:${item.topic}:${item.tag}`).sort()).toEqual([
@@ -1959,6 +2010,113 @@ describe("QuizLearningStateReducer 持久学习闭环", () => {
       .rejects.toThrow("答题记录 ID 与已保存内容冲突");
     const persisted = rowValue<RuntimeState>(rows, "quiz_learning_state");
     expect(persisted.stats).toMatchObject({ totalAttempts: 1, totalQuestions: 1, correctQuestions: 0 });
+    expect(persisted.appliedQuizProofs).toEqual([
+      expect.objectContaining({
+        quizId: "payload-conflict",
+        verification: "verified",
+        fingerprintVersion: 1,
+        payloadSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      }),
+    ]);
+  });
+
+  it("结果被 recent window 淘汰后仍以持久 proof 证明同载荷幂等并拒绝异载荷", async () => {
+    const rows = repositoryRows();
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const first = result("long-proof-0", "2026-07-01T08:00:00.000Z", false);
+    await loaded.repository.appendQuizResult(first);
+    for (let index = 1; index < 25; index += 1) {
+      const day = (index + 1).toString().padStart(2, "0");
+      await loaded.repository.appendQuizResult(
+        result(`long-proof-${index}`, `2026-07-${day}T08:00:00.000Z`, index % 2 === 0)
+      );
+    }
+
+    const beforeRetry = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(beforeRetry.recentResults).toHaveLength(20);
+    expect(beforeRetry.recentResults.some((item) => item.quizId === first.quizId)).toBe(false);
+    expect(beforeRetry.appliedQuizIds).toHaveLength(25);
+    expect(beforeRetry.appliedQuizProofs).toHaveLength(25);
+    await expect(loaded.repository.appendQuizResult(first)).resolves.toMatchObject({ applied: false });
+    await expect(loaded.repository.appendQuizResult(
+      result(first.quizId, first.submittedAt, true)
+    )).rejects.toThrow("答题记录 ID 与已保存内容冲突");
+
+    const afterRetry = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(afterRetry.stats.totalAttempts).toBe(25);
+    expect(afterRetry.appliedQuizProofs.find((proof) => proof.quizId === first.quizId))
+      .toMatchObject({ verification: "verified", fingerprintVersion: 1 });
+  });
+
+  it("schema 2 迁移仅升级 recent 内 proof，已截断历史 ID 独立 fail-closed", async () => {
+    const legacy = reducer.createEmptyState();
+    for (let index = 0; index < 25; index += 1) {
+      applyReducerResult(
+        legacy,
+        result(`legacy-proof-${index}`, `2026-06-${(index + 1).toString().padStart(2, "0")}T08:00:00.000Z`,
+          index % 2 === 0)
+      );
+    }
+    const legacyPayload = JSON.parse(JSON.stringify(legacy)) as Record<string, unknown>;
+    legacyPayload.schemaVersion = 2;
+    delete legacyPayload.appliedQuizProofs;
+    const rows = repositoryRows(12);
+    rows.set("quiz_learning_state", { payload: JSON.stringify(legacyPayload), updatedAt: 99 });
+
+    const loaded = loadRepository(rows);
+    await loaded.repository.initialize({});
+    const migrated = rowValue<RuntimeState>(rows, "quiz_learning_state");
+    expect(rowValue<number>(rows, "schema_version")).toBe(13);
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.appliedQuizProofs).toHaveLength(25);
+    expect(migrated.appliedQuizProofs.slice(0, 5).every(
+      (proof) => proof.verification === "legacy-unverifiable" && proof.payloadSha256 === ""
+    )).toBe(true);
+    expect(migrated.appliedQuizProofs.slice(5).every(
+      (proof) => proof.verification === "verified" && /^[0-9a-f]{64}$/.test(proof.payloadSha256)
+    )).toBe(true);
+
+    await expect(loaded.repository.appendQuizResult(
+      result("legacy-proof-24", "2026-06-25T08:00:00.000Z", true)
+    )).resolves.toMatchObject({ applied: false });
+    await expect(loaded.repository.appendQuizResult(
+      result("legacy-proof-0", "2026-06-01T08:00:00.000Z", true)
+    )).rejects.toThrow("历史答题记录缺少可验证摘要");
+    expect(rowValue<RuntimeState>(rows, "quiz_learning_state").stats.totalAttempts).toBe(25);
+  });
+
+  it("SHA-256 canonical payload 覆盖原同载荷比较全部字段且页面区分确定性错误", () => {
+    const fingerprint = repositoryMethodSource("quizResultFingerprintPayload");
+    const sha256 = repositoryMethodSource("sha256");
+    for (const field of ["quizId", "sourceQuizId", "userId", "courseId", "topic", "source", "difficulty",
+      "totalQuestions", "correctCount", "accuracy", "evaluation", "submittedAt", "weakTopics", "details"]) {
+      expect(fingerprint).toContain(`result.${field}`);
+    }
+    for (const field of ["questionId", "stem", "options", "userAnswer", "correctAnswer", "isCorrect",
+      "explanation", "difficulty", "tags", "reviewItemId"]) {
+      expect(fingerprint).toContain(`detail.${field}`);
+    }
+    expect(sha256).toContain("cryptoFramework.createMd('SHA256')");
+    expect(sha256).toContain("digest.updateSync");
+    expect(sha256).toContain("digest.digestSync().data");
+
+    for (const pageSource of [quizPageSource, practicePageSource]) {
+      const submit = pageSource === quizPageSource ?
+        pageMethod(pageSource, "submitQuiz").source : pageMethod(pageSource, "submit").source;
+      const conflict = submit.indexOf("instanceof QuizResultConflictError");
+      const unavailable = submit.indexOf("instanceof QuizResultVerificationUnavailableError");
+      const transient = submit.indexOf("答题结果写回未确认");
+      expect(conflict).toBeGreaterThan(-1);
+      expect(unavailable).toBeGreaterThan(conflict);
+      expect(transient).toBeGreaterThan(unavailable);
+      expect(submit).toContain("已阻止重复写回；请放弃草稿后重新开始");
+      expect(submit).toContain("已阻止重复累计；请放弃草稿后重新开始");
+      expect(submit).toContain("this.writeBackBlocked = true");
+      expect(pageSource).toContain("this.writeBackBlocked ? '写回已阻止'");
+      expect(pageSource).toContain("!this.writeBackBlocked");
+      expect(pageSource).toContain("本机完整性校验已阻止写回；请放弃草稿后重新开始");
+    }
   });
 });
 
@@ -2424,7 +2582,7 @@ describe("Lesson 事件与完成进度 outbox", () => {
     await first.repository.initialize({});
 
     const migrated = rowValue<RuntimeLessonProgress[]>(rows, "lesson_progress");
-    expect(rowValue<number>(rows, "schema_version")).toBe(12);
+    expect(rowValue<number>(rows, "schema_version")).toBe(13);
     expect(migrated[0]).toMatchObject({
       completionEventId: "legacy-lesson-completed",
       completionEventSyncedAt: completedAt,
@@ -2460,7 +2618,7 @@ describe("Lesson 事件与完成进度 outbox", () => {
     expect(rowValue<number>(rows, "schema_version")).toBe(11);
 
     await loaded.repository.initialize({});
-    expect(rowValue<number>(rows, "schema_version")).toBe(12);
+    expect(rowValue<number>(rows, "schema_version")).toBe(13);
     expect(rowValue<RuntimeStudyEvent[]>(rows, "study_events")).toHaveLength(1);
 
     await loaded.repository.completeLessonChunk("a", "b:c", "one", 1);

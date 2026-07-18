@@ -1,5 +1,7 @@
 import { relationalStore } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
+import { cryptoFramework } from '@kit.CryptoArchitectureKit';
+import { util } from '@kit.ArkTS';
 import {
   ChatMessage,
   AchievementProgress,
@@ -11,6 +13,7 @@ import {
   UserProfile
 } from '../model/DataModels';
 import {
+  AppliedQuizProof,
   AiQuizDraft,
   CuratedPracticeDraft,
   LearningQuizResult as QuizResult,
@@ -27,7 +30,7 @@ import { QuizLearningStateReducer } from './QuizLearningStateReducer';
 
 const STORE_NAME: string = 'hongxueban_learning.db';
 const TABLE_NAME: string = 'app_state';
-const SCHEMA_VERSION: number = 12;
+const SCHEMA_VERSION: number = 13;
 
 const KEY_PROFILE: string = 'profile';
 const KEY_COURSES: string = 'courses';
@@ -46,6 +49,7 @@ const KEY_CURATED_PRACTICE_DRAFTS: string = 'curated_practice_drafts';
 
 const ANSWER_DRAFT_SCHEMA_VERSION: number = 1;
 const ANSWER_DRAFT_LIMIT: number = 12;
+const QUIZ_RESULT_FINGERPRINT_VERSION: number = 1;
 
 interface LegacyQuizStatsAggregate {
   totalQuestions: number;
@@ -60,6 +64,18 @@ export interface ReviewQueueSnapshot {
 }
 
 export class AnswerDraftClearedError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class QuizResultConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class QuizResultVerificationUnavailableError extends Error {
   constructor(message: string) {
     super(message);
   }
@@ -176,7 +192,10 @@ export class LocalLearningRepository {
     if (previousVersion < 6) {
       const results = (await LocalLearningRepository.getValue<QuizResult[]>(KEY_QUIZ_RESULTS)) ?? [];
       const state = QuizLearningStateReducer.createEmptyState();
-      for (const result of results.slice().reverse()) QuizLearningStateReducer.applyResult(state, result);
+      for (const result of results.slice().reverse()) {
+        QuizLearningStateReducer.applyResult(state, result,
+          LocalLearningRepository.createAppliedQuizProof(result));
+      }
       await LocalLearningRepository.putValue<TopicMastery[]>(KEY_TOPIC_MASTERY, state.topicMastery);
     }
     if (previousVersion < 11) {
@@ -184,6 +203,9 @@ export class LocalLearningRepository {
     }
     if (previousVersion < 12) {
       await LocalLearningRepository.migrateLessonCompletionOutbox();
+    }
+    if (previousVersion < 13) {
+      await LocalLearningRepository.migrateQuizResultProofs();
     }
   }
 
@@ -207,6 +229,16 @@ export class LocalLearningRepository {
     await LocalLearningRepository.putValue<LessonProgress[]>(KEY_LESSON_PROGRESS, items);
   }
 
+  private static async migrateQuizResultProofs(): Promise<void> {
+    return LocalLearningRepository.runQuizStateTask(async (): Promise<void> => {
+      const state = await LocalLearningRepository.getValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE);
+      if (state === null) return;
+      let changed = QuizLearningStateReducer.preparePersistentState(state);
+      if (LocalLearningRepository.upgradeAppliedQuizProofs(state)) changed = true;
+      if (changed) await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
+    });
+  }
+
   private static async migrateQuizLearningState(): Promise<void> {
     return LocalLearningRepository.runQuizStateTask(async (): Promise<void> => {
       const existing = await LocalLearningRepository.getValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE);
@@ -227,10 +259,11 @@ export class LocalLearningRepository {
         const legacyReviews = await LocalLearningRepository.getValue<ReviewItem[]>(KEY_REVIEW_ITEMS);
         LocalLearningRepository.mergeLegacyReviewItems(existing, legacyReviews);
         LocalLearningRepository.mergeLegacyQuizEvents(existing, validLegacyEvents);
-        QuizLearningStateReducer.applyPendingResults(existing);
+        LocalLearningRepository.applyPendingQuizResults(existing);
         for (const event of validLegacyEvents) QuizLearningStateReducer.applyLearningInsightEvent(existing, event);
         LocalLearningRepository.mergeLegacyQuizStats(existing, legacyStats, appendLegacyHistory);
         QuizLearningStateReducer.refreshProfileTopics(existing);
+        LocalLearningRepository.upgradeAppliedQuizProofs(existing);
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, existing);
         await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, retainedStudyEvents);
         return;
@@ -240,7 +273,8 @@ export class LocalLearningRepository {
       const legacyResults = (await LocalLearningRepository.getValue<QuizResult[]>(KEY_QUIZ_RESULTS)) ?? [];
       for (const result of legacyResults.slice().reverse()) {
         if (LocalLearningRepository.isExactCourseTopic(result.courseId, result.topic)) {
-          QuizLearningStateReducer.applyResult(state, result);
+          QuizLearningStateReducer.applyResult(state, result,
+            LocalLearningRepository.createAppliedQuizProof(result));
         }
       }
 
@@ -294,6 +328,7 @@ export class LocalLearningRepository {
       QuizLearningStateReducer.refreshProfileTopics(state);
       const legacyStats = await LocalLearningRepository.getValue<LegacyQuizStatsAggregate>(KEY_QUIZ_STATS);
       LocalLearningRepository.mergeLegacyQuizStats(state, legacyStats, false);
+      LocalLearningRepository.upgradeAppliedQuizProofs(state);
       await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       await LocalLearningRepository.putValue<StudyEvent[]>(KEY_STUDY_EVENTS, retainedStudyEvents);
     });
@@ -505,6 +540,142 @@ export class LocalLearningRepository {
     QuizLearningStateReducer.refreshProfileTopics(state);
   }
 
+  private static upgradeAppliedQuizProofs(state: QuizLearningState): boolean {
+    const next: AppliedQuizProof[] = [];
+    for (const quizId of state.appliedQuizIds) {
+      if (next.some((item: AppliedQuizProof): boolean => item.quizId === quizId)) continue;
+      const result = state.recentResults.find((item: QuizResult): boolean => item.quizId === quizId);
+      if (result !== undefined) {
+        next.push(LocalLearningRepository.createAppliedQuizProof(result));
+        continue;
+      }
+      const existing = state.appliedQuizProofs.find((item: AppliedQuizProof): boolean => item.quizId === quizId);
+      if (existing !== undefined && LocalLearningRepository.validAppliedQuizProof(existing)) {
+        next.push(existing);
+      } else {
+        next.push({
+          quizId: quizId,
+          verification: 'legacy-unverifiable',
+          fingerprintVersion: 0,
+          payloadSha256: ''
+        });
+      }
+    }
+    if (LocalLearningRepository.sameAppliedQuizProofs(state.appliedQuizProofs, next)) return false;
+    state.appliedQuizProofs = next;
+    return true;
+  }
+
+  private static validAppliedQuizProof(proof: AppliedQuizProof): boolean {
+    if (proof.quizId.trim().length === 0) return false;
+    if (proof.verification === 'legacy-unverifiable') {
+      return proof.fingerprintVersion === 0 && proof.payloadSha256.length === 0;
+    }
+    if (proof.verification !== 'verified' || proof.fingerprintVersion !== QUIZ_RESULT_FINGERPRINT_VERSION ||
+      proof.payloadSha256.length !== 64) return false;
+    const hex = '0123456789abcdef';
+    for (const character of proof.payloadSha256) {
+      if (!hex.includes(character)) return false;
+    }
+    return true;
+  }
+
+  private static sameAppliedQuizProofs(left: AppliedQuizProof[], right: AppliedQuizProof[]): boolean {
+    if (left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index].quizId !== right[index].quizId ||
+        left[index].verification !== right[index].verification ||
+        left[index].fingerprintVersion !== right[index].fingerprintVersion ||
+        left[index].payloadSha256 !== right[index].payloadSha256) return false;
+    }
+    return true;
+  }
+
+  private static createAppliedQuizProof(result: QuizResult): AppliedQuizProof {
+    return {
+      quizId: result.quizId,
+      verification: 'verified',
+      fingerprintVersion: QUIZ_RESULT_FINGERPRINT_VERSION,
+      payloadSha256: LocalLearningRepository.sha256(
+        LocalLearningRepository.quizResultFingerprintPayload(result))
+    };
+  }
+
+  private static quizResultFingerprintPayload(result: QuizResult): string {
+    const parts: string[] = [];
+    LocalLearningRepository.appendFingerprintField(parts, 'quiz-result-v1');
+    LocalLearningRepository.appendFingerprintField(parts, result.quizId);
+    LocalLearningRepository.appendOptionalFingerprintField(parts, result.sourceQuizId);
+    LocalLearningRepository.appendFingerprintField(parts, result.userId);
+    LocalLearningRepository.appendFingerprintField(parts, result.courseId);
+    LocalLearningRepository.appendFingerprintField(parts, result.topic);
+    LocalLearningRepository.appendFingerprintField(parts, result.source);
+    LocalLearningRepository.appendOptionalFingerprintField(parts, result.difficulty);
+    LocalLearningRepository.appendFingerprintField(parts, result.totalQuestions.toString());
+    LocalLearningRepository.appendFingerprintField(parts, result.correctCount.toString());
+    LocalLearningRepository.appendFingerprintField(parts, result.accuracy.toString());
+    LocalLearningRepository.appendFingerprintField(parts, result.evaluation);
+    LocalLearningRepository.appendFingerprintField(parts, result.submittedAt);
+    LocalLearningRepository.appendFingerprintArray(parts, result.weakTopics);
+    LocalLearningRepository.appendFingerprintField(parts, result.details.length.toString());
+    for (const detail of result.details) {
+      LocalLearningRepository.appendFingerprintField(parts, detail.questionId);
+      LocalLearningRepository.appendFingerprintField(parts, detail.stem);
+      LocalLearningRepository.appendFingerprintArray(parts, detail.options ?? []);
+      LocalLearningRepository.appendFingerprintField(parts, detail.userAnswer);
+      LocalLearningRepository.appendFingerprintField(parts, detail.correctAnswer);
+      LocalLearningRepository.appendFingerprintField(parts, detail.isCorrect ? '1' : '0');
+      LocalLearningRepository.appendFingerprintField(parts, detail.explanation);
+      LocalLearningRepository.appendOptionalFingerprintField(parts, detail.difficulty);
+      LocalLearningRepository.appendFingerprintArray(parts, detail.tags ?? []);
+      LocalLearningRepository.appendOptionalFingerprintField(parts, detail.reviewItemId);
+    }
+    return parts.join('');
+  }
+
+  private static appendFingerprintField(parts: string[], value: string): void {
+    parts.push(value.length.toString() + ':' + value);
+  }
+
+  private static appendOptionalFingerprintField(parts: string[], value: string | undefined): void {
+    if (value === undefined) {
+      LocalLearningRepository.appendFingerprintField(parts, '0');
+      return;
+    }
+    LocalLearningRepository.appendFingerprintField(parts, '1');
+    LocalLearningRepository.appendFingerprintField(parts, value);
+  }
+
+  private static appendFingerprintArray(parts: string[], values: string[]): void {
+    LocalLearningRepository.appendFingerprintField(parts, values.length.toString());
+    for (const value of values) LocalLearningRepository.appendFingerprintField(parts, value);
+  }
+
+  private static sha256(value: string): string {
+    try {
+      const digest = cryptoFramework.createMd('SHA256');
+      const encoder = new util.TextEncoder('utf-8');
+      digest.updateSync({ data: encoder.encodeInto(value) });
+      const bytes = digest.digestSync().data;
+      const hex = '0123456789abcdef';
+      let result = '';
+      for (const byte of bytes) {
+        const high = (byte >> 4) & 15;
+        const low = byte & 15;
+        result += hex.substring(high, high + 1) + hex.substring(low, low + 1);
+      }
+      return result;
+    } catch (error) {
+      throw new Error('生成答题记录完整性摘要失败: ' + String(error));
+    }
+  }
+
+  private static applyPendingQuizResults(state: QuizLearningState): number {
+    const proofs = state.pendingResults.map((result: QuizResult): AppliedQuizProof =>
+      LocalLearningRepository.createAppliedQuizProof(result));
+    return QuizLearningStateReducer.applyPendingResults(state, proofs);
+  }
+
   private static async getValue<T>(key: string): Promise<T | null> {
     const store = LocalLearningRepository.requireStore();
     let resultSet: relationalStore.ResultSet | null = null;
@@ -612,6 +783,7 @@ export class LocalLearningRepository {
     const state = (await LocalLearningRepository.getValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE)) ??
       QuizLearningStateReducer.createEmptyState();
     let changed = QuizLearningStateReducer.preparePersistentState(state);
+    if (LocalLearningRepository.upgradeAppliedQuizProofs(state)) changed = true;
     const storedEvents = (await LocalLearningRepository.getValue<StudyEvent[]>(KEY_STUDY_EVENTS)) ?? [];
     for (const event of storedEvents) {
       if (LocalLearningRepository.isValidStoredStudyEvent(event) &&
@@ -627,7 +799,7 @@ export class LocalLearningRepository {
     return LocalLearningRepository.runQuizStateTask(async (): Promise<QuizLearningState> => {
       const state = await LocalLearningRepository.loadQuizLearningStateUnlocked();
       if (state.pendingResults.length > 0) {
-        QuizLearningStateReducer.applyPendingResults(state);
+        LocalLearningRepository.applyPendingQuizResults(state);
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       }
       return state;
@@ -993,13 +1165,18 @@ export class LocalLearningRepository {
     return LocalLearningRepository.runQuizStateTask(async (): Promise<QuizWriteReceipt> => {
       const state = await LocalLearningRepository.loadQuizLearningStateUnlocked();
       if (state.pendingResults.length > 0) {
-        QuizLearningStateReducer.applyPendingResults(state);
+        LocalLearningRepository.applyPendingQuizResults(state);
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       }
       if (state.appliedQuizIds.includes(result.quizId)) {
-        const persisted = state.recentResults.find((item: QuizResult): boolean => item.quizId === result.quizId);
-        if (persisted === undefined || !LocalLearningRepository.sameQuizResult(persisted, result)) {
-          throw new Error('答题记录 ID 与已保存内容冲突');
+        const proof = state.appliedQuizProofs.find((item: AppliedQuizProof): boolean => item.quizId === result.quizId);
+        if (proof === undefined || proof.verification === 'legacy-unverifiable' ||
+          proof.fingerprintVersion !== QUIZ_RESULT_FINGERPRINT_VERSION) {
+          throw new QuizResultVerificationUnavailableError('历史答题记录缺少可验证摘要');
+        }
+        const expected = LocalLearningRepository.createAppliedQuizProof(result);
+        if (proof.payloadSha256 !== expected.payloadSha256) {
+          throw new QuizResultConflictError('答题记录 ID 与已保存内容冲突');
         }
         const receipt = QuizLearningStateReducer.createReceipt(state, result, false);
         return LocalLearningRepository.withCourseProgress(receipt, state, result.courseId);
@@ -1007,7 +1184,7 @@ export class LocalLearningRepository {
 
       QuizLearningStateReducer.enqueueResult(state, result);
       await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
-      const applied = QuizLearningStateReducer.applyPendingResults(state) > 0;
+      const applied = LocalLearningRepository.applyPendingQuizResults(state) > 0;
       await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       const receipt = QuizLearningStateReducer.createReceipt(state, result, applied);
       return LocalLearningRepository.withCourseProgress(receipt, state, result.courseId);
@@ -1075,39 +1252,6 @@ export class LocalLearningRepository {
         throw new Error('答题记录题目内容不完整');
       }
     }
-  }
-
-  private static sameQuizResult(left: QuizResult, right: QuizResult): boolean {
-    if (left.quizId !== right.quizId || left.sourceQuizId !== right.sourceQuizId || left.userId !== right.userId ||
-      left.courseId !== right.courseId || left.topic !== right.topic || left.source !== right.source ||
-      left.difficulty !== right.difficulty || left.totalQuestions !== right.totalQuestions ||
-      left.correctCount !== right.correctCount || left.accuracy !== right.accuracy ||
-      left.evaluation !== right.evaluation || left.submittedAt !== right.submittedAt ||
-      !LocalLearningRepository.sameStringArray(left.weakTopics, right.weakTopics) ||
-      left.details.length !== right.details.length) {
-      return false;
-    }
-    for (let index = 0; index < left.details.length; index += 1) {
-      const leftDetail = left.details[index];
-      const rightDetail = right.details[index];
-      if (leftDetail.questionId !== rightDetail.questionId || leftDetail.stem !== rightDetail.stem ||
-        leftDetail.userAnswer !== rightDetail.userAnswer || leftDetail.correctAnswer !== rightDetail.correctAnswer ||
-        leftDetail.isCorrect !== rightDetail.isCorrect || leftDetail.explanation !== rightDetail.explanation ||
-        leftDetail.difficulty !== rightDetail.difficulty || leftDetail.reviewItemId !== rightDetail.reviewItemId ||
-        !LocalLearningRepository.sameStringArray(leftDetail.options ?? [], rightDetail.options ?? []) ||
-        !LocalLearningRepository.sameStringArray(leftDetail.tags ?? [], rightDetail.tags ?? [])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private static sameStringArray(left: string[], right: string[]): boolean {
-    if (left.length !== right.length) return false;
-    for (let index = 0; index < left.length; index += 1) {
-      if (left[index] !== right[index]) return false;
-    }
-    return true;
   }
 
   private static validAnswerOptions(options: string[]): boolean {
@@ -1304,7 +1448,7 @@ export class LocalLearningRepository {
         LocalLearningRepository.isValidStoredStudyEvent(event));
       const state = await LocalLearningRepository.loadQuizLearningStateUnlocked();
       if (state.pendingResults.length > 0) {
-        QuizLearningStateReducer.applyPendingResults(state);
+        LocalLearningRepository.applyPendingQuizResults(state);
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       }
       return events.concat(state.quizEvents).sort((left: StudyEvent, right: StudyEvent): number =>
@@ -1320,7 +1464,7 @@ export class LocalLearningRepository {
     return LocalLearningRepository.runQuizStateTask(async (): Promise<void> => {
       const state = await LocalLearningRepository.loadQuizLearningStateUnlocked();
       if (state.pendingResults.length > 0) {
-        QuizLearningStateReducer.applyPendingResults(state);
+        LocalLearningRepository.applyPendingQuizResults(state);
         await LocalLearningRepository.putValue<QuizLearningState>(KEY_QUIZ_LEARNING_STATE, state);
       }
       const stored = (await LocalLearningRepository.getValue<StudyEvent[]>(KEY_STUDY_EVENTS)) ?? [];

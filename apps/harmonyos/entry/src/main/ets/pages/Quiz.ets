@@ -20,7 +20,12 @@ import {
   LearningQuizResultDetail as QuizResultDetail,
   QuizWriteReceipt
 } from '../model/LearningMetadataModels';
-import { AnswerDraftClearedError, LocalLearningRepository } from '../common/LocalLearningRepository';
+import {
+  AnswerDraftClearedError,
+  LocalLearningRepository,
+  QuizResultConflictError,
+  QuizResultVerificationUnavailableError
+} from '../common/LocalLearningRepository';
 
 interface DifficultyOption {
   value: string;
@@ -84,6 +89,7 @@ struct QuizPage {
   @State writeBackTopicAccuracy: number = 0;
   @State writeBackActivityCount: number = 0;
   @State writeBackCourseProgress: number = 0;
+  @State writeBackBlocked: boolean = false;
   @State progressStep: number = 0;
   @State progressTick: number = 0;
   @State draftLoading: boolean = false;
@@ -476,6 +482,7 @@ struct QuizPage {
     this.writeBackTopicAccuracy = 0;
     this.writeBackActivityCount = 0;
     this.writeBackCourseProgress = 0;
+    this.writeBackBlocked = false;
     this.grading = [];
     this.attemptId = '';
     this.attemptSubmittedAt = '';
@@ -625,7 +632,8 @@ struct QuizPage {
   }
 
   async submitQuiz(): Promise<void> {
-    if (this.submitting || this.discardingDraft || this.quizId.length === 0 || this.attemptId.length === 0) return;
+    if (this.submitting || this.discardingDraft || this.writeBackBlocked ||
+      this.quizId.length === 0 || this.attemptId.length === 0) return;
     if (!this.allQuestionsAnswered()) {
       this.message = '请先完成全部题目';
       return;
@@ -713,6 +721,20 @@ struct QuizPage {
     } catch (e) {
       if (e instanceof AnswerDraftClearedError) {
         this.handleClearedDraft();
+        return;
+      }
+      if (e instanceof QuizResultConflictError) {
+        this.draftSaveFailed = false;
+        this.writeBackBlocked = true;
+        this.message = '当前答题记录与本机摘要不一致，已阻止重复写回；请放弃草稿后重新开始';
+        this.hasError = true;
+        return;
+      }
+      if (e instanceof QuizResultVerificationUnavailableError) {
+        this.draftSaveFailed = false;
+        this.writeBackBlocked = true;
+        this.message = '历史答题已写入但缺少可验证摘要，已阻止重复累计；请放弃草稿后重新开始';
+        this.hasError = true;
         return;
       }
       this.draftSaveFailed = !draftPersisted;
@@ -1477,7 +1499,8 @@ struct QuizPage {
         .justifyContent(FlexAlign.SpaceBetween)
 
         if (this.attemptSubmittedAt.length > 0) {
-          Text('上次写回未确认，答案已冻结；重试只会确认同一次答题。')
+          Text(this.writeBackBlocked ? '本机完整性校验已阻止写回；请放弃草稿后重新开始。' :
+            '上次写回未确认，答案已冻结；重试只会确认同一次答题。')
             .width('100%')
             .fontSize(12)
             .lineHeight(18)
@@ -1558,16 +1581,20 @@ struct QuizPage {
               .onClick(() => { this.goToNextQuestion(); })
           } else {
             Button(this.discardingDraft ? '正在放弃...' : (this.submitting ? '写入中...' :
-              (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分')))
+              (this.writeBackBlocked ? '写回已阻止' :
+              (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分'))))
               .layoutWeight(1)
               .height(48)
               .fontSize(14)
-              .fontColor(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft ?
+              .fontColor(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft &&
+                !this.writeBackBlocked ?
                 Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-              .backgroundColor(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft ?
+              .backgroundColor(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft &&
+                !this.writeBackBlocked ?
                 Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
               .borderRadius(Constants.RADIUS_MD)
-              .enabled(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft)
+              .enabled(this.currentAnswerText().length > 0 && !this.submitting && !this.discardingDraft &&
+                !this.writeBackBlocked)
               .onClick(() => { this.submitQuiz(); })
           }
         }

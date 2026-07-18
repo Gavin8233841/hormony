@@ -194,3 +194,33 @@
 - **未验证**：全量 smoke 在已完成安装、启动、首页和课程页截图后，因当前首屏 UI 树没有精确文本“计算机网络”而 exit 1；该断点与草稿状态机无关，但其后步骤不能标记通过。
 - **未验证**：本次设备流程不使用文本输入；`uitest uiInput inputText` 曾切到系统“学习助理”，重新 `aa start` 后应用正常，属于模拟器输入法干扰，不记录为产品失败。最新 HAP 的 Quiz 生成、取消、放弃、重进与提交设备流程未完成。
 - **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成或业务字段通过；项目未配置生产签名，真机与多设备未验证。
+
+## 批次 6：长期结果幂等摘要与确定性错误分层
+
+### 背景
+
+`recentResults` 只保留最近 20 条，但 `appliedQuizIds` 长期保留。第 21 条之后，旧成功结果的同载荷重试无法再从 recent window 找到原文，旧实现会把“摘要已截断”误报成“载荷冲突”，页面又统一提示可以重试，形成不会自行恢复的错误循环。
+
+### 行为变化
+
+- `QuizLearningState` 从 schema 2 迁移到 schema 3，ArkData schema 从 12 迁移到 13；新增与 `appliedQuizIds` 同保留期、同顺序的 `appliedQuizProofs`。
+- 新写回使用 API 12 `CryptoArchitectureKit` 的 `createMd('SHA256')`、`updateSync`、`digestSync` 和 UTF-8 `TextEncoder` 生成 verified proof。输入为带长度前缀的显式 canonical payload，覆盖原同载荷比较的全部结果字段、逐题字段、数组顺序与 optional 区分，不依赖对象属性顺序或分隔符猜测。
+- recent window 内的 schema 2 结果在迁移时重新计算 verified proof；已经被截断、无法从现有 ArkData 重建原文的 ID 标记为 `legacy-unverifiable`，不冒充同载荷成功，也不冒充 payload conflict。
+- 新结果 pending outbox 在归并前生成 proof，结果、画像、错题、标签、活动与 proof 在同一 `quiz_learning_state` 写回链路持久化。第 21 条之后的同载荷重试仍返回 `applied: false`，不会重复累计；异载荷仍由 SHA-256 proof 确定性拒绝。
+- Repository 分别抛出 `QuizResultConflictError` 与 `QuizResultVerificationUnavailableError`。Quiz/Practice 对这两类确定性错误显示“放弃草稿后重新开始”，当前页面将提交按钮切换为“写回已阻止”并禁用；暂时性 ArkData/摘要生成失败仍保留原重试路径。
+- 旧的 `sameQuizResult/sameStringArray` 已删除，避免两套同载荷定义漂移。
+
+### 验证
+
+- **静态诊断通过**：`cd apps/web; pnpm exec vitest run src/lib/data/quiz-learning-state.test.ts`，exit 0，`59/59` 通过。
+- **静态诊断通过**：动态 ArkData fixture 连续写入 25 个结果，确认首条被 recent window 淘汰后同载荷重试仍幂等、异载荷仍冲突，统计保持 25 次；schema 2 的 25 个 ID 迁移后前 5 个为 legacy、后 20 个为 verified，legacy 重试 fail-closed 且不增加统计。
+- **静态诊断通过**：canonical payload 字段覆盖、SHA-256 精确算法名、pending proof 顺序、schema 13 迁移、页面确定性错误先于暂时性错误及按钮阻止态均有源码契约；Web lint、typecheck、28 个文件 `436/436` 测试通过。
+- **构建通过**：`cd apps/web; pnpm build`，exit 0，Next.js 生产构建完成。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` 完成 CompileArkTS 与 PackageHap，`BUILD SUCCESSFUL in 24 s 710 ms`；项目未配置 `signingConfigs`，构建跳过签名。
+- **模拟器通过**：目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`。最新 `entry-default-unsigned.hap` 返回 `install bundle successfully`，`com.c4ai.hormony/EntryAbility` 返回 `start ability successfully`；UI 树为 `pages/Index`，根 bounds `[0,137][1256,2760]`，可见品牌文本“鸿学伴”。
+
+### 未验证
+
+- **未验证**：本批不构造或清除模拟器用户数据库，长期第 21 条重试与 schema 2 升级由可执行 ArkData fixture 和 API 12 HAP 构建验证，未在模拟器 UI 中人工制造 25 次历史答题。
+- **未验证**：未调用线上 Quiz 或模型，不声明线上题组生成、线上提交或模型业务字段通过；DevEco Agent 的 Alibaba 403 与内置模型 401 状态未重试。
+- **未验证**：项目未配置生产签名，真机与多设备未验证。

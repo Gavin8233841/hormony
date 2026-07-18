@@ -2,7 +2,12 @@ import { AnswerOption, GradientHeader, ReviewDetailRow } from '../common/Builder
 import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
-import { AnswerDraftClearedError, LocalLearningRepository } from '../common/LocalLearningRepository';
+import {
+  AnswerDraftClearedError,
+  LocalLearningRepository,
+  QuizResultConflictError,
+  QuizResultVerificationUnavailableError
+} from '../common/LocalLearningRepository';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   CuratedPracticeDraft,
@@ -53,6 +58,7 @@ struct PracticePage {
   @State writeBackTopicAccuracy: number = 0;
   @State writeBackActivityCount: number = 0;
   @State writeBackCourseProgress: number = 0;
+  @State writeBackBlocked: boolean = false;
   @State draftLoading: boolean = false;
   @State draftSaveFailed: boolean = false;
   @State draftReadFailed: boolean = false;
@@ -160,6 +166,7 @@ struct PracticePage {
     this.writeBackTopicAccuracy = 0;
     this.writeBackActivityCount = 0;
     this.writeBackCourseProgress = 0;
+    this.writeBackBlocked = false;
   }
 
   private isActiveLifecycle(lifecycleRunId: number): boolean {
@@ -570,7 +577,7 @@ struct PracticePage {
   }
 
   private async submit(): Promise<void> {
-    if (this.saving || this.discardingDraft || !this.allAnswered()) return;
+    if (this.saving || this.discardingDraft || this.writeBackBlocked || !this.allAnswered()) return;
     if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
       this.message = '当前主题无效，答题记录未保存';
       this.hasError = true;
@@ -636,6 +643,20 @@ struct PracticePage {
     } catch (error) {
       if (error instanceof AnswerDraftClearedError) {
         this.handleClearedDraft();
+        return;
+      }
+      if (error instanceof QuizResultConflictError) {
+        this.draftSaveFailed = false;
+        this.writeBackBlocked = true;
+        this.message = '当前答题记录与本机摘要不一致，已阻止重复写回；请放弃草稿后重新开始';
+        this.hasError = true;
+        return;
+      }
+      if (error instanceof QuizResultVerificationUnavailableError) {
+        this.draftSaveFailed = false;
+        this.writeBackBlocked = true;
+        this.message = '历史答题已写入但缺少可验证摘要，已阻止重复累计；请放弃草稿后重新开始';
+        this.hasError = true;
         return;
       }
       this.draftSaveFailed = !draftPersisted;
@@ -733,7 +754,8 @@ struct PracticePage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
       if (this.attemptSubmittedAt.length > 0) {
-        Text('上次写回未确认，答案已冻结；重试只会确认同一次答题。')
+        Text(this.writeBackBlocked ? '本机完整性校验已阻止写回；请放弃草稿后重新开始。' :
+          '上次写回未确认，答案已冻结；重试只会确认同一次答题。')
           .width('100%')
           .fontSize(12)
           .lineHeight(18)
@@ -804,13 +826,14 @@ struct PracticePage {
             .onClick((): void => { this.goToNextQuestion(); })
         } else {
           Button(this.discardingDraft ? '正在放弃...' : (this.saving ? '写入中...' :
-            (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分')))
+            (this.writeBackBlocked ? '写回已阻止' :
+            (this.attemptSubmittedAt.length > 0 ? '重试写回' : '提交评分'))))
             .layoutWeight(1)
             .height(46)
-            .enabled(this.allAnswered() && !this.saving && !this.discardingDraft)
-            .fontColor(this.allAnswered() && !this.discardingDraft ?
+            .enabled(this.allAnswered() && !this.saving && !this.discardingDraft && !this.writeBackBlocked)
+            .fontColor(this.allAnswered() && !this.discardingDraft && !this.writeBackBlocked ?
               Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
-            .backgroundColor(this.allAnswered() && !this.discardingDraft ?
+            .backgroundColor(this.allAnswered() && !this.discardingDraft && !this.writeBackBlocked ?
               Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => { this.submit(); })
