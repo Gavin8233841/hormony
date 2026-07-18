@@ -430,3 +430,43 @@
 - **未验证**：HDC 仍连接 `127.0.0.1:5555 / TCP / Connected / localhost`，但本批未在共享设备打开 q53/k44；长文本换行、读屏、答题流程、横屏、平板、真机和线上 API 未验证。
 - `lesson-experiences.json` 当前承载 WS09/用户保留改动，主线未覆盖或暂存；其 IPC 活动仍是旧文案，已向 WS09 发出从规格源受控生成的精确请求，融合前不能宣称 Lesson 内容已同步。
 - 本批未修改 Lesson 页面、Repository/schema、模型、安全边界、用户保留文件或秘密；已知失败的 Alibaba/DevEco Provider 未重试，也未回落到 `openai/*`。
+
+## 主线集成：二次探测可达槽位与覆盖边界
+
+### 行为
+
+- `cs101_q53` 从公式记忆题改为固定可执行输入：单侧 `H_i=(H(key)+i²) mod M`，`M=7`、`H(key)=0`、`i=0..6` 的序列为 `0→1→4→2→2→4→1`，不同槽位严格为 `{0,1,2,4}`。
+- 解释删除“4k+3 型质数保证遍历所有位置”的错误断言。质数表长配单侧 `i²` 至少访问一半槽位，负载小于一半时可保证找到空槽，但不保证全表覆盖；`M=7` 仍有 `3/5/6` 不可达。
+- 全覆盖示例限定为另一组匹配条件：表长为 2 的幂且偏移 `(i²+i)/2`；契约以 `M=8` 执行得到 `0,1,3,6,2,7,5,4`，验证八个槽位恰好各访问一次。
+- 目标契约剥离 TypeScript 注释并用平衡方括号精确截取 `cs101Quizzes`，固定完整 Web 文案、端侧 `courseId/topic/difficulty/tags`、单侧全覆盖反向句和数组前/后/注释对象反例。难度审计同步为真实的七次模运算与去重任务，仍为 `easy`，因为公式和全部输入均已给出且不要求插入状态或证明。
+
+### 来源与许可
+
+- Virginia Tech OpenDSA `Improved Collision Resolution / Quadratic Probing` 源文：`https://opendsa-server.cs.vt.edu/ODSA/Books/Everything/html/_sources/HashCImproved.rst.txt`；2026-07-18 HTTP 200，16,711 bytes，SHA-256 `47018e9d1b61874022b0d9417f92a52f0e9c701980c7ab52736dfdd22115deb5`。
+- OpenDSA 仓库 MIT 许可文件：`https://raw.githubusercontent.com/OpenDSA/OpenDSA/master/MIT-license.txt`；HTTP 200，1,135 bytes，SHA-256 `a4d83bb66f3f9058c49a9795583fe20a4256def38e9bc365c76c40affaf20709`。
+- 本批只用 OpenDSA 作为事实核验来源；题面、选项、执行序列和中文解释均为项目内编写，没有复制外部课程正文或题库。
+
+### 文件
+
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `docs/QUIZ-DIFFICULTY-AUDIT-CS101.md`
+- `scripts/test_cs101_quadratic_probing_quiz_facts.py`
+- `docs/workstreams/03-course-learning-result.md`
+
+### 证据
+
+- **源码确认**：独立只读审查复算 q53 与同 home=3 的平移序列，确认数学结论及 OpenDSA 对质数半表、2 的幂/三角偏移全覆盖的描述；同时定位并推动修复真实导出、反向语义、端侧元数据和难度审计四类缺口。
+- **静态诊断通过**：`python -B scripts/test_cs101_quadratic_probing_quiz_facts.py` 退出码 0，9/9 通过；覆盖 M=7 单侧序列、M=8 全覆盖组合、旧 4k+3 断言、正反语义共存、完整生产文案、九字段端侧对象、真实导出边界、来源 URL 与难度审计。
+- **静态诊断通过**：`node scripts/generate-quizzes-json.mjs` 退出码 0；165 道端侧选择题与 Web 唯一源逐字段一致。
+- **静态诊断通过**：`python -B scripts/validate-topic-relations.py` 退出码 0；33 Topic、147 知识切片、165 道题和 33 份学习体验的结构、引用、DAG、连通性、层级与 Lesson 路由门禁全部通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 均退出码 0；36 个测试文件、437/437 通过。
+- **构建通过**：Web `pnpm build` 退出码 0；Next.js 14.2.18 生成 10/10 静态页面与 26.8 kB middleware。
+- **构建通过**：HarmonyOS API 12 增量 HAP 退出码 0；`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，`BUILD SUCCESSFUL in 35 s 259 ms`，仍未配置签名。
+
+### 失败与未验证
+
+- 新反向语义正则首次运行把“不能保证”中的“保证”误判为肯定句，目标契约退出码 1；改为按句切分并显式识别否定词后，正确生产文案与固定矛盾输入分别按预期绿/红。
+- 同 Topic 的 ACTIVE 规格和 Lesson 明确采用线性探测，其 `17→5` 等状态与本题单侧二次探测不矛盾；本批无需修改受保护的 `lesson-experiences.json`。
+- **未验证**：HDC 实测 `127.0.0.1:5555 / TCP / Connected / localhost`，但本批未在共享设备打开 q53；Unicode 公式、箭头、长解释、读屏、答题流程、横屏、平板、真机和线上 API 未验证。
+- 本批未调用已知失败的模型 Provider，未回落到 `openai/*`，未修改 Repository/schema、模型、安全边界、用户保留文件或秘密。
