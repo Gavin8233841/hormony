@@ -24,8 +24,9 @@ function sourceSection(source, startMarker, endMarker) {
 }
 
 function nodesFor(relations, masteredIds) {
-  return relations.map((relation) => ({
+  return relations.map((relation, index) => ({
     ...relation,
+    order: index + 1,
     mastered: masteredIds.has(relation.id),
     unlocked: relation.prerequisiteIds.every((id) => masteredIds.has(id)),
   }));
@@ -49,6 +50,45 @@ function firstActionablePrerequisite(node, nodes) {
     target = earlier;
   }
   return target !== null && target.unlocked ? target : null;
+}
+
+function reachableSuccessors(node, nodes) {
+  const successors = [];
+  const pendingIds = [node.id];
+  for (let pendingIndex = 0; pendingIndex < pendingIds.length; pendingIndex += 1) {
+    const sourceId = pendingIds[pendingIndex];
+    for (const item of nodes) {
+      if (!item.prerequisiteIds.includes(sourceId) ||
+        successors.some((value) => value.id === item.id)) continue;
+      successors.push(item);
+      pendingIds.push(item.id);
+    }
+  }
+  return successors;
+}
+
+function findRecommendedNode(nodes) {
+  return nodes.filter((node) => !node.mastered && node.unlocked)
+    .sort((left, right) => left.level - right.level || left.order - right.order)[0] ?? null;
+}
+
+function recommendedReachableAction(node, nodes) {
+  const successors = reachableSuccessors(node, nodes);
+  const successor = findRecommendedNode(successors);
+  if (successor !== null) return successor;
+  const prerequisites = [];
+  for (const item of successors) {
+    if (item.mastered) continue;
+    const target = firstActionablePrerequisite(item, nodes);
+    if (target !== null && !prerequisites.some((value) => value.id === target.id)) prerequisites.push(target);
+  }
+  return findRecommendedNode(prerequisites);
+}
+
+function nextActionTarget(node, nodes) {
+  if (node.mastered) return recommendedReachableAction(node, nodes) ?? node;
+  if (!node.unlocked) return firstActionablePrerequisite(node, nodes);
+  return node;
 }
 
 const learningMapSource = readSource(learningMapPath);
@@ -125,6 +165,100 @@ test('真实 33 Topic DAG 的每个锁定节点都能解析到未掌握且已解
     'lesson navigation must receive the resolved exact Topic');
   assert.equal(learningMapSource.includes('.enabled(node.unlocked)'), false,
     'locked nodes must not remain a disabled-action dead end');
+});
+
+test('已掌握节点只在全部可达后继掌握后才回到自身复习', () => {
+  const courseIds = [...new Set(relations.map((item) => item.courseId))];
+  let checkedReachableStates = 0;
+  for (const courseId of courseIds) {
+    const courseRelations = relations.filter((item) => item.courseId === courseId);
+    const combinations = 2 ** courseRelations.length;
+    for (let mask = 0; mask < combinations; mask += 1) {
+      const masteredIds = new Set();
+      for (let index = 0; index < courseRelations.length; index += 1) {
+        if ((mask & (2 ** index)) !== 0) masteredIds.add(courseRelations[index].id);
+      }
+      const nodes = nodesFor(courseRelations, masteredIds);
+      for (const node of nodes.filter((item) => item.mastered)) {
+        const incompleteSuccessors = reachableSuccessors(node, nodes).filter((item) => !item.mastered);
+        const target = nextActionTarget(node, nodes);
+        if (incompleteSuccessors.length === 0) {
+          assert.equal(target.id, node.id,
+            `${courseId}/${node.topic} should return to itself only at its completed branch end`);
+          continue;
+        }
+        assert.notEqual(target, null, `${courseId}/${node.topic} lost an actionable reachable path`);
+        assert.notEqual(target.id, node.id, `${courseId}/${node.topic} incorrectly returned to self review`);
+        assert.equal(target.unlocked, true, `${courseId}/${node.topic} resolved a locked action`);
+        assert.equal(target.mastered, false, `${courseId}/${node.topic} resolved an already mastered action`);
+        checkedReachableStates += 1;
+      }
+    }
+  }
+  assert.equal(checkedReachableStates > 0, true,
+    'the exhaustive check must exercise mastered nodes with incomplete reachable paths');
+
+  const networkRelations = relations.filter((item) => item.courseId === 'cs103');
+  const networkNodes = nodesFor(networkRelations,
+    new Set(['cs103_osi_model', 'cs103_physical_link']));
+  const osi = networkNodes.find((item) => item.id === 'cs103_osi_model');
+  assert.notEqual(osi, undefined, 'cs103 OSI root relation missing');
+  assert.equal(recommendedReachableAction(osi, networkNodes)?.id, 'cs103_network_ip',
+    'the audited two-hop path must advance from OSI through the mastered link layer to Network/IP');
+  const independentlyMasteredNodes = nodesFor(networkRelations, new Set(['cs103_physical_link']));
+  const physicalLink = independentlyMasteredNodes.find((item) => item.id === 'cs103_physical_link');
+  assert.notEqual(physicalLink, undefined, 'cs103 physical/link relation missing');
+  assert.equal(physicalLink.unlocked, false,
+    'the regression state must keep the independently mastered node itself locked');
+  assert.equal(nextActionTarget(physicalLink, independentlyMasteredNodes)?.id, 'cs103_network_ip',
+    'an independently mastered locked node must still advance to its unlocked reachable successor');
+
+  const reachability = sourceSection(learningMapSource,
+    '  private reachableSuccessors(node: MapNode): MapNode[] {',
+    '\n  private recommendedReachableAction(');
+  const reachableAction = sourceSection(learningMapSource,
+    '  private recommendedReachableAction(node: MapNode): MapNode | null {',
+    '\n  private isReachableSuccessor(');
+  const actionTarget = sourceSection(learningMapSource,
+    '  private nextActionTarget(node: MapNode): MapNode | null {',
+    '\n  private nextActionUsesPractice(');
+  assert.equal(reachability.includes('item.prerequisiteIds.includes(sourceId)') &&
+    reachability.includes('pendingIds.push(item.id)'), true,
+  'the page must traverse all descendant levels rather than only direct successors');
+  assert.equal(reachableAction.includes('this.findRecommendedNode(successors)') &&
+    reachableAction.includes('this.firstActionablePrerequisite(item)') &&
+    reachableAction.includes('this.findRecommendedNode(prerequisiteTargets)'), true,
+  'reachable descendants must reuse the existing recommendation order and resolve locked merges');
+  assert.equal(actionTarget.includes('this.recommendedReachableAction(node) ?? node'), true,
+    'a mastered node may return to itself only when no reachable action remains');
+  const masteredBranch = actionTarget.indexOf('if (node.mastery?.mastered === true)');
+  const lockedBranch = actionTarget.indexOf('if (!node.unlocked)');
+  assert.equal(masteredBranch >= 0 && lockedBranch > masteredBranch, true,
+    'independently mastered Topics must resolve reachable actions before the lock branch');
+  const masteryLabel = sourceSection(learningMapSource,
+    '  private masteryLabel(node: MapNode): string {',
+    '\n  private masteredCount(');
+  const masteredLabelBranch = masteryLabel.indexOf('if (node.mastery !== null && node.mastery.mastered)');
+  const lockedLabelBranch = masteryLabel.indexOf('if (!node.unlocked)');
+  assert.equal(masteredLabelBranch >= 0 && lockedLabelBranch > masteredLabelBranch &&
+    masteryLabel.includes("' · 前置未完成'"), true,
+  'a mastered but relation-locked Topic must announce mastery first and retain the unmet prerequisite fact');
+  const recommendationLabel = sourceSection(learningMapSource,
+    '  private recommendationLabel(node: MapNode): string {',
+    '\n  private selectedNode(');
+  assert.equal(recommendationLabel.indexOf('if (node.mastery?.mastered === true)') <
+    recommendationLabel.indexOf('if (!node.unlocked)') &&
+    recommendationLabel.includes('保留本机测验掌握事实'), true,
+  'the detail explanation must not replace persistent mastery with a locked-only description');
+  const opacity = sourceSection(learningMapSource,
+    '  private nodeOpacity(node: MapNode): number {',
+    '\n  private nodeOuterOpacity(');
+  assert.equal(opacity.includes('(node.mastery?.mastered === true || node.unlocked) ? 1 : 0.58'), true,
+    'a mastered Topic must remain visually present even when its prerequisite relation is incomplete');
+  assert.equal(learningMapSource.includes('private firstIncompleteSuccessor('), false,
+    'the one-hop successor shortcut must not return');
+  assert.equal(learningMapSource.includes('this.isReachableSuccessor(node, target)'), true,
+    'labels and screen-reader descriptions must identify multi-hop successors correctly');
 });
 
 test('学习动作保持精确 AppStorage 契约且导航失败可见', () => {

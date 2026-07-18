@@ -232,10 +232,13 @@ struct LearningMapPage {
   }
 
   private masteryLabel(node: MapNode): string {
+    if (node.mastery !== null && node.mastery.mastered) {
+      const accuracy = Math.round(node.mastery.accuracy * 100).toString() + '%';
+      return node.unlocked ? '已掌握 · ' + accuracy : '已掌握 · ' + accuracy + ' · 前置未完成';
+    }
     if (!node.unlocked) return '未解锁 · ' + this.prerequisiteLabel(node);
     if (node.mastery === null && node.lessonCompleted) return '已学习 · 待练习';
     if (node.mastery === null) return '可开始 · 尚未练习';
-    if (node.mastery.mastered) return '已掌握 · ' + Math.round(node.mastery.accuracy * 100).toString() + '%';
     return '学习中 · ' + Math.round(node.mastery.accuracy * 100).toString() + '%';
   }
 
@@ -289,6 +292,10 @@ struct LearningMapPage {
   }
 
   private recommendationLabel(node: MapNode): string {
+    if (node.mastery?.mastered === true) {
+      return node.unlocked ? '已掌握：可作为后续节点的先修支撑' :
+        '已掌握：先修关系仍未满足，保留本机测验掌握事实';
+    }
     if (node.recommended) {
       if (node.mastery !== null && !node.mastery.mastered) return '推荐原因：已练习但未达 80%，优先巩固';
       if (node.lessonCompleted) return '推荐原因：已完成学习内容，下一步做精选练习';
@@ -296,7 +303,6 @@ struct LearningMapPage {
       return '推荐原因：先修主题已掌握，进入下一节点';
     }
     if (!node.unlocked) return '暂未解锁：先完成前置主题并达到掌握';
-    if (node.mastery?.mastered === true) return '已掌握：可作为后续节点的先修支撑';
     return '可学习：按当前节奏安排到后续练习';
   }
 
@@ -326,7 +332,7 @@ struct LearningMapPage {
 
   private nodeOpacity(node: MapNode): number {
     if (!this.isFocusedNode(node)) return 0.24;
-    return node.unlocked ? 1 : 0.58;
+    return (node.mastery?.mastered === true || node.unlocked) ? 1 : 0.58;
   }
 
   private nodeOuterOpacity(node: MapNode): number {
@@ -378,19 +384,48 @@ struct LearningMapPage {
     return target !== null && target.unlocked ? target : null;
   }
 
-  private firstIncompleteSuccessor(node: MapNode): MapNode | null {
-    return this.nodes.find((item: MapNode): boolean =>
-      item.prerequisiteIds.includes(node.id) && item.mastery?.mastered !== true) ?? null;
+  private reachableSuccessors(node: MapNode): MapNode[] {
+    const successors: MapNode[] = [];
+    const pendingIds: string[] = [node.id];
+    let pendingIndex = 0;
+    while (pendingIndex < pendingIds.length) {
+      const sourceId = pendingIds[pendingIndex];
+      pendingIndex += 1;
+      for (const item of this.nodes) {
+        if (!item.prerequisiteIds.includes(sourceId) ||
+          successors.some((value: MapNode): boolean => value.id === item.id)) continue;
+        successors.push(item);
+        pendingIds.push(item.id);
+      }
+    }
+    return successors;
+  }
+
+  private recommendedReachableAction(node: MapNode): MapNode | null {
+    const successors = this.reachableSuccessors(node);
+    const successor = this.findRecommendedNode(successors);
+    if (successor !== null) return successor;
+    const prerequisiteTargets: MapNode[] = [];
+    for (const item of successors) {
+      if (item.mastery?.mastered === true) continue;
+      const target = this.firstActionablePrerequisite(item);
+      if (target !== null &&
+        !prerequisiteTargets.some((value: MapNode): boolean => value.id === target.id)) {
+        prerequisiteTargets.push(target);
+      }
+    }
+    return this.findRecommendedNode(prerequisiteTargets);
+  }
+
+  private isReachableSuccessor(node: MapNode, target: MapNode): boolean {
+    return this.reachableSuccessors(node).some((item: MapNode): boolean => item.id === target.id);
   }
 
   private nextActionTarget(node: MapNode): MapNode | null {
-    if (!node.unlocked) return this.firstActionablePrerequisite(node);
     if (node.mastery?.mastered === true) {
-      const successor = this.firstIncompleteSuccessor(node);
-      if (successor === null) return node;
-      if (successor.unlocked) return successor;
-      return this.firstActionablePrerequisite(successor) ?? node;
+      return this.recommendedReachableAction(node) ?? node;
     }
+    if (!node.unlocked) return this.firstActionablePrerequisite(node);
     return node;
   }
 
@@ -403,7 +438,7 @@ struct LearningMapPage {
     const target = this.nextActionTarget(node);
     if (target === null) return '暂无可执行前置主题';
     if (target.id !== node.id) {
-      const relation = target.prerequisiteIds.includes(node.id) ? '后继主题' : '前置主题';
+      const relation = this.isReachableSuccessor(node, target) ? '后继主题' : '前置主题';
       return (this.nextActionUsesPractice(node) ? '练习' : '学习') + relation;
     }
     if (node.mastery?.mastered === true) return '复习主题练习';
@@ -417,7 +452,7 @@ struct LearningMapPage {
     if (target === null) return '当前课程关系数据无法解析出可执行前置主题';
     if (target.id !== node.id) {
       const action = this.nextActionUsesPractice(node) ? '练习' : '学习';
-      return target.prerequisiteIds.includes(node.id) ? '下一步：' + action + '后继「' + target.topic + '」' :
+      return this.isReachableSuccessor(node, target) ? '下一步：' + action + '后继「' + target.topic + '」' :
         '下一步：先' + action + '前置「' + target.topic + '」';
     }
     if (node.mastery?.mastered === true) return '下一步：复习当前主题，保留新的客观答题记录';

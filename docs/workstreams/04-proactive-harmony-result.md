@@ -44,6 +44,13 @@
 - 画像加载和导航失败均保留可见提示与 48 vp 重试入口；知识点练习只写入目录派生的课程标题和精确 Topic，并清空旧标签筛选。
 - `Achievements.ets` 展示每项里程碑的真实来源、剩余量和本地解锁日期；最接近解锁的目标使用本地课程目录、未计数互动和未掌握 Topic 提供可增长的精确动作。
 
+### 学习星图可达行动
+
+- `LearningMap.ets` 的课程切换使用单调请求版本，只由最新课程请求整批提交课程目录、先修关系、学习进度和掌握状态；旧成功、旧失败和旧 `finally` 均不能覆盖新快照。
+- 已掌握节点不再只检查一层后继，而是遍历真实 Topic DAG 的全部可达后继，并复用现有层级、练习状态、正确率与目录顺序选择最近可执行行动。分支汇合处的后继仍锁定时，会解析到未掌握且已解锁的真实前置 Topic。
+- 独立答题可能形成“长期掌握事实存在、先修关系仍未满足”的状态。此时行动先沿可达后继继续，节点文字、读屏语义和可见度优先保留“已掌握”，同时明确显示“前置未完成”，不再把同一节点降级描述为单纯未解锁。
+- 多层后继行动统一解释为“后继主题”；锁定节点的主按钮解释并执行精确前置 Topic。课程切换、失败恢复和主动作保留至少 48 vp，动作读屏文本包含实际解析出的 Topic。
+
 ### 标签洞察状态
 
 - schema 12 已使用 `courseId + topic + tag` 三元组累计标签洞察，并提供不截断的全量读取契约；跨课程和跨 Topic 同名标签不会合并。
@@ -68,12 +75,14 @@
 - `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/ActivityRecords.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Achievements.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
 - `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`
 - `apps/harmonyos/entry/src/main/resources/base/element/string.json`
 - `scripts/test-proactive-delivery-contracts.mjs`
 - `scripts/test-proactive-learning-service.mjs`
 - `scripts/test-profile-accessibility-contracts.mjs`
 - `scripts/test-activity-records-accessibility-contracts.mjs`
+- `scripts/test-learning-map-contracts.mjs`
 
 ## 验证证据
 
@@ -83,12 +92,15 @@
 | **源码确认** | DevEco Studio API 12 `@ohos.notificationManager.d.ts` | `requestEnableNotification(context)` 要求 UI 加载后调用；用户拒绝后不能再次弹框。`openNotificationSettings` 从 API 13 提供，因此 API 12 采用系统设置提示与显式重试 |
 | **源码确认** | schema 12 学习状态契约 | 标签洞察按 `courseId + topic + tag` 隔离；画像继续使用课程目录校验后的 `TopicMastery` |
 | **源码确认** | 四个 WS04 契约脚本合并执行 | exit 0，55/55 通过；覆盖主动行动、提醒/卡片、Form 冷启动、画像真实 Topic、记录一致快照、双错误态恢复、窄屏与无障碍 |
-| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon` | 最新 exit 0，`CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 31 s 973 ms` |
-| **未验证** | DevEco MCP 单文件 ArkTS 诊断 | 当前任务未提供 DevEco MCP，不能写为静态诊断通过 |
-| **未验证** | `hdc list targets` | 使用 DevEco 安装目录中的 `hdc 3.2.0e` 执行，exit 0，返回 `[Empty]` |
-| **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前无模拟器或真机目标 |
+| **源码确认** | `node --test scripts/test-learning-map-contracts.mjs` | 最终源码 exit 0，5/5 通过；逐门枚举 `4096 + 1024 + 2048 = 7,168` 个掌握组合，覆盖多层后继、分支汇合前置动作、独立掌握但关系锁定、旧课程回调隔离、精确路由、动态读屏与 48 vp |
+| **构建通过** | `cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental` | 最终源码 exit 0，API 12 `CompileArkTS` 与 HAP 打包完成，`BUILD SUCCESSFUL in 21 s 706 ms` |
+| **静态诊断通过** | DevEco build agent `check_ets_files`，会话 `ses_08b973018ffe09UP9Ypjm6iO9d` | 显式使用 `alibaba-cn/qwen3-coder-plus` 对最终 `LearningMap.ets` 返回 `no diagnostics`；此前“诊断 + 启动”组合进程在 184.1 秒超时，不作为诊断结论 |
+| **模拟器通过** | `hdc list targets -v`、HAP 安装、`aa force-stop`、`aa start`、`aa dump` | 目标 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；最新 HAP 安装成功，旧进程强停成功，`entry/EntryAbility` 以新 PID 5344 前台启动 |
+| **模拟器通过** | `hdc uitest dumpLayout/uiInput` 与 `snapshot_display` | 1256 x 2760 竖屏：计算机网络星图从锁定“物理层与数据链路层”解析并实际进入精确前置 `OSI与TCP/IP模型` 的 `pages/Lesson`。证据位于 `screenshots/ws04-learning-map-20260718-165422/`，不纳入 Git |
+| **未验证** | 通知授权、通知点击、服务卡片桌面渲染与点击 | 当前连接模拟器未执行这些系统流程 |
+| **未验证** | DevEco Agent `start_app` 最终调用 | 会话 `ses_08b9515ddffeBfIe2lRMHp5Or1` 在工具调用前返回 HTTP 403 `AllocationQuota.FreeTierOnly`；这不否定随后 HDC 安装启动成功。当前内置 `deveco/glm-5` 登录态为 401 `Token refresh failed`，未回落到 `openai/*` |
 
-构建仍提示仓库未配置 `signingConfigs`，所以只证明未签名 debug HAP 构建通过，不证明安装或提交包可用。
+构建仍提示仓库未配置 `signingConfigs`。未签名 debug HAP 已在当前模拟器安装运行，但这不证明正式签名包或真机安装可用。
 
 ## 未验证与后续
 
@@ -96,8 +108,10 @@
 - 按课程/Topic/标签隔离的主动标签推荐当前明确未启用；schema 已具备精确数据，但产品还需补可解释证据和下一动作设计。
 - 服务卡片 2x2 的桌面排版、安全区、字体截断和点击区域未取得模拟器或真机证据。
 - Profile 与 ActivityRecords 的屏幕阅读器播报顺序、字体放大、窄屏排版、48 vp 实际触控和错误重试独立聚焦尚无设备证据。
+- LearningMap 的 1256 x 2760 竖屏视觉和 bounds 导航已通过模拟器；屏幕阅读器实际播报顺序、系统字体放大、横屏、平板布局与失败恢复聚焦仍未验证。
+- Achievements 的动态屏幕阅读器播报、字体放大换行和 48 vp 实际触控尚无设备证据。
 - 通知权限首次请求、用户拒绝后的错误态与重试、通知点击冷热启动 `onNewWant` 幂等均未取得设备证据。
-- HAP 签名、安装、横屏、平板和真机均未验证。
+- 正式签名 HAP、横屏、平板和真机仍未验证；当前只完成未签名 debug HAP 的模拟器安装运行。
 - OCR、TTS、Lottie、distributedKVStore 未修改且仍为未验证。
 
 第一批提交：`a3d2ad4 feat: 统一主动学习触达`。
