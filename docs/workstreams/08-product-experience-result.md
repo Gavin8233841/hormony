@@ -1,6 +1,6 @@
 # WS08 成熟产品级首屏与课程体验结果
 
-更新时间：2026-07-18
+更新时间：2026-07-19
 恢复基线提交：`a3f6b59`（已包含批次 A-E）
 工作分支：`codex/08-product-experience`
 
@@ -107,6 +107,12 @@
 - 表单、消息、加载、依据、任务列表和空态限制最大内容宽度 760 vp；窄屏仍使用可用全宽，宽屏避免长行和卡片无限拉伸。
 - 本批只修改 `Plan.ets` 展示状态与 Builder；未修改计划读取代次、请求参数、HTTP、校验、取消、ArkData 保存、任务串行写入、服务卡片更新、Repository 或 `pageTransition()`。
 
+### 批次 H：计划任务操作的大字号增长空间
+
+- 计划任务的“学习/练习/测验”和“完成/恢复/保存中”不再固定为 `64 x 48 vp`，改为最小 `64 x 48 vp` 并保留内容内边距；普通字号下仍维持 48 vp 触控高度，字体或文案增长时允许按钮随内容增长。
+- WS08 与 WS01 Chat/Plan 源契约同步禁止这两类任务操作回退到固定 `width(64)` / `height(48)`，同时继续约束任务写入串行锁、对象化无障碍名称和真实路由。
+- 本批只修改 `Plan.ets` 的两类任务按钮及对应源契约；未修改任务状态机、ArkData、Repository、计划内容、路由、HTTP 或 Agent 调用。
+
 ## 四、文件
 
 - `DESIGN.md`
@@ -120,6 +126,7 @@
 - `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
 - `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
 - `scripts/test-product-experience-contracts.mjs`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
 - `scripts/test-proactive-learning-service.mjs`
 - `scripts/test-proactive-delivery-contracts.mjs`
 - `scripts/test_course_resume_contract.py`
@@ -150,6 +157,15 @@ node --test scripts/test-ws01-chat-plan-source-contract.mjs
 - exit 0，13/13 通过。
 - 覆盖 Chat 真实 SSE 提交、单调请求身份、取消、结构化失败、本机会话恢复、引用/代码/表格阅读，以及 Plan 串行写入和安全区；证明本批展示层修改未改变既有 Chat/Plan 状态契约。
 
+批次 H 定向复核：
+
+```powershell
+node --test scripts/test-product-experience-contracts.mjs scripts/test-ws01-chat-plan-source-contract.mjs
+```
+
+- exit 0，27/27 通过。
+- 新增约束两类计划任务操作只固定最小 `64 x 48 vp`，不固定最终宽高；既有任务写入串行、保存锁、Chat SSE、长文本和无障碍契约继续通过。
+
 ### API 12 HAP
 
 Hvigor 帮助已确认当前版本支持 `--incremental`。最终命令：
@@ -159,10 +175,10 @@ cd apps/harmonyos
 .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon
 ```
 
-- 主线批次 F 独立审查后的源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`；WS08 分支学伴无障碍批次最终复核 `BUILD SUCCESSFUL in 6 s 863 ms`，Plan 失败恢复反例修正后最终 `BUILD SUCCESSFUL in 27 s 288 ms`。
+- 主线批次 F 独立审查后的源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`；WS08 分支学伴无障碍批次最终复核 `BUILD SUCCESSFUL in 6 s 863 ms`，Plan 失败恢复反例修正后最终 `BUILD SUCCESSFUL in 27 s 288 ms`，任务操作弹性尺寸修复后 `BUILD SUCCESSFUL in 38 s 884 ms`。
 - `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，多项任务显示 `UP-TO-DATE`。
 - 项目没有 `signingConfigs`，Hvigor 跳过签名；该结果只记为**构建通过**。
-- 最终 HAP：`apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap`；SHA-256 为 `82106E2EEFB71B2191EF30E6508A0E7C6764C1114ADEEB92B5BAC28F6881C2B7`。
+- 最终 HAP：`apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap`；SHA-256 为 `6C6AEF66A93AD4BE4467E28291083961BD1B95625C055E9324FA5EB93FBE40DF`。
 - 早期通用 `assembleHap --no-daemon` 构建虽 exit 0，但日志内部出现 `:entry:clean`；最终证据以上述显式增量构建为准。
 
 ### 设备
@@ -186,7 +202,18 @@ cd apps/harmonyos
 - 收束态中“调整目标与周期” bounds 为 `[56,878][1200,1046]`；以中心 `(628,962)` 展开后，“收起编辑”、目标输入、三枚建议、三枚周期和生成按钮高度均为 168 px，即 48 vp。以“收起编辑”实时 bounds `[933,601][1200,769]` 中心 `(1066,685)` 返回任务优先视图成功。
 - Plan 截图人工复核：收束态首项任务完整显示标题、课程/Topic、规划理由、日期、时长、类型和两枚操作，第二项露出并可继续滚动；展开态建议自动换行，输入、周期和生成控件无相互遮挡，任务操作需先用顶部“收起编辑”返回任务优先视图。
 - 失败恢复反例修正后的最终 HAP 再次重装，`17-plan-final2-ui.json` 仍确认 `pages/Plan`、调整按钮 `[56,878][1200,1046]` 和任务 List `[0,1670][1256,2662]`；`17-plan-final2.jpeg` 人工复核任务优先层级无回退。
+- 证据目录：`screenshots/ws08-chat-a11y-20260718T093940Z/`。Chat 主要证据为 `04-chat-postinstall-ui.json` 和 `04-chat-postinstall.jpeg`；Plan 主要证据为 `13-plan-final-ui.json`、`13-plan-final.jpeg`、`14-plan-editor-final-ui.json`、`14-plan-editor-final.jpeg`、`15-plan-final-collapsed-ui.json`、`17-plan-final2-ui.json` 和 `17-plan-final2.jpeg`。该目录按仓库规范不提交。
+- `uitest dumpLayout` 不导出源码中的 `accessibilityText`；尝试 `-e accessibilityText` 和 `-e focusable` 均返回 `Invalid attribute name, currently supported names are 'uniqueId'.`，因此对象化语义只记为**源码确认/源契约通过**，屏幕朗读与设备焦点行为仍为**未验证**。
+- 已按 DisplayManagerService 帮助执行 `-rotationlock,0` 与 `-motion,1`，等待后 DMS 仍显示旋转 0、`1256 x 2760`；横屏未取得有效证据，明确记为**未验证**。应用实际字体缩放效果、平板、减少动效和动态安全区同样未取得对应设备证据。
 - 保存失败锁定与加载区滚动已达**源码确认/源契约通过/构建通过**；本批不伪造 ArkData 故障、不调用模型制造慢请求，因此这两条异常流程的模拟器交互仍为**未验证**。
+
+批次 H 设备复核继续使用同一 API 12 模拟器与目标：
+
+- 系统设置 UI 树先确认“字体大小”为“特大”、滑块值 `5.000000`；应用经 `aa force-stop com.c4ai.hormony` 和 `aa start -a EntryAbility -b com.c4ai.hormony` 真实重启后，完成 Chat 与 Plan 流程。系统设置本身已确认，但应用文本几何与标准字号基线一致，因此只证明**最大字体设置流程已执行**，不把应用实际字体缩放记为模拟器通过。
+- 最终 HAP 以 `hdc install -r` 安装成功并重新启动。Plan 连续 UI 树稳定在 `pages/Plan`；“学习/完成/练习/完成”操作 bounds 分别为 `[927,1719][1151,1887]`、`[927,1908][1151,2076]`、`[927,2202][1151,2370]`、`[927,2391][1151,2559]`，均为 `224 x 168 px`，即密度 3.5 下的最小 `64 x 48 vp`。截图中任务标题、课程/Topic、理由、日期、时长、类型和两组操作无重叠。
+- Chat 最终 UI 树确认输入框 `[56,1829][990,1997]`、发送按钮 `[1032,1829][1200,1997]`，均为 168 px（48 vp）高；长回答位于独立滚动区，输入、重试、恢复提示和底栏无重叠。
+- DisplayManagerService 只读信息确认实际视口 `1256 x 2760`、`VirtualWidth: 358`、`VirtualHeight: 788`、`VirtualPixelRatio: 3.5`，因此本批取得**358 vp 窄宽模拟器证据**。同一输出仍为 `Rotation: 0`，帮助文本同时显示 `dms.hidumper.supportdebug false`；未修改调试开关或绕过限制，横屏继续记为**未验证**。
+- 最终证据位于 `screenshots/ws08-max-font-20260718T180018Z/`：Plan 为 `27-final-plan-a-ui.json`、`28-final-plan-b-ui.json`、`28-final-plan.jpeg`；Chat 为 `31-final-chat-ui.json`、`31-final-chat.jpeg`；系统字体恢复为“标准”与滑块 `2.000000` 的证据为 `41-font-restored-verification-ui.json`。该目录按仓库规范不提交。
 
 ## 六、仍未验证与下一缺口
 
