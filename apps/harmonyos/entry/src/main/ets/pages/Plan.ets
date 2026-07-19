@@ -1229,8 +1229,8 @@ struct PlanPage {
 
                 Column({ space: 6 }) {
                   Button(this.actionLabel(t))
-                    .width(64)
-                    .height(48)
+                    .constraintSize({ minWidth: 64, minHeight: 48 })
+                    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
                     .fontSize(12)
                     .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
                     .backgroundColor(this.hasTaskTarget(t) ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
@@ -1240,8 +1240,8 @@ struct PlanPage {
                     .accessibilityDescription('打开该计划任务对应的真实学习环节')
                     .onClick(() => { this.openTask(t); })
                   Button(this.updatingTaskId === t.id ? '保存中' : (t.done ? '恢复' : '完成'))
-                    .width(64)
-                    .height(48)
+                    .constraintSize({ minWidth: 64, minHeight: 48 })
+                    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
                     .fontSize(12)
                     .fontColor(t.done ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
                     .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)

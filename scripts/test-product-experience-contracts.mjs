@@ -288,6 +288,9 @@ test('Plan 任务文本和宽屏阅读层级不会依赖省略', () => {
   assert.match(build, /Flex\(\{ wrap: FlexWrap\.Wrap \}\)/);
   assert.match(build, /\.accessibilityGroup\(true\)\s*\.accessibilityText\(this\.taskAccessibilityText\(t\)\)/);
   assert.match(build, /\.accessibilityText\(this\.taskAccessibilityText\(t\)\)[\s\S]*?Column\(\{ space: 6 \}\) \{[\s\S]*?Button\(this\.actionLabel\(t\)\)/);
+  const flexibleTaskActions = build.match(/\.constraintSize\(\{ minWidth: 64, minHeight: 48 \}\)/g) ?? [];
+  assert.equal(flexibleTaskActions.length, 2, 'Plan task actions must grow beyond their 64 x 48 vp minimum');
+  assert.doesNotMatch(build, /\.width\(64\)|\.height\(48\)/);
   assert.match(taskName, /task\.title/);
   assert.match(taskName, /this\.taskReason\(task\)/);
   assert.match(taskName, /task\.estimatedMin\.toString\(\)/);

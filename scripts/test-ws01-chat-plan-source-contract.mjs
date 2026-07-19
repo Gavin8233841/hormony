@@ -621,7 +621,9 @@ test('Plan serializes task writes against the latest persisted plan and conflict
   assert.match(taskControls,
     /Button\(this\.updatingTaskId === t\.id \? '保存中' : \(t\.done \? '恢复' : '完成'\)\)/);
   assert.match(taskControls, /\.enabled\(this\.updatingTaskId\.length === 0\)/);
-  assert.equal(occurrences(taskControls, '.height(48)'), 2);
+  assert.equal(occurrences(taskControls, '.constraintSize({ minWidth: 64, minHeight: 48 })'), 2);
+  assert.equal(occurrences(taskControls, '.width(64)'), 0);
+  assert.equal(occurrences(taskControls, '.height(48)'), 0);
   assert.match(taskControls, /\.accessibilityText\(this\.actionLabel\(t\) \+ '：' \+ t\.title\)/);
   assert.match(taskControls, /\.accessibilityText\(\(t\.done \? '恢复待完成：' : '标记完成：'\) \+ t\.title\)/);
 
