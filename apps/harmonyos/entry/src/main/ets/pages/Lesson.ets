@@ -3,9 +3,21 @@ import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
-import { CuratedKnowledgeChunk, LearningActivity, LessonExperience, LessonProgress } from '../model/DataModels';
+import {
+  CuratedKnowledgeChunk,
+  ExternalLearningResource,
+  LearningActivity,
+  LessonExperience,
+  LessonProgress
+} from '../model/DataModels';
 import { LearningStudyEvent } from '../model/LearningMetadataModels';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { common } from '@kit.AbilityKit';
+import {
+  LocalAudioPlaybackState,
+  LocalAudioPlayer,
+  LocalAudioSnapshot
+} from '../common/LocalAudioPlayer';
 
 const EMPTY_CHUNK: CuratedKnowledgeChunk = {
   id: '',
@@ -40,8 +52,18 @@ struct LessonPage {
   @State conceptStepIndex: number = 0;
   @State codeRunStepIndex: number = -1;
   @State activityEvidenceMessage: string = '';
+  @State audioRequested: boolean = false;
+  @State audioResource: ExternalLearningResource | null = null;
+  @State audioState: LocalAudioPlaybackState = 'idle';
+  @State audioStatusMessage: string = '本地音频已就绪，播放不需要网络';
+  @State audioCurrentTimeMs: number = 0;
+  @State audioDurationMs: number = 0;
+  @State audioTranscriptVisible: boolean = false;
+  private localAudioPlayer: LocalAudioPlayer | null = null;
+  private audioSessionId: number = 0;
 
   aboutToAppear(): void {
+    this.releaseAudioSession(false);
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.topic = AppStorage.get<string>('selectedContentTopic') ?? '';
@@ -57,10 +79,15 @@ struct LessonPage {
     this.resetActivityInput();
     const content = LearningContentRepository.getKnowledge(this.courseId, this.topic);
     this.experience = LearningContentRepository.getLessonExperience(this.courseId, this.topic);
+    this.configureAudioExperience();
     this.conceptStepIndex = 0;
     this.chunks = content;
     this.activeChunk = content.length > 0 ? content[0] : EMPTY_CHUNK;
     this.loadProgress();
+  }
+
+  aboutToDisappear(): void {
+    this.releaseAudioSession(false);
   }
 
   private async loadProgress(): Promise<void> {
@@ -105,6 +132,10 @@ struct LessonPage {
 
   private moveTo(index: number): void {
     if (index < 0 || index >= this.chunks.length) return;
+    if (index !== this.currentIndex) {
+      this.releaseAudioSession(true);
+      this.audioTranscriptVisible = false;
+    }
     this.currentIndex = index;
     this.activeChunk = this.chunks[index];
     this.message = '';
@@ -369,6 +400,132 @@ struct LessonPage {
     return '把正文拆成判断点，逐条确认自己是否能复述。';
   }
 
+  private configureAudioExperience(): void {
+    this.audioSessionId += 1;
+    this.localAudioPlayer = null;
+    this.audioRequested = false;
+    this.audioResource = null;
+    this.audioState = 'idle';
+    this.audioStatusMessage = '本地音频已就绪，播放不需要网络';
+    this.audioCurrentTimeMs = 0;
+    this.audioDurationMs = 0;
+    this.audioTranscriptVisible = false;
+    const resourceIds = this.experience?.mediaResourceIds ?? [];
+    if (resourceIds.length === 0) return;
+    this.audioRequested = true;
+    const resources = LearningContentRepository.getResources(this.courseId);
+    const resource = resources.find((item: ExternalLearningResource): boolean => item.id === resourceIds[0]);
+    if (resource === undefined || resource.type !== 'audio' || resource.media === undefined ||
+      resource.media.rawFilePath.length === 0) {
+      this.audioState = 'failed';
+      this.audioStatusMessage = '本课引用的本地音频资源不可用';
+      return;
+    }
+    this.audioResource = resource;
+    this.audioDurationMs = resource.media.durationMs;
+  }
+
+  private createAudioPlayer(): LocalAudioPlayer | null {
+    if (this.localAudioPlayer !== null) return this.localAudioPlayer;
+    if (this.audioResource === null || this.audioResource.media === undefined) return null;
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const sessionId = this.audioSessionId;
+      const onSnapshot = (snapshot: LocalAudioSnapshot): void => {
+        if (sessionId !== this.audioSessionId) return;
+        this.audioState = snapshot.state;
+        this.audioStatusMessage = snapshot.message;
+        this.audioCurrentTimeMs = snapshot.currentTimeMs;
+        if (snapshot.durationMs > 0) this.audioDurationMs = snapshot.durationMs;
+      };
+      this.localAudioPlayer = new LocalAudioPlayer(context.resourceManager, onSnapshot);
+      return this.localAudioPlayer;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.audioState = 'failed';
+      this.audioStatusMessage = '无法创建本地音频播放器，请重试';
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'LessonPage local audio creation failed: %{public}s', message);
+      return null;
+    }
+  }
+
+  private handleAudioAction(): void {
+    if (this.audioResource === null || this.audioResource.media === undefined) {
+      this.audioState = 'failed';
+      this.audioStatusMessage = '本课引用的本地音频资源不可用';
+      return;
+    }
+    const player = this.createAudioPlayer();
+    if (player === null) return;
+    const operation = this.audioState === 'failed' ?
+      player.retry(this.audioResource.media.rawFilePath) : player.toggle(this.audioResource.media.rawFilePath);
+    operation.catch((error: Error): void => {
+      this.audioState = 'failed';
+      this.audioStatusMessage = '本地音频操作失败，请重试';
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'LessonPage local audio action failed: %{public}s', error.message);
+    });
+  }
+
+  private releaseAudioSession(resetVisual: boolean): void {
+    this.audioSessionId += 1;
+    const player = this.localAudioPlayer;
+    this.localAudioPlayer = null;
+    if (resetVisual && this.audioResource !== null && this.audioResource.media !== undefined) {
+      this.audioState = 'idle';
+      this.audioStatusMessage = '本地音频已就绪，播放不需要网络';
+      this.audioCurrentTimeMs = 0;
+      this.audioDurationMs = this.audioResource.media.durationMs;
+    }
+    if (player === null) return;
+    player.release().catch((error: Error): void => {
+      hilog.warn(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'LessonPage local audio release failed: %{public}s', error.message);
+    });
+  }
+
+  private audioActionLabel(): string {
+    if (this.audioState === 'loading') return '正在准备';
+    if (this.audioState === 'playing') return '暂停';
+    if (this.audioState === 'paused') return '继续播放';
+    if (this.audioState === 'completed') return '重新播放';
+    if (this.audioState === 'failed') return '重试本地音频';
+    return '播放本地音频';
+  }
+
+  private audioActionAccessibilityText(): string {
+    const title = this.audioResource?.title ?? '本课音频';
+    return this.audioActionLabel() + '：' + title;
+  }
+
+  private audioTimeLabel(valueMs: number): string {
+    let totalSeconds = Math.floor(Math.max(0, valueMs) / 1000);
+    if (valueMs > 0 && totalSeconds === 0) totalSeconds = 1;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes.toString() + ':' + (seconds < 10 ? '0' : '') + seconds.toString();
+  }
+
+  private audioPublisher(): string {
+    return this.audioResource?.evidence?.publisher ?? '发布者未记录';
+  }
+
+  private audioLicense(): string {
+    return this.audioResource?.evidence?.license ?? '许可未记录';
+  }
+
+  private audioProgressValue(): number {
+    return Math.min(this.audioCurrentTimeMs, Math.max(this.audioDurationMs, 1));
+  }
+
+  private audioStatusColor(): string {
+    if (this.audioState === 'failed') return Constants.COLOR_ERROR;
+    if (this.audioState === 'completed') return Constants.COLOR_SUCCESS;
+    if (this.audioState === 'playing') return Constants.COLOR_BRAND;
+    return Constants.COLOR_TEXT_SECONDARY;
+  }
+
   private activityProgressText(): string {
     if (this.experience === null || this.experience.activities.length === 0) return '无互动练习';
     return this.attemptedActivityIds.length.toString() + '/' + this.experience.activities.length.toString() + ' 已练';
@@ -553,6 +710,181 @@ struct LessonPage {
     .backgroundColor(Constants.COLOR_SURFACE_TINT)
     .borderRadius(Constants.RADIUS_SM)
     .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private AudioExperience() {
+    Column({ space: 14 }) {
+      Row({ space: 10 }) {
+        Column() {
+          SymbolGlyph($r('sys.symbol.speaker_wave_2_fill'))
+            .fontSize(21)
+            .fontColor([Constants.COLOR_BRAND])
+        }
+        .width(40)
+        .height(40)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(Constants.RADIUS_SM)
+
+        Column({ space: 2 }) {
+          Text('本地词音训练')
+            .width('100%')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text('已随应用离线提供 · 不发起网络请求')
+            .width('100%')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+
+      if (this.audioResource === null || this.audioResource.media === undefined) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+            .fontSize(17)
+            .fontColor([Constants.COLOR_ERROR])
+          Text(this.audioStatusMessage)
+            .layoutWeight(1)
+            .fontSize(13)
+            .lineHeight(21)
+            .fontColor(Constants.COLOR_ERROR)
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Constants.COLOR_SURFACE_TINT)
+        .borderRadius(Constants.RADIUS_SM)
+        .accessibilityText(this.audioStatusMessage)
+      } else {
+        Text(this.audioResource.title)
+          .width('100%')
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .lineHeight(26)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+
+        Row() {
+          Text(this.audioTimeLabel(this.audioCurrentTimeMs))
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.audioTimeLabel(this.audioDurationMs))
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+
+        Progress({
+          value: this.audioProgressValue(),
+          total: Math.max(this.audioDurationMs, 1),
+          type: ProgressType.Linear
+        })
+          .width('100%')
+          .color(this.audioState === 'completed' ? Constants.COLOR_SUCCESS : Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+
+        Button({ type: ButtonType.Normal }) {
+          Row({ space: 8 }) {
+            if (this.audioState === 'loading') {
+              LoadingProgress()
+                .width(18)
+                .height(18)
+                .color(Constants.COLOR_TEXT_ON_GRADIENT)
+            } else {
+              SymbolGlyph($r(this.audioState === 'playing' ? 'sys.symbol.pause_fill' : 'sys.symbol.play_fill'))
+                .fontSize(18)
+                .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+            }
+            Text(this.audioActionLabel())
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          }
+          .justifyContent(FlexAlign.Center)
+        }
+        .width('100%')
+        .height(48)
+        .enabled(this.audioState !== 'loading')
+        .backgroundColor(this.audioState === 'failed' ? Constants.COLOR_ERROR : Constants.COLOR_BRAND)
+        .borderRadius(Constants.RADIUS_MD)
+        .accessibilityText(this.audioActionAccessibilityText())
+        .accessibilityDescription('播放已打包在应用内的许可音频')
+        .onClick((): void => { this.handleAudioAction(); })
+
+        Text(this.audioStatusMessage)
+          .width('100%')
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .lineHeight(19)
+          .fontColor(this.audioStatusColor())
+          .accessibilityText('音频状态：' + this.audioStatusMessage)
+
+        Button(this.audioTranscriptVisible ? '隐藏静态文本' : '显示静态文本')
+          .width('100%')
+          .height(44)
+          .fontSize(13)
+          .fontColor(Constants.COLOR_BRAND)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_MD)
+          .accessibilityText((this.audioTranscriptVisible ? '隐藏' : '显示') + '文件级静态文本')
+          .accessibilityDescription('该文本没有时间码，不会随音频同步滚动')
+          .onClick((): void => { this.audioTranscriptVisible = !this.audioTranscriptVisible; })
+
+        if (this.audioTranscriptVisible) {
+          Column({ space: 8 }) {
+            Text('静态完整文本（非同步字幕）')
+              .width('100%')
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_BRAND)
+            Text(this.audioResource.media.transcript)
+              .width('100%')
+              .fontSize(18)
+              .fontWeight(FontWeight.Medium)
+              .lineHeight(28)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text('文本依据：' + this.audioResource.media.transcriptSource)
+              .width('100%')
+              .fontSize(11)
+              .lineHeight(18)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor(Constants.COLOR_SURFACE_TINT)
+          .borderRadius(Constants.RADIUS_SM)
+          .accessibilityText('静态完整文本，非同步字幕：' + this.audioResource.media.transcript)
+        }
+
+        Column({ space: 4 }) {
+          Text('来源与许可')
+            .width('100%')
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.audioResource.media.attribution)
+            .width('100%')
+            .fontSize(12)
+            .lineHeight(19)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.audioPublisher() + ' · ' + this.audioLicense() + ' · 原始音频未修改')
+            .width('100%')
+            .fontSize(11)
+            .lineHeight(18)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
   }
 
   @Builder
@@ -1148,6 +1480,9 @@ struct LessonPage {
             .borderRadius(Constants.RADIUS_LG)
 
             if (this.showIntroExperience()) {
+              if (this.audioRequested) {
+                this.AudioExperience()
+              }
               this.IntroExperience()
             }
 

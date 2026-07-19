@@ -1,6 +1,6 @@
 # WS09 多学科与多模态学习闭环结果
 
-更新时间：2026-07-18
+更新时间：2026-07-19
 
 ## 本批范围
 
@@ -121,6 +121,35 @@
 - **模拟器通过**：最终 HAP 再次 `install -r`、强停、启动均成功；递归 UI 树唯一页面为 `pages/Index`，路径 `/data/local/tmp/layout_25449094164.json`。
 - 截图：`screenshots/ws09-cet-20260718-230031/01-cet6-plan-prefilled.jpeg`、`02-cet6-result.jpeg`；已目视检查长标题、六个目标按钮、复盘与底部动作无重叠或截断，不提交版本库。
 
+## 批次三：本地许可音频 AVPlayer 闭环
+
+### 实现与契约
+
+- `LocalAudioPlayer.ets` 使用 API 12 已声明接口按 `getRawFd -> createAVPlayer -> fdSrc -> initialized -> prepare -> play` 串行初始化；播放、暂停、完成、重播、失败重试和离页释放均由真实 `media.AVPlayer` 状态驱动，不用计时器伪造播放结果。
+- 释放顺序固定为移除监听器、`AVPlayer.release()`、再以打开时的同一 rawfile 相对路径调用 `closeRawFd()`；generation 隔离迟到回调，重复释放幂等，准备阶段离页可取消，`initialized` 等待具有 5 秒超时。
+- Lesson 只从 `LearningContentRepository.getResources(courseId)` 与当前体验的 `mediaResourceIds` 交集选择 `audio`，只把已生成的 `rawFilePath` 交给播放器，不读取 `mediaUrl`，不新增网络请求。
+- 原生区块提供播放/暂停/继续/重播、进度、完成与失败重试；明确显示“已随应用离线提供 · 不发起网络请求”。文件级文本默认隐藏，展开后固定标注“静态完整文本（非同步字幕）”，不伪装成带时间码字幕。
+- 页面可见发布者、署名、许可证、许可要求和“原始音频未修改”；播放按钮和文本按钮均设置动作名称及说明。当前音频不可用时显示明确失败态，创建/prepare 等 partial init 失败也会 release/close 后进入可重试状态。
+
+### 静态、生成与构建
+
+- **静态诊断通过**：`node --test scripts/test-local-audio-player-contract.mjs`，exit 0，6/6；覆盖真实控制器顺序、播放/暂停/完成、幂等释放、create 后重试、prepare 失败清理、准备中离页取消、Lesson 本地路径边界及两个媒体文件哈希/静态文本契约。
+- **静态诊断通过**：`python -m unittest scripts.test_lesson_activity_resume_contract`，exit 0，11/11。
+- **静态诊断通过**：统一生成器输出 `6/162/180/46/36/36`，活动为 `36/36 Topic、65 个`；生成 JSON 无漂移，媒体大小与 SHA-256 门禁通过。Topic 关系校验及 Python 11 项单测通过。
+- **静态诊断通过**：Web `pnpm lint`、`pnpm typecheck`、`pnpm test` 和 `pnpm build` 均 exit 0；测试为 34 文件、444 项。
+- 构建配置源码确认：`compatibleSdkVersion` 与 `targetSdkVersion` 均为 `5.0.0(12)`；本机 SDK 声明中使用的 AVPlayer、raw FD 和事件接口均标记 `@since 12`。
+- **构建通过**：`cd apps/harmonyos; .\hvigorw.bat assembleHap --no-daemon --incremental`，exit 0；最终生成后重编译 `CompileResource`、`CompileArkTS` 与 `PackageHap`，`BUILD SUCCESSFUL in 59 s 51 ms`；仅有未配置 `signingConfigs` 的既有警告。
+
+### API 12 模拟器证据
+
+- 目标：`127.0.0.1:5555 / TCP / Connected / localhost`，1256x2760，竖屏。当前 HAP `install -r` 返回 `install bundle successfully`，强停返回 `force stop process successfully`，冷启动返回 `start ability successfully`；最终安装后的 UI 树为 `pages/Index`，路径 `/data/local/tmp/layout_106128082014.json`。
+- **模拟器通过**：冷启动后真实进入“大学英语四级（CET-4）”课程及 `pages/Lesson`；音频初态显示离线说明、0:00/0:02、播放按钮和默认隐藏的静态文本。
+- **模拟器通过**：同一 PID `6263` 的 hilog 记录 `LocalAudio state ready`、`playing`、`paused`、再次 `playing`、`completed`。暂停 UI 树 `/data/local/tmp/layout_105579575084.json` 显示“继续播放”；完成 UI 树 `/data/local/tmp/layout_105638688467.json` 显示 0:02/0:02 和“重新播放”。
+- **模拟器通过**：展开后的 UI 树 `/data/local/tmp/layout_105772119876.json` 显示“播放完成，可重播或显示静态文本”、“静态完整文本（非同步字幕）”、完整短语、文本依据、Paul2520、CC BY-SA 4.0、Wikimedia Commons、许可要求及“原始音频未修改”。
+- **模拟器通过**：离开 Lesson 后 UI 树为 `pages/CourseDetail`，路径 `/data/local/tmp/layout_105849074835.json`，PID 仍为 `6263`；hilog 同时记录 AVPlayer `JsRelease`、`Release Task Out` 与 `LocalAudio released`，证明该路径真实执行离页释放而非进程退出。
+- 设备截图：`screenshots/ws09-audio-20260719/paused.jpeg`、`completed.jpeg`、`transcript-license.jpeg`；不提交版本库。
+- HDC `uitest uiInput drag 628 1385 628 700 600` 曾返回 `No Error` 但随后 UI 树 `/data/local/tmp/layout_104795490952.json` 为系统 `pages/home/SettingsHome`。应用没有新 faultlog，恢复后改用 Emulator 窗口内可视滚动并在每个关键状态继续用 HDC UI 树和 hilog 复核，不将该手势结果写成应用失败。
+
 ## 协作契约
 
 - WS08 / Lesson 展示域：在 `Lesson.ets` 读取 `LearningContentRepository.getResources(courseId)` 与 `experience.mediaResourceIds`。普通来源以非嵌套原生区块展示标题、发布者、许可和系统浏览器动作；音频必须使用 raw FD、显示文件级静态文本和署名，提供播放/暂停、加载/失败/离线、离页释放与可访问名称。验收要求 acc101 显示 3 条来源，CET 两条 OGG/OGA 分别完成 prepare/play/pause/complete，失败不伪装成功。
@@ -131,7 +160,7 @@
 
 - **未验证**：DevEco Agent 模型不可用；Alibaba `qwen3-coder-plus` 已知 403 `AllocationQuota.FreeTierOnly`，`deveco/glm-5` 已知 401 `Token refresh failed`，按要求停止重试，禁止 `openai/*`。本批未把这些认证失败写成模型不存在。
 - **未验证**：acc101 的在线 Agent 实际解释正文与 citation；本批只验证真实入口、上下文和现有取消/安全架构未被绕过。
-- **未验证**：来源浏览器打开、断网降级和来源元数据的页面可见性；协调契约已交给 WS08 展示域。
+- **未验证**：acc101 三条官方来源的浏览器打开和页面可见性；协调契约已交给 WS08 展示域。CET 本地音频的离线说明、文本、发布者、许可和署名已在模拟器页面可见。
 - **未验证**：acc101 错题到期后的重练标题设备路径；新增错题尚未到期，当前只有源码、定向测试和 API 12 构建证据。
-- **未验证**：两个 OGG/OGA 已校验并打包，但 AVPlayer 的 prepare/play/pause/complete、音频焦点、离页释放、离线重进和可访问名称仍未验证；不得写成音频播放通过。
+- **未验证**：模拟器已验证 CET-4 OGA 的 prepare/play/pause/complete 与离页释放；CET-6 OGG 的设备播放、系统音频焦点/来电中断恢复、断网杀进程后重进、读屏实际朗读和真机音频仍未验证。
 - **未验证**：视频、同步字幕、TTS、横屏、平板和真机。CET 官方 PDF、页面和受保护题目未进入 HAP。
