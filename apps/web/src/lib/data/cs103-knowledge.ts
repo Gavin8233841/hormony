@@ -1,4 +1,4 @@
-import type { KnowledgeChunk } from "@/lib/types";
+import type { ContentProvenance, KnowledgeChunk } from "@/lib/types";
 
 /**
  * 计算机网络课程知识切片数据
@@ -6,6 +6,33 @@ import type { KnowledgeChunk } from "@/lib/types";
  * 覆盖主题：OSI/TCP-IP模型、物理与数据链路层、网络层与IP、TCP握手挥手、
  *           流量与拥塞控制、UDP、HTTP、HTTPS与TLS、DNS、路由算法与协议、网络安全
  */
+
+const CS103_SOURCE = {
+  sourceTitle: "Computer Networking: A Top-Down Approach",
+  sourceVersion: "9th Edition",
+  sourceUrl:
+    "https://www.pearson.com/en-us/subject-catalog/p/computer-networking-a-top-down-approach/P200000013385",
+  rightsStatus: "reference-only",
+  rightsName: "Pearson copyrighted textbook; bibliographic reference only",
+  rightsUrl: "https://www.pearson.com/en-us/legal-information/terms-of-use.html",
+  accessStatus: "reachable",
+  checkedAt: "2026-07-17",
+  httpStatus: 200,
+} satisfies Omit<ContentProvenance, "sourceLocator">;
+
+const CS103_LOCATORS = {
+  "OSI与TCP/IP模型": "Chapter 1: Computer Networks and the Internet",
+  "物理层与数据链路层": "Chapter 6: The Link Layer and LANs",
+  "网络层与IP协议": "Chapter 4: The Network Layer: Data Plane",
+  "TCP握手与挥手": "Chapter 3: Transport Layer",
+  "TCP流量控制与拥塞控制": "Chapter 3: Transport Layer",
+  "UDP协议": "Chapter 3: Transport Layer",
+  "HTTP协议": "Chapter 2: Application Layer",
+  "HTTPS与TLS": "Chapter 8: Security in Computer Networks",
+  "DNS系统": "Chapter 2: Application Layer",
+  "路由算法与协议": "Chapter 5: The Network Layer: Control Plane",
+  "网络安全基础": "Chapter 8: Security in Computer Networks",
+} as const satisfies Record<string, string>;
 
 export const cs103KnowledgeChunks: KnowledgeChunk[] = [
   // ========== OSI七层模型与TCP/IP四层模型 ==========
@@ -196,7 +223,7 @@ export const cs103KnowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "cs103_k26",
-    text: "UDP适用于对实时性要求高、可容忍丢包但对延迟敏感的应用场景。典型应用包括：DNS查询（小包快速请求响应）、DHCP（无连接的地址获取与分配）、SNMP（网络管理简单查询）、RIP（路由表周期性更新）、实时音视频传输如VoIP和视频会议（基于RTP协议承载）、在线游戏（低延迟状态同步）以及NTP时间同步等。这些应用要么数据量小请求响应快，要么需要组播或广播能力。当应用需要可靠传输时，由应用层自行实现，如QUIC协议在UDP之上实现了可靠传输、多路复用和前向纠错（FEC），已成为HTTP/3的传输基础。",
+    text: "UDP适用于对实时性要求高、可容忍丢包但对延迟敏感的应用场景。典型应用包括：DNS查询（小包快速请求响应）、DHCP（无连接的地址获取与分配）、SNMP（网络管理简单查询）、RIP（路由表周期性更新）、实时音视频传输如VoIP和视频会议（基于RTP协议承载）、在线游戏（低延迟状态同步）以及NTP时间同步等。这些应用要么数据量小请求响应快，要么需要组播或广播能力。当应用需要可靠传输时，可在UDP之上另行实现。QUIC提供可靠传输、拥塞控制和流式多路复用，是HTTP/3的传输基础；RFC 9000本身不定义前向纠错（FEC），若需要纠删码须由扩展或应用层另行提供。",
     source: "计算机网络：自顶向下方法",
     courseId: "cs103",
     topic: "UDP协议",
@@ -233,7 +260,7 @@ export const cs103KnowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "cs103_k31",
-    text: "HTTP首部字段分为通用首部、请求首部、响应首部和实体首部四类。通用首部如Cache-Control、Connection适用于请求和响应。请求首部如Host、User-Agent、Accept、Authorization、Cookie描述客户端信息和偏好。响应首部如Server、Set-Cookie、Location描述服务器信息。实体首部如Content-Type、Content-Length、Content-Encoding描述消息体属性。Keep-Alive机制允许同一TCP连接上发送多个HTTP请求，避免每次请求都重新建立连接的开销。HTTP/1.1默认启用持久连接，通过Connection: close首部关闭。HTTP/2进一步采用多路复用，在一个连接上并行处理多个请求，彻底解决了队头阻塞问题。",
+    text: "HTTP首部字段分为通用首部、请求首部、响应首部和实体首部四类。通用首部如Cache-Control、Connection适用于请求和响应。请求首部如Host、User-Agent、Accept、Authorization、Cookie描述客户端信息和偏好。响应首部如Server、Set-Cookie、Location描述服务器信息。实体首部如Content-Type、Content-Length、Content-Encoding描述消息体属性。Keep-Alive机制允许同一TCP连接上发送多个HTTP请求，避免每次请求都重新建立连接的开销。HTTP/1.1默认启用持久连接，通过Connection: close首部关闭。HTTP/2通过二进制分帧和多路复用消除了HTTP/1.1管线化的应用层队头阻塞，但仍共用一个TCP连接；发生丢包时，该连接上的多个流仍可能受到TCP层队头阻塞。",
     source: "计算机网络：自顶向下方法",
     courseId: "cs103",
     topic: "HTTP协议",
@@ -249,7 +276,7 @@ export const cs103KnowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "cs103_k33",
-    text: "TLS证书验证基于公钥基础设施（PKI）的信任链。终端实体证书由中间CA签发，中间CA由根CA签发，根CA证书预装在操作系统或浏览器中作为信任锚（Trust Anchor）。验证证书时，接收方从终端证书开始逐级向上验证签名，直到到达信任的根CA。验证内容包括：签名是否由上级CA的私钥正确签发、证书是否在有效期内、域名是否匹配证书中的SAN（Subject Alternative Name）或CN字段、证书是否被吊销（通过CRL或OCSP查询）。证书吊销列表CRL定期发布已吊销证书，OCSP提供实时在线查询。证书透明度（CT）日志和HPKP公钥固定进一步增强了证书生态的安全性。",
+    text: "TLS证书验证基于公钥基础设施（PKI）的信任链。终端实体证书由中间CA签发，中间CA由根CA签发，根CA证书预装在操作系统或浏览器中作为信任锚（Trust Anchor）。验证证书时，接收方从终端证书开始逐级向上验证签名，直到到达信任的根CA。验证内容包括：签名是否由上级CA的私钥正确签发、证书是否在有效期内、域名是否匹配证书中的SAN（Subject Alternative Name）字段，以及证书是否被吊销（通过CRL或OCSP查询）。证书透明度（CT）日志提升了误签证书的可审计性。HTTP公钥固定（HPKP）曾用于限制可接受公钥，但因误配置锁站和滥用风险已被主流浏览器弃用，不应作为现代部署建议。",
     source: "计算机网络：自顶向下方法",
     courseId: "cs103",
     topic: "HTTPS与TLS",
@@ -359,5 +386,12 @@ export const cs103KnowledgeChunks: KnowledgeChunk[] = [
     topic: "网络安全基础",
   },
 ];
+
+for (const chunk of cs103KnowledgeChunks) {
+  chunk.provenance = {
+    ...CS103_SOURCE,
+    sourceLocator: CS103_LOCATORS[chunk.topic as keyof typeof CS103_LOCATORS],
+  };
+}
 
 export default cs103KnowledgeChunks;

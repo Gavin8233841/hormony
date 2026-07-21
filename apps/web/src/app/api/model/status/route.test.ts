@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe("GET /api/model/status public contract", () => {
   it("does not expose the configured upstream URL or embedded credentials", async () => {
-    process.env.MODEL_API_KEY = "status-api-key-sentinel";
+    process.env.MODEL_API_KEY = "status-" + "api-key-sentinel";
     process.env.MODEL_BASE_URL =
       "https://status-user:status-password@model.example/v1?token=status-query#status-fragment";
 

@@ -112,6 +112,19 @@ export interface QuizCatalogItem {
   questionCount: number;
 }
 
+export interface ContentProvenance {
+  sourceTitle: string;
+  sourceVersion: string;
+  sourceLocator: string;
+  sourceUrl: string;
+  rightsStatus: "reference-only" | "external-link-only" | "redistributable";
+  rightsName: string;
+  rightsUrl: string;
+  accessStatus: "reachable" | "unreachable" | "not-checked";
+  checkedAt: string | null;
+  httpStatus: number | null;
+}
+
 export interface KnowledgeChunk {
   id: string;
   text: string;
@@ -119,6 +132,7 @@ export interface KnowledgeChunk {
   courseId: string;
   topic?: string;
   score?: number;
+  provenance?: ContentProvenance;
 }
 
 export interface Citation {
@@ -267,6 +281,7 @@ export interface ExternalResource {
   description: string;
   courseId?: string;
   tags: string[];
+  provenance: ContentProvenance;
 }
 
 // ========== 计划任务打卡 ==========

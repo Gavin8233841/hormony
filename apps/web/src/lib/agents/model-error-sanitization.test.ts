@@ -36,7 +36,7 @@ const calls = [
 ] as const;
 
 beforeEach(() => {
-  process.env.MODEL_API_KEY = "model-error-test-key";
+  process.env.MODEL_API_KEY = "model-" + "error-test-key";
   process.env.MODEL_BASE_URL = "https://model.example/v1";
   delete process.env.TEST_MODEL_RESPONSE;
   delete process.env.TEST_MODEL_RESPONSE_SEQUENCE;

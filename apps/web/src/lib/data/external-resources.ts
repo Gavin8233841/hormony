@@ -3,9 +3,201 @@
 // 共 36 条资源，每条 description 不少于 30 个中文字符，优先使用官方深层链接
 // 供资源推荐模块使用，按 courseId 与 type 进行分类检索
 
-import type { ExternalResource } from "@/lib/types";
+import type { ContentProvenance, ExternalResource } from "@/lib/types";
 
-export const externalResources: ExternalResource[] = [
+type ResourceSourceMetadata = Pick<
+  ContentProvenance,
+  "sourceTitle" | "sourceVersion" | "sourceLocator"
+>;
+
+const RESOURCE_SOURCE_METADATA = {
+  res_01: {
+    sourceTitle: "Introduction to Algorithms",
+    sourceVersion: "Fourth Edition (2022)",
+    sourceLocator: "MIT Press product page; ISBN 9780262046305",
+  },
+  res_02: {
+    sourceTitle: "Data Structures and Algorithm Analysis in C++",
+    sourceVersion: "Fourth Edition (2013); ISBN 978-0132847377",
+    sourceLocator: "Author's FIU page; C++ Fourth Edition book section",
+  },
+  res_03: {
+    sourceTitle: "Algorithms, 4th Edition",
+    sourceVersion: "Fourth Edition",
+    sourceLocator: "Princeton official companion site home",
+  },
+  res_04: {
+    sourceTitle: "数据结构（C语言版）",
+    sourceVersion: "1997 edition; ISBN 9787302023685",
+    sourceLocator: "清华大学出版社图书详情 00236807",
+  },
+  res_05: {
+    sourceTitle: "Operating System Concepts",
+    sourceVersion: "Tenth Edition",
+    sourceLocator: "Official companion site home and 10th-edition entry",
+  },
+  res_06: {
+    sourceTitle: "Modern Operating Systems",
+    sourceVersion: "Second Edition",
+    sourceLocator: "Author's official book page",
+  },
+  res_07: {
+    sourceTitle: "Operating Systems: Three Easy Pieces",
+    sourceVersion: "Online edition checked 2026-07-17",
+    sourceLocator: "Official online book index",
+  },
+  res_08: {
+    sourceTitle: "Computer Networking: A Top-Down Approach",
+    sourceVersion: "9th Edition",
+    sourceLocator: "Pearson subject catalog product P200000013385",
+  },
+  res_09: {
+    sourceTitle: "TCP/IP Illustrated, Volume 1: The Protocols",
+    sourceVersion: "2nd Edition (2011)",
+    sourceLocator: "InformIT product page; ISBN 9780321336316",
+  },
+  res_10: {
+    sourceTitle: "计算机网络",
+    sourceVersion: "第9版（2026）; ISBN 9787121527852",
+    sourceLocator: "电子工业出版社图书详情 70139",
+  },
+  res_11: {
+    sourceTitle: "MDN Web Docs",
+    sourceVersion: "Continuously updated web documentation; checked 2026-07-17",
+    sourceLocator: "Official documentation portal home",
+  },
+  res_12: {
+    sourceTitle: "Node.js Documentation",
+    sourceVersion: "Current documentation portal; checked 2026-07-17",
+    sourceLocator: "Official documentation index",
+  },
+  res_13: {
+    sourceTitle: "HarmonyOS Developer Documentation",
+    sourceVersion: "Current documentation portal; checked 2026-07-17",
+    sourceLocator: "Huawei Developer documentation index",
+  },
+  res_14: {
+    sourceTitle: "RFC 9110: HTTP Semantics",
+    sourceVersion: "RFC 9110 (June 2022)",
+    sourceLocator: "RFC Editor full-text HTML",
+  },
+  res_15: {
+    sourceTitle: "RFC 9293: Transmission Control Protocol (TCP)",
+    sourceVersion: "RFC 9293 (August 2022)",
+    sourceLocator: "RFC Editor full-text HTML",
+  },
+  res_16: {
+    sourceTitle: "RFC 768: User Datagram Protocol",
+    sourceVersion: "RFC 768 (August 1980)",
+    sourceLocator: "RFC Editor full-text HTML",
+  },
+  res_17: {
+    sourceTitle: "TypeScript Documentation",
+    sourceVersion: "Current documentation portal; checked 2026-07-17",
+    sourceLocator: "Official documentation index",
+  },
+  res_18: {
+    sourceTitle: "ArkTS",
+    sourceVersion: "Current developer guide; checked 2026-07-17",
+    sourceLocator: "Huawei Developer ArkTS getting-started page",
+  },
+  res_19: {
+    sourceTitle: "MIT 6.006 Introduction to Algorithms",
+    sourceVersion: "Spring 2020",
+    sourceLocator: "MIT OpenCourseWare course home",
+  },
+  res_20: {
+    sourceTitle: "CS 61B Data Structures",
+    sourceVersion: "Spring 2021",
+    sourceLocator: "UC Berkeley archived course home",
+  },
+  res_21: {
+    sourceTitle: "MIT 6.1810 Operating System Engineering",
+    sourceVersion: "Official course entry checked 2026-07-17",
+    sourceLocator: "MIT PDOS 6.828/6.1810 course index",
+  },
+  res_22: {
+    sourceTitle: "CS 144: Introduction to Computer Networking",
+    sourceVersion: "Official course entry checked 2026-07-17",
+    sourceLocator: "Stanford CS144 course home",
+  },
+  res_23: {
+    sourceTitle: "CS50: Introduction to Computer Science",
+    sourceVersion: "Official course entry checked 2026-07-17",
+    sourceLocator: "Harvard CS50 course index",
+  },
+  res_24: {
+    sourceTitle: "Algorithms, Part I",
+    sourceVersion: "Current Coursera course page; checked 2026-07-17",
+    sourceLocator: "Princeton course landing page on Coursera",
+  },
+  res_25: {
+    sourceTitle: "数据结构",
+    sourceVersion: "中国大学 MOOC 课程 cid=93001",
+    sourceLocator: "Official course detail page",
+  },
+  res_26: {
+    sourceTitle: "数据结构与算法之美",
+    sourceVersion: "极客时间专栏 100017301",
+    sourceLocator: "Official column introduction page",
+  },
+  res_27: {
+    sourceTitle: "IEEE 802.3 Ethernet Working Group",
+    sourceVersion: "Current working-group portal; checked 2026-07-17",
+    sourceLocator: "IEEE 802.3 official working-group home",
+  },
+  res_28: {
+    sourceTitle: "RFC 9113: HTTP/2",
+    sourceVersion: "RFC 9113 (June 2022)",
+    sourceLocator: "RFC Editor full-text HTML",
+  },
+  res_29: {
+    sourceTitle: "RFC 9114: HTTP/3",
+    sourceVersion: "RFC 9114 (June 2022)",
+    sourceLocator: "RFC Editor full-text HTML",
+  },
+  res_30: {
+    sourceTitle: "The Open Group Base Specifications Issue 7",
+    sourceVersion: "2018 Edition (POSIX.1-2017)",
+    sourceLocator: "The Open Group online publication 9699919799",
+  },
+  res_31: {
+    sourceTitle: "The Unicode Standard",
+    sourceVersion: "Current standard portal; checked 2026-07-17",
+    sourceLocator: "Unicode Consortium official home",
+  },
+  res_32: {
+    sourceTitle: "Visual Studio Code",
+    sourceVersion: "Current product portal; checked 2026-07-17",
+    sourceLocator: "Microsoft official product home",
+  },
+  res_33: {
+    sourceTitle: "Wireshark",
+    sourceVersion: "Current project portal; checked 2026-07-17",
+    sourceLocator: "Wireshark Foundation official home",
+  },
+  res_34: {
+    sourceTitle: "GDB: The GNU Project Debugger",
+    sourceVersion: "Current project portal; checked 2026-07-17",
+    sourceLocator: "GNU official GDB project page",
+  },
+  res_35: {
+    sourceTitle: "Git",
+    sourceVersion: "Current project portal; checked 2026-07-17",
+    sourceLocator: "Git official project home",
+  },
+  res_36: {
+    sourceTitle: "Postman",
+    sourceVersion: "Current product portal; checked 2026-07-17",
+    sourceLocator: "Postman official product home",
+  },
+} as const satisfies Record<string, ResourceSourceMetadata>;
+
+type ExternalResourceDraft = Omit<ExternalResource, "id" | "provenance"> & {
+  id: keyof typeof RESOURCE_SOURCE_METADATA;
+};
+
+const externalResourceDrafts: ExternalResourceDraft[] = [
   // ========== 一、教材（textbook） ==========
 
   // --- 数据结构相关（cs101） ---
@@ -372,3 +564,24 @@ export const externalResources: ExternalResource[] = [
     tags: ["Postman", "API测试", "HTTP", "开发工具", "接口调试"],
   },
 ];
+
+export const externalResources: ExternalResource[] = externalResourceDrafts.map(
+  (resource) => {
+    const metadata = RESOURCE_SOURCE_METADATA[resource.id];
+    const reachable = resource.id !== "res_01";
+    return {
+      ...resource,
+      provenance: {
+        ...metadata,
+        sourceUrl: resource.url,
+        rightsStatus: "external-link-only",
+        rightsName:
+          "Third-party official page; external link only, with no page or attachment redistribution",
+        rightsUrl: resource.url,
+        accessStatus: reachable ? "reachable" : "unreachable",
+        checkedAt: "2026-07-17",
+        httpStatus: reachable ? 200 : 403,
+      },
+    };
+  }
+);

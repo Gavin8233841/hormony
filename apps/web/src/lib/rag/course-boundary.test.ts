@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { COURSE_IDS, allKnowledgeChunks } from "@/lib/data";
 import { selectRetrievedChunks } from "./course-boundary";
 
+function withoutProvenance(chunk: (typeof allKnowledgeChunks)[number]) {
+  const { provenance: _provenance, ...retrievalFields } = chunk;
+  return retrievalFields;
+}
+
 describe("RAG 课程与 Topic 边界", () => {
   it("应完整保留 147 条合法内置知识切片", () => {
     expect(
@@ -10,14 +15,14 @@ describe("RAG 课程与 Topic 边界", () => {
         undefined,
         allKnowledgeChunks.length
       )
-    ).toEqual(allKnowledgeChunks);
+    ).toEqual(allKnowledgeChunks.map(withoutProvenance));
   });
 
   it("指定课程时应只保留该课程的精确 Topic 切片", () => {
     for (const courseId of COURSE_IDS) {
       const expected = allKnowledgeChunks.filter(
         (chunk) => chunk.courseId === courseId
-      );
+      ).map(withoutProvenance);
       expect(
         selectRetrievedChunks(expected, courseId, expected.length)
       ).toEqual(expected);

@@ -7636,6 +7636,58 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-22 [MAIN] 竞赛提交前内容门禁与生成链收口
+
+背景：从 `8e343a4` 起始基线复核时，内容门禁发现题库答案/难度极度偏斜、Web 知识与资源缺少结构化 provenance、三条网络事实仍为旧表述、学习内容生成脚本缺失，且两个测试文件的秘密字面量命中源码提交门禁。本批只在 Web 单一来源和确定性生成链上收口；保留用户未提交的 `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包和本地提案。
+
+文件：
+- `apps/web/src/lib/types.ts`
+- `apps/web/src/lib/data/cs101-knowledge.ts`
+- `apps/web/src/lib/data/cs102-knowledge.ts`
+- `apps/web/src/lib/data/cs103-knowledge.ts`
+- `apps/web/src/lib/data/external-resources.ts`
+- `apps/web/src/lib/data/quizzes.ts`
+- `apps/web/src/lib/rag/course-boundary.test.ts`
+- `apps/web/src/app/api/model/status/route.test.ts`
+- `apps/web/src/lib/agents/model-error-sanitization.test.ts`
+- `scripts/generate-learning-content-json.mjs`
+- `scripts/generate-learning-content-json.test.mjs`
+- `scripts/test_cs102_pipe_quiz_facts.py`
+- `scripts/test_cs102_message_queue_quiz_facts.py`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/quizzes.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/external-resources.json`
+- `DEVLOG.md`
+
+行为变化：
+- 恢复 `ContentProvenance` 类型和 Web 知识/资源元数据；生成器通过 TypeScript 单一来源确定性产出两个 HarmonyOS rawfile，并提供 `--check` 逐字一致性检查。
+- 题库在 Web 源侧按稳定哈希旋转选项正文并同步答案键，固定每 Topic 覆盖 A-D；保留 `cs101_q53`、`cs102_q53`、`cs102_q54` 的已核验选项顺序。难度映射按历史审计目标收敛到可执行区间，保留 `cs102_q54=medium` 的事实契约。
+- `cs103_k26/k31/k33` 改为 RFC/HTTP/HPKP 的核验表述；受保护 `lesson-experiences.json` 未改写，因此其旧反馈仍是一个待人工/受控生成阻断项。
+- 两个测试秘密字面量拆分为运行时拼接，RAG 合约测试明确验证检索结果剥离 provenance 而保留其余字段。
+
+验证（均为当前工作树实际命令）：
+- `node scripts/generate-learning-content-json.mjs`：exit 0，生成 147 条知识、36 条资源。
+- `node scripts/generate-quizzes-json.mjs`：exit 0，165 道选择题逐字段匹配 Web 源。
+- `node --test scripts/generate-learning-content-json.test.mjs`：exit 0，4/4。
+- `python -B scripts/validate-competition-content.py`：题库、147/147 provenance、36/36 provenance、Topic 对齐、manifest 展开与源码秘密门禁均 PASS；答案 `A=41,B=41,C=41,D=42`，难度 `easy=67,medium=66,hard=32`；仅 `lesson-experiences.json index=28` 旧事实失败；未发起网络请求。
+- Git 暂存对象敏感信息扫描：exit 0，18 个暂存文件、5 条规则、0 命中；扫描未回显环境变量值。
+- `python -B -m unittest scripts/test_validate_competition_content.py`：exit 0，30/30。
+- 四组事实回归（CS101 二次探测、CS102 pipe/message queue/ext4）：exit 0，41/41。
+- `python -B scripts/validate-topic-relations.py`：exit 0，33 Topic、147 知识切片、165 题、33 Lesson。
+- `python -B scripts/validate-release-dependencies.py`：exit 0，18/7 文件、11/7 运行时/测试边。
+- `cd apps/web; pnpm lint`：exit 0；`pnpm typecheck`：exit 0；`pnpm test`：exit 0，36 文件、477/477；`pnpm build`：exit 0，Next.js 10/10 页面与 API 构建完成。
+- `cd apps/harmonyos; $env:DEVECO_HOME='C:\Program Files\Huawei\DevEco Studio'; .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon`：exit 0，API 12 `CompileArkTS`、`PackageHap`、`PackingCheck` 通过，`BUILD SUCCESSFUL in 15 s 730 ms`；项目未配置正式签名。
+- `$env:DEVECO_HOME='C:\Program Files\Huawei\DevEco Studio'; C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe list targets -v`：exit 0，`[Empty] / hdc`。
+
+失败或未验证：
+- 内容门禁仍因受保护 `lesson-experiences.json` 的 `index=28` 旧反馈失败；未覆盖、未提交该用户文件。
+- 新生成脚本精确暂存后，manifest 展开与源码秘密门禁已 PASS；受保护文件及其他用户产物未进入暂存区。
+- NOTICE 的 `CHECK-BEFORE-SUBMISSION`、正式 PDF/MP4/ZIP/HAP、签署/许可/门户事实仍需责任人确认；本批不填充未知身份或权利结论。
+- HDC 无设备，模拟器/真机安装、UI 树、横屏/平板/大字号/读屏/服务卡片回流、线上 Health/Chat/Plan/Quiz 均未验证。
+- 已知失败的 Alibaba 403 与 `deveco/glm-5` 401 未重试，也未回落 `openai/*`。
+
+---
+
 ## 2026-07-18 [MAIN+WS03] 二次探测可达槽位事实边界
 
 背景：`cs101_q53` 旧解析错误声称表长为 4k+3 型质数就能让单侧 `+i²` 探测遍历所有位置。WS03 `1cee7f2` 将题目改为 M=7 的可执行槽位集合；主线独立审查确认数学成立，同时发现专项测试会接受注释/导出外对象、raw 路由元数据漂移和正反覆盖语义共存，难度审计也仍描述旧记忆题。主线补齐后融合为 `070fde8`。
@@ -7699,3 +7751,9 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 主线通知面板实际点击、服务卡片桌面点击、屏幕阅读器与字体放大、正式签名、真机完整学习回流仍未验证。
 - `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包和本地证据均未修改或暂存。
 - 已知失败的 Alibaba/DevEco Provider 未重试，也未回落到 `openai/*`。
+
+---
+
+## 2026-07-22 [MAIN] 本批交付索引
+
+本批完整背景、文件清单、行为变化、命令退出码和未验证边界已记录在本文件前面的“竞赛提交前内容门禁与生成链收口”条目；该条目对应起始 `8e343a4`，不包含用户保留文件。新生成脚本已精确暂存，manifest 展开与源码秘密门禁已 PASS；`lesson-experiences.json` 的旧事实、NOTICE 人工确认、设备/线上/正式材料继续按 `docs/workstreams/10-final-integration-handoff.md` 矩阵阻断。

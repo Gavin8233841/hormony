@@ -283,6 +283,10 @@ def answered_option(question):
     return matches[0]
 
 
+def without_provenance(value):
+    return {key: item for key, item in value.items() if key != "provenance"}
+
+
 class PipeDescriptorRegistry:
     def __init__(self):
         self.descriptors = {}
@@ -606,7 +610,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
 
     def test_k44_is_identical_offline_and_preserves_pipe_boundaries(self):
         self.assertEqual(EXPECTED_K44, self.web_chunk)
-        self.assertEqual(EXPECTED_K44, self.raw_chunk)
+        self.assertEqual(EXPECTED_K44, without_provenance(self.raw_chunk))
 
     def test_active_learning_spec_preserves_read_and_capacity_boundaries(self):
         for clause in EXPECTED_SPEC_CLAUSES:

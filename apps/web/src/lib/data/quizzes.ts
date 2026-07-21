@@ -15,34 +15,34 @@ type QuizSeed = Omit<Quiz, "questions"> & { questions: QuizSeedQuestion[] };
 
 const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q01": "easy",
-  "cs101_q02": "medium",
+  "cs101_q02": "hard",
   "cs101_q03": "medium",
   "cs101_q04": "hard",
   "cs101_q06": "easy",
   "cs101_q07": "medium",
   "cs101_q09": "medium",
   "cs101_q10": "medium",
-  "cs101_q11": "medium",
-  "cs101_q13": "medium",
+  "cs101_q11": "hard",
+  "cs101_q13": "hard",
   "cs101_q15": "easy",
   "cs101_q16": "medium",
-  "cs101_q17": "medium",
+  "cs101_q17": "hard",
   "cs101_q18": "medium",
   "cs101_q19": "medium",
   "cs101_q21": "medium",
   "cs101_q23": "medium",
   "cs101_q25": "medium",
   "cs101_q26": "medium",
-  "cs101_q27": "medium",
+  "cs101_q27": "hard",
   "cs101_q28": "easy",
   "cs101_q29": "easy",
-  "cs101_q30": "easy",
+  "cs101_q30": "medium",
   "cs101_q31": "easy",
   "cs101_q32": "easy",
   "cs101_q33": "hard",
   "cs101_q34": "easy",
-  "cs101_q35": "medium",
-  "cs101_q36": "medium",
+  "cs101_q35": "easy",
+  "cs101_q36": "easy",
   "cs101_q37": "easy",
   "cs101_q38": "easy",
   "cs101_q39": "easy",
@@ -52,12 +52,12 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q43": "medium",
   "cs101_q44": "easy",
   "cs101_q45": "medium",
-  "cs101_q46": "medium",
+  "cs101_q46": "hard",
   "cs101_q47": "medium",
-  "cs101_q48": "medium",
+  "cs101_q48": "easy",
   "cs101_q49": "hard",
   "cs101_q50": "easy",
-  "cs101_q51": "medium",
+  "cs101_q51": "hard",
   "cs101_q52": "medium",
   "cs101_q53": "easy",
   "cs101_q54": "medium",
@@ -65,7 +65,7 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q56": "medium",
   "cs101_q57": "medium",
   "cs101_q58": "easy",
-  "cs101_q59": "medium",
+  "cs101_q59": "hard",
   "cs101_q60": "easy",
   "cs101_q61": "medium",
   "cs101_q62": "medium",
@@ -74,48 +74,48 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs101_q65": "easy",
   "cs101_q66": "hard",
   "cs101_q67": "medium",
-  "cs102_q01": "easy",
+  "cs102_q01": "medium",
   "cs102_q02": "easy",
-  "cs102_q04": "medium",
-  "cs102_q05": "easy",
-  "cs102_q07": "easy",
+  "cs102_q04": "hard",
+  "cs102_q05": "medium",
+  "cs102_q07": "medium",
   "cs102_q08": "medium",
-  "cs102_q10": "easy",
+  "cs102_q10": "medium",
   "cs102_q11": "medium",
-  "cs102_q13": "easy",
-  "cs102_q14": "easy",
-  "cs102_q16": "easy",
+  "cs102_q13": "hard",
+  "cs102_q14": "medium",
+  "cs102_q16": "medium",
   "cs102_q17": "easy",
   "cs102_q19": "medium",
   "cs102_q20": "easy",
   "cs102_q22": "easy",
-  "cs102_q23": "easy",
-  "cs102_q24": "easy",
-  "cs102_q25": "easy",
-  "cs102_q26": "medium",
-  "cs102_q27": "medium",
+  "cs102_q23": "medium",
+  "cs102_q24": "medium",
+  "cs102_q25": "hard",
+  "cs102_q26": "hard",
+  "cs102_q27": "hard",
   "cs102_q28": "easy",
-  "cs102_q29": "medium",
+  "cs102_q29": "hard",
   "cs102_q30": "easy",
   "cs102_q31": "easy",
-  "cs102_q32": "easy",
+  "cs102_q32": "medium",
   "cs102_q33": "easy",
-  "cs102_q34": "easy",
-  "cs102_q35": "medium",
+  "cs102_q34": "medium",
+  "cs102_q35": "hard",
   "cs102_q36": "easy",
-  "cs102_q37": "easy",
+  "cs102_q37": "medium",
   "cs102_q38": "easy",
   "cs102_q39": "easy",
   "cs102_q40": "easy",
-  "cs102_q41": "easy",
+  "cs102_q41": "medium",
   "cs102_q42": "medium",
-  "cs102_q43": "medium",
+  "cs102_q43": "hard",
   "cs102_q44": "medium",
   "cs102_q45": "medium",
   "cs102_q46": "easy",
   "cs102_q47": "easy",
   "cs102_q48": "easy",
-  "cs102_q49": "medium",
+  "cs102_q49": "hard",
   "cs102_q50": "easy",
   "cs102_q51": "medium",
   "cs102_q52": "easy",
@@ -123,13 +123,13 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs102_q54": "medium",
   "cs102_q55": "easy",
   "cs102_q56": "easy",
-  "cs102_q57": "easy",
+  "cs102_q57": "medium",
   "cs103_q01": "easy",
   "cs103_q02": "easy",
   "cs103_q04": "medium",
   "cs103_q05": "easy",
   "cs103_q07": "easy",
-  "cs103_q08": "easy",
+  "cs103_q08": "medium",
   "cs103_q09": "easy",
   "cs103_q10": "easy",
   "cs103_q12": "medium",
@@ -137,47 +137,47 @@ const QUESTION_DIFFICULTY: Record<string, QuizDifficulty> = {
   "cs103_q15": "medium",
   "cs103_q16": "easy",
   "cs103_q18": "medium",
-  "cs103_q19": "medium",
+  "cs103_q19": "hard",
   "cs103_q21": "easy",
-  "cs103_q22": "easy",
-  "cs103_q24": "medium",
-  "cs103_q25": "medium",
-  "cs103_q26": "easy",
-  "cs103_q27": "medium",
-  "cs103_q28": "easy",
-  "cs103_q29": "easy",
+  "cs103_q22": "medium",
+  "cs103_q24": "hard",
+  "cs103_q25": "hard",
+  "cs103_q26": "medium",
+  "cs103_q27": "hard",
+  "cs103_q28": "medium",
+  "cs103_q29": "hard",
   "cs103_q30": "easy",
   "cs103_q31": "easy",
   "cs103_q32": "easy",
   "cs103_q33": "medium",
-  "cs103_q34": "medium",
-  "cs103_q35": "easy",
-  "cs103_q36": "easy",
+  "cs103_q34": "hard",
+  "cs103_q35": "medium",
+  "cs103_q36": "medium",
   "cs103_q37": "easy",
   "cs103_q38": "easy",
-  "cs103_q39": "easy",
-  "cs103_q40": "easy",
+  "cs103_q39": "medium",
+  "cs103_q40": "medium",
   "cs103_q41": "easy",
-  "cs103_q42": "easy",
+  "cs103_q42": "hard",
   "cs103_q43": "medium",
   "cs103_q44": "medium",
-  "cs103_q45": "medium",
-  "cs103_q46": "medium",
+  "cs103_q45": "hard",
+  "cs103_q46": "hard",
   "cs103_q47": "easy",
-  "cs103_q48": "easy",
-  "cs103_q49": "easy",
+  "cs103_q48": "medium",
+  "cs103_q49": "medium",
   "cs103_q50": "easy",
   "cs103_q51": "easy",
-  "cs103_q52": "easy",
-  "cs103_q53": "medium",
+  "cs103_q52": "medium",
+  "cs103_q53": "hard",
   "cs103_q54": "easy",
-  "cs103_q55": "easy",
+  "cs103_q55": "medium",
   "cs103_q56": "easy",
   "cs103_q57": "easy",
   "cs103_q58": "easy",
   "cs103_q59": "easy",
-  "cs103_q60": "easy",
-  "cs103_q61": "easy",
+  "cs103_q60": "hard",
+  "cs103_q61": "medium",
   "cs103_q62": "easy",
 };
 
@@ -218,17 +218,97 @@ const TOPIC_TAGS: Record<string, string> = {
 };
 
 function withQuizMetadata(quizzes: QuizSeed[]): Quiz[] {
-  return quizzes.map((quiz) => ({
-    ...quiz,
-    questions: quiz.questions.map((question) => {
-      const difficulty = question.difficulty ?? QUESTION_DIFFICULTY[question.id] ?? inferQuestionDifficulty(question);
-      return {
-        ...question,
-        difficulty,
-        tags: buildQuestionTags(quiz.topic, question, difficulty),
-      };
-    }),
-  }));
+  return quizzes.map((quiz) => {
+    const choiceTargetIndexes = buildChoiceTargetIndexes(quiz);
+    let choicePosition = 0;
+
+    return {
+      ...quiz,
+      questions: quiz.questions.map((question) => {
+        const balancedQuestion = question.type === "choice"
+          ? balanceChoiceOptions(question, choiceTargetIndexes[choicePosition++])
+          : question;
+        const difficulty = balancedQuestion.difficulty ?? QUESTION_DIFFICULTY[balancedQuestion.id] ??
+          inferQuestionDifficulty(balancedQuestion);
+        return {
+          ...balancedQuestion,
+          difficulty,
+          tags: buildQuestionTags(quiz.topic, balancedQuestion, difficulty),
+        };
+      }),
+    };
+  });
+}
+
+const CHOICE_LABELS = ["A", "B", "C", "D"] as const;
+const PROTECTED_QUESTION_OPTION_POSITIONS = new Set([
+  "cs101_q53",
+  "cs102_q53",
+  "cs102_q54",
+]);
+
+function buildChoiceTargetIndexes(quiz: QuizSeed): number[] {
+  const firstFour = CHOICE_LABELS.map((_, index) => index).sort((left, right) =>
+    stableQuestionHash(`${quiz.quizId}:${CHOICE_LABELS[left]}`) -
+    stableQuestionHash(`${quiz.quizId}:${CHOICE_LABELS[right]}`)
+  );
+  const choices = quiz.questions.filter((question) => question.type === "choice");
+  const reserved = new Set(
+    choices
+      .filter((question) => PROTECTED_QUESTION_OPTION_POSITIONS.has(question.id))
+      .map((question) => CHOICE_LABELS.indexOf(question.answer as typeof CHOICE_LABELS[number]))
+      .filter((index) => index >= 0)
+  );
+  const available = firstFour.filter((index) => !reserved.has(index));
+  let availablePosition = 0;
+  return choices.map((question, index) => {
+    if (PROTECTED_QUESTION_OPTION_POSITIONS.has(question.id)) {
+      return CHOICE_LABELS.indexOf(question.answer as typeof CHOICE_LABELS[number]);
+    }
+    if (availablePosition < available.length) {
+      return available[availablePosition++];
+    }
+    return stableQuestionHash(`${question.id}:${index}`) % CHOICE_LABELS.length;
+  });
+}
+
+export function balanceChoiceOptions(
+  question: QuizSeedQuestion,
+  targetIndex: number
+): QuizSeedQuestion {
+  if (PROTECTED_QUESTION_OPTION_POSITIONS.has(question.id)) return question;
+  if (question.type !== "choice" || question.options?.length !== CHOICE_LABELS.length) {
+    return question;
+  }
+
+  const answerIndex = CHOICE_LABELS.indexOf(question.answer as typeof CHOICE_LABELS[number]);
+  const optionBodies = question.options.map((option, index) => {
+    const prefix = `${CHOICE_LABELS[index]}.`;
+    return option.startsWith(prefix) ? option.slice(prefix.length).trimStart() : "";
+  });
+  if (answerIndex < 0 || optionBodies.some((option) => option.length === 0)) {
+    return question;
+  }
+
+  const shift = (targetIndex - answerIndex + CHOICE_LABELS.length) % CHOICE_LABELS.length;
+  const rotatedBodies = optionBodies.map((_, index) =>
+    optionBodies[(index - shift + CHOICE_LABELS.length) % CHOICE_LABELS.length]
+  );
+
+  return {
+    ...question,
+    options: rotatedBodies.map((option, index) => `${CHOICE_LABELS[index]}. ${option}`),
+    answer: CHOICE_LABELS[targetIndex],
+  };
+}
+
+function stableQuestionHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function inferQuestionDifficulty(question: QuizSeedQuestion): QuizDifficulty {

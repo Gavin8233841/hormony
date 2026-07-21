@@ -270,6 +270,10 @@ def answered_option(question):
     return matches[0]
 
 
+def without_provenance(value):
+    return {key: item for key, item in value.items() if key != "provenance"}
+
+
 def receive_system_v(messages, msgtyp):
     """Select a message using the POSIX.1-2024 msgrcv() msgtyp rules."""
 
@@ -561,7 +565,7 @@ export const cs103Quizzes: Quiz[] = withQuizMetadata([
 
     def test_k45_is_identical_offline_and_distinguishes_receive_contracts(self):
         self.assertEqual(EXPECTED_K45, self.web_chunk)
-        self.assertEqual(EXPECTED_K45, self.raw_chunk)
+        self.assertEqual(EXPECTED_K45, without_provenance(self.raw_chunk))
 
     def test_active_learning_spec_does_not_restore_generic_type_selection(self):
         self.assertIn(EXPECTED_SPEC_CASE_CLAUSE, self.active_learning_spec)
