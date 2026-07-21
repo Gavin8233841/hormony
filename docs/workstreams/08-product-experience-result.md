@@ -140,7 +140,7 @@
 node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs
 ```
 
-- 批次 G 融合后为 62/62；批次 H 合入后的最终数字以整条 WS08 主线复跑为准。
+- 整条 WS08 融入主线后复跑 exit 0，64/64 通过。
 - 覆盖首页真实状态门禁、提醒/任务写回互斥、课程直达与旧 payload 兼容、课程排序、三页 latest-wins、错误恢复、Lesson 显式提交/下一互动、提交后输入与选项冻结、Chat/Plan 动态操作语义与 48 vp、Plan 编辑层级与完整任务文本、长文本、返回语义和实际颜色对比度。
 
 ```powershell
@@ -175,7 +175,7 @@ cd apps/harmonyos
 .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon
 ```
 
-- 主线批次 F 独立审查后的源码 exit 0，`BUILD SUCCESSFUL in 39 s 148 ms`；WS08 分支学伴无障碍批次最终复核 `BUILD SUCCESSFUL in 6 s 863 ms`，Plan 失败恢复反例修正后最终 `BUILD SUCCESSFUL in 27 s 288 ms`，任务操作弹性尺寸修复后 `BUILD SUCCESSFUL in 38 s 884 ms`。
+- 主线融合整条 WS08 后实际增量构建 exit 0，`BUILD SUCCESSFUL in 37 s 153 ms`；历史分支构建只保留为来源记录。
 - `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，多项任务显示 `UP-TO-DATE`。
 - 项目没有 `signingConfigs`，Hvigor 跳过签名；该结果只记为**构建通过**。
 - 最终 HAP：`apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap`；SHA-256 为 `6C6AEF66A93AD4BE4467E28291083961BD1B95625C055E9324FA5EB93FBE40DF`。

@@ -6848,6 +6848,39 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-22 [MAIN+WS08] 融合 Chat/Plan 无障碍与大字号任务操作
+
+背景：按依赖顺序逐项融合 WS08 `04da452 -> 6acb0b9 -> 97e3984`。结果文档冲突只涉及主线既有批次与支线验证历史，主线保留既有提交态、主动行动和对比度事实，将 Chat 与 Plan 批次顺延编号，并明确历史支线设备证据不等于当前主线重新通过。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`
+- `scripts/test-product-experience-contracts.mjs`
+- `scripts/test-ws01-chat-plan-source-contract.mjs`
+- `docs/workstreams/08-product-experience-result.md`
+- `DEVLOG.md`
+
+行为变化：
+- Chat 的推荐问题、重连、输入、发送/停止、会话/回答重试、引用、错误详情和生成过程提供至少 48 vp 触控区及对象化无障碍语义；长状态和 Agent 说明不再依赖省略，内容宽度上限为 760 vp。
+- Plan 已有任务优先于大表单显示；目标与周期编辑可展开/收起，写入失败时锁定为“保存刚生成的计划”，安全或 4xx 输入错误进入调整流程。任务、检查点、错误详情和规划依据提供完整读屏文本与至少 48 vp 触控区。
+- 两个任务操作按钮从固定 `64 x 48` 改为最小 `64 x 48` 加内容 padding，使其可随字号和标签长度增长。
+- Chat/Plan 契约同步当前 Home 双条件互斥、提前空回执退出、最终释放锁，以及 WS07 的 `LegacyQuizHistorySnapshot`/`LegacyQuizTopicHistorySnapshot` 精确类型；运行时并发模拟实际验证 Repository 队列。
+
+验证：
+- `node --test scripts/test-product-experience-contracts.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs`：exit 0，64/64 通过。
+- `node --test scripts/test-ws01-chat-plan-source-contract.mjs`：exit 0，13/13 通过，含 Repository 运行时并发模拟。
+- `python -B -m unittest scripts.test_course_resume_contract scripts.test_lesson_activity_resume_contract -v`：exit 0，16/16 通过。
+- 设置 `DEVECO_HOME=C:\Program Files\Huawei\DevEco Studio` 后执行 `.\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon`：exit 0，API 12 `CompileArkTS`、`PackageHap` 与 `PackingCheck` 通过，`BUILD SUCCESSFUL in 37 s 153 ms`；未配置签名。
+- `hdc list targets -v`：exit 0，输出 `[Empty] / hdc`。
+
+失败或未验证：
+- 当前没有 HDC 设备，未在整合后的主线重新安装 HAP；最大字体设置、应用实际字体缩放、横屏、平板、屏幕朗读、硬件键盘焦点和动态安全区仍为未验证。
+- WS08 分支的竖屏 1256 x 2760、358 vp 窄宽和 Plan/Chat UI 树只保留为支线限定证据，不提升本次主线证据等级。
+- 未调用线上模型、通知或服务卡片；线上、真机和正式签名均未验证。
+- `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包和本地截图均未修改或暂存。
+
+---
+
 ## 2026-07-22 [MAIN+WS06] 补齐正式发布门禁文档闭包
 
 背景：主线已选择性融合 WS06 的正式发布门禁实现，但评分计划仍使用旧版自由文本证据状态、旧时间轴表头，且 source manifest 引用的 `docs/COMPETITION-NOTICE.md` 未进入主线，导致门禁实现、测试夹具和正式文档不自洽。本批保留主线更准确的“用户手动创建、非定时触达”事实边界，只补齐 WS06 已审计的机器可验证合同。

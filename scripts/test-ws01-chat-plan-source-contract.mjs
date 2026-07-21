@@ -67,6 +67,8 @@ function compileLocalLearningRepository() {
   LearningReviewItem as ReviewItem,
   LearningStudyEvent as StudyEvent,
   LearningTagInsight as TagInsight,
+  LegacyQuizHistorySnapshot,
+  LegacyQuizTopicHistorySnapshot,
   QuizLearningState,
   QuizWriteReceipt,
   TopicMasteryMilestone
@@ -664,16 +666,16 @@ test('Plan writes are serialized in the repository across Plan and Home entry po
   const homeToggle = section(home, '  private async toggleTask(task: PlanTask): Promise<void> {',
     '  private async publishReminder(', 'Home plan task update');
   assertOrder(homeToggle, [
-    'if (this.updatingTaskId.length > 0) return;',
+    "if (this.updatingTaskId.length > 0 || this.notificationState === 'loading') return;",
     'const desiredDone = !Boolean(task.done);',
     'receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);',
     'this.planTasks = nextTasks;',
-    '} finally {',
-    "if (this.updatingTaskId === taskId) this.updatingTaskId = '';",
     'if (receipt === null) return;',
     'await LearningFormUpdater.refreshAll();',
     'if (receipt.changed && receipt.task.done === true) {',
-    'await LocalLearningRepository.appendStudyEvent(event);'
+    'await LocalLearningRepository.appendStudyEvent(event);',
+    '} finally {',
+    "if (this.updatingTaskId === taskId) this.updatingTaskId = '';"
   ], 'Home uses the same atomic plan writer');
   assert.doesNotMatch(homeToggle, /LocalLearningRepository\.(getPlan|savePlan)\(/);
 
