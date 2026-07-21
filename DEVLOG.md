@@ -6848,6 +6848,36 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-22 [MAIN] 收束全部开发任务并冻结最终缺口基线
+
+背景：逐项核对 WS06/WS07/WS08/WS09 的原提交、主线重放提交、精确前置 API、受保护产物和当前回归结果。已进入主线的成果按当前提交重新验证；缺少完整前置或会回退主线、覆盖用户课程产物的提交不直接 cherry-pick，统一转入新的竞赛提交前最终缺口任务。
+
+文件：
+- `docs/workstreams/10-final-integration-handoff.md`
+- `DEVLOG.md`
+
+行为变化：
+- 固化 WS07 `c03930e/c04e468` 到主线 `52a9492/d3d9fb8`、WS06 四批到 `f250027/86bdb8e/9f11b1c/e527a2b/1eb115a`、WS08 三批到 `f207b82/3a00e63/fb52420/5ca76d5` 的采用关系。
+- 明确 `87ca721` 缺少 `AppliedQuizProof` 前置，`4b1b8cf` 缺少完整草稿仓储与 CAS 前置；两项均不孤立移植。
+- 明确 WS09 `0badf17 -> 04c0514 -> 2ea7ce9` 从旧主线分叉且同时触及受保护生成物、核心 Agent/仓储、二进制媒体和播放器，整枝合并会回退当前事实；初级会计、CET 和本地许可音频仍不属于当前主线能力。
+- 将当前 P0/P1/P2、证据等级和新任务接力规则写入独立收尾文档。
+
+验证：
+- `cd apps/web; pnpm lint`、`pnpm typecheck`：exit 0；`pnpm test`：exit 0，36 文件、477/477；`pnpm build`：exit 0，Next.js 生产构建通过。
+- `python -B scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识切片、165 道题、33 份 Lesson experience 的结构与路由门禁通过。
+- 七组正式发布门禁单测：exit 0，137/137；`pwsh -NoProfile -File .\scripts\harmonyos-app-smoke.ps1 -SelfTest`：exit 0，17/17。
+- `python -B scripts/validate-release-dependencies.py`：exit 0；18 个直接文件、7 个测试文件、11 条运行时边和 7 条测试边闭合。
+- 设置 `DEVECO_HOME=C:\Program Files\Huawei\DevEco Studio` 后执行 API 12 Hvigor 增量 HAP：exit 0，`BUILD SUCCESSFUL in 9 s 650 ms`；未配置签名。
+- 指定 `hdc list targets -v`：exit 0，`[Empty] / hdc`。
+
+失败或未验证：
+- `python -B scripts/validate-competition-content.py`：exit 1；答案位置/难度 64 项、147/36 条 provenance、4 条失实内容、缺失生成脚本、两处测试秘密字面量和 NOTICE 待确认项均保持真实阻断。
+- 当前无设备；整合后主线没有模拟器/真机安装、横屏/窄宽/大字号、屏幕阅读器、服务卡片/提醒回流或黄金路径证据。
+- 正式 PDF、MP4、源码 ZIP、签名 HAP、线上四接口、release evidence、两张图、团队签署和门户回执均未验证。
+- `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包和本地提案未修改或暂存。
+
+---
+
 ## 2026-07-22 [MAIN+WS08] 融合 Chat/Plan 无障碍与大字号任务操作
 
 背景：按依赖顺序逐项融合 WS08 `04da452 -> 6acb0b9 -> 97e3984`。结果文档冲突只涉及主线既有批次与支线验证历史，主线保留既有提交态、主动行动和对比度事实，将 Chat 与 Plan 批次顺延编号，并明确历史支线设备证据不等于当前主线重新通过。
