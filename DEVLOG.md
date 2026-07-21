@@ -6848,6 +6848,37 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 
 ---
 
+## 2026-07-22 [MAIN+WS06] 补齐正式发布门禁文档闭包
+
+背景：主线已选择性融合 WS06 的正式发布门禁实现，但评分计划仍使用旧版自由文本证据状态、旧时间轴表头，且 source manifest 引用的 `docs/COMPETITION-NOTICE.md` 未进入主线，导致门禁实现、测试夹具和正式文档不自洽。本批保留主线更准确的“用户手动创建、非定时触达”事实边界，只补齐 WS06 已审计的机器可验证合同。
+
+文件：
+- `docs/COMPETITION-NOTICE.md`
+- `docs/COMPETITION-SCORE-FIRST-PLAN.md`
+- `scripts/test_validate_competition_content.py`
+- `DEVLOG.md`
+
+行为变化：
+- 恢复第三方 NOTICE、原创与 AI 使用声明审计草案；所有需团队确认的权利、身份、签署和正式材料事实继续保留 `CHECK-BEFORE-SUBMISSION`，脚本不替团队填写。
+- 两张图从旧自由文本迁移为 `level/evidenceId/artifact/gap` 结构化状态；当前仍明确为“未验证”，没有伪造模拟器、真机或媒体证据。
+- 黄金演示时间轴加入 D01-D07 稳定镜头 ID，固定 04:45 收束和 D02 手动提醒口径；六个单项门禁命令写入评分计划，形成总入口可拆分审计闭包。
+- NOTICE 模式测试隔离无关内容质量检查，仅验证“日常 source audit 允许待处理标记、正式模式必须失败”的精确合同；内容数据质量仍由独立门禁负责。
+
+验证：
+- `python -B -m unittest scripts.test_validate_competition_evidence scripts.test_validate_competition_content scripts.test_validate_competition_release scripts.test_validate_official_deliverables scripts.test_validate_release_bundle scripts.test_validate_release_dependencies scripts.test_validate_release_evidence`：exit 0，137/137 通过。
+- `pwsh -NoProfile -File .\scripts\harmonyos-app-smoke.ps1 -SelfTest`：exit 0，17/17 通过。
+- `python -B scripts/validate-competition-evidence.py`：exit 0，13 条评分主张、7 个镜头、285 秒与 479 字介绍通过结构门禁。
+- `git diff --check`：exit 0。
+- `hdc list targets -v`：exit 0，输出 `[Empty] / hdc`，当前没有连接设备。
+
+失败或未验证：
+- `validate-competition-content.py` 仍因题库答案位置/难度、知识与外部资源 provenance、已知失实内容和缺失生成脚本失败；这些是真实内容链缺口，继续由 WS09 单一来源整合处理，不放宽门禁、不手改受保护产物。
+- NOTICE 尚未完成团队真实权利确认和签署，正式 `--require-notice-ready` 预检按设计失败。
+- 当前无 HDC 设备；模拟器、真机、最终 HAP、PDF、MP4、ZIP 与门户上传均未验证。
+- `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包和本地证据均未修改或暂存。
+
+---
+
 ## 2026-07-17 [MAIN+WS02] schema 12 学习事实、完成 outbox 与错题重练一致性收口
 
 背景：WS02 已证明旧版 schema 8 会覆盖历史已发布 schema 10，且近期答题、截断活动明细、Lesson 完成、首次掌握 milestone 与旧 AI 错题降级之间存在多处长期事实不一致。主线逐项复核 `2a600e0`，补齐迁移反例、完成事件 outbox、替代题身份和活动重试，并拒绝把构建成功冒充设备运行成功。

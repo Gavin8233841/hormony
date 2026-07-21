@@ -502,9 +502,20 @@ class CompetitionContentGateTests(unittest.TestCase):
     def test_formal_notice_mode_fails_while_source_audit_stays_available(self) -> None:
         entries = complete_submission_entries()
         entries[MODULE.COMPETITION_NOTICE] = MODULE.PENDING_SUBMISSION_MARKER
+        unrelated_content_checks = {
+            "check_quiz_distribution": mock.Mock(return_value=[]),
+            "check_knowledge_provenance": mock.Mock(return_value=[]),
+            "check_topic_alignment": mock.Mock(return_value=[]),
+            "check_external_resources": mock.Mock(return_value=[]),
+            "check_lesson_experiences": mock.Mock(return_value=[]),
+            "check_disallowed_fact_fragments": mock.Mock(return_value=[]),
+        }
 
         relaxed_output = io.StringIO()
-        with mock.patch.object(
+        with mock.patch.multiple(
+            MODULE,
+            **unrelated_content_checks,
+        ), mock.patch.object(
             MODULE,
             "submission_entries",
             return_value=(entries, [], "固定源码 manifest"),
@@ -512,7 +523,10 @@ class CompetitionContentGateTests(unittest.TestCase):
             relaxed_exit = MODULE.main([])
 
         strict_output = io.StringIO()
-        with mock.patch.object(
+        with mock.patch.multiple(
+            MODULE,
+            **unrelated_content_checks,
+        ), mock.patch.object(
             MODULE,
             "submission_entries",
             return_value=(entries, [], "固定源码 manifest"),
