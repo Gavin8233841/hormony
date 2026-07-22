@@ -306,7 +306,7 @@ export struct ProfileContent {
                   .shadow({ radius: 7, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 2 })
                 SymbolGlyph($r('sys.symbol.book_open_fill'))
                   .fontSize(20)
-                  .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+                  .fontColor([Constants.COLOR_BRAND_TEXT])
               }
               .width(48)
               .height(48)
@@ -315,7 +315,7 @@ export struct ProfileContent {
                 Text('学习星图')
                   .fontSize(19)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  .fontColor(Constants.COLOR_MAP_CORE)
                 Text('查看知识之间的联系与掌握状态')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
@@ -326,7 +326,7 @@ export struct ProfileContent {
 
               SymbolGlyph($r('sys.symbol.chevron_right'))
                 .fontSize(20)
-                .fontColor([Constants.COLOR_TEXT_PRIMARY])
+                .fontColor([Constants.COLOR_MAP_CORE])
             }
             .width('100%')
             .constraintSize({ minHeight: 96 })

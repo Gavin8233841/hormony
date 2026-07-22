@@ -206,24 +206,25 @@ function Invoke-ReturnToPage(
     [scriptblock]$backAction,
     [int]$maxBacks = 8,
     [int]$pollsPerBack = 8,
-    [int]$pollDelayMilliseconds = 500
+    [int]$pollDelayMilliseconds = 500,
+    [int]$initialPolls = 20
 ) {
     if ([string]::IsNullOrWhiteSpace($expectedPagePath)) {
         throw 'Expected page path must be non-empty'
     }
-    if ($maxBacks -lt 0 -or $pollsPerBack -lt 1 -or $pollDelayMilliseconds -lt 0) {
+    if ($maxBacks -lt 0 -or $pollsPerBack -lt 1 -or $pollDelayMilliseconds -lt 0 -or $initialPolls -lt 1) {
         throw 'Return-to-page limits are invalid'
     }
 
     $backs = 0
     $lastPath = $null
-    for ($poll = 0; $poll -lt $pollsPerBack; $poll++) {
+    for ($poll = 0; $poll -lt $initialPolls; $poll++) {
         $lastPath = & $getPagePathAction
         if ($lastPath -ceq $expectedPagePath) {
             return [PSCustomObject]@{ PagePath = $lastPath; BackCount = $backs }
         }
         if (-not [string]::IsNullOrWhiteSpace([string]$lastPath)) { break }
-        if ($poll -lt ($pollsPerBack - 1) -and $pollDelayMilliseconds -gt 0) {
+        if ($poll -lt ($initialPolls - 1) -and $pollDelayMilliseconds -gt 0) {
             Start-Sleep -Milliseconds $pollDelayMilliseconds
         }
     }
@@ -955,6 +956,25 @@ function Invoke-SelfTest() {
             }
         },
         @{
+            Name = 'root recovery allows a bounded cold-start render delay'
+            Run = {
+                $paths = [System.Collections.Queue]::new()
+                foreach ($path in @('', '', '', '', '', '', '', '', '', 'pages/Index')) {
+                    $paths.Enqueue($path)
+                }
+                $getPath = {
+                    if ($paths.Count -eq 0) { throw 'Synthetic page path queue is empty' }
+                    return $paths.Dequeue()
+                }.GetNewClosure()
+                $script:syntheticBackCount = 0
+                $result = Invoke-ReturnToPage 'pages/Index' $getPath { $script:syntheticBackCount++ } 4 3 0 10
+                Assert-SelfTest ($result.PagePath -ceq 'pages/Index') 'Cold-start root page was not recovered'
+                Assert-SelfTest ($result.BackCount -eq 0) 'Cold-start wait sent an unnecessary Back event'
+                Assert-SelfTest ($script:syntheticBackCount -eq 0) 'Cold-start wait invoked the Back action'
+                $script:syntheticBackCount = $null
+            }
+        },
+        @{
             Name = 'course CTA entry and continue states'
             Run = {
                 foreach ($ctaText in $COURSE_CTA_TEXTS) {
@@ -1449,7 +1469,7 @@ try {
     $rootRecovery = Invoke-ReturnToPage 'pages/Index' `
         { Get-PagePath (Get-UiTree) } `
         { Invoke-HdcShell -arguments @('uitest', 'uiInput', 'keyEvent', 'Back') } `
-        8 8 500
+        8 8 500 20
 } catch {
     Write-Step "Page: Root recovery" "FAIL" $_.Exception.Message
     exit 1
@@ -1561,6 +1581,15 @@ Write-Output "`n[INFO] Returning to Home tab..."
 if (-not (Click-Element "今日" "Home tab")) { exit 1 }
 Start-Sleep -Seconds 1
 Take-Screenshot "15-home-return"
+
+# 19. 验证首页到学习计划的核心次级路径
+Write-Output "`n[INFO] Navigating to learning plan..."
+if (-not (Click-Element "查看全部" "Learning plan entry")) { exit 1 }
+if (-not (Verify-Page "pages/Plan" "Learning plan")) { exit 1 }
+if (-not (Verify-TextExists "学习计划" "Learning plan title")) { exit 1 }
+Take-Screenshot "16-plan"
+Invoke-HdcShell -arguments @("uitest", "uiInput", "keyEvent", "Back") | Out-Null
+if (-not (Verify-Page "pages/Index" "Root after learning plan")) { exit 1 }
 
 # ==================== 汇总 ====================
 Write-Output ""

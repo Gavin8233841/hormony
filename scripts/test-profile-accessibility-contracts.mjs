@@ -99,6 +99,20 @@ test('画像操作具备明确名称与可随字体增长的触控区', () => {
     'profile content must not depend on fixed x/y positions on narrow screens');
   assert.equal(source.includes(".accessibilityText('打开学习星图')"), true,
     'the responsive learning map entry needs one action name');
+
+  const mapEntry = sourceSection(source,
+    '                  .backgroundColor(Constants.COLOR_MAP_CORE)',
+    '\n            Column({ space: 10 }) {');
+  assert.equal(mapEntry.includes('.fontColor([Constants.COLOR_BRAND_TEXT])'), true,
+    'the map entry icon must contrast with its light icon surface');
+  assert.equal(mapEntry.includes("Text('学习星图')"), true,
+    'the map entry contract must cover its visible title');
+  assert.equal(mapEntry.includes('.fontColor(Constants.COLOR_MAP_CORE)'), true,
+    'the map entry title must contrast with the dark map surface');
+  assert.equal(mapEntry.includes('.fontColor([Constants.COLOR_MAP_CORE])'), true,
+    'the map entry chevron must remain visible on the dark map surface');
+  assert.equal(mapEntry.includes('.fontColor(Constants.COLOR_TEXT_PRIMARY)'), false,
+    'dark primary text is invisible on the dark map surface');
 });
 
 test('统计播报明确真实证据来源且颜色引用均已定义', () => {

@@ -7757,3 +7757,48 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 ## 2026-07-22 [MAIN] 本批交付索引
 
 本批完整背景、文件清单、行为变化、命令退出码和未验证边界已记录在本文件前面的“竞赛提交前内容门禁与生成链收口”条目；该条目对应起始 `8e343a4`，不包含用户保留文件。新生成脚本已精确暂存，manifest 展开与源码秘密门禁已 PASS；`lesson-experiences.json` 的旧事实、NOTICE 人工确认、设备/线上/正式材料继续按 `docs/workstreams/10-final-integration-handoff.md` 矩阵阻断。
+
+---
+
+## 2026-07-22 [MAIN] 竞赛端侧视觉与模拟器黄金路径收口
+
+背景：从已推送的 `54140b2` 开始，针对前台 API 12 模拟器复核核心页面和交互门禁。截图抽检发现 Profile 的深色“学习星图”入口仍使用深色标题/箭头和白色图标，LearningMap 的课程选择又引入近黑选中态；冷安装首轮冒烟还暴露根页面 `pagePath` 在旧短等待窗口内持续为空。该批只修正可独立验证的视觉与设备门禁，不修改受保护课程产物、仓储、schema、模型或正式材料身份字段。
+
+文件：
+- `apps/harmonyos/entry/src/main/ets/pages/Profile.ets`
+- `apps/harmonyos/entry/src/main/ets/pages/LearningMap.ets`
+- `scripts/harmonyos-app-smoke.ps1`
+- `scripts/test-profile-accessibility-contracts.mjs`
+- `scripts/test-learning-map-contracts.mjs`
+- `docs/workstreams/10-final-integration-handoff.md`
+- `DEVLOG.md`
+
+行为变化：
+- Profile 的星图标题和箭头统一使用 `COLOR_MAP_CORE`，图标使用 `COLOR_BRAND_TEXT`；相关对比度由 1.00:1/1.10:1 修正为 16.17:1 和 5.82:1。
+- LearningMap 课程选择以 `COLOR_BRAND` 表示当前状态，白字对比度为 4.58:1，继续保持 48 vp 最小触控高度，避免与主界面的品牌状态语义漂移。
+- 冒烟脚本把首次根页面空路径等待单独扩展为最多 20 次有界轮询，保持后续每次 Back 的 8 次轮询边界；新增第 18 项离线自测固定冷启动延迟反例。
+- 模拟器黄金路径新增首页“查看全部”到 `pages/Plan`、标题检查、截图和返回根页，设备门禁由 59 项扩展为 64 项。
+- 最终缺口矩阵补齐事实来源、证据等级、完成定义、依赖/风险和最短验证路径，明确竖屏模拟器已关闭项与真机/线上/正式材料未验证项。
+
+验证（均为当前工作树实际命令）：
+- `cd apps/web; pnpm lint; pnpm typecheck; pnpm test; pnpm build`：exit 0；36 文件、477/477，Next.js 10/10 页面与 API 生产构建通过。
+- 七个 ArkUI/UI/主动学习契约脚本合并执行：exit 0，96/96；其中 Profile 与 LearningMap 新对比度、品牌选中态和 48 vp 反例通过。
+- `pwsh -NoProfile -File .\scripts\harmonyos-app-smoke.ps1 -SelfTest`：exit 0，18/18。
+- 七组正式发布门禁单测：exit 0，137/137。
+- `python -B scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识切片、165 道题、33 Lesson 的结构和路由门禁通过。
+- `python -B scripts/validate-release-dependencies.py`：exit 0；18 个直接文件、7 个测试文件、11 条运行时边、7 条测试边与 7 条计划命令闭合。
+- `cd apps/harmonyos; $env:DEVECO_HOME='C:\Program Files\Huawei\DevEco Studio'; .\hvigorw.bat assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon`：exit 0，API 12 HAP `BUILD SUCCESSFUL in 13 s 404 ms`；项目未配置正式签名。
+- 未签名 HAP 为 `entry-default-unsigned.hap`，3,001,877 bytes，SHA-256 `40BF65F2C270C666701C6063F824DEE0F937ACC7236F6E49D3B8C6F4226CEC7C`。
+- 设置同一 `DEVECO_HOME` 后指定 `hdc.exe list targets -v`：exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+- `harmonyos-app-smoke.ps1` 最终设备执行：exit 0，64/64；设备为 `emulator`、`OpenHarmony-6.1.1.125`，rotation 0，1256×2760、358×788 vp、density 3.5；`dms.hidumper.supportdebug=false`，未绕过系统旋转限制。
+- 最终截图目录为 `screenshots/trae-smoke-20260722-124937/`；人工抽检 Profile、三门 LearningMap 与 Plan 未见本批目标范围内的文字遮挡或状态对比度缺陷。截图按仓库规则未暂存。
+- `impeccable` 检测器对两个 ArkUI 文件返回空问题集合；`git diff --check` exit 0。
+- 暂存保护检查与同源 5 条秘密规则扫描：exit 0；精确暂存 7 个文件，0 个受保护路径、0 条敏感信息命中；`git diff --cached --check` exit 0。
+
+失败或未验证：
+- 冷安装首轮设备冒烟在旧实现下失败：根页面 `pagePath` 在短初始窗口内持续为空；延长为独立有界等待并加入反例后，最终完整流程 64/64 通过。该失败没有通过固定坐标或跳过页面检查掩盖。
+- `python -B scripts/validate-competition-content.py`：exit 1；答案 `A=41,B=41,C=41,D=42`、难度 `easy=67,medium=66,hard=32`、147/147 知识 provenance、36/36 资源 provenance、manifest 和秘密子门禁均通过，仅受保护 `lesson-experiences.json index=28` 仍含“实现了可靠传输和前向纠错”。该文件未修改、未暂存。
+- `docs/COMPETITION-NOTICE.md` 仍含 `CHECK-BEFORE-SUBMISSION`；正式 PDF、MP4、源码 ZIP、签名 HAP、证据索引、门户回执、团队身份与权利结论仍需责任人确认。
+- 横屏、平板、系统字号放大、屏幕阅读器、真机、通知面板/服务卡片实际点击回流和线上 Health/Chat/Plan/Quiz 未验证；竖屏模拟器证据不外推到这些层级。
+- 已知失败的 Alibaba 403 与 `deveco/glm-5` 401 未重试，也未回落 `openai/*`。
+- `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包、本地提案和截图证据均未暂存。

@@ -521,7 +521,7 @@ struct LearningMapPage {
           .constraintSize({ minHeight: 48 })
           .fontSize(12)
           .fontColor(this.selectedCourseId === course.id ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
-          .backgroundColor(this.selectedCourseId === course.id ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BG_TAG)
+          .backgroundColor(this.selectedCourseId === course.id ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => { this.selectCourse(course); })
           .accessibilityText(course.title + (this.selectedCourseId === course.id ? '，已选择' : '，未选择'))

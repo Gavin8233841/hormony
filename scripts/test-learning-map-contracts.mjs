@@ -100,6 +100,22 @@ const practiceSource = readSource(practicePath);
 const quizReducerSource = readSource(quizReducerPath);
 const relations = JSON.parse(readSource(relationsPath));
 
+test('课程选择控件使用品牌选中态与稳定触控区', () => {
+  const selector = sourceSection(learningMapSource,
+    '  @Builder\n  CourseSelector() {',
+    '\n  @Builder\n  MapCanvas() {');
+  assert.equal(selector.includes('.constraintSize({ minHeight: 48 })'), true,
+    'every course selector needs a 48vp minimum touch target');
+  assert.equal(selector.includes(
+    '.fontColor(this.selectedCourseId === course.id ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)'),
+  true, 'course selectors need explicit selected and inactive text colors');
+  assert.equal(selector.includes(
+    '.backgroundColor(this.selectedCourseId === course.id ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)'),
+  true, 'the current course must use the shared brand selected state');
+  assert.equal(selector.includes('Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BG_TAG'), false,
+    'the selected course must not introduce an unrelated near-black state');
+});
+
 test('课程切换只提交最新请求的完整本机快照', () => {
   const selectCourse = sourceSection(learningMapSource,
     '  private async selectCourse(course: Course): Promise<void> {',
