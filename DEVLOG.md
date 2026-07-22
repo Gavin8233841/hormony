@@ -7802,3 +7802,43 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 横屏、平板、系统字号放大、屏幕阅读器、真机、通知面板/服务卡片实际点击回流和线上 Health/Chat/Plan/Quiz 未验证；竖屏模拟器证据不外推到这些层级。
 - 已知失败的 Alibaba 403 与 `deveco/glm-5` 401 未重试，也未回落 `openai/*`。
 - `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包、本地提案和截图证据均未暂存。
+
+---
+
+## 2026-07-22 [MAIN] 关闭 Lesson 事实门禁并同步受控生成产物
+
+背景：`20b5748` 后内容门禁只剩 `cs103/UDP协议` 状态推演仍声称 QUIC 实现前向纠错。该表述来自 `docs/ACTIVE-LEARNING-SPEC-CS103.md`，并由 `generate-learning-activities.mjs` 写入此前受保护的端侧 JSON。用户在本批明确授权修改和提交规格与生成产物；没有从 WS09 旧分支覆盖文件。
+
+文件：
+- `docs/ACTIVE-LEARNING-SPEC-CS103.md`
+- `apps/harmonyos/entry/src/main/resources/rawfile/learning/lesson-experiences.json`
+- `docs/workstreams/10-final-integration-handoff.md`
+- `DEVLOG.md`
+
+行为变化：
+- UDP 反馈改为精确边界：QUIC 在 UDP 之上提供可靠传输、拥塞控制和流式多路复用；RFC 9000 本身不定义 FEC，纠删码需由扩展或应用层另行提供。来源补入 RFC 9000 与实际承载该边界的 `cs103_k26`。
+- 从当前三份 ACTIVE 规格运行现有生成器，33 Topic、59 活动完整生成；同时把主线已核验但此前未落入端侧产物的 IPC 管道描述符、读取/EOF/容量边界，以及 System V/POSIX 消息队列差异同步到 JSON。
+- 第二次生成前后 `lesson-experiences.json` SHA-256 均为 `8BBBFB1FB31254A233BD9201E59D0DD29EA853199020BA6152D9E4921BDD9393`，证明当前生成链字节稳定。
+- 缺口矩阵将内容 P0 标为关闭；正式 NOTICE 模式精确收敛为 3 个待责任人确认的文档标记。
+
+验证：
+- `node scripts/generate-learning-activities.mjs`：两次均 exit 0；33/33 Topic、59 个活动，类型分布 `code_fill=13, step_order=16, state_trace=17, output_predict=13`，第二次哈希不变。
+- `python -B scripts/validate-competition-content.py`：exit 0；165 题、147 知识、36 资源、33 Lesson/59 活动、manifest/秘密和已知失实内容子门禁全部通过。
+- CS102 pipe、message queue、ext4 三组事实测试：exit 0，32/32。
+- `python -B scripts/validate-topic-relations.py`：exit 0；33 Topic、147 知识、165 题、33 Lesson 全部通过。
+- `python -B scripts/validate-release-dependencies.py`：exit 0；18/7 文件、11/7 运行时/测试边与 7 条计划命令闭合。
+- 七组正式发布门禁单测：exit 0，137/137。
+- `cd apps/web; pnpm lint; pnpm typecheck; pnpm test; pnpm build`：exit 0；36 文件、477/477，Next.js 10/10 页面与 API 生产构建通过。
+- API 12 首次显式增量 HAP：exit 0，`BUILD SUCCESSFUL in 28 s 611 ms`；最终设备脚本内部增量构建 exit 0，`BUILD SUCCESSFUL in 12 s 204 ms`；项目未配置正式签名。
+- 最终未签名 HAP 为 3,002,130 bytes，SHA-256 `7C23269406DE262F06782E614427BF75900936E3DFC13EDC2E770201AF5DD820`。
+- 指定 `hdc.exe list targets -v`：exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc`。
+- `harmonyos-app-smoke.ps1 -DeviceTarget 127.0.0.1:5555`：最终 exit 0，64/64；证据目录 `screenshots/trae-smoke-20260722-180319/` 未暂存。
+- `git diff --check`：exit 0。
+- 暂存路径与同源 5 条秘密规则扫描：exit 0；精确暂存 4 个授权文件，0 条敏感信息命中；`git diff --cached --check` exit 0。
+
+失败或未验证：
+- 第一轮设备命令被执行器 124 秒外层上限终止，未取得脚本汇总，不计产品通过或失败；以随后 146.7 秒完整运行的 64/64 为设备证据。
+- `python -B scripts/validate-competition-content.py --require-notice-ready`：exit 1；内容子门禁全通过，只因 `docs/COMPETITION-NOTICE.md`、`docs/COMPETITION-SCORE-FIRST-PLAN.md`、`docs/workstreams/06-competition-release-result.md` 的 3 个 `CHECK-BEFORE-SUBMISSION` 标记失败。
+- 正式 PDF、MP4、源码 ZIP、签名 HAP、证据索引、团队身份/权利确认和门户回执仍未验证；这些事实不能由代码生成或自行填写。
+- 外部 URL 当前实时可达性、横屏、平板、系统字号放大、读屏、真机、通知/服务卡片实际点击和线上 Health/Chat/Plan/Quiz 仍未验证。
+- `.trae/progress.json`、`.tmp/`、`assets/`、展示站、压缩包、本地提案、HAP 和截图均未暂存。

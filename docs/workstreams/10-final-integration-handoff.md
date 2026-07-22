@@ -5,9 +5,9 @@
 ## 1. 冻结基线
 
 - 主线分支：`codex/harmony-integration-20260717`。
-- 本批起始 `HEAD`：`54140b2 fix: 收口竞赛内容生成门禁`；`8e343a4` 是本轮最终缺口评估的原始冻结基线。
-- 远端 `origin/codex/harmony-integration-20260717` 已与 `54140b2` 对齐；本批提交后必须再次核对推送状态。
-- 工作树保留 `.trae/progress.json`、`lesson-experiences.json`、`.tmp/`、`assets/`、展示站、压缩包和本地提案；这些内容不是本次提交的一部分。
+- 本批起始 `HEAD`：`20b5748 fix: 完善竞赛端侧视觉与设备门禁`；`8e343a4` 是本轮最终缺口评估的原始冻结基线。
+- 远端 `origin/codex/harmony-integration-20260717` 已与 `20b5748` 对齐；本批提交后必须再次核对推送状态。
+- 工作树保留 `.trae/progress.json`、`.tmp/`、`assets/`、展示站、压缩包和本地提案；这些内容不是本次提交的一部分。
 - 2026-07-22 最终指定 HDC 检查为 `127.0.0.1:5555 / TCP / Connected / localhost / hdc`；该目标经设备信息确认是 `OpenHarmony-6.1.1.125` 模拟器，不能提升为真机证据。
 
 ## 2. 已完成的主线整合
@@ -35,7 +35,7 @@
 ### WS09 多学科与媒体链
 
 - `0badf17 -> 04c0514 -> 2ea7ce9` 同时修改 Web 内容源、生成脚本、Agent、数据库、页面、HarmonyOS 生成物、二进制媒体和 AVPlayer 页面。该分支从旧 `c94d72b` 分叉，整枝合并会回退当前发布门禁、模型安全、测验状态和产品体验修正。
-- `lesson-experiences.json` 是用户保留的未提交产物，不能被旧分支覆盖；课程、题库、知识、关系和媒体必须由核验后的 Web 单一来源及生成链统一生成。
+- `lesson-experiences.json` 原为用户保留的未提交产物，不能被旧分支覆盖；本批仅在用户明确授权后从当前受控规格运行现有生成器，补入已核验的 IPC 与 QUIC/FEC 修正。课程、题库、知识、关系和媒体仍必须由核验后的单一来源及生成链统一生成。
 - 主线当前不存在 `accounting.ts`、`cet.ts`、`course-catalog.ts`、`generate-learning-content.mjs`、`LocalAudioPlayer.ets` 和两个媒体文件，因此初级会计/CET/本地音频不属于当前主线交付能力。
 - WS09 分支的历史模拟器流程和 OGG 许可研究只保留为支线来源记录。当前主线没有 AVPlayer、字幕/转写、离线/失败态和 API 12 设备播放闭环，不提升证据等级。
 
@@ -47,15 +47,15 @@
 | `pnpm test` | exit 0，36 文件、477/477 | 静态诊断通过 |
 | `pnpm build` | exit 0，Next.js 10/10 页面与 API 构建完成 | 构建通过 |
 | `node --test scripts/generate-learning-content-json.test.mjs` | exit 0，4/4；147/147 知识、36/36 资源与 rawfile 一致 | 静态诊断通过 |
-| `python -B scripts/validate-competition-content.py` | 题库/知识/资源门禁通过；仅受保护 Lesson `index=28` 旧事实失败 | 未完全通过，失败项可定位 |
+| `python -B scripts/validate-competition-content.py` | exit 0；题库、知识、资源、33 Lesson/59 活动、HTTP/2、QUIC FEC 与 HPKP 事实回归全部通过 | 静态诊断通过 |
 | `python -B scripts/validate-topic-relations.py` | exit 0，33 Topic、147 知识、165 题、33 Lesson | 静态诊断通过 |
 | `python -B scripts/validate-release-dependencies.py` | exit 0，18/7 文件、11/7 运行时/测试边 | 静态诊断通过 |
 | 四组事实回归 | exit 0，41/41 | 静态诊断通过 |
 | 本批 ArkUI/UI/主动触达契约 | exit 0，96/96 | 静态诊断通过 |
 | `harmonyos-app-smoke.ps1 -SelfTest` | exit 0，18/18 | 静态诊断通过 |
-| API 12 Hvigor 增量 HAP | exit 0，`BUILD SUCCESSFUL in 13 s 404 ms`；未配置签名；3,001,877 bytes；SHA-256 `40BF65F2C270C666701C6063F824DEE0F937ACC7236F6E49D3B8C6F4226CEC7C` | 构建通过 |
+| API 12 Hvigor 增量 HAP | exit 0，最终设备脚本内部 `BUILD SUCCESSFUL in 12 s 204 ms`；未配置签名；3,002,130 bytes；SHA-256 `7C23269406DE262F06782E614427BF75900936E3DFC13EDC2E770201AF5DD820` | 构建通过 |
 | 指定 `hdc list targets -v` | exit 0，`127.0.0.1:5555 / TCP / Connected / localhost / hdc` | 模拟器已连接 |
-| 竖屏模拟器黄金路径 | exit 0，64/64；`emulator`、`OpenHarmony-6.1.1.125`、1256×2760、358×788 vp、density 3.5、rotation 0；证据目录 `screenshots/trae-smoke-20260722-124937/` 未纳入 Git | 模拟器通过 |
+| 竖屏模拟器黄金路径 | exit 0，64/64；`emulator`、`OpenHarmony-6.1.1.125`、1256×2760、358×788 vp、density 3.5、rotation 0；证据目录 `screenshots/trae-smoke-20260722-180319/` 未纳入 Git | 模拟器通过 |
 
 ## 5. 当前真实阻断项
 
@@ -63,9 +63,9 @@
 
 | 缺口 | 事实来源 / 当前证据等级 | 完成定义 | 依赖/风险 | 最短验证路径 |
 | --- | --- | --- | --- | --- |
-| 内容门禁 | `validate-competition-content.py` 当前输出：**部分关闭，静态诊断未完全通过**；题库 `A=41,B=41,C=41,D=42`、难度 `easy=67,medium=66,hard=32`，147/147 知识与 36/36 资源 provenance、三个网络事实均通过；仅受保护 Lesson `index=28` 仍失败 | 受控更新 Lesson 单一来源并重新生成，内容门禁 exit 0 | `lesson-experiences.json` 是用户保留文件，未经确认不得改写或提交；直接改产物会破坏单一来源 | 责任人确认来源后运行 `generate-learning-activities.mjs`，再跑内容、Topic 与事实回归 |
+| 内容门禁（已关闭） | 受控规格、`generate-learning-activities.mjs` 幂等 SHA-256、内容门禁与 32 项 IPC/网络事实测试：**静态诊断通过**；题库 `A=41,B=41,C=41,D=42`、难度 `easy=67,medium=66,hard=32`，147/147 知识、36/36 资源和 33/33 Lesson 均通过 | 已达成：IPC 规格修正与 QUIC/FEC 边界生成到端侧产物，内容门禁 exit 0 | 后续必须先改受控规格再生成，不得手工分叉端侧 JSON | 修改内容后运行生成器两次比对哈希，再跑内容、Topic 与事实回归 |
 | 生成闭包与秘密门禁（已关闭） | 生成器 4/4、内容门禁 manifest/secret 子门禁及前批 staged 扫描：**静态诊断通过** | 已达成：必要源码被跟踪，禁止项与可识别秘密均未命中 | 后续仍只能精确暂存；用户保留产物不得进入提交 | 每批复跑内容门禁并扫描 staged blob |
-| NOTICE 与正式材料 | `docs/COMPETITION-NOTICE.md` 与发布门禁：**未验证/人工阻断**；`CHECK-BEFORE-SUBMISSION` 仍存在，正式 PDF、MP4、源码 ZIP、签名 HAP、证据索引、提交图和门户回执未形成 | 责任人逐项确认身份、原创/AI、权利、签署，并按最终提交生成和核验全部材料 | 不得猜测队伍、成员、导师、许可证、门户或签署事实 | 责任人提供事实后运行发布门禁及 PDF/MP4/ZIP/HAP 绑定检查 |
+| NOTICE 与正式材料 | `validate-competition-content.py --require-notice-ready`：**未验证/人工阻断**；内容子门禁全通过，仅 `COMPETITION-NOTICE.md`、评分计划和 WS06 结果文档的 3 个 `CHECK-BEFORE-SUBMISSION` 标记失败；正式 PDF、MP4、源码 ZIP、签名 HAP、证据索引、提交图和门户回执仍未形成 | 责任人逐项确认身份、原创/AI、权利、签署，并按最终提交生成和核验全部材料 | 不得猜测队伍、成员、导师、许可证、门户或签署事实 | 责任人提供事实后清除 3 个标记并运行正式 NOTICE、PDF/MP4/ZIP/HAP 绑定检查 |
 | 竖屏模拟器黄金路径（已关闭） | `harmonyos-app-smoke.ps1` 当前主线 HAP：**模拟器通过**，64/64；覆盖首页、课程、Lesson、Chat、Profile、活动/错题/成就、三门学习星图和 Plan；截图目录未提交 | 已达成：API 12 模拟器安装、UI 树驱动交互、关键文案和页面路由全部通过 | 只证明 358×788 vp 竖屏模拟器；不证明真机、横屏、平板或读屏 | 修改端侧行为后重跑 HAP 构建、指定 HDC 和 64 项设备门禁 |
 | 正式设备与线上黄金路径 | HDC/冒烟与当前缺失的线上回执：**未验证**；真机、横屏、平板、大字号、读屏、通知/服务卡片实际回流及线上 Health/Chat/Plan/Quiz 均无本批证据 | 最终签名 HAP 在目标真机完成跨视口与辅助功能验收，线上端点返回正确 HTTP 状态和业务字段 | 依赖签名、真机、部署和账户权限；模拟器或历史记录不能替代 | 取得权限后运行指定 HDC、跨视口冒烟、通知/卡片回流和线上端点结构校验 |
 
