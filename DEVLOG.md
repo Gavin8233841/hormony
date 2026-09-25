@@ -7971,3 +7971,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：API 12 HAP 增量构建 exit 0，去掉多余成功横幅后最终构建再次 exit 0；Python `unittest discover` 215/215，`test-product-experience-contracts.mjs` 17/17、`test-graph-lesson-contract.mjs` 3/3、`test-ws01-chat-plan-source-contract.mjs` 13/13，最终均 exit 0。Pura X View 1320×2232：课程详情截图 `.runtime/learning-detail-v2.png`，Lesson 末节互动 `.runtime/learning-lesson-v2.png`，底部续练后选项区域 `.runtime/learning-lesson-focused.png`；排序活动按 3→1→2→4→5→6 提交显示“答对了”，底部进入练习。练习五题作答并提交后首屏显示 1/5、首道错题与学伴讲解按钮，截图 `.runtime/learning-practice-v2.png`、`.runtime/learning-practice-result-v2.png`。通过“我的学习”待巩固入口打开测验，主题折叠/展开/更换行为在 UI 树验证，紧凑首屏 `.runtime/learning-quiz-compact.png`；经模拟器网关调用线上测验 API 后实际拿到 5 题，首题截图 `.runtime/learning-quiz-question.png`。
 
 未验证：本批没有提交这组 AI 测验的评分结果；全对路径、大字号、横屏、真机与签名发布 HAP 尚未验收。计划、知识搜索、错题本及学习记录子页待后续统一。工作区其他未提交脚本与审计文档保留。
+
+---
+
+## 2026-09-25 [MAIN] 外部学习资源进入课程主路径
+
+背景：课程内容仓储已内置从 Web 单一来源生成的 36 条外部资源索引，HarmonyOS 学生端此前没有可见入口。索引中 10 条未绑定课程，1 条历史访问状态为 unreachable；全部只允许外部链接，不转存第三方页面或题目。
+
+改动：新增 `ResourceLibrary.ets`，课程详情和 Lesson 均可进入。按课程显示资源，过滤非 HTTPS、非 `external-link-only` 与历史不可达项，优先呈现与课程相关的官方课程、教材配套站和原始规范，其他资料列在下方；网络课程的 TCP/HTTP 主题优先显示相应 RFC。每条显示类型、标题、域名和外部网站标记，通过 API 12 `UIAbilityContext.openLink` 打开系统浏览器。打开后回到应用，可进入当前主题精选练习，或给学伴预填一条简短的回忆提问。扩展 `ExternalLearningResource` 类型以读取现有 provenance 字段，注册页面路由；没有新增依赖和内容副本。上游 Princeton 算法站、MIT 6.006、UC Berkeley CS61B、OSTEP、MIT 6.1810、os-book、RFC 9110/9293、Wireshark 官方页在本批打开核对；该核对不等于逐一验证索引中的全部 URL。
+
+验证：首次 API 12 构建发现 ArkTS 不接受对象字面量类型、目标 SDK 无 `book_closed_fill`，改用命名接口和已有 Symbol 后，增量 `assembleHap` 最终 exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成；签名仍未配置。Python 3.12 `unittest discover` 215/215，`node scripts/generate-learning-content-json.test.mjs` 4/4，`git diff --check` exit 0。Pura X View 模拟器 1320×2232 竖屏安装最终 HAP，从课程详情进入资料页，UI 树显示链表主题、三条推荐与来源域名，最终截图 `.runtime/resource-library-final.png`。此前同批构建点击 Princeton 项，系统浏览器地址显示 `algs4.cs.princeton.edu`；回到应用后点击“做几道题”，练习页显示“数据结构 · 链表”与真实 5 题；点击“和老师聊聊”，学伴输入框出现对应资料标题与链表主题的预填问题。最后调整展示文案、栏目和推荐顺序后已重新构建并安装，最终截图确认更新内容。
+
+未验证：没有逐个在模拟器打开全部课程资源，也没有证明所有第三方页面可在该设备完成加载；资料阅读时长、真实理解程度、学伴对这条预填问题的完整云端回答、真机、横屏、大字号及正式签名包尚未验证。其他未提交脚本和审计文档保留。

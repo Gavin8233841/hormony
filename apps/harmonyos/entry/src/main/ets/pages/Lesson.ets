@@ -140,6 +140,15 @@ struct LessonPage {
     if (this.loadRunId === runId) this.loading = false;
   }
 
+  private openResources(): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedResourceTopic', this.topic);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/ResourceLibrary' }).catch((): void => {
+      this.message = '资料页暂时打不开，请重试';
+    });
+  }
+
   private async restoreActivityProgress(runId: number = this.loadRunId): Promise<void> {
     if (this.experience === null || this.experience.activities.length === 0) return;
     try {
@@ -1721,6 +1730,29 @@ struct LessonPage {
             .width('100%')
             .padding({ top: 16 })
             .border({ width: { top: 1 }, color: Constants.COLOR_BORDER })
+
+            Button({ type: ButtonType.Normal }) {
+              Row({ space: 10 }) {
+                Text('再读一点')
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_BRAND_TEXT)
+                Text('去看相关公开资料')
+                  .layoutWeight(1)
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                SymbolGlyph($r('sys.symbol.arrow_up_right'))
+                  .fontSize(15)
+                  .fontColor([Constants.COLOR_BRAND])
+              }
+              .width('100%')
+            }
+            .width('100%')
+            .constraintSize({ minHeight: 54 })
+            .padding({ left: 14, right: 14 })
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.openResources(); })
           }
           .width('100%')
           .constraintSize({ minHeight: '100%', maxWidth: 720 })

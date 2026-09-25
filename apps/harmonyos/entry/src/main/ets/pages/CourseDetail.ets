@@ -81,6 +81,15 @@ struct CourseDetailPage {
     });
   }
 
+  private openResources(): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    AppStorage.setOrCreate<string>('selectedResourceTopic', this.nextTopic());
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/ResourceLibrary' }).catch((): void => {
+      this.message = '资料页暂时打不开，请重试';
+    });
+  }
+
   private topicStatusLabel(topic: string): string {
     return resolveTopicAction(topic, this.completedTopics, this.nextTopic(), this.resumeState());
   }
@@ -278,14 +287,40 @@ struct CourseDetailPage {
                 .fontColor(Constants.COLOR_ERROR)
             }
 
-            Row() {
-              Text('全部主题')
-                .fontSize(Constants.PAGE_SECTION_SIZE)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Button({ type: ButtonType.Normal }) {
+              Row({ space: 12 }) {
+                SymbolGlyph($r('sys.symbol.book_open_fill'))
+                  .fontSize(20)
+                  .fontColor([Constants.COLOR_BRAND])
+                Column({ space: 3 }) {
+                  Text('拓展资料')
+                    .fontSize(16)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  Text('公开课程、教材配套站与原始文档')
+                    .fontSize(12)
+                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+                SymbolGlyph($r('sys.symbol.chevron_right'))
+                  .fontSize(16)
+                  .fontColor([Constants.COLOR_BRAND])
+              }
+              .width('100%')
             }
             .width('100%')
-            .justifyContent(FlexAlign.SpaceBetween)
+            .constraintSize({ minHeight: 72 })
+            .padding({ left: 16, right: 16 })
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(Constants.RADIUS_LG)
+            .onClick((): void => { this.openResources(); })
+
+            Text('全部主题')
+              .width('100%')
+              .fontSize(Constants.PAGE_SECTION_SIZE)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
             Column() {
               ForEach(this.topics, (topic: string, index: number): void => {

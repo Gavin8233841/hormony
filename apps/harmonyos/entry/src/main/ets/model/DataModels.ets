@@ -286,6 +286,12 @@ export interface CuratedQuestion {
   explanation: string;
 }
 
+export interface ExternalResourceProvenance {
+  sourceTitle: string;
+  rightsStatus: string;
+  accessStatus: string;
+}
+
 export interface ExternalLearningResource {
   id: string;
   title: string;
@@ -294,6 +300,7 @@ export interface ExternalLearningResource {
   description: string;
   courseId: string;
   tags: string[];
+  provenance?: ExternalResourceProvenance;
 }
 
 // SSE 流式事件
