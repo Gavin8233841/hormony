@@ -8073,3 +8073,15 @@ Python 3.12 `unittest discover` 215/215；`test-product-experience-contracts.mjs
 ### 验证与文件
 
 Python 3.12 `unittest discover` 215/215；`test-product-experience-contracts.mjs` 17/17；`test-profile-accessibility-contracts.mjs` 6/6；`test-ws01-chat-plan-source-contract.mjs` 13/13；`test-learning-map-contracts.mjs` 7/7；HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 已安装至 Pura X View。1320×2232 竖屏抽样查看“我的学习”和“课程”首屏，截图位于 `.runtime/copy-profile-followup.png` 与 `.runtime/copy-course-followup.png`。在线错误分支和新测验生成本批未触发。涉及 `apps/harmonyos/entry/src/main/ets/pages/` 的 11 个页面、三份相关契约及 `DEVLOG.md`；其他任务已有的未提交文件保留。
+
+---
+
+## [2026-09-25T11:47:38Z] [2026-09-25 19:47:38 CST] 模型: Codex (GPT-6)
+
+### 操作
+
+知识资料结果卡的“检索词命中／Topic 关联”改为“相关段落／主题相关”，保留实际段落、课程来源、关联顺序及测验导航。同步更新对应契约中的两处标签断言。已推送页面包含测验入口，而仓库原测试仍断言没有该入口；根据用户授权，接管并提交测试文件已有的导航断言，使干净检出的页面与契约一致。
+
+### 验证与边界
+
+知识页契约 8/8、Python 3.12 `unittest discover` 215/215；HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 安装到 Pura X View。1320×2232 竖屏上由课程进入资料页，使用“二叉搜索树”推荐搜索，UI 树和截图均显示“相关段落”、原文及“进入主题”；截图存于 `.runtime/copy-knowledge-final.png`。本次未单独触发“主题相关”回退分支；真机、横屏、大字号和正式签名包仍未验证。其他任务已有未提交文件保留。

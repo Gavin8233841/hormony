@@ -76,11 +76,14 @@ class KnowledgeNavigationContractTest(unittest.TestCase):
 
     def test_search_text_cannot_become_a_lesson_or_quiz_topic(self):
         open_lesson = compact(extract_method(self.source, "openLesson"))
+        start_quiz = compact(extract_method(self.source, "startTopicQuiz"))
+        result_topic = compact(extract_method(self.source, "resultTopic"))
 
-        self.assertNotIn("'selectedQuizTopic'", self.source)
-        self.assertNotIn("pages/Quiz", self.source)
         self.assertIn("const topic = this.exactTopic(item);", open_lesson)
-        self.assertNotIn("this.query", open_lesson)
+        self.assertIn("const topic = this.resultTopic();", start_quiz)
+        for method in (open_lesson, start_quiz, result_topic):
+            self.assertNotIn("this.query", method)
+            self.assertNotIn("this.resultQuery", method)
         self.assertRegex(
             open_lesson,
             re.compile(
@@ -95,6 +98,12 @@ class KnowledgeNavigationContractTest(unittest.TestCase):
             self.source,
         )
         self.assertEqual(["topic"], [value.strip() for value in content_topic_writes])
+        quiz_topic_writes = re.findall(
+            r"AppStorage\.setOrCreate<string>\(\s*"
+            r"'selectedQuizTopic'\s*,\s*([^\)]+)\)",
+            self.source,
+        )
+        self.assertEqual(["topic"], [value.strip() for value in quiz_topic_writes])
 
     def test_only_an_exact_topic_from_the_current_course_can_open_lesson(self):
         exact_topic = compact(extract_method(self.source, "exactTopic"))
@@ -117,6 +126,34 @@ class KnowledgeNavigationContractTest(unittest.TestCase):
         self.assertGreater(write, guard)
         self.assertGreater(route, write)
         self.assertIn("return;", open_lesson[guard:write])
+
+    def test_only_an_exact_result_topic_from_the_current_course_can_open_quiz(self):
+        result_topic = compact(extract_method(self.source, "resultTopic"))
+        start_quiz = compact(extract_method(self.source, "startTopicQuiz"))
+
+        self.assertRegex(
+            result_topic,
+            re.compile(
+                r"^const courseTopics = LearningContentRepository\.getTopics\(this\.courseId\); "
+                r"for \(const item of this\.results\) \{ "
+                r"const topic = item\.topic \?\? ''; "
+                r"if \(item\.courseId === this\.courseId && courseTopics\.includes\(topic\)\) "
+                r"return topic; \} return '';$"
+            ),
+        )
+
+        guard = start_quiz.find("if (topic.length === 0)")
+        first_write = start_quiz.find("AppStorage.setOrCreate")
+        topic_write = start_quiz.find("'selectedQuizTopic', topic")
+        route = start_quiz.find("url: 'pages/Quiz'")
+        self.assertGreaterEqual(guard, 0)
+        self.assertGreater(first_write, guard)
+        self.assertGreater(topic_write, first_write)
+        self.assertGreater(route, topic_write)
+        self.assertIn("this.hasError = true;", start_quiz[guard:first_write])
+        self.assertIn("return;", start_quiz[guard:first_write])
+        self.assertIn("'selectedCourseId', this.courseId", start_quiz[first_write:route])
+        self.assertIn("'selectedCourseTitle', this.courseTitle", start_quiz[first_write:route])
 
     def test_result_without_an_exact_topic_can_ask_with_source_material(self):
         ask_tutor = compact(extract_method(self.source, "askTutor"))
@@ -171,12 +208,12 @@ class KnowledgeNavigationContractTest(unittest.TestCase):
         token_match = evidence.find(
             "evidence = this.matchedEvidence(segments, term)", query_terms
         )
-        query_label = evidence.find("label: '检索词命中'", token_match)
+        query_label = evidence.find("label: '相关段落'", token_match)
         topic_match = evidence.find(
             "evidence = this.matchedEvidence(segments, this.exactTopic(item))",
             query_label,
         )
-        topic_label = evidence.find("label: 'Topic 关联'", topic_match)
+        topic_label = evidence.find("label: '主题相关'", topic_match)
         summary_label = evidence.find("label: '课程资料摘要'", topic_label)
 
         self.assertGreaterEqual(direct_query, 0)

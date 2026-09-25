@@ -124,10 +124,10 @@ struct KnowledgePage {
         if (evidence.length > 0) break;
       }
     }
-    if (evidence.length > 0) return { label: '检索词命中', text: evidence };
+    if (evidence.length > 0) return { label: '相关段落', text: evidence };
 
     evidence = this.matchedEvidence(segments, this.exactTopic(item));
-    if (evidence.length > 0) return { label: 'Topic 关联', text: evidence };
+    if (evidence.length > 0) return { label: '主题相关', text: evidence };
     return { label: '课程资料摘要', text: this.firstSentence(item.text) };
   }
 
