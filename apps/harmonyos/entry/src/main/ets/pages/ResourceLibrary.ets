@@ -21,21 +21,19 @@ struct ResourceLibraryPage {
     const topics = LearningContentRepository.getTopics(this.courseId);
     const requestedTopic = AppStorage.get<string>('selectedResourceTopic') ?? '';
     this.topic = topics.includes(requestedTopic) ? requestedTopic : (topics[0] ?? '');
+    const curatedIds = this.featuredIds();
     this.resources = LearningContentRepository.getResources(this.courseId).filter(
-      (item: ExternalLearningResource): boolean => item.url.startsWith('https://') &&
+      (item: ExternalLearningResource): boolean => curatedIds.includes(item.id) && item.url.startsWith('https://') &&
         item.provenance?.rightsStatus === 'external-link-only' &&
         item.provenance?.accessStatus !== 'unreachable');
   }
 
   private featuredIds(): string[] {
-    if (this.courseId === 'cs102') return ['res_07', 'res_21', 'res_05'];
+    if (this.courseId === 'cs102') return ['res_07', 'res_21'];
     if (this.courseId === 'cs103') {
-      if (this.topic.includes('TCP')) return ['res_15', 'res_22', 'res_33'];
-      if (this.topic.includes('HTTP')) return ['res_14', 'res_22', 'res_33'];
-      return ['res_22', 'res_14', 'res_33'];
+      return this.topic.includes('TCP') ? ['res_15', 'res_22'] : ['res_22', 'res_15'];
     }
-    if (this.topic.includes('图') || this.topic.includes('排序')) return ['res_03', 'res_20', 'res_19'];
-    return ['res_20', 'res_03', 'res_19'];
+    return this.topic.includes('链表') ? ['res_20', 'res_19'] : ['res_19', 'res_20'];
   }
 
   private featuredResources(): ExternalLearningResource[] {
@@ -43,11 +41,6 @@ struct ResourceLibraryPage {
     return this.resources.filter((item: ExternalLearningResource): boolean => ids.includes(item.id))
       .sort((left: ExternalLearningResource, right: ExternalLearningResource): number =>
         ids.indexOf(left.id) - ids.indexOf(right.id));
-  }
-
-  private otherResources(): ExternalLearningResource[] {
-    const ids = this.featuredIds();
-    return this.resources.filter((item: ExternalLearningResource): boolean => !ids.includes(item.id));
   }
 
   private typeLabel(item: ExternalLearningResource): string {
@@ -60,6 +53,17 @@ struct ResourceLibraryPage {
 
   private host(item: ExternalLearningResource): string {
     return item.url.replace('https://', '').split('/')[0];
+  }
+
+  private readingGoal(item: ExternalLearningResource): string {
+    if (item.id === 'res_20') return this.topic.includes('链表') ?
+      '找 Linked Lists 讲义，看节点怎样连接。' : '在讲义中找一个数据结构的实现例子。';
+    if (item.id === 'res_19') return '看 Lecture Notes 中的数据结构与复杂度分析。';
+    if (item.id === 'res_07') return this.topic.includes('进程') || this.topic.includes('线程') ?
+      '读 Processes 和 Concurrency and Threads 两章。' : '从目录找到当前主题，读一章正文。';
+    if (item.id === 'res_21') return '看 xv6 Lab 如何实现系统调用。';
+    if (item.id === 'res_15') return '查 3.5 节，理清 TCP 如何建立连接。';
+    return '看课程讲义与 Lab 中的可靠传输。';
   }
 
   private async openResource(item: ExternalLearningResource): Promise<void> {
@@ -86,12 +90,9 @@ struct ResourceLibraryPage {
   }
 
   private askTutor(): void {
-    const resource = this.selectedResource();
-    if (resource === undefined) return;
-    const topicText = this.topic.length > 0 ? '，正在学“' + this.topic + '”' : '';
+    if (this.selectedResource() === undefined || this.topic.length === 0) return;
     AppStorage.setOrCreate<string>('pendingChatQuestion',
-      '我刚读了《' + resource.title + '》' + topicText +
-        '。问我一道小题，看看我是否理解了。');
+      '给我一道关于' + this.topic + '的小题，先别给答案。');
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '暂时无法打开学伴，请重试';
     });
@@ -102,42 +103,43 @@ struct ResourceLibraryPage {
     Button({ type: ButtonType.Normal }) {
       Row({ space: 12 }) {
         Column({ space: 5 }) {
-          Row({ space: 8 }) {
-            Text(this.typeLabel(item))
-              .fontSize(11)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(featured ? Constants.COLOR_BRAND_TEXT : Constants.COLOR_TEXT_SECONDARY)
-            if (featured) {
-              Text('推荐')
-                .fontSize(10)
-                .fontColor(Constants.COLOR_SUCCESS)
-            }
-          }
+          Text(featured ? '先读这份 · ' + this.typeLabel(item) : this.typeLabel(item))
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(featured ? Constants.COLOR_MAP_CORE : Constants.COLOR_TEXT_SECONDARY)
           Text(item.title)
             .width('100%')
-            .fontSize(featured ? 16 : 15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .fontSize(featured ? 18 : 16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(featured ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
             .maxLines(2)
             .textAlign(TextAlign.Start)
-          Text(this.host(item) + ' · 外部网站')
-            .fontSize(11)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.readingGoal(item))
+            .width('100%')
+            .fontSize(13)
+            .lineHeight(20)
+            .fontColor(featured ? Constants.COLOR_MAP_TEXT_MUTED : Constants.COLOR_TEXT_SECONDARY)
+            .maxLines(2)
+            .textAlign(TextAlign.Start)
+          Text(this.host(item) + ' · 浏览器打开')
+            .fontSize(12)
+            .fontColor(featured ? Constants.COLOR_MAP_TEXT_MUTED : Constants.COLOR_TEXT_SECONDARY)
             .maxLines(1)
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         SymbolGlyph($r('sys.symbol.arrow_up_right'))
           .fontSize(16)
-          .fontColor([Constants.COLOR_BRAND])
+          .fontColor([featured ? Constants.COLOR_MAP_CORE : Constants.COLOR_TEXT_SECONDARY])
       }
       .width('100%')
     }
     .width('100%')
-    .constraintSize({ minHeight: featured ? 100 : 88 })
-    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .backgroundColor(featured ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_CARD)
-    .borderRadius(Constants.RADIUS_MD)
+    .constraintSize({ minHeight: featured ? 138 : 118 })
+    .padding({ left: 18, right: 18, top: 16, bottom: 16 })
+    .backgroundColor(featured ? Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_CARD)
+    .border({ width: 1, color: featured ? Constants.COLOR_MAP_SURFACE : Constants.COLOR_BORDER })
+    .borderRadius(Constants.RADIUS_LG)
     .accessibilityText(item.title + '，' + this.typeLabel(item) + '，打开外部网站')
     .onClick((): void => { this.openResource(item); })
   }
@@ -149,11 +151,11 @@ struct ResourceLibraryPage {
       Scroll() {
         Column({ space: 16 }) {
           Column({ space: 6 }) {
-            Text(this.topic.length > 0 ? this.topic + '的参考资料' : '本课程参考资料')
+            Text(this.topic.length > 0 ? this.topic : '本课程')
               .fontSize(22)
               .fontWeight(FontWeight.Bold)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text('点击在浏览器打开')
+            Text(this.resources.length.toString() + ' 份公开资料')
               .fontSize(13)
               .lineHeight(20)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -170,27 +172,9 @@ struct ResourceLibraryPage {
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_LG)
           } else {
-            Text('推荐阅读')
-              .width('100%')
-              .fontSize(Constants.PAGE_SECTION_SIZE)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
-
-            ForEach(this.featuredResources(), (item: ExternalLearningResource): void => {
-              this.ResourceRow(item, true)
+            ForEach(this.featuredResources(), (item: ExternalLearningResource, index: number): void => {
+              this.ResourceRow(item, index === 0)
             }, (item: ExternalLearningResource): string => item.id)
-
-            if (this.otherResources().length > 0) {
-              Text('更多资料')
-                .width('100%')
-                .margin({ top: 8 })
-                .fontSize(Constants.PAGE_SECTION_SIZE)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              ForEach(this.otherResources(), (item: ExternalLearningResource): void => {
-                this.ResourceRow(item, false)
-              }, (item: ExternalLearningResource): string => item.id)
-            }
           }
 
           if (this.message.length > 0) {
@@ -206,23 +190,24 @@ struct ResourceLibraryPage {
           top: 12, bottom: 24 + this.safeAreaBottomVpValue })
       }
       .layoutWeight(1)
+      .align(Alignment.TopStart)
       .scrollBar(BarState.Off)
 
       if (this.selectedResourceId.length > 0) {
         Column({ space: 10 }) {
-          Text('看完了？试着说说学到了什么。')
+          Text('继续学 ' + this.topic)
             .width('100%')
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
           Row({ space: 10 }) {
-            Button('和老师聊聊')
+            Button('问学伴')
               .layoutWeight(1)
               .height(48)
               .fontColor(Constants.COLOR_BRAND_TEXT)
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .borderRadius(Constants.RADIUS_MD)
               .onClick((): void => { this.askTutor(); })
-            Button('做几道题')
+            Button('练习本主题')
               .layoutWeight(1)
               .height(48)
               .enabled(this.topic.length > 0)

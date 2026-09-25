@@ -8101,3 +8101,19 @@ Python 3.12 `unittest discover` 215/215；Node 两份相关契约 30/30；Harmon
 ### 涉及文件
 
 `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`apps/harmonyos/entry/src/main/ets/pages/Course.ets`、`scripts/test_course_resume_contract.py`、`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`DEVLOG.md`。保留其他任务的未提交文件。
+
+---
+
+## [2026-09-25T12:44:20Z] [2026-09-25 20:44:20 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+课程详情原有外部资料入口和 `ResourceLibrary`，不是从零新增。36 条索引中只展示三门演示课各两条重新核对的官网资料，按当前主题决定先读哪份，并写出阅读目标和来源域名。页面改为一项重点阅读、一项补充阅读，修正短列表在 Scroll 中垂直居中造成的顶部大空白。外链返回后给“问学伴／练习本主题”，预填问题不再假定学生已读完。六条来源与权限边界记录在 `docs/RESOURCE-CURATION-20260925.md`，同步修正交接文档里“端侧尚未调用资源仓库”的旧说法。
+
+### 验证与边界
+
+Python 3.12 `unittest discover` 215/215；HarmonyOS API 12 增量 `assembleHap` exit 0，HAP 未签名。安装到 Pura X View，1320×2232 竖屏 UI 树和截图确认双资料首屏、OSTEP 官网打开、返回后进入“操作系统 · 进程与线程”练习，以及学伴主题提问预填。截图 `.runtime/design-audit-20260925/14-resources-aligned.jpeg`，UI 树同目录，不纳入 Git。其他五条核过官网但未逐条在模拟器浏览器打开；未验证是否真正阅读、掌握、在线学伴回答、横屏、大字号、真机或签名包。现有 `TextInputController` syscap 与未签名构建提示仍在。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/pages/ResourceLibrary.ets`、`docs/RESOURCE-CURATION-20260925.md`、`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`DEVLOG.md`。保留其他任务已有未提交文件。
