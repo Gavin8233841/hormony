@@ -103,6 +103,21 @@ struct MistakeBookPage {
     });
   }
 
+  private askTutor(item: ReviewItem): void {
+    AppStorage.setOrCreate<string>('pendingChatQuestion', '这道题我做错了，帮我讲清楚怎么判断。');
+    AppStorage.setOrCreate<string>('pendingChatContextJson', JSON.stringify({
+      courseId: item.courseId,
+      topic: item.topic,
+      question: item.stem,
+      userAnswer: item.userAnswer,
+      correctAnswer: item.correctAnswer,
+      submitted: true
+    }));
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
+      this.message = '无法打开学伴，请重试';
+    });
+  }
+
   build() {
     Column() {
       if (this.loading) {
@@ -222,10 +237,18 @@ struct MistakeBookPage {
                     .fontSize(11)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
                 }
+                Button('请学伴讲解')
+                  .width('100%')
+                  .height(48)
+                  .fontSize(14)
+                  .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                  .backgroundColor(Constants.COLOR_BRAND)
+                  .borderRadius(Constants.RADIUS_MD)
+                  .onClick((): void => { this.askTutor(item); })
                 Row({ space: 10 }) {
                   Button(this.expandedId === item.id ? '收起解析' : '查看解析')
                     .layoutWeight(1)
-                    .height(40)
+                    .height(48)
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_PRIMARY)
                     .backgroundColor(Constants.COLOR_BG_TAG)
@@ -234,10 +257,10 @@ struct MistakeBookPage {
                   Button(this.isDue(item) ?
                     (this.hasOriginalQuestion(item) ? '重练原题' : '练同主题精选题') : '等待到期')
                     .layoutWeight(1)
-                    .height(40)
+                    .height(48)
                     .fontSize(12)
-                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                    .backgroundColor(this.isDue(item) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER)
+                    .fontColor(this.isDue(item) ? Constants.COLOR_BRAND_TEXT : Constants.COLOR_TEXT_SECONDARY)
+                    .backgroundColor(this.isDue(item) ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
                     .borderRadius(Constants.RADIUS_MD)
                     .enabled(this.isDue(item))
                     .onClick((): void => { this.retry(item); })

@@ -248,9 +248,7 @@ struct PracticePage {
 
   private askTutor(detail: QuizResultDetail): void {
     if (!this.submitted) return;
-    const question = '请结合课程资料讲解这道题：' + detail.stem +
-      '。我的答案是“' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答') +
-      '”，正确答案是“' + detail.correctAnswer + '”。请指出关键概念和判断步骤。';
+    const question = '这道题我做错了，帮我讲清楚怎么判断。';
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
     AppStorage.setOrCreate<string>('pendingChatContextJson', JSON.stringify({
       courseId: this.courseId,
@@ -276,9 +274,8 @@ struct PracticePage {
       [...this.toggledDetailIds, questionId];
   }
 
-  private firstWrongQuestion(): string {
-    const detail = this.details.find((item: QuizResultDetail): boolean => !item.isCorrect);
-    return detail === undefined ? '' : detail.stem;
+  private firstWrongDetail(): QuizResultDetail | undefined {
+    return this.details.find((item: QuizResultDetail): boolean => !item.isCorrect);
   }
 
   private openQuiz(): void {
@@ -563,18 +560,18 @@ struct PracticePage {
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
         Text(this.correctCount === this.questions.length ?
           '这组没有错题。用新题检验能否稳定运用本主题。' :
-          this.firstWrongQuestion())
+          this.firstWrongDetail()?.stem ?? '')
           .width('100%')
           .fontSize(14)
           .lineHeight(22)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
         if (this.correctCount < this.questions.length) {
-          Text('查看错题解析')
+          Text('你选了 ' + (this.firstWrongDetail()?.userAnswer || '未作答'))
             .width('100%')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
-        Button(this.correctCount === this.questions.length ? '进入 AI 测验' : '去错题本重练')
+        Button(this.correctCount === this.questions.length ? '进入 AI 测验' : '请学伴讲解这道错题')
           .width('100%')
           .height(48)
           .fontSize(15)
@@ -582,9 +579,23 @@ struct PracticePage {
           .backgroundColor(Constants.COLOR_BRAND)
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => {
-            if (this.correctCount < this.questions.length) this.openMistakeBook();
-            else this.openQuiz();
+            if (this.correctCount === this.questions.length) {
+              this.openQuiz();
+            } else {
+              const detail = this.firstWrongDetail();
+              if (detail !== undefined) this.askTutor(detail);
+            }
           })
+        if (this.correctCount < this.questions.length) {
+          Button('去错题本重练')
+            .width('100%')
+            .height(48)
+            .fontSize(13)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.openMistakeBook(); })
+        }
       }
       .width('100%')
       .padding(16)

@@ -164,7 +164,7 @@ test('Lesson 自由回答提交后冻结输入并固定学伴与反馈使用的�
   assert.match(reveal, /const answer: string = this\.responseText\.trim\(\);/);
   assert.match(reveal, /this\.submittedResponseText = answer;/);
   assert.match(answer, /this\.feedbackVisible \? this\.submittedResponseText : this\.responseText\.trim\(\)/);
-  assert.match(practice, /TextArea\(\{ placeholder: '先写下你的答案或推演过程', text: this\.responseText \}\)/);
+  assert.match(practice, /TextArea\(\{ placeholder: '写下你的答案', text: this\.responseText \}\)/);
   assert.match(practice, /if \(!this\.feedbackVisible\) this\.responseText = value;/);
   assert.match(practice, /答案已冻结，可向下对照关键点/);
 });

@@ -7935,3 +7935,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - Pura X View 1320×2232：HDC `127.0.0.1:5555` 安装和启动成功。首屏 UI 树中五个选项 bounds 均为 144px 高（48vp），完全位于固定底栏上方；截图 `.runtime/bfs-final.png`。选 `0` 后队列 `1 → 2`，误选 `2` 后仍为 `1 → 2` 且出现“看看队首，再试一次。”，再选 `1` 后队列 `2 → 3`；对应 UI 树在 `.runtime/layout-hx-after0.json`、`.runtime/layout-hx-wrong2.json`、`.runtime/layout-hx-after1.json`。展开/收起解释不改变队列；推演至队列为空后“重新推演”回到队列 `0`。
 
 未验证：真机、横屏及系统放大字号；签名/发布 HAP 和复赛门户提交。现有 `Chat`/`Plan` 的 `TextInputController` 设备能力警告仍由构建器报告，未在本批改动。保留原有未提交脚本和文档，不纳入本次提交。
+
+---
+
+## 2026-09-25 [MAIN] 生产端云接通与错题讲解入口
+
+背景：HAP 固定连接 `https://hormony-ruddy.vercel.app`，原生产别名仍指向 7 月版本。已验证的 Preview 为 `ce133a5`，先通过账号内 `vercel promote` 生成生产部署 `dpl_6rHKDj8CzwuSpNKLhV7WtYaaDtoo`，别名现指向新部署。两次直接 `vercel deploy --prod` 分别因文件归档数和项目根目录配置失败，未改变别名；随后推广成功。生产 `/api/health` HTTP 200，`status=ready`、`modelConfigured=true`、`deploymentMode=stateless`；生产 `/api/chat` HTTP 200，12 个 SSE 事件含回答、3 条引用、practice 行动和 done，无 error。
+
+产品改动：Practice 错题结果首屏显示具体题目及作答，主操作带题目上下文进入学伴，重练保留为次操作；错题本增加同样的直接讲解入口。Chat 修复预填问题显示却无法发送的状态判断：将 `canSend` 从属性 getter 改为方法，保留原 TextInput 双向绑定与发送条件。提问文案缩为“这道题我做错了，帮我讲清楚怎么判断”，正确答案和课程题目仍通过结构化上下文提交。两份源码契约测试仅同步更新方法签名和此前已变化的 Lesson 输入提示文字，不改变业务断言。
+
+验证：Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（36 文件、482 项）和 `pnpm build` 均 exit 0；HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP SHA-256 `ce1a9fa745a3bc93cff48fe3dd53f3992c87bf3537132afa419d9604e0b0f6e3`。`test-product-experience-contracts.mjs` 17/17、`test-ws01-chat-plan-source-contract.mjs` 13/13，均 exit 0。Pura X View 1320×2232 竖屏、HDC `127.0.0.1:5555`：实际完成 5 题、1/5 正确，结果页显示首道错题和所选答案；错题本点击“请学伴讲解”，Chat 发送预填问题后，本机代理日志为 `POST /api/chat -> 200`，UI 显示针对顺序表删除的解释、3 条资料和继续练习行动，截图 `.runtime/hbx-answer.png`，布局 `.runtime/hbx-answer.json`。最终精简代码重装后再次确认预填问题与蓝色可发送按钮，布局 `.runtime/hbx-verifydraft.json`。模拟器经 `NODE_USE_ENV_PROXY=1` 的本机 3001 网关访问线上 API；直接外网在该模拟器环境不可达。
+
+边界：未签名 HAP、真机、横屏、键盘首次隐私同意后的手动输入、正式竞赛提交仍未验证。旧会话在 Chat 占据过多屏幕高度，接下来按全 App 视觉升级目标处理。保留原有未提交脚本和审计文档。

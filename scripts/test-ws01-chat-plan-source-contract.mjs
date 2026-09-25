@@ -127,7 +127,7 @@ test('Chat keeps request identity monotonic across page leave and re-entry', () 
     'private pageActive: boolean = false;'
   ], 'Chat request identity fields');
 
-  const lifecycle = section(chat, '  aboutToAppear(): void {', '  get canSend(): boolean {', 'Chat lifecycle');
+  const lifecycle = section(chat, '  aboutToAppear(): void {', '  private canSend(): boolean {', 'Chat lifecycle');
   const appear = section(lifecycle, '  aboutToAppear(): void {', '  aboutToDisappear(): void {', 'Chat appear');
   assertOrder(appear, [
     'this.lifecycleRunId += 1;',
@@ -148,7 +148,7 @@ test('Chat keeps request identity monotonic across page leave and re-entry', () 
     'this.lifecycleRunId += 1;',
     'this.cancelCurrentRequest(false);'
   ], 'Chat leave lifecycle invalidation');
-  const activeLifecycle = section(chat, '  private isActiveLifecycle(', '  get canSend(): boolean {',
+  const activeLifecycle = section(chat, '  private isActiveLifecycle(', '  private canSend(): boolean {',
     'Chat active lifecycle');
   assert.match(activeLifecycle, /return this\.pageActive && this\.lifecycleRunId === lifecycleRunId;/);
 

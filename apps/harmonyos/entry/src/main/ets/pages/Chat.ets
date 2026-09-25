@@ -186,7 +186,7 @@ export struct ChatContent {
     return this.pageActive && this.lifecycleRunId === lifecycleRunId;
   }
 
-  get canSend(): boolean {
+  private canSend(): boolean {
     return this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
       !this.historyLoadFailed && this.inputText.trim().length > 0;
   }
@@ -197,20 +197,20 @@ export struct ChatContent {
 
   private sendButtonBackground(): string {
     if (this.loading) return Constants.COLOR_ERROR_LIGHT;
-    if (this.canSend) return Constants.COLOR_BRAND;
+    if (this.canSend()) return Constants.COLOR_BRAND;
     if (this.canRetryCloudAgent()) return Constants.COLOR_WARNING;
     return Constants.COLOR_BRAND_LIGHT;
   }
 
   private sendButtonIconColor(): string {
     if (this.loading) return Constants.COLOR_ERROR;
-    if (this.canSend || this.canRetryCloudAgent()) return Constants.COLOR_TEXT_ON_GRADIENT;
+    if (this.canSend() || this.canRetryCloudAgent()) return Constants.COLOR_TEXT_ON_GRADIENT;
     return Constants.COLOR_BRAND;
   }
 
   private sendButtonAccessibilityText(): string {
     if (this.loading) return '停止回答';
-    if (this.canSend) return '发送问题';
+    if (this.canSend()) return '发送问题';
     if (this.canRetryCloudAgent()) return '重新连接云端学伴';
     if (this.probing) return '正在连接云端学伴';
     return '发送问题不可用';
@@ -223,7 +223,7 @@ export struct ChatContent {
     if (this.historyMessage.length > 0) return this.historyMessage;
     if (this.probing) return '正在连接云端学伴';
     if (!this.cloudAgentReady) return '云端未连接，点击右侧按钮重试';
-    if (this.inputText.trim().length === 0) return '输入问题后发送按钮会亮起';
+    if (this.inputText.trim().length === 0) return '输入问题';
     return '';
   }
 
@@ -932,7 +932,7 @@ export struct ChatContent {
             .border({
               width: 1,
               color: this.loading ? Constants.COLOR_ERROR :
-                (this.canSend ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
+                (this.canSend() ? Constants.COLOR_BRAND : Constants.COLOR_BRAND_LIGHT)
             })
             .borderRadius(24)
             .accessibilityText(this.sendButtonAccessibilityText())
@@ -940,7 +940,7 @@ export struct ChatContent {
             .onClick(() => {
               if (this.loading) {
                 this.cancelCurrentRequest(true);
-              } else if (this.canSend) {
+              } else if (this.canSend()) {
                 this.sendMessage();
               } else if (this.canRetryCloudAgent()) {
                 this.probeCloudAgent();
