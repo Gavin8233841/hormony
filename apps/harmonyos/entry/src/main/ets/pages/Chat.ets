@@ -713,7 +713,22 @@ export struct ChatContent {
 
   build() {
     Column() {
-      MainPageHeader('学伴', '')
+      if (this.messages.length === 0) {
+        MainPageHeader('学伴', '')
+      } else {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
+            .fontSize(19)
+            .fontColor([Constants.COLOR_BRAND])
+          Text('学伴')
+            .fontSize(20)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        }
+        .width('100%')
+        .constraintSize({ minHeight: 56 })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER })
+      }
 
       if (this.contextSummary.length > 0) {
         Column({ space: 5 }) {
@@ -734,11 +749,11 @@ export struct ChatContent {
           .constraintSize({ minHeight: 48 })
           .onClick((): void => { this.contextExpanded = !this.contextExpanded; })
 
-          if (this.contextQuestion.length > 0) {
+          if (this.contextExpanded && this.contextQuestion.length > 0) {
             Text(this.contextQuestion)
               .width('100%')
               .fontSize(13)
-              .maxLines(this.contextExpanded ? 8 : 1)
+              .maxLines(8)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
           }
@@ -767,43 +782,44 @@ export struct ChatContent {
       if (this.messages.length === 0) {
         // 欢迎引导
         Column() {
-          // AI 头像
           SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
-            .width(56)
-            .height(56)
-            .fontSize(26)
+            .width(48)
+            .height(48)
+            .fontSize(24)
             .fontColor([Constants.COLOR_BRAND])
             .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-            .borderRadius(28)
-            .shadow({ radius: 12, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 4 })
+            .borderRadius(Constants.RADIUS_MD)
 
-          Text('有问题，问鸿学伴')
-            .fontSize(16)
+          Text('今天想弄懂什么？')
+            .fontSize(22)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .margin({ top: 16 })
 
-          Text('想学什么，或哪道题卡住了？')
-            .fontSize(13)
+          Text('可以从课程、错题或一个具体问题开始。')
+            .fontSize(14)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .margin({ top: 8, left: 32, right: 32 })
+            .margin({ top: 6, left: 20, right: 20 })
             .textAlign(TextAlign.Center)
 
-          // 推荐问题
-          Text('试试问')
-            .fontSize(13)
-            .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
-            .margin({ top: 28, bottom: 10 })
-
-          Column({ space: 8 }) {
+          Column({ space: 0 }) {
             ForEach(this.suggestions, (s: string) => {
-              Button(s)
-                .fontSize(13)
-                .fontColor(Constants.COLOR_BRAND)
-                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                .borderRadius(Constants.RADIUS_LG)
-                .constraintSize({ minHeight: 48 })
-                .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+              Button({ type: ButtonType.Normal }) {
+                Row() {
+                  Text(s)
+                    .layoutWeight(1)
+                    .fontSize(14)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  SymbolGlyph($r('sys.symbol.chevron_right'))
+                    .fontSize(13)
+                    .fontColor([Constants.COLOR_TEXT_SECONDARY])
+                }
+                .width('100%')
+              }
+                .width('100%')
+                .constraintSize({ minHeight: 56 })
+                .padding({ left: 16, right: 16 })
+                .backgroundColor(Constants.COLOR_BG_CARD)
                 .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
                   !this.historyLoadFailed)
                 .accessibilityText('提问：' + s)
@@ -812,14 +828,22 @@ export struct ChatContent {
                   this.inputText = s;
                   this.sendMessage();
                 })
+              Divider()
+                .width('100%')
+                .color(Constants.COLOR_BORDER)
             })
           }
+          .width('100%')
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .border({ width: 1, color: Constants.COLOR_BORDER })
+          .borderRadius(Constants.RADIUS_LG)
+          .margin({ top: 24 })
         }
         .width('100%')
         .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        .justifyContent(FlexAlign.Start)
         .alignItems(HorizontalAlign.Center)
-        .padding({ left: 24, right: 24, bottom: 100 })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 48 })
         .constraintSize({ maxWidth: 760 })
       } else {
         // 消息列表
@@ -863,7 +887,7 @@ export struct ChatContent {
         .constraintSize({ maxWidth: 760 })
       }
       Column({ space: 6 }) {
-        Row({ space: 12 }) {
+        Row({ space: 4 }) {
           TextInput({
             text: $$this.inputText,
             controller: this.inputController,
@@ -871,7 +895,7 @@ export struct ChatContent {
           })
             .layoutWeight(1)
             .constraintSize({ minHeight: 48 })
-            .fontSize(14)
+            .fontSize(15)
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_MD)
             .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historyLoadFailed)
@@ -926,6 +950,10 @@ export struct ChatContent {
             })
         }
         .width('100%')
+        .padding({ left: 4, right: 4, top: 4, bottom: 4 })
+        .backgroundColor(Constants.COLOR_BG_CARD)
+        .border({ width: 1, color: Constants.COLOR_BORDER })
+        .borderRadius(Constants.RADIUS_LG)
 
         if (this.sendButtonHint().length > 0 || this.historyLoadFailed || this.historySaveFailed) {
           Row({ space: 8 }) {
@@ -1262,13 +1290,14 @@ export struct ChatContent {
           Column() {
             Text(msg.content)
               .fontSize(Constants.PAGE_BODY_SIZE)
+              .lineHeight(23)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              .padding(12)
-              .backgroundColor(Constants.COLOR_CHAT_USER)
-              .borderRadius(Constants.RADIUS_MD)
+              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+              .backgroundColor(Constants.COLOR_BG_TAG)
+              .borderRadius(Constants.RADIUS_LG)
           }
           .alignItems(HorizontalAlign.End)
-          .constraintSize({ maxWidth: '86%' })
+          .constraintSize({ maxWidth: '84%' })
         }
         .width('100%')
         .justifyContent(FlexAlign.End)
@@ -1276,6 +1305,17 @@ export struct ChatContent {
         // 学伴正文按阅读流排版，行动与依据留在同一条回复下方。
         Column() {
           Column() {
+            Row({ space: 7 }) {
+              SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
+                .fontSize(16)
+                .fontColor([Constants.COLOR_BRAND])
+              Text('鸿学伴')
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            }
+            .width('100%')
+            .margin({ bottom: 8 })
             if (msg.content.length > 0) {
               Column() {
                 this.MarkdownContent(this.readableMarkdown(msg.content), msg.failed)
@@ -1296,9 +1336,9 @@ export struct ChatContent {
             // 引用（折叠式）
             if (msg.citations.length > 0) {
               Row() {
-                Text('参考资料 (' + msg.citations.length + ')')
+                Text(msg.citations.length.toString() + ' 条参考资料')
                   .fontSize(12)
-                  .fontColor(Constants.COLOR_BRAND)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   .padding({ left: 4, right: 4, top: 4, bottom: 4 })
                 Text(msg.citationExpanded ? '收起' : '展开')
                   .fontSize(12)
@@ -1368,11 +1408,15 @@ export struct ChatContent {
 
   @Builder
   ActionCard(action: ChatAction) {
-    Column({ space: 4 }) {
+    Column({ space: 8 }) {
+      Text(action.kind === 'lesson' ? '接着学' : action.kind === 'quiz' ? '测一测' : '接着练')
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_BRAND_TEXT)
       Row({ space: 12 }) {
         Text(action.title)
           .layoutWeight(1)
-          .fontSize(16)
+          .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
         Button(this.actionButtonLabel(action.kind))
@@ -1393,10 +1437,11 @@ export struct ChatContent {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .padding(12)
-    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-    .borderRadius(Constants.RADIUS_MD)
-    .margin({ top: 10, bottom: 4 })
+    .padding(14)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .borderRadius(Constants.RADIUS_LG)
+    .margin({ top: 12, bottom: 4 })
   }
 
   @Builder
@@ -1489,13 +1534,13 @@ export struct ChatContent {
 
   @Builder
   MarkdownContent(content: string, failed: boolean) {
-    Column({ space: 7 }) {
+    Column({ space: 10 }) {
       ForEach(this.markdownBlocks(content), (block: MarkdownBlock): void => {
         if (block.type === 'heading') {
           Text(block.text)
             .width('100%')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
             .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
         } else if (block.type === 'quote') {
           Row({ space: 9 }) {
@@ -1506,8 +1551,8 @@ export struct ChatContent {
               .borderRadius(2)
             Text(block.text)
               .layoutWeight(1)
-              .fontSize(13)
-              .lineHeight(21)
+              .fontSize(14)
+              .lineHeight(22)
               .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_TERTIARY)
           }
           .width('100%')
@@ -1528,8 +1573,8 @@ export struct ChatContent {
               .borderRadius(10)
             Text(block.text)
               .layoutWeight(1)
-              .fontSize(14)
-              .lineHeight(22)
+              .fontSize(15)
+              .lineHeight(24)
               .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
           }
           .width('100%')
@@ -1541,8 +1586,8 @@ export struct ChatContent {
               .fontColor(Constants.COLOR_BRAND)
             Text(block.type === 'numbered' ? block.text.slice(block.text.indexOf(' ') + 1) : block.text)
               .layoutWeight(1)
-              .fontSize(14)
-              .lineHeight(22)
+              .fontSize(15)
+              .lineHeight(24)
               .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
           }
           .width('100%')
@@ -1644,8 +1689,8 @@ export struct ChatContent {
         } else {
           Text(block.text)
             .width('100%')
-            .fontSize(14)
-            .lineHeight(22)
+            .fontSize(15)
+            .lineHeight(25)
             .fontColor(failed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_PRIMARY)
         }
       })

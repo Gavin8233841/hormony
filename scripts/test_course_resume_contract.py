@@ -89,7 +89,7 @@ class CourseResumeContractTest(unittest.TestCase):
         message = self.course_source.find("Text(this.message)", list_branch)
         retry = self.course_source.find("Button('重试')", message)
         reload = self.course_source.find("this.loadCourses()", retry)
-        course_list = self.course_source.find("List({ space: 10 })", reload)
+        course_list = self.course_source.find("List({ space: 0 })", reload)
 
         self.assertGreaterEqual(list_branch, 0)
         self.assertGreater(message, list_branch)

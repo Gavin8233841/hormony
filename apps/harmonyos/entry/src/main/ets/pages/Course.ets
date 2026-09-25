@@ -72,6 +72,10 @@ export struct CourseContent {
     return course.progress > 0 || hasCourseStarted(this.resumeState(course)) ? '继续课程' : '进入课程';
   }
 
+  private courseIsStarted(course: Course): boolean {
+    return course.progress > 0 || hasCourseStarted(this.resumeState(course));
+  }
+
   private courseProgressLabel(course: Course): string {
     const recentTopic = this.resumeState(course).recentTopic;
     return recentTopic.length > 0 ? '上次学到 · ' + recentTopic : '学习进度';
@@ -123,9 +127,117 @@ export struct CourseContent {
     .borderRadius(Constants.RADIUS_LG)
   }
 
+  @Builder
+  FeaturedCourse(course: Course) {
+    Column({ space: 10 }) {
+      Text('接着学')
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_BRAND_TEXT)
+      Row() {
+        Text(course.title)
+          .layoutWeight(1)
+          .fontSize(22)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(course.docCount.toString() + ' 份资料')
+          .fontSize(12)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      Text(this.courseProgressLabel(course))
+        .width('100%')
+        .fontSize(13)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Row({ space: 20 }) {
+        Row({ space: 10 }) {
+          Progress({ value: course.progress * 100, total: 100, type: ProgressType.Linear })
+            .layoutWeight(1)
+            .height(4)
+            .color(Constants.COLOR_BRAND)
+            .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+          Text(Math.round(course.progress * 100).toString() + '%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+        }
+        .layoutWeight(1)
+        Button(this.courseActionLabel(course))
+          .constraintSize({ minHeight: 48 })
+          .padding({ left: 20, right: 20 })
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .accessibilityText(this.courseActionLabel(course) + '：' + course.title)
+          .onClick((): void => { this.openCourse(course); })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding(18)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .borderRadius(Constants.RADIUS_XL)
+    .margin({ bottom: 20 })
+  }
+
+  @Builder
+  CourseDirectoryRow(course: Course, showDivider: boolean) {
+    Column() {
+      Button({ type: ButtonType.Normal }) {
+        Row({ space: 12 }) {
+          Stack({ alignContent: Alignment.Center }) {
+            Column()
+              .width(44)
+              .height(44)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+            SymbolGlyph($r('sys.symbol.book_open_fill'))
+              .fontSize(21)
+              .fontColor([Constants.COLOR_BRAND])
+          }
+          Column({ space: 4 }) {
+            Text(course.title)
+              .fontSize(17)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Text(course.topics.length.toString() + ' 个主题 · ' + course.docCount.toString() + ' 份资料')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          SymbolGlyph($r('sys.symbol.chevron_right'))
+            .fontSize(13)
+            .fontColor([Constants.COLOR_TEXT_SECONDARY])
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .constraintSize({ minHeight: 92 })
+      .padding({ left: 14, right: 14 })
+      .backgroundColor(Constants.COLOR_BG_CARD)
+      .accessibilityText(this.courseActionLabel(course) + '：' + course.title)
+      .onClick((): void => { this.openCourse(course); })
+      if (showDivider) {
+        Divider()
+          .width('100%')
+          .color(Constants.COLOR_BORDER)
+      }
+    }
+    .width('100%')
+    .backgroundColor(Constants.COLOR_BG_CARD)
+  }
+
   build() {
     Column() {
-      MainPageHeader('课程', '接着学，或选一个新主题')
+      MainPageHeader('课程', '')
 
       if (this.loading) {
         Column({ space: 10 }) {
@@ -162,105 +274,38 @@ export struct CourseContent {
           .border({ width: 1, color: Constants.COLOR_BORDER })
           .borderRadius(Constants.RADIUS_MD)
         }
-        List({ space: 10 }) {
-          ForEach(this.visibleCourses(), (c: Course) => {
+        List({ space: 0 }) {
+          if (this.courseIsStarted(this.visibleCourses()[0])) {
+            ListItem() {
+              this.FeaturedCourse(this.visibleCourses()[0])
+            }
+          }
+          if (this.visibleCourses().length > 1 || !this.courseIsStarted(this.visibleCourses()[0])) {
             ListItem() {
               Column() {
-                // 课程标题行
-                Row() {
-                  Row({ space: 10 }) {
-                    Stack({ alignContent: Alignment.Center }) {
-                      Column()
-                        .width(42)
-                        .height(42)
-                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                        .borderRadius(13)
-                      SymbolGlyph($r('sys.symbol.book_open_fill'))
-                        .fontSize(22)
-                        .fontColor([Constants.COLOR_BRAND])
+                Text(this.courseIsStarted(this.visibleCourses()[0]) ? '其他课程' : '全部课程')
+                  .width('100%')
+                  .fontSize(Constants.PAGE_SECTION_SIZE)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  .margin({ bottom: 10 })
+                Column() {
+                  ForEach(this.visibleCourses(), (c: Course, index: number) => {
+                    if (index > 0 || !this.courseIsStarted(c)) {
+                      this.CourseDirectoryRow(c, index < this.visibleCourses().length - 1)
                     }
-                    Text(c.title)
-                      .layoutWeight(1)
-                      .fontSize(18)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                      .maxLines(2)
-                  }
-                  .layoutWeight(1)
-                  Text(c.docCount.toString() + ' 份资料')
-                    .fontSize(12)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                    .margin({ left: 8 })
+                  })
                 }
                 .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
-
-                // 进度行
-                Row() {
-                  Text(this.courseProgressLabel(c))
-                    .layoutWeight(1)
-                    .fontSize(12)
-                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .margin({ right: 12 })
-                  Text(Math.round(c.progress * 100).toString() + '%')
-                    .fontSize(12)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(Constants.COLOR_BRAND_TEXT)
-                }
-                .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
-                .margin({ top: 12, bottom: 6 })
-
-                // 进度条
-                Progress({ value: c.progress * 100, total: 100, type: ProgressType.Linear })
-                  .width('100%')
-                  .color(Constants.COLOR_BRAND)
-                  .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-                  .borderRadius(4)
-
-                // 课程主题预览
-                Text(c.topics.slice(0, 3).join(' · '))
-                  .width('100%')
-                  .fontSize(12)
-                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                  .maxLines(2)
-                  .margin({ top: 12 })
-
-                Button({ type: ButtonType.Normal }) {
-                  Row({ space: 8 }) {
-                    SymbolGlyph($r('sys.symbol.book_open_fill'))
-                      .fontSize(16)
-                      .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
-                    Text(this.courseActionLabel(c))
-                      .fontSize(13)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-                    Blank()
-                    SymbolGlyph($r('sys.symbol.chevron_right'))
-                      .fontSize(14)
-                      .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
-                  }
-                  .width('100%')
-                }
-                .width('100%')
-                .constraintSize({ minHeight: 48 })
-                .margin({ top: 6 })
-                .padding({ left: 14, right: 14 })
-                .backgroundColor(Constants.COLOR_BRAND)
-                .borderRadius(Constants.RADIUS_MD)
-                .onClick(() => {
-                  this.openCourse(c);
-                })
+                .backgroundColor(Constants.COLOR_BG_CARD)
+                .border({ width: 1, color: Constants.COLOR_BORDER })
+                .borderRadius(Constants.RADIUS_LG)
+                .clip(true)
               }
               .width('100%')
-              .padding(16)
-              .backgroundColor(Constants.COLOR_BG_CARD)
-              .borderRadius(Constants.RADIUS_LG)
-              .border({ width: 1, color: Constants.COLOR_BORDER })
+              .alignItems(HorizontalAlign.Start)
             }
-          })
+          }
         }
         .width('100%')
         .constraintSize({ maxWidth: 720 })
@@ -268,7 +313,7 @@ export struct CourseContent {
         .layoutWeight(1)
         .cachedCount(3)
         .scrollBar(BarState.Off)
-        .padding({ left: 16, right: 16 })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER })
       } else {
         Column({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.book_open_fill'))

@@ -8085,3 +8085,19 @@ Python 3.12 `unittest discover` 215/215；`test-product-experience-contracts.mjs
 ### 验证与边界
 
 知识页契约 8/8、Python 3.12 `unittest discover` 215/215；HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 安装到 Pura X View。1320×2232 竖屏上由课程进入资料页，使用“二叉搜索树”推荐搜索，UI 树和截图均显示“相关段落”、原文及“进入主题”；截图存于 `.runtime/copy-knowledge-final.png`。本次未单独触发“主题相关”回退分支；真机、横屏、大字号和正式签名包仍未验证。其他任务已有未提交文件保留。
+
+---
+
+## [2026-09-25T12:15:00Z] [2026-09-25 20:15:00 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+复赛首屏抽样显示课程页三张同等大卡和蓝色按钮挤占屏幕，学伴旧会话的回答、练习与资料入口层级松散。按 Pura X View 实际截图、Astra 只读审查和外部学习产品的结构参考完成 A 批：课程用一张续学卡和一个包含两行的课程目录，学伴把身份、回答、练习卡、可展开资料与输入框重新编排；课程和会话数据、提交逻辑、原有路由不改。Astra 复审改后截图，又收紧续学卡底部并统一目录圆角。概念图仅用于构图比较，未作为运行证据，也未复制竞品素材。
+
+### 验证与边界
+
+Python 3.12 `unittest discover` 215/215；Node 两份相关契约 30/30；HarmonyOS API 12 增量 `assembleHap` exit 0，产物未签名。HAP 安装到 Pura X View，1320×2232 竖屏 UI 树和截图确认三门课同屏可辨，改后目录行仍可进入“操作系统 · 进程与线程”，数据结构续学进入“数据结构 · 链表”；学伴保留旧回答、练习和输入，“3 条参考资料”可展开，“去练习”到“数据结构 · 数组与线性表”练习。最终课程截图为 `.runtime/design-audit-20260925/10-course-refined.jpeg`，其余截图和 UI 树也在同目录，不提交。新在线回答、横屏、大字号、真机及签名包未验证。构建有既有 `TextInputController` syscap 提示。A 批只完成高频入口视觉基准，尚未达到全应用视觉收口。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`apps/harmonyos/entry/src/main/ets/pages/Course.ets`、`scripts/test_course_resume_contract.py`、`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`DEVLOG.md`。保留其他任务的未提交文件。
