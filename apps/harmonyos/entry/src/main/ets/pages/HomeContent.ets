@@ -670,7 +670,7 @@ export struct HomeContent {
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text('已保存任务没有被替换，可原地重新读取')
+            Text('任务还在，点此重试')
               .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Button('重新读取计划')

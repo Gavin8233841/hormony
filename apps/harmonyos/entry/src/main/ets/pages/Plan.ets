@@ -710,7 +710,7 @@ struct PlanPage {
   private planErrorMessage(error: Error): string {
     const code = error instanceof HttpStatusError ? error.errorCode : '';
     const retained = this.tasks.length > 0 ? '，上一版计划仍可继续执行' : '';
-    if (code === 'MODEL_UNAVAILABLE') return '在线规划暂不可用，不会用本地模板代替' + retained;
+    if (code === 'MODEL_UNAVAILABLE') return '在线规划暂不可用，请稍后重试' + retained;
     if (code === 'MODEL_TIMEOUT') return '规划等待超时，目标和周期已保留' + retained;
     if (code === 'MODEL_INVALID_RESPONSE') return '返回的计划无法正常显示，请重新生成' + retained;
     if (code === 'SAFETY_BLOCKED') return '计划内容未通过安全检查，请换一种目标描述再试' + retained;
@@ -803,7 +803,7 @@ struct PlanPage {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(17)
             .fontColor([Constants.COLOR_SUCCESS])
-          Text(this.savedPlanLabel() + '已保留，取消或失败后仍可继续执行')
+          Text(this.savedPlanLabel() + '仍可继续执行')
             .layoutWeight(1)
             .fontSize(12)
             .lineHeight(18)
@@ -1147,8 +1147,8 @@ struct PlanPage {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(16)
             .fontColor([Constants.COLOR_SUCCESS])
-          Text(this.retryAction === 'save' ? this.savedPlanLabel() + '未被替换，可以继续执行或重试保存' :
-            this.savedPlanLabel() + '未被替换，可以继续执行或重新生成')
+          Text(this.retryAction === 'save' ? this.savedPlanLabel() + '仍可继续执行，也可重试保存' :
+            this.savedPlanLabel() + '仍可继续执行，也可重新生成')
             .layoutWeight(1)
             .fontSize(12)
             .lineHeight(18)

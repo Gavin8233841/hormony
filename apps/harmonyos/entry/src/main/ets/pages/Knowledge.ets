@@ -150,7 +150,7 @@ struct KnowledgePage {
   private openLesson(item: KnowledgeChunk): void {
     const topic = this.exactTopic(item);
     if (topic.length === 0) {
-      this.message = '该结果未关联当前课程 Topic，无法进入 Lesson';
+      this.message = '该资料尚未关联课程主题，暂时无法开始学习';
       this.hasError = true;
       return;
     }

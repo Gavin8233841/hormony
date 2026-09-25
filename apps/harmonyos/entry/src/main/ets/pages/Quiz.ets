@@ -1265,7 +1265,7 @@ struct QuizPage {
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
           }
           .width('100%')
-          Text('画像累计 ' + this.writeBackTotalQuestions.toString() + ' 题 · 当前错题 ' +
+          Text('累计答题 ' + this.writeBackTotalQuestions.toString() + ' 题 · 当前错题 ' +
             this.writeBackActiveReviews.toString() + ' 道')
             .width('100%')
             .fontSize(12)
