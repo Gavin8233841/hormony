@@ -301,7 +301,7 @@ export function ReviewDetailRow(
           .fontColor(Constants.COLOR_TEXT_TERTIARY)
         Button({ type: ButtonType.Normal }) {
           Row({ space: 6 }) {
-            SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
+            SymbolGlyph($r('sys.symbol.rays'))
               .fontSize(15)
               .fontColor([Constants.COLOR_BRAND])
             Text('向学伴追问')

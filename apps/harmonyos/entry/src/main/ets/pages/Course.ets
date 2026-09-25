@@ -72,6 +72,12 @@ export struct CourseContent {
     return course.progress > 0 || hasCourseStarted(this.resumeState(course)) ? '继续课程' : '进入课程';
   }
 
+  private courseArtwork(courseId: string): Resource {
+    if (courseId === 'cs102') return $r('app.media.course_os');
+    if (courseId === 'cs103') return $r('app.media.course_network');
+    return $r('app.media.course_data');
+  }
+
   private courseIsStarted(course: Course): boolean {
     return course.progress > 0 || hasCourseStarted(this.resumeState(course));
   }
@@ -130,27 +136,31 @@ export struct CourseContent {
   @Builder
   FeaturedCourse(course: Course) {
     Column({ space: 10 }) {
-      Text('接着学')
-        .fontSize(12)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Constants.courseInk(course.id))
-      Row() {
-        Text(course.title)
-          .layoutWeight(1)
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text(course.docCount.toString() + ' 份资料')
-          .fontSize(12)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Row({ space: 8 }) {
+        Column({ space: 6 }) {
+          Text('接着学')
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.courseInk(course.id))
+          Text(course.title)
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(this.courseProgressLabel(course))
+            .width('100%')
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .maxLines(2)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Image(this.courseArtwork(course.id))
+          .width(96)
+          .height(96)
+          .objectFit(ImageFit.Contain)
+          .accessibilityText('')
       }
       .width('100%')
-      Text(this.courseProgressLabel(course))
-        .width('100%')
-        .fontSize(13)
-        .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
       Row({ space: 20 }) {
         Row({ space: 10 }) {
           Progress({ value: course.progress * 100, total: 100, type: ProgressType.Linear })
@@ -175,64 +185,60 @@ export struct CourseContent {
           .onClick((): void => { this.openCourse(course); })
       }
       .width('100%')
+      .padding({ left: 12, right: 8, top: 7, bottom: 7 })
+      .backgroundColor(Constants.COLOR_HERO_INSET)
+      .borderRadius(15)
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding(18)
-    .backgroundColor(Constants.COLOR_BG_CARD)
-    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .backgroundColor(Constants.courseTint(course.id))
     .borderRadius(Constants.RADIUS_XL)
     .margin({ bottom: 20 })
   }
 
   @Builder
-  CourseDirectoryRow(course: Course, showDivider: boolean) {
-    Column() {
-      Button({ type: ButtonType.Normal }) {
-        Row({ space: 12 }) {
-          Stack({ alignContent: Alignment.Center }) {
-            Column()
-              .width(44)
-              .height(44)
-              .backgroundColor(Constants.courseTint(course.id))
-              .borderRadius(Constants.RADIUS_MD)
-            SymbolGlyph($r('sys.symbol.book_open_fill'))
-              .fontSize(21)
+  CourseDirectoryRow(course: Course) {
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 8 }) {
+        Column({ space: 5 }) {
+          Text(course.title)
+            .fontSize(18)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          Text(course.topics.length.toString() + ' 个主题 · ' + course.docCount.toString() + ' 份资料')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Row({ space: 4 }) {
+            Text(this.courseIsStarted(course) ? '继续学习' : '进入课程')
+              .fontSize(11)
+              .fontColor(Constants.courseInk(course.id))
+            SymbolGlyph($r('sys.symbol.arrow_up_right'))
+              .fontSize(11)
               .fontColor([Constants.courseInk(course.id)])
           }
-          Column({ space: 4 }) {
-            Text(course.title)
-              .fontSize(17)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text(course.topics.length.toString() + ' 个主题 · ' + course.docCount.toString() + ' 份资料')
-              .fontSize(12)
-              .fontColor(Constants.COLOR_TEXT_SECONDARY)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.chevron_right'))
-            .fontSize(13)
-            .fontColor([Constants.COLOR_TEXT_SECONDARY])
+          .margin({ top: 4 })
         }
-        .width('100%')
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Image(this.courseArtwork(course.id))
+          .width(74)
+          .height(74)
+          .objectFit(ImageFit.Contain)
+          .accessibilityText('')
       }
       .width('100%')
-      .constraintSize({ minHeight: 92 })
-      .padding({ left: 14, right: 14 })
-      .backgroundColor(Constants.COLOR_BG_CARD)
-      .accessibilityText(this.courseActionLabel(course) + '：' + course.title)
-      .onClick((): void => { this.openCourse(course); })
-      if (showDivider) {
-        Divider()
-          .width('100%')
-          .color(Constants.COLOR_BORDER)
-      }
     }
     .width('100%')
-    .backgroundColor(Constants.COLOR_BG_CARD)
+    .height(108)
+    .padding({ left: 16, right: 12 })
+    .backgroundColor(Constants.courseTint(course.id))
+    .borderRadius(Constants.RADIUS_XL)
+    .margin({ bottom: 10 })
+    .accessibilityText(this.courseActionLabel(course) + '：' + course.title)
+    .onClick((): void => { this.openCourse(course); })
   }
 
   build() {
@@ -292,15 +298,11 @@ export struct CourseContent {
                 Column() {
                   ForEach(this.visibleCourses(), (c: Course, index: number) => {
                     if (index > 0 || !this.courseIsStarted(c)) {
-                      this.CourseDirectoryRow(c, index < this.visibleCourses().length - 1)
+                      this.CourseDirectoryRow(c)
                     }
                   })
                 }
                 .width('100%')
-                .backgroundColor(Constants.COLOR_BG_CARD)
-                .border({ width: 1, color: Constants.COLOR_BORDER })
-                .borderRadius(Constants.RADIUS_LG)
-                .clip(true)
               }
               .width('100%')
               .alignItems(HorizontalAlign.Start)

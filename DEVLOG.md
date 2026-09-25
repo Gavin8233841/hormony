@@ -8151,3 +8151,21 @@ Python 3.12 `unittest discover` 215/215；Node 相关契约 46/46；生成知识
 ### 涉及文件
 
 `Builders.ets`、`Lesson.ets`、`Practice.ets`、`cs102-knowledge.ts` 及其端侧生成知识数据、`ACTIVE-LEARNING-SPEC-CS101.md` 及其生成体验数据、设计参考、实施交接和本日志。
+
+---
+
+## [2026-09-26T04:45:00Z] [2026-09-26 12:45:00 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+用户认为复赛 App 仍偏白板，要求参考更多成熟学习和 Agent App、提升色彩及卡片层次、优化底部 Tab 与学伴对话，并探索原创可复用的拟人化角色。本批由只读 Astra 审美评审和轻型资料检索给出结构建议，主代理在 ArkUI 落地：今日主卡使用深灰绿背景、奶油色进度与行动内嵌区及学习阶梯图；课程卡使用三幅原创小图、不同识别色与更清楚的重点/其他课程层级；底部 Tab 改为选中横向胶囊。学伴页去除重复气泡符号，使用“小鸿”头像、暖色行动卡和无会话欢迎卡；欢迎卡只做一次短淡入。课程、对话、计划数据和原有行动路由没有改。
+
+“小鸿”第一批投产头像与全身欢迎图已核对真实透明通道；多姿态实验图因假棋盘格或深色背景拒绝加入产品，不冒称已完成锁定角色包。角色识别、页面使用位置、下一批姿态的质量门槛见 `docs/VISUAL-IDENTITY-XIAOHONG-20260926.md`。未使用竞品、美术网站或用户截图中的人物与图片。参考和落地决定见 `docs/DESIGN-REFERENCE-20260925.md`。
+
+### 验证与边界
+
+Python 3.12 `unittest discover` 215/215，三份相关 Node 契约 46/46，`git diff --check` exit 0。HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 已安装并启动到 Pura X View；1320×2232 竖屏截图为 `.runtime/design-audit-20260925/40-home-layered-e.jpeg`、`43-chat-final-e.jpeg`、`45-course-final-e.jpeg`。UI 树确认底部课程和学伴 Tab 位置，学伴旧对话保留回复、可执行练习与资料入口。未验证无历史欢迎卡运行画面、大字号、横屏、真机、新在线模型回答与签名包；构建仍有既有 `TextInputController` syscap 与未签名提示。模拟器已有学习记录保留，未清空。
+
+### 涉及文件
+
+`Constants.ets`、`Builders.ets`、`HomeContent.ets`、`Course.ets`、`Chat.ets`、`Index.ets`、六张原创 PNG、两份设计文档、实施交接和本日志。其他任务的未提交文件保留。

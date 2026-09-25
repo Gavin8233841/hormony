@@ -1,6 +1,6 @@
 /**
  * AI 辅导页
- * 浅色主题 · 渐变标题栏 · SSE 流式接收 · 欢迎引导
+ * 学伴对话 · SSE 流式接收 · 学习行动
  */
 
 import http from '@ohos.net.http';
@@ -10,7 +10,6 @@ import { Citation, StreamEvent, ChatRequest, ChatMessage, ChatContext, ChatActio
   HealthResponse } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { ProactiveLearningAction, ProactiveLearningLaunch, ProactiveLearningService } from '../common/ProactiveLearningService';
-import { MainPageHeader } from '../common/Builders';
 
 interface DisplayMessage {
   role: string;
@@ -55,6 +54,8 @@ export struct ChatContent {
   @State contextExpanded: boolean = false;
   @State actionMessage: string = '';
   @State actionOpening: boolean = false;
+  @State welcomeOpacity: number = 0;
+  @State welcomeOffset: number = 8;
   private activeChatContext: ChatContext | null = null;
   private scroller: Scroller = new Scroller();
   private inputController: TextInputController = new TextInputController();
@@ -87,6 +88,15 @@ export struct ChatContent {
     this.currentCancellation = null;
     this.receivedDone = false;
     this.activeRequestId = 0;
+    this.welcomeOpacity = 0;
+    this.welcomeOffset = 8;
+    setTimeout((): void => {
+      if (!this.isActiveLifecycle(lifecycleRunId)) return;
+      this.getUIContext().animateTo({ duration: 260, curve: Curve.EaseOut }, (): void => {
+        this.welcomeOpacity = 1;
+        this.welcomeOffset = 0;
+      });
+    }, 50);
     this.historyLoading = true;
     this.loadLocalHistory(lifecycleRunId);
     this.probeCloudAgent(lifecycleRunId);
@@ -713,22 +723,21 @@ export struct ChatContent {
 
   build() {
     Column() {
-      if (this.messages.length === 0) {
-        MainPageHeader('学伴', '')
-      } else {
-        Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
-            .fontSize(19)
-            .fontColor([Constants.COLOR_BRAND])
-          Text('学伴')
-            .fontSize(20)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        }
-        .width('100%')
-        .constraintSize({ minHeight: 56 })
-        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER })
+      Row({ space: 9 }) {
+        Image($r('app.media.mascot_xiaohong_avatar'))
+          .width(34)
+          .height(34)
+          .objectFit(ImageFit.Contain)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(13)
+        Text('学伴')
+          .fontSize(20)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
       }
+      .width('100%')
+      .constraintSize({ minHeight: 56 })
+      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER })
 
       if (this.contextSummary.length > 0) {
         Column({ space: 5 }) {
@@ -780,30 +789,45 @@ export struct ChatContent {
 
       // 消息列表 / 欢迎页
       if (this.messages.length === 0) {
-        // 欢迎引导
+        // 欢迎引导：角色只在空状态完整出现，不挤占回答区域。
         Column() {
-          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
-            .width(48)
-            .height(48)
-            .fontSize(24)
-            .fontColor([Constants.COLOR_BRAND])
-            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-            .borderRadius(Constants.RADIUS_MD)
+          Row() {
+            Column({ space: 8 }) {
+              Text('小鸿在这儿')
+                .fontSize(24)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Constants.COLOR_MAP_CORE)
+              Text('课程、错题，都可以问。')
+                .fontSize(13)
+                .lineHeight(19)
+                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
 
-          Text('今天想弄懂什么？')
-            .fontSize(22)
+            Image($r('app.media.mascot_xiaohong_welcome'))
+              .width(112)
+              .height(142)
+              .objectFit(ImageFit.Contain)
+              .accessibilityText('小鸿挥手欢迎')
+          }
+          .width('100%')
+          .height(176)
+          .padding({ left: 20, right: 8, top: 12, bottom: 8 })
+          .backgroundColor(Constants.COLOR_HERO_SURFACE)
+          .borderRadius(Constants.RADIUS_XL)
+          .opacity(this.welcomeOpacity)
+          .translate({ y: this.welcomeOffset })
+
+          Text('试试这样问')
+            .width('100%')
+            .fontSize(17)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            .margin({ top: 16 })
+            .margin({ top: 24, bottom: 12 })
 
-          Text('可以从课程、错题或一个具体问题开始。')
-            .fontSize(14)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .margin({ top: 6, left: 20, right: 20 })
-            .textAlign(TextAlign.Center)
-
-          Column({ space: 0 }) {
-            ForEach(this.suggestions, (s: string) => {
+          Column({ space: 8 }) {
+            ForEach(this.suggestions, (s: string, index: number) => {
               Button({ type: ButtonType.Normal }) {
                 Row() {
                   Text(s)
@@ -819,7 +843,9 @@ export struct ChatContent {
                 .width('100%')
                 .constraintSize({ minHeight: 56 })
                 .padding({ left: 16, right: 16 })
-                .backgroundColor(Constants.COLOR_BG_CARD)
+                .backgroundColor(index === 0 ? Constants.COLOR_BRAND_LIGHT :
+                  (index === 1 ? Constants.COLOR_COURSE_OS_LIGHT : Constants.COLOR_HERO_INSET))
+                .borderRadius(Constants.RADIUS_LG)
                 .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
                   !this.historyLoadFailed)
                 .accessibilityText('提问：' + s)
@@ -828,22 +854,15 @@ export struct ChatContent {
                   this.inputText = s;
                   this.sendMessage();
                 })
-              Divider()
-                .width('100%')
-                .color(Constants.COLOR_BORDER)
             })
           }
           .width('100%')
-          .backgroundColor(Constants.COLOR_BG_CARD)
-          .border({ width: 1, color: Constants.COLOR_BORDER })
-          .borderRadius(Constants.RADIUS_LG)
-          .margin({ top: 24 })
         }
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Start)
         .alignItems(HorizontalAlign.Center)
-        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 48 })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 20 })
         .constraintSize({ maxWidth: 760 })
       } else {
         // 消息列表
@@ -1306,10 +1325,13 @@ export struct ChatContent {
         Column() {
           Column() {
             Row({ space: 7 }) {
-              SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
-                .fontSize(16)
-                .fontColor([Constants.COLOR_BRAND])
-              Text('鸿学伴')
+              Image($r('app.media.mascot_xiaohong_avatar'))
+                .width(26)
+                .height(26)
+                .objectFit(ImageFit.Contain)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(10)
+              Text('小鸿')
                 .fontSize(12)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -1409,10 +1431,16 @@ export struct ChatContent {
   @Builder
   ActionCard(action: ChatAction) {
     Column({ space: 8 }) {
-      Text(action.kind === 'lesson' ? '接着学' : action.kind === 'quiz' ? '测一测' : '接着练')
-        .fontSize(12)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Constants.COLOR_BRAND_TEXT)
+      Row({ space: 6 }) {
+        SymbolGlyph($r(action.kind === 'lesson' ? 'sys.symbol.book_open_fill' :
+          'sys.symbol.checkmark_circle_fill'))
+          .fontSize(14)
+          .fontColor([Constants.COLOR_BRAND_TEXT])
+        Text(action.kind === 'lesson' ? '接着学' : action.kind === 'quiz' ? '测一测' : '接着练')
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+      }
       Row({ space: 12 }) {
         Text(action.title)
           .layoutWeight(1)
@@ -1437,9 +1465,8 @@ export struct ChatContent {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .padding(14)
-    .backgroundColor(Constants.COLOR_BG_CARD)
-    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .padding(16)
+    .backgroundColor(action.kind === 'quiz' ? Constants.COLOR_COURSE_OS_LIGHT : Constants.COLOR_HERO_INSET)
     .borderRadius(Constants.RADIUS_LG)
     .margin({ top: 12, bottom: 4 })
   }

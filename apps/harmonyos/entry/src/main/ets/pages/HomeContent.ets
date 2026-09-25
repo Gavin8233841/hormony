@@ -19,6 +19,10 @@ export struct HomeContent {
   @State notificationOpen: boolean = false;
   @State notificationState: string = 'idle';
   @State pressedTask: number = -1;
+  @State pressedPrimary: boolean = false;
+  @State pressedCourseId: string = '';
+  @State todayExpanded: boolean = false;
+  @State artworkRevealed: boolean = false;
   @State updatingTaskId: string = '';
   @State taskUpdateMessage: string = '';
   @State taskUpdateFailed: boolean = false;
@@ -51,6 +55,9 @@ export struct HomeContent {
   aboutToAppear(): void {
     this.loadPlan();
     this.loadNextAction();
+    setTimeout((): void => {
+      this.artworkRevealed = true;
+    }, 80);
   }
 
   private refreshLearningView(): void {
@@ -238,6 +245,12 @@ export struct HomeContent {
     return '数据结构';
   }
 
+  private courseArtwork(courseId: string): Resource {
+    if (courseId === 'cs102') return $r('app.media.course_os');
+    if (courseId === 'cs103') return $r('app.media.course_network');
+    return $r('app.media.course_data');
+  }
+
   private alternativeCourseIds(): string[] {
     return ['cs101', 'cs102', 'cs103'].filter((courseId: string): boolean =>
       courseId !== this.nextActionCourseId).slice(0, 2);
@@ -314,14 +327,6 @@ export struct HomeContent {
         'HomeContent proactive action navigation failed: %{public}s', err.message);
       this.nextActionNavigationMessage = '暂时无法打开学习内容，请重试';
     });
-  }
-
-  private nextActionIcon(): Resource {
-    if (this.nextActionKind === 'review') return $r('sys.symbol.clock');
-    if (this.nextActionKind === 'tag') return $r('sys.symbol.rays');
-    if (this.nextActionKind === 'task') return $r('sys.symbol.calendar_fill');
-    if (this.nextActionKind === 'plan') return $r('sys.symbol.calendar_badge_plus');
-    return $r('sys.symbol.book_open_fill');
   }
 
   @Builder
@@ -436,7 +441,7 @@ export struct HomeContent {
 
   @Builder
   ContinueCard() {
-    Column({ space: 14 }) {
+    Column({ space: 8 }) {
       if (this.nextActionLoading) {
         Row({ space: 10 }) {
           Column()
@@ -494,20 +499,13 @@ export struct HomeContent {
           .onClick((): void => { this.loadNextAction(); })
       } else {
         Row({ space: 8 }) {
-          Stack({ alignContent: Alignment.Center }) {
-            Column()
-              .width(32)
-              .height(32)
-              .backgroundColor(Constants.COLOR_BRAND)
-              .borderRadius(9)
-            SymbolGlyph(this.nextActionIcon())
-              .fontSize(17)
-              .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
-          }
           Text(this.nextActionBadge)
-            .fontSize(14)
+            .fontSize(11)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_MAP_CORE)
+            .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+            .backgroundColor(Constants.COLOR_HERO_BADGE)
+            .borderRadius(9)
           Blank()
           if (this.nextActionKind === 'task' && this.todayTasks().length > 0) {
             Row({ space: 4 }) {
@@ -529,41 +527,76 @@ export struct HomeContent {
         }
         .width('100%')
 
-        Text(this.nextActionTitle)
-          .width('100%')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_MAP_CORE)
-          .maxLines(2)
-
-        Text(this.nextActionEvidence.length > 0 ?
-          this.nextActionEvidence + ' · ' + this.nextActionSubtitle : this.nextActionSubtitle)
-        .width('100%')
-          .fontSize(12)
-          .lineHeight(19)
-          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-          .maxLines(2)
-
-        Button() {
-          Row({ space: 6 }) {
-            Text(this.nextActionCta)
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            SymbolGlyph($r('sys.symbol.chevron_right'))
-              .fontSize(15)
-              .fontColor([Constants.COLOR_TEXT_ON_GRADIENT])
+        Row({ space: 4 }) {
+          Column({ space: 7 }) {
+            Text(this.nextActionTitle)
+              .width('100%')
+              .fontSize(22)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Constants.COLOR_MAP_CORE)
+              .maxLines(2)
+            Text(this.nextActionEvidence.length > 0 ?
+              this.nextActionEvidence + ' · ' + this.nextActionSubtitle : this.nextActionSubtitle)
+              .width('100%')
+              .fontSize(12)
+              .lineHeight(19)
+              .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+              .maxLines(2)
           }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          Image($r('app.media.hero_learning_steps'))
+            .width(102)
+            .height(94)
+            .objectFit(ImageFit.Contain)
+            .opacity(this.artworkRevealed ? 1 : 0)
+            .translate({ y: this.artworkRevealed ? 0 : 8 })
+            .scale({ x: this.artworkRevealed ? 1 : 0.94, y: this.artworkRevealed ? 1 : 0.94 })
+            .animation({ duration: 260, curve: Curve.EaseOut })
+            .accessibilityText('')
         }
         .width('100%')
-        .height(48)
-        .backgroundColor(Constants.COLOR_BRAND)
-        .borderRadius(Constants.RADIUS_MD)
-        .accessibilityText(this.nextActionCta + '，' + this.nextActionTitle)
-        .onClick(() => {
-          this.nextActionNavigationMessage = '';
-          this.openNextAction();
-        })
+        .alignItems(VerticalAlign.Center)
+
+        Row({ space: 8 }) {
+          Text(this.nextActionProgressText)
+            .layoutWeight(1)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_HERO_SURFACE)
+            .maxLines(1)
+          Button() {
+            Row({ space: 4 }) {
+              Text(this.nextActionCta)
+                .fontSize(13)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_MAP_CORE)
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(13)
+                .fontColor([Constants.COLOR_MAP_CORE])
+            }
+          }
+          .height(44)
+          .padding({ left: 14, right: 12 })
+          .backgroundColor(Constants.COLOR_HERO_SURFACE)
+          .borderRadius(12)
+          .scale({ x: this.pressedPrimary ? 0.98 : 1, y: this.pressedPrimary ? 0.98 : 1 })
+          .animation({ duration: this.pressedPrimary ? 120 : 180, curve: Curve.EaseOut })
+          .accessibilityText(this.nextActionCta + '，' + this.nextActionTitle)
+          .onTouch((event?: TouchEvent): void => {
+            if (event) {
+              this.pressedPrimary = event.type === TouchType.Down;
+            }
+          })
+          .onClick(() => {
+            this.nextActionNavigationMessage = '';
+            this.openNextAction();
+          })
+        }
+        .width('100%')
+        .height(56)
+        .padding({ left: 12, right: 6 })
+        .backgroundColor(Constants.COLOR_HERO_INSET)
+        .borderRadius(15)
 
         if (this.nextActionNavigationMessage.length > 0) {
           Text(this.nextActionNavigationMessage)
@@ -577,9 +610,9 @@ export struct HomeContent {
     .width('100%')
     .padding(16)
     .backgroundColor(this.nextActionReady && !this.nextActionLoading && !this.nextActionError ?
-      Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_CARD)
-    .borderRadius(Constants.RADIUS_LG)
-    .shadow({ radius: 6, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
+      Constants.COLOR_HERO_SURFACE : Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_XL)
+    .shadow({ radius: 12, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 5 })
   }
 
   @Builder
@@ -745,14 +778,43 @@ export struct HomeContent {
           .width('100%')
           .padding({ top: 18, bottom: 18 })
         } else {
-          ForEach(this.otherTodayTasks().slice(0, 3), (task: PlanTask, index: number) => {
-            this.TaskRow(task, index)
-            if (index < Math.min(this.otherTodayTasks().length, 3) - 1) {
-              Divider()
-                .color(Constants.COLOR_BORDER)
-                .margin({ left: 46 })
+          Button({ type: ButtonType.Normal }) {
+            Row({ space: 8 }) {
+              Text('还有 ' + this.otherTodayTasks().length.toString() + ' 项')
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              Blank()
+              Text(this.todayExpanded ? '收起' : '展开')
+                .fontSize(12)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(12)
+                .fontColor([Constants.COLOR_TEXT_SECONDARY])
+                .rotate({ angle: this.todayExpanded ? 90 : 0 })
+                .animation({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut })
             }
+            .width('100%')
+          }
+          .width('100%')
+          .height(52)
+          .backgroundColor(Color.Transparent)
+          .accessibilityText(this.todayExpanded ? '收起今日其他学习任务' : '展开今日其他学习任务')
+          .onClick((): void => {
+            this.getUIContext().animateTo({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut }, (): void => {
+              this.todayExpanded = !this.todayExpanded;
+            });
           })
+          if (this.todayExpanded) {
+            ForEach(this.otherTodayTasks().slice(0, 3), (task: PlanTask, index: number) => {
+              this.TaskRow(task, index)
+              if (index < Math.min(this.otherTodayTasks().length, 3) - 1) {
+                Divider()
+                  .color(Constants.COLOR_BORDER)
+                  .margin({ left: 46 })
+              }
+            })
+          }
         }
       }
       .width('100%')
@@ -775,41 +837,57 @@ export struct HomeContent {
   @Builder
   CourseJump(courseId: string) {
     Button({ type: ButtonType.Normal }) {
-      Column({ space: 8 }) {
-        Row() {
-          Stack({ alignContent: Alignment.Center }) {
-            Column()
-              .width(34)
-              .height(34)
-              .backgroundColor(Constants.COLOR_BG_CARD)
-              .borderRadius(11)
-            SymbolGlyph($r('sys.symbol.book_open_fill'))
-              .fontSize(17)
-              .fontColor([Constants.courseInk(courseId)])
-          }
-          Blank()
-          SymbolGlyph($r('sys.symbol.arrow_up_right'))
-            .fontSize(16)
-            .fontColor([Constants.courseInk(courseId)])
-        }
-        .width('100%')
+      Column({ space: 2 }) {
         Text(this.courseTitle(courseId))
+          .width('100%')
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text(LearningContentRepository.getTopics(courseId).length.toString() + ' 个主题')
-          .fontSize(12)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .maxLines(1)
+        Row({ space: 2 }) {
+          Column() {
+          Text(LearningContentRepository.getTopics(courseId).length.toString() + ' 个主题')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Blank()
+          SymbolGlyph($r('sys.symbol.arrow_up_right'))
+            .fontSize(13)
+            .fontColor([Constants.courseInk(courseId)])
+            .width(28)
+            .height(28)
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(14)
+          }
+          .layoutWeight(1)
+          .height('100%')
+          .alignItems(HorizontalAlign.Start)
+          Image(this.courseArtwork(courseId))
+            .width(76)
+            .height(80)
+            .objectFit(ImageFit.Contain)
+            .accessibilityText('')
+        }
+        .width('100%')
+        .layoutWeight(1)
       }
       .width('100%')
+      .height('100%')
       .alignItems(HorizontalAlign.Start)
     }
     .layoutWeight(1)
-    .constraintSize({ minHeight: 118 })
+    .height(142)
     .padding(14)
     .backgroundColor(Constants.courseTint(courseId))
-    .borderRadius(Constants.RADIUS_LG)
+    .borderRadius(Constants.RADIUS_XL)
+    .scale({ x: this.pressedCourseId === courseId ? 0.98 : 1,
+      y: this.pressedCourseId === courseId ? 0.98 : 1 })
+    .animation({ duration: this.pressedCourseId === courseId ? 120 : 180, curve: Curve.EaseOut })
     .accessibilityText('进入' + this.courseTitle(courseId) + '课程')
+    .onTouch((event?: TouchEvent): void => {
+      if (event) {
+        this.pressedCourseId = event.type === TouchType.Down ? courseId : '';
+      }
+    })
     .onClick((): void => { this.openCourse(courseId); })
   }
 
@@ -853,7 +931,7 @@ export struct HomeContent {
           .height(38)
           .backgroundColor(Constants.COLOR_BRAND_LIGHT)
           .borderRadius(13)
-        SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
+        SymbolGlyph($r('sys.symbol.rays'))
           .fontSize(20)
           .fontColor([Constants.COLOR_BRAND])
       }

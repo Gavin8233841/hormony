@@ -35,50 +35,54 @@ export class Constants {
 
   // 颜色常量（统一收口，禁止页面内硬编码颜色）
   // 文字色
-  static readonly COLOR_TEXT_PRIMARY: string = '#111827';
-  static readonly COLOR_TEXT_SECONDARY: string = '#606b80';
-  static readonly COLOR_TEXT_PLACEHOLDER: string = '#606b80';
-  static readonly COLOR_TEXT_TERTIARY: string = '#526078';
+  static readonly COLOR_TEXT_PRIMARY: string = '#243d3a';
+  static readonly COLOR_TEXT_SECONDARY: string = '#5c6d68';
+  static readonly COLOR_TEXT_PLACEHOLDER: string = '#5c6d68';
+  static readonly COLOR_TEXT_TERTIARY: string = '#50645e';
   // 品牌与功能色
-  static readonly COLOR_BRAND: string = '#176bff';
-  static readonly COLOR_BRAND_TEXT: string = '#0b57d0';
+  static readonly COLOR_BRAND: string = '#2d665b';
+  static readonly COLOR_BRAND_TEXT: string = '#23594f';
   static readonly COLOR_SUCCESS: string = '#18794e';
   static readonly COLOR_WARNING: string = '#9a5b00';
   static readonly COLOR_ERROR: string = '#b42318';
   // 背景色
-  static readonly COLOR_BG_CARD: string = '#ffffff';
-  static readonly COLOR_BG_PAGE: string = '#f4f7fc';
-  static readonly COLOR_BG_PROGRESS_TRACK: string = '#dce4f0';
-  static readonly COLOR_BG_SKELETON: string = '#e7edf6';
-  static readonly COLOR_BG_TAG: string = '#eef3fa';
-  static readonly COLOR_BORDER: string = '#e5ebf4';
-  static readonly COLOR_SURFACE_TINT: string = '#f8fbff';
-  static readonly COLOR_NAV_SURFACE: string = '#f2ffffff';
-  static readonly COLOR_NAV_INACTIVE: string = '#667085';
+  static readonly COLOR_BG_CARD: string = '#fdfbf5';
+  static readonly COLOR_BG_PAGE: string = '#f3f1ea';
+  static readonly COLOR_BG_PROGRESS_TRACK: string = '#d8e2da';
+  static readonly COLOR_BG_SKELETON: string = '#e8ebe5';
+  static readonly COLOR_BG_TAG: string = '#eaf0e9';
+  static readonly COLOR_BORDER: string = '#dfe5dc';
+  static readonly COLOR_SURFACE_TINT: string = '#faf8f2';
+  static readonly COLOR_NAV_SURFACE: string = '#fdfbf5';
+  static readonly COLOR_NAV_INACTIVE: string = '#64716b';
   // 浅色背景（带透明度，用于标签底色）
-  static readonly COLOR_BRAND_LIGHT: string = '#eaf2ff';
-  static readonly COLOR_CHAT_USER: string = '#e8f0ff';
+  static readonly COLOR_BRAND_LIGHT: string = '#e3eee7';
+  static readonly COLOR_CHAT_USER: string = '#e8f1e9';
   static readonly COLOR_ERROR_LIGHT: string = '#fff0f1';
   static readonly COLOR_SUCCESS_LIGHT: string = '#eaf8ef';
   // 三门课程的识别色；状态仍由独立的成功、警告、错误色表达。
-  static readonly COLOR_COURSE_OS_LIGHT: string = '#f1edff';
-  static readonly COLOR_COURSE_OS_INK: string = '#6651a8';
-  static readonly COLOR_COURSE_NETWORK_LIGHT: string = '#e6f6f3';
-  static readonly COLOR_COURSE_NETWORK_INK: string = '#17766c';
+  static readonly COLOR_COURSE_OS_LIGHT: string = '#e5dfec';
+  static readonly COLOR_COURSE_OS_INK: string = '#62537c';
+  static readonly COLOR_COURSE_NETWORK_LIGHT: string = '#dde7df';
+  static readonly COLOR_COURSE_NETWORK_INK: string = '#286b63';
+  static readonly COLOR_HERO_SURFACE: string = '#203e39';
+  static readonly COLOR_HERO_BADGE: string = '#426257';
+  static readonly COLOR_HERO_INSET: string = '#ede7d9';
+  static readonly COLOR_HERO_ACCENT: string = '#f1d5bc';
   // 学习图谱：深色星云画布 + 真实状态色，不用装饰线冒充先修关系。
-  static readonly COLOR_MAP_SURFACE: string = '#111827';
+  static readonly COLOR_MAP_SURFACE: string = '#193f3b';
   static readonly COLOR_MAP_LINE: string = '#34415c';
   static readonly COLOR_MAP_LINE_ACTIVE: string = '#6fb6ff';
   static readonly COLOR_MAP_NODE_IDLE: string = '#70809f';
-  static readonly COLOR_MAP_TEXT_MUTED: string = '#9aa8c4';
-  static readonly COLOR_MAP_CORE: string = '#eef5ff';
+  static readonly COLOR_MAP_TEXT_MUTED: string = '#c2d8ce';
+  static readonly COLOR_MAP_CORE: string = '#f8f6ef';
   static readonly COLOR_MAP_STAR: string = '#dbeafe';
 
   // 阴影色（带透明度的黑色）
   static readonly SHADOW_CARD: string = '#120f2748';
   static readonly SHADOW_CARD_LG: string = '#1a0f2748';
   // 品牌阴影色（用于AI头像等品牌色元素的阴影）
-  static readonly SHADOW_BRAND: string = '#35176bff';
+  static readonly SHADOW_BRAND: string = '#352d665b';
 
   // 强调背景上的文字色
   static readonly COLOR_TEXT_ON_GRADIENT: string = '#ffffff';

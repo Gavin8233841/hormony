@@ -162,19 +162,39 @@ struct Index {
 
   @Builder
   TabItem(title: string, icon: Resource, selectedIcon: Resource, index: number) {
-    Column({ space: 4 }) {
-      SymbolGlyph(this.currentIndex === index ? selectedIcon : icon)
-        .fontSize(22)
-        .fontColor([this.currentIndex === index ? Constants.COLOR_BRAND : Constants.COLOR_NAV_INACTIVE])
-        .scale({ x: this.currentIndex === index ? 1.06 : 1, y: this.currentIndex === index ? 1.06 : 1 })
-        .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
-      Text(title)
-        .fontSize(11)
-        .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Regular)
-        .fontColor(this.currentIndex === index ? Constants.COLOR_BRAND : Constants.COLOR_NAV_INACTIVE)
+    Column() {
+      if (this.currentIndex === index) {
+        Row({ space: 5 }) {
+          SymbolGlyph(selectedIcon)
+            .fontSize(19)
+            .fontColor([Constants.COLOR_MAP_CORE])
+          Text(title)
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_MAP_CORE)
+        }
+        .width('100%')
+        .height(48)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(Constants.COLOR_HERO_SURFACE)
+        .borderRadius(17)
+      } else {
+        Column({ space: 2 }) {
+          SymbolGlyph(icon)
+            .fontSize(20)
+            .fontColor([Constants.COLOR_NAV_INACTIVE])
+          Text(title)
+            .fontSize(10)
+            .fontColor(Constants.COLOR_NAV_INACTIVE)
+        }
+        .width('100%')
+        .height(48)
+        .justifyContent(FlexAlign.Center)
+      }
     }
     .width('25%')
     .height('100%')
+    .padding(5)
     .justifyContent(FlexAlign.Center)
     .onClick(() => {
       this.selectTab(index);
@@ -186,16 +206,16 @@ struct Index {
     Row() {
       this.TabItem('今日', $r('sys.symbol.calendar'), $r('sys.symbol.calendar_fill'), 0)
       this.TabItem('课程', $r('sys.symbol.book_open_fill'), $r('sys.symbol.book_open_fill'), 1)
-      this.TabItem('学伴', $r('sys.symbol.ellipsis_message'), $r('sys.symbol.ellipsis_message_fill'), 2)
+      this.TabItem('学伴', $r('sys.symbol.rays'), $r('sys.symbol.rays'), 2)
       this.TabItem('我的', $r('sys.symbol.person'), $r('sys.symbol.person_2_fill'), 3)
     }
     .width('92%')
     .constraintSize({ maxWidth: 520 })
     .height(Constants.NAV_HEIGHT)
     .backgroundColor(Constants.COLOR_NAV_SURFACE)
-    .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
-    .borderRadius(22)
-    .shadow({ radius: 6, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
+    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .borderRadius(24)
+    .shadow({ radius: 18, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 5 })
     .zIndex(2)
   }
 

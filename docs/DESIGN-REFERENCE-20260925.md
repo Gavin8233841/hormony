@@ -32,3 +32,11 @@
 Pura X View 竖屏截图存于 `.runtime/design-audit-20260925/23-home-final-d1.jpeg` 和 `22-plan-verified-d1.jpeg`。抽样验证了首页课程直达、首页进入计划、计划任务进入对应 Lesson；这些截图不代表大字号、横屏或真机验收。
 
 D2 把学习页的推演改成“当前步骤、下一步”的紧凑结构，未展开步骤不占整屏；练习页以课程色题干和独立选项替换整页大白卡。结果页将首道错题的所选答案、正确答案和原有解析放在学伴入口之前。布局比较见同目录 `24-lesson-before-d2.jpeg`、`32-lesson-inline-d2.jpeg`、`27-practice-before-d2.jpeg`、`33-practice-after-d2.jpeg`、`29-result-before-d2.jpeg`、`34-result-after-d2.jpeg`。本批继续使用 ArkUI 和现有数据，没有移植外部代码或设计素材。
+
+## D3：图像层次、导航和学伴角色
+
+再对照用户提供的学习卡片、Agent 工作台和较完整的手机界面参考，采用“少量高质量图像＋有用途的嵌套卡片＋安静底色”。参考 [HarmonyOS 卡片设计](https://developer.huawei.com/consumer/cn/doc/design-guides/harmonyos-widget2-0000002731312633) 的低饱和与主次节奏、[ArkUI 动画指南](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkts-animation-usage-guide) 的原生轻动效；未调用 API 26 的沉浸式光感，也没有引入 Web 动画库。
+
+今日主卡改为深灰绿背景与奶油色进度／行动内嵌卡，学习阶梯图只说明连续推进；操作系统、网络和数据结构使用分别生成的纸艺小图。课程页用一张重点续学卡与不同色的其他课程卡，真实名称和进度仍来自现有数据。底部 Tab 用选中深色横向胶囊、其余轻量纵向符号；学伴聊天中的重复气泡改为原创“小鸿”头像和更克制的系统符号，完整角色只进无会话欢迎卡。角色的资产、质量门槛和页面位置见 [小鸿规范](VISUAL-IDENTITY-XIAOHONG-20260926.md)。
+
+本批素材均为新生成并人工挑选，未复用用户参考截图、社交媒体图、其他品牌角色或开源仓库的图片。当前 1320×2232 Pura X View 竖屏最终截图为 `.runtime/design-audit-20260925/40-home-layered-e.jpeg`、`43-chat-final-e.jpeg`、`45-course-final-e.jpeg`，不进入提交。无历史聊天欢迎卡尚未在现有模拟器状态中截屏；不得用代码构建通过代替视觉验收。
