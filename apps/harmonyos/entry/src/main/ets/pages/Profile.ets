@@ -4,6 +4,7 @@
  */
 
 import { Constants } from '../common/Constants';
+import { MainPageHeader } from '../common/Builders';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { Course, TopicMastery, UserProfile } from '../model/DataModels';
@@ -205,19 +206,7 @@ export struct ProfileContent {
 
   build() {
     Column() {
-      Column() {
-        Text('我的')
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('你的学习节奏与成长记录')
-          .fontSize(14)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          .margin({ top: 6 })
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding({ left: 22, right: 22, top: 24, bottom: 18 })
+      MainPageHeader('我的学习', '')
 
       if (this.loading) {
         this.ProfileSkeleton()
@@ -280,7 +269,7 @@ export struct ProfileContent {
             .padding(16)
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
-            .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+            .border({ width: 1, color: Constants.COLOR_BORDER })
             .accessibilityGroup(true)
             .accessibilityText(this.profile.name + '，' + this.profile.stage)
 
@@ -289,7 +278,7 @@ export struct ProfileContent {
               Divider().color(Constants.COLOR_BORDER).margin({ left: 50 })
               this.GrowthEntry('错题本', '集中复习尚未解决的问题', $r('sys.symbol.xmark_circle_fill'), 'pages/MistakeBook')
               Divider().color(Constants.COLOR_BORDER).margin({ left: 50 })
-              this.GrowthEntry('成就', '用真实完成记录解锁里程碑', $r('sys.symbol.star_fill'), 'pages/Achievements')
+              this.GrowthEntry('成就', '完成任务，解锁里程碑', $r('sys.symbol.star_fill'), 'pages/Achievements')
             }
             .width('100%')
             .padding({ left: 14, right: 14, top: 4, bottom: 4 })
@@ -347,7 +336,7 @@ export struct ProfileContent {
                 this.Metric(this.profile.stats.streakDays.toString(), '连续天数', Constants.COLOR_BRAND)
               }
               .width('100%')
-              Text('累计活跃 ' + this.profile.stats.studyDays.toString() + ' 天 · 来自本机答题与学习事件')
+              Text('已学习 ' + this.profile.stats.studyDays.toString() + ' 天')
                 .width('100%')
                 .fontSize(11)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -358,7 +347,7 @@ export struct ProfileContent {
             .padding({ top: 16, bottom: 16 })
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
-            .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+            .border({ width: 1, color: Constants.COLOR_BORDER })
             .accessibilityGroup(true)
             .accessibilityText('学习统计，正确率' + Math.round(this.profile.stats.accuracy * 100).toString() +
               '%，累计答题' + this.profile.stats.totalQuestions.toString() + '题，连续学习' +
@@ -393,7 +382,7 @@ export struct ProfileContent {
             .padding(16)
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
-            .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+            .border({ width: 1, color: Constants.COLOR_BORDER })
           }
           .width('100%')
           .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })

@@ -298,30 +298,16 @@ export struct HomeContent {
       Row() {
         Column() {
           Text('鸿学伴')
-            .fontSize(30)
+            .fontSize(Constants.PAGE_TITLE_SIZE)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
           Text('今天学什么')
-            .fontSize(15)
+            .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 5 })
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
-
-        Button() {
-          SymbolGlyph($r('sys.symbol.person_crop_circle_fill_1'))
-            .fontSize(26)
-            .fontColor([Constants.COLOR_BRAND])
-        }
-        .width(48)
-        .height(48)
-        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-        .borderRadius(24)
-        .accessibilityText('打开个人学习档案')
-        .onClick(() => {
-          this.selectedTab = 3;
-        })
 
         Button() {
           SymbolGlyph($r('sys.symbol.bell_fill'))
@@ -336,7 +322,6 @@ export struct HomeContent {
         .opacity(this.notificationState === 'loading' || this.updatingTaskId.length > 0 ? 0.56 : 1)
         .accessibilityText(this.notificationState === 'loading' ? '正在创建当前学习提醒' :
           this.updatingTaskId.length > 0 ? '正在保存学习任务，稍后可创建提醒' : '创建当前学习任务提醒')
-        .margin({ left: 8 })
         .onClick(() => {
           this.publishReminder();
         })
@@ -491,6 +476,10 @@ export struct HomeContent {
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_MAP_CORE)
+          Blank()
+          Text(this.nextActionProgressText)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
         }
         .width('100%')
 
@@ -501,26 +490,12 @@ export struct HomeContent {
           .fontColor(Constants.COLOR_MAP_CORE)
           .maxLines(2)
 
-        Text(this.nextActionEvidence)
-          .width('100%')
+        Text(this.nextActionEvidence + ' · ' + this.nextActionSubtitle)
+        .width('100%')
           .fontSize(12)
+          .lineHeight(19)
           .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
           .maxLines(2)
-
-        Column({ space: 4 }) {
-          Text(this.nextActionSubtitle)
-            .width('100%')
-            .fontSize(13)
-            .lineHeight(20)
-            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-          Text(this.nextActionProgressText)
-            .width('100%')
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_MAP_CORE)
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
 
         Button() {
           Row({ space: 6 }) {
@@ -557,7 +532,7 @@ export struct HomeContent {
     .backgroundColor(this.nextActionReady && !this.nextActionLoading && !this.nextActionError ?
       Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
-    .shadow({ radius: 8, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
+    .shadow({ radius: 6, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
   }
 
   @Builder
@@ -814,7 +789,7 @@ export struct HomeContent {
         this.QuickAsk()
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 16, bottom: 104 })
+      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 16, bottom: 16 })
     }
     .width('100%')
     .height('100%')

@@ -7947,3 +7947,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（36 文件、482 项）和 `pnpm build` 均 exit 0；HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP SHA-256 `ce1a9fa745a3bc93cff48fe3dd53f3992c87bf3537132afa419d9604e0b0f6e3`。`test-product-experience-contracts.mjs` 17/17、`test-ws01-chat-plan-source-contract.mjs` 13/13，均 exit 0。Pura X View 1320×2232 竖屏、HDC `127.0.0.1:5555`：实际完成 5 题、1/5 正确，结果页显示首道错题和所选答案；错题本点击“请学伴讲解”，Chat 发送预填问题后，本机代理日志为 `POST /api/chat -> 200`，UI 显示针对顺序表删除的解释、3 条资料和继续练习行动，截图 `.runtime/hbx-answer.png`，布局 `.runtime/hbx-answer.json`。最终精简代码重装后再次确认预填问题与蓝色可发送按钮，布局 `.runtime/hbx-verifydraft.json`。模拟器经 `NODE_USE_ENV_PROXY=1` 的本机 3001 网关访问线上 API；直接外网在该模拟器环境不可达。
 
 边界：未签名 HAP、真机、横屏、键盘首次隐私同意后的手动输入、正式竞赛提交仍未验证。旧会话在 Chat 占据过多屏幕高度，接下来按全 App 视觉升级目标处理。保留原有未提交脚本和审计文档。
+
+---
+
+## 2026-09-25 [MAIN] 四个主入口与学伴阅读流视觉升级
+
+背景：复赛主路径的首页、课程、学伴、我的页面字号、留白和卡片层级不一致；学伴的头像、回答卡、过程卡与行动按钮占用过多屏幕，长回答难读。参照 HarmonyOS 原生视觉资源与已有 CatPawAgent 对话资产的布局思路，继续沿用系统 Symbol，不引入网页 UI 依赖或 Swift 代码。
+
+改动：`Constants.ets` 与 `Builders.ets` 建立四个入口共用的标题、边距、正文和导航尺寸。首页收紧主卡和内容尾部空白；课程卡将主题标签简化为主题摘要；“我的学习”用边框替代重复阴影，并精简成就与统计文案。底部导航收紧高度、阴影和图标比例。Chat 把助手回答改成全宽阅读流，用户消息改浅蓝区分；题目上下文可展开，行动按钮按练习、课程、测验、错题显示具体去向；引用和处理记录置于回答后，默认折叠；正常输入时不占用一行状态提示；恢复旧会话后滚动到最新消息。根据模拟器复查，再去掉已有对话上的多余副标题，并收紧行动卡。
+
+验证：API 12 `assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon` exit 0，行动卡左对齐微调后再次构建 exit 0；`node scripts/test-product-experience-contracts.mjs` 17/17、`node scripts/test-ws01-chat-plan-source-contract.mjs` 13/13、`node scripts/test-proactive-learning-service.mjs` 24/24，均 exit 0。Pura X View 模拟器安装并逐屏目视检查首页、课程、学伴及“我的学习”，截图位于忽略目录 `.runtime/visual-home2.png`、`.runtime/visual-course.png`、`.runtime/visual-chat-final3.png`、`.runtime/visual-profile.png`。学伴最新消息显示错题讲解、练习行动、引用与折叠处理记录；按钮保持 48vp。
+
+未验证：四个入口之外的课程详情、计划、练习、测验、错题本等页面尚未在本批逐屏统一；真机、横屏、系统大字号与签名发布包仍需后续验收。保留原有未提交脚本与审计文档，不纳入本批提交。

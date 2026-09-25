@@ -10,7 +10,7 @@ import { Citation, StreamEvent, ChatRequest, ChatMessage, ChatContext, ChatActio
   HealthResponse } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { ProactiveLearningAction, ProactiveLearningLaunch, ProactiveLearningService } from '../common/ProactiveLearningService';
-import { StagedProgress, WorkStep } from '../common/Builders';
+import { MainPageHeader } from '../common/Builders';
 
 interface DisplayMessage {
   role: string;
@@ -53,6 +53,7 @@ export struct ChatContent {
   @State serviceMessage: string = '正在连接云端学伴';
   @State contextSummary: string = '';
   @State contextQuestion: string = '';
+  @State contextExpanded: boolean = false;
   @State actionMessage: string = '';
   @State actionOpening: boolean = false;
   private activeChatContext: ChatContext | null = null;
@@ -75,12 +76,6 @@ export struct ChatContent {
     'TCP 三次握手的过程',
     '动态规划的基本思想',
     '进程和线程的区别',
-  ];
-  private answerSteps: WorkStep[] = [
-    { title: '理解', description: '识别问题和课程上下文' },
-    { title: '查证', description: '检索课程资料与依据' },
-    { title: '讲解', description: '组织例子、步骤和代码' },
-    { title: '核对', description: '补充引用并检查表达' }
   ];
 
   aboutToAppear(): void {
@@ -113,6 +108,7 @@ export struct ChatContent {
     this.activeChatContext = null;
     this.contextSummary = '';
     this.contextQuestion = '';
+    this.contextExpanded = false;
     const pending = AppStorage.get<string>('pendingChatContextJson') ?? '';
     AppStorage.setOrCreate<string>('pendingChatContextJson', '');
     if (pending.length === 0) return;
@@ -146,6 +142,13 @@ export struct ChatContent {
     if (kind === 'lesson') return 'pages/Lesson';
     if (kind === 'quiz') return 'pages/Quiz';
     return 'pages/Practice';
+  }
+
+  private actionButtonLabel(kind: string): string {
+    if (kind === 'lesson') return '看课程';
+    if (kind === 'quiz') return '开始测验';
+    if (kind === 'review') return '复习错题';
+    return '去练习';
   }
 
   private async openAction(action: ChatAction): Promise<void> {
@@ -217,13 +220,10 @@ export struct ChatContent {
   }
 
   private sendButtonHint(): string {
-    if (this.loading) return '学伴正在回答，点击右侧按钮可停止';
+    if (this.loading) return '正在回答，可随时停止';
     if (this.historyLoading) return '正在加载对话';
     if (this.historySaving) return '正在保存对话';
-    if (this.historyMessage.length > 0) return this.historyMessage;
-    if (this.probing) return '正在连接云端学伴';
-    if (!this.cloudAgentReady) return '云端未连接，点击右侧按钮重试';
-    if (this.inputText.trim().length === 0) return '输入问题';
+    if (this.historyLoadFailed || this.historySaveFailed) return this.historyMessage;
     return '';
   }
 
@@ -583,14 +583,6 @@ export struct ChatContent {
     return '正在理解你的问题';
   }
 
-  private answerProgressSubtitle(msg: DisplayMessage): string {
-    const index = this.answerProgressIndex(msg);
-    if (msg.content.length > 0) {
-      return '已把解释、例子和参考资料整理到回答中';
-    }
-    return this.answerSteps[index].description;
-  }
-
   private async loadLocalHistory(lifecycleRunId: number): Promise<void> {
     try {
       const history = await LocalLearningRepository.getChatHistory();
@@ -629,6 +621,7 @@ export struct ChatContent {
     } finally {
       if (this.isActiveLifecycle(lifecycleRunId)) {
         this.historyLoading = false;
+        if (this.messages.length > 0) this.scrollToBottom();
       }
     }
   }
@@ -737,51 +730,54 @@ export struct ChatContent {
 
   build() {
     Column() {
-      Column() {
-        Text('学伴')
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('课程有疑问，来这里聊聊')
-          .fontSize(14)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          .margin({ top: 6 })
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding({ left: 22, right: 22, top: 24, bottom: 12 })
+      MainPageHeader('学伴', '')
 
       if (this.contextSummary.length > 0) {
-        Row({ space: 10 }) {
-          Column({ space: 4 }) {
+        Column({ space: 5 }) {
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.book_open_fill'))
+              .fontSize(16)
+              .fontColor([Constants.COLOR_BRAND])
             Text(this.contextSummary)
+              .layoutWeight(1)
               .fontSize(12)
               .fontWeight(FontWeight.Medium)
-              .fontColor(Constants.COLOR_BRAND)
-            Text(this.contextQuestion.length > 0 ? this.contextQuestion : this.contextSummary)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
+            SymbolGlyph($r(this.contextExpanded ? 'sys.symbol.chevron_up' : 'sys.symbol.chevron_down'))
+              .fontSize(14)
+              .fontColor([Constants.COLOR_TEXT_SECONDARY])
+          }
+          .width('100%')
+          .constraintSize({ minHeight: 48 })
+          .onClick((): void => { this.contextExpanded = !this.contextExpanded; })
+
+          if (this.contextQuestion.length > 0) {
+            Text(this.contextQuestion)
+              .width('100%')
               .fontSize(13)
-              .maxLines(2)
+              .maxLines(this.contextExpanded ? 8 : 1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
           }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-          Button('移除')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .backgroundColor(Constants.COLOR_BG_TAG)
-            .constraintSize({ minHeight: 48 })
-            .onClick((): void => {
-              this.activeChatContext = null;
-              this.contextSummary = '';
-              this.contextQuestion = '';
-            })
+          if (this.contextExpanded) {
+            Button('移除题目')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              .backgroundColor(Constants.COLOR_BG_TAG)
+              .constraintSize({ minHeight: 48 })
+              .onClick((): void => {
+                this.activeChatContext = null;
+                this.contextSummary = '';
+                this.contextQuestion = '';
+                this.contextExpanded = false;
+              })
+          }
         }
         .width('100%')
-        .padding(12)
+        .padding({ left: 12, right: 12, top: 4, bottom: 10 })
         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
         .borderRadius(Constants.RADIUS_MD)
-        .margin({ left: 16, right: 16, bottom: 8 })
+        .margin({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 8 })
       }
 
       // 消息列表 / 欢迎页
@@ -852,11 +848,10 @@ export struct ChatContent {
           })
         }
         .width('100%')
-        .height('100%')
         .layoutWeight(1)
         .cachedCount(5)
         .scrollBar(BarState.Off)
-        .padding({ left: 16, right: 16 })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER })
         .constraintSize({ maxWidth: 760 })
       }
 
@@ -949,33 +944,35 @@ export struct ChatContent {
         }
         .width('100%')
 
-        Row({ space: 8 }) {
-          Text(this.sendButtonHint().length > 0 ? this.sendButtonHint() : ' ')
-            .layoutWeight(1)
-            .fontSize(11)
-            .lineHeight(18)
-            .fontColor(this.sendButtonHintColor())
-          if (this.historyLoadFailed || this.historySaveFailed) {
-            Button(this.historyLoadFailed ? '重新读取' : (this.historySaving ? '保存中' : '重试保存'))
-              .constraintSize({ minHeight: 48 })
+        if (this.sendButtonHint().length > 0 || this.historyLoadFailed || this.historySaveFailed) {
+          Row({ space: 8 }) {
+            Text(this.sendButtonHint())
+              .layoutWeight(1)
               .fontSize(11)
-              .fontColor(Constants.COLOR_BRAND)
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(Constants.RADIUS_MD)
-              .padding({ left: 12, right: 12 })
-              .enabled(!this.loading && !this.historySaving && !this.historyLoading)
-              .accessibilityText(this.historyLoadFailed ? '重新读取本机会话' : '重试保存本机会话')
-              .onClick((): void => {
-                if (this.historyLoadFailed) this.retryLocalHistoryLoad();
-                else this.retryLocalHistorySave();
-              })
+              .lineHeight(18)
+              .fontColor(this.sendButtonHintColor())
+            if (this.historyLoadFailed || this.historySaveFailed) {
+              Button(this.historyLoadFailed ? '重新读取' : (this.historySaving ? '保存中' : '重试保存'))
+                .constraintSize({ minHeight: 48 })
+                .fontSize(11)
+                .fontColor(Constants.COLOR_BRAND)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(Constants.RADIUS_MD)
+                .padding({ left: 12, right: 12 })
+                .enabled(!this.loading && !this.historySaving && !this.historyLoading)
+                .accessibilityText(this.historyLoadFailed ? '重新读取本机会话' : '重试保存本机会话')
+                .onClick((): void => {
+                  if (this.historyLoadFailed) this.retryLocalHistoryLoad();
+                  else this.retryLocalHistorySave();
+                })
+            }
           }
+          .width('100%')
+          .constraintSize({ minHeight: 24 })
         }
-        .width('100%')
-        .constraintSize({ minHeight: 48 })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 20, top: 12 })
+      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 12, top: 8 })
       .constraintSize({ maxWidth: 760 })
     }
     .width('100%')
@@ -1335,11 +1332,10 @@ export struct ChatContent {
   }
 
   private agentSummary(msg: DisplayMessage): string {
-    const count = this.agentFlow(msg).length;
-    if (msg.streaming) return '正在生成 · ' + count.toString() + ' 个步骤';
-    if (msg.cancelled) return '已停止 · 已完成 ' + count.toString() + ' 个步骤';
-    if (msg.failed) return '未完成 · 已执行 ' + count.toString() + ' 个步骤';
-    return '已完成 · ' + msg.citations.length.toString() + ' 条引用';
+    if (msg.streaming) return '正在整理回答';
+    if (msg.cancelled) return '已停止';
+    if (msg.failed) return '未完成';
+    return '已完成';
   }
 
   private traceDisplayText(trace: string): string {
@@ -1359,48 +1355,32 @@ export struct ChatContent {
         Row() {
           Column() {
             Text(msg.content)
-              .fontSize(14)
-              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .fontSize(Constants.PAGE_BODY_SIZE)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
               .padding(12)
-              .backgroundColor(Constants.COLOR_BRAND)
+              .backgroundColor(Constants.COLOR_CHAT_USER)
               .borderRadius(Constants.RADIUS_MD)
           }
           .alignItems(HorizontalAlign.End)
-          .constraintSize({ maxWidth: '80%' })
+          .constraintSize({ maxWidth: '86%' })
         }
         .width('100%')
         .justifyContent(FlexAlign.End)
       } else {
-        // AI 消息（带头像）
-        Row({ space: 8 }) {
-          // AI 头像
-          SymbolGlyph($r('sys.symbol.ellipsis_message_fill'))
-            .width(32)
-            .height(32)
-            .fontSize(16)
-            .fontColor([Constants.COLOR_BRAND])
-            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-            .borderRadius(16)
-
+        // 学伴正文按阅读流排版，行动与依据留在同一条回复下方。
+        Column() {
           Column() {
             if (msg.content.length > 0) {
               Column() {
                 this.MarkdownContent(this.readableMarkdown(msg.content), msg.failed)
               }
-                .padding(12)
-                .backgroundColor(msg.failed ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_CARD)
-                .borderRadius(Constants.RADIUS_MD)
-                .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+                .padding({ top: 4, bottom: 6 })
                 .width('100%')
             }
 
             if (msg.action !== null && !msg.streaming && !msg.failed && !msg.cancelled &&
               msg.content.length > 0) {
               this.ActionCard(msg.action)
-            }
-
-            if (msg.thinking.length > 0 || msg.agentTrace.length > 0 || msg.streaming) {
-              this.AnswerProcessCard(msg)
             }
 
             if (msg.failed || msg.cancelled) {
@@ -1455,12 +1435,16 @@ export struct ChatContent {
                 .padding({ left: 4, top: 4 })
               }
             }
+
+            if (msg.thinking.length > 0 || msg.agentTrace.length > 0 || msg.streaming) {
+              this.AnswerProcessCard(msg)
+            }
           }
-          .layoutWeight(1)
+          .width('100%')
           .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
-        .alignItems(VerticalAlign.Top)
+        .alignItems(HorizontalAlign.Start)
       }
     }
     .width('100%')
@@ -1469,24 +1453,26 @@ export struct ChatContent {
 
   @Builder
   ActionCard(action: ChatAction) {
-    Column({ space: 8 }) {
-      Text('接下来')
-        .fontSize(12)
-        .fontColor(Constants.COLOR_TEXT_SECONDARY)
-      Text(action.title)
-        .fontSize(16)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+    Column({ space: 4 }) {
+      Row({ space: 12 }) {
+        Text(action.title)
+          .layoutWeight(1)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Button(this.actionButtonLabel(action.kind))
+          .height(48)
+          .padding({ left: 18, right: 18 })
+          .borderRadius(Constants.RADIUS_MD)
+          .enabled(!this.actionOpening)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .onClick((): void => { this.openAction(action); })
+      }
+      .width('100%')
       Text(action.reason)
         .fontSize(12)
         .fontColor(Constants.COLOR_TEXT_SECONDARY)
-      Button('打开并开始')
-        .height(48)
-        .width('100%')
-        .enabled(!this.actionOpening)
-        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-        .backgroundColor(Constants.COLOR_BRAND)
-        .onClick((): void => { this.openAction(action); })
       if (this.actionMessage.length > 0) {
         Text(this.actionMessage)
           .fontSize(11)
@@ -1494,10 +1480,11 @@ export struct ChatContent {
       }
     }
     .width('100%')
-    .padding(14)
-    .backgroundColor(Constants.COLOR_BG_CARD)
+    .alignItems(HorizontalAlign.Start)
+    .padding(12)
+    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
     .borderRadius(Constants.RADIUS_MD)
-    .margin({ top: 8 })
+    .margin({ top: 10, bottom: 4 })
   }
 
   @Builder
@@ -1590,11 +1577,7 @@ export struct ChatContent {
 
   @Builder
   AnswerProcessCard(msg: DisplayMessage) {
-    Column({ space: 10 }) {
-      if (msg.streaming && msg.content.length === 0) {
-        StagedProgress(this.answerProgressTitle(msg), this.answerProgressSubtitle(msg),
-          this.answerProgressIndex(msg), this.answerSteps)
-      }
+    Column({ space: 6 }) {
       Row({ space: 8 }) {
         if (msg.streaming) {
           LoadingProgress()
@@ -1620,20 +1603,13 @@ export struct ChatContent {
             .fontSize(16)
             .fontColor([Constants.COLOR_SUCCESS])
         }
-        Column({ space: 2 }) {
-          Text('回答过程')
-            .fontSize(12)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(this.agentSummary(msg))
-            .fontSize(10)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-        Text(msg.agentExpanded ? '收起' : '展开')
-          .fontSize(11)
-          .fontColor(Constants.COLOR_BRAND)
+        Text(msg.streaming ? this.answerProgressTitle(msg) : '处理记录')
+          .layoutWeight(1)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Text(msg.agentExpanded ? '收起' : '查看')
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
       }
       .width('100%')
       .constraintSize({ minHeight: 48 })
@@ -1665,10 +1641,8 @@ export struct ChatContent {
       }
     }
     .width('100%')
-    .padding(12)
-    .backgroundColor(Constants.COLOR_SURFACE_TINT)
-    .borderRadius(Constants.RADIUS_MD)
-    .margin({ bottom: 6 })
+    .padding({ top: 2, bottom: 2 })
+    .margin({ bottom: 2 })
   }
 
   @Builder

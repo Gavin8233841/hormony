@@ -57,6 +57,7 @@ export class Constants {
   static readonly COLOR_NAV_INACTIVE: string = '#667085';
   // 浅色背景（带透明度，用于标签底色）
   static readonly COLOR_BRAND_LIGHT: string = '#eaf2ff';
+  static readonly COLOR_CHAT_USER: string = '#e8f0ff';
   static readonly COLOR_ERROR_LIGHT: string = '#fff0f1';
   static readonly COLOR_SUCCESS_LIGHT: string = '#eaf8ef';
   // 学习图谱：深色星云画布 + 真实状态色，不用装饰线冒充先修关系。
@@ -90,6 +91,13 @@ export class Constants {
   static readonly RADIUS_MD: number = 12;
   static readonly RADIUS_LG: number = 16;
   static readonly RADIUS_XL: number = 20;
+
+  // 主界面排版：四个入口共用一套留白与字号。
+  static readonly PAGE_GUTTER: number = 20;
+  static readonly PAGE_TITLE_SIZE: number = 26;
+  static readonly PAGE_SECTION_SIZE: number = 18;
+  static readonly PAGE_BODY_SIZE: number = 15;
+  static readonly NAV_HEIGHT: number = 64;
 
   // hilog 日志
   static readonly HILOG_DOMAIN: number = 0x0001;

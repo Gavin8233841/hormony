@@ -12,6 +12,24 @@ export interface WorkStep {
   description: string;
 }
 
+@Builder
+export function MainPageHeader(title: string, subtitle: string) {
+  Column({ space: 4 }) {
+    Text(title)
+      .fontSize(Constants.PAGE_TITLE_SIZE)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(Constants.COLOR_TEXT_PRIMARY)
+    if (subtitle.length > 0) {
+      Text(subtitle)
+        .fontSize(13)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+    }
+  }
+  .width('100%')
+  .alignItems(HorizontalAlign.Start)
+  .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 16, bottom: 12 })
+}
+
 /**
  * 统一标题栏（带返回按钮）
  * @param title       主标题

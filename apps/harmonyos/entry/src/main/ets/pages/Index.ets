@@ -43,11 +43,11 @@ struct Index {
   }
 
   private contentBottomPadding(): number {
-    return 88 + this.safeAreaBottomVp();
+    return Constants.NAV_HEIGHT + 18 + this.safeAreaBottomVp();
   }
 
   private navigationBottomPadding(): number {
-    return 12 + this.safeAreaBottomVp();
+    return 10 + this.safeAreaBottomVp();
   }
 
   private consumeProactiveLaunch(): void {
@@ -164,7 +164,7 @@ struct Index {
   TabItem(title: string, icon: Resource, selectedIcon: Resource, index: number) {
     Column({ space: 4 }) {
       SymbolGlyph(this.currentIndex === index ? selectedIcon : icon)
-        .fontSize(23)
+        .fontSize(22)
         .fontColor([this.currentIndex === index ? Constants.COLOR_BRAND : Constants.COLOR_NAV_INACTIVE])
         .scale({ x: this.currentIndex === index ? 1.06 : 1, y: this.currentIndex === index ? 1.06 : 1 })
         .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
@@ -189,13 +189,13 @@ struct Index {
       this.TabItem('学伴', $r('sys.symbol.ellipsis_message'), $r('sys.symbol.ellipsis_message_fill'), 2)
       this.TabItem('我的', $r('sys.symbol.person'), $r('sys.symbol.person_2_fill'), 3)
     }
-    .width('90%')
+    .width('92%')
     .constraintSize({ maxWidth: 520 })
-    .height(72)
+    .height(Constants.NAV_HEIGHT)
     .backgroundColor(Constants.COLOR_NAV_SURFACE)
     .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
-    .borderRadius(Constants.RADIUS_XL)
-    .shadow({ radius: 8, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
+    .borderRadius(22)
+    .shadow({ radius: 6, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
     .zIndex(2)
   }
 

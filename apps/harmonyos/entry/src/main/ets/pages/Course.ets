@@ -3,6 +3,7 @@
  */
 
 import { Constants } from '../common/Constants';
+import { MainPageHeader } from '../common/Builders';
 import { Course, LessonProgress } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { CourseResumeState, hasCourseStarted, resolveCourseResumeState } from './CourseResumeState';
@@ -124,19 +125,7 @@ export struct CourseContent {
 
   build() {
     Column() {
-      Column() {
-        Text('我的课程')
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('沿着清晰进度，继续今天的学习')
-          .fontSize(14)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          .margin({ top: 6 })
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding({ left: 22, right: 22, top: 24, bottom: 18 })
+      MainPageHeader('课程', '接着学，或选一个新主题')
 
       if (this.loading) {
         Column({ space: 10 }) {
@@ -232,28 +221,12 @@ export struct CourseContent {
                   .borderRadius(4)
 
                 // 课程主题预览
-                Flex({ wrap: FlexWrap.Wrap }) {
-                  ForEach(c.topics.slice(0, 3), (t: string) => {
-                    Text(t)
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                      .backgroundColor(Constants.COLOR_BG_TAG)
-                      .borderRadius(8)
-                      .margin({ right: 6, bottom: 6 })
-                  })
-                  if (c.topics.length > 3) {
-                    Text('+' + (c.topics.length - 3).toString())
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                      .backgroundColor(Constants.COLOR_BG_TAG)
-                      .borderRadius(8)
-                      .margin({ right: 6, bottom: 6 })
-                  }
-                }
-                .width('100%')
-                .margin({ top: 12 })
+                Text(c.topics.slice(0, 3).join(' · '))
+                  .width('100%')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
+                  .maxLines(2)
+                  .margin({ top: 12 })
 
                 Button({ type: ButtonType.Normal }) {
                   Row({ space: 8 }) {
@@ -285,7 +258,7 @@ export struct CourseContent {
               .padding(16)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_LG)
-              .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+              .border({ width: 1, color: Constants.COLOR_BORDER })
             }
           })
         }
