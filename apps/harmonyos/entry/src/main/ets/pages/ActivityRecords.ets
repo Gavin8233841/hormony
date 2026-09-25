@@ -22,11 +22,12 @@ struct ActivityRecordsPage {
   @State planTasks: PlanTask[] = [];
   @State recentDays: ActivityDay[] = [];
   @State selectedFilter: string = 'all';
+  @State overviewExpanded: boolean = false;
   @State streakDays: number = 0;
   @State loading: boolean = true;
   @State message: string = '';
 
-  aboutToAppear(): void {
+  onPageShow(): void {
     this.loadEvents();
   }
 
@@ -59,10 +60,10 @@ struct ActivityRecordsPage {
 
   private title(event: StudyEvent): string {
     if (event.type === 'task_completed') return '完成学习任务';
-    if (event.type === 'lesson_completed') return '完成课程主题';
-    if (event.type === 'lesson_activity') return '提交课程互动';
-    if (event.type === 'quiz_mastered') return '掌握练习主题';
-    if (event.type === 'quiz_submitted') return '提交练习';
+    if (event.type === 'lesson_completed') return '学完课程主题';
+    if (event.type === 'lesson_activity') return '完成互动';
+    if (event.type === 'quiz_mastered') return '已掌握';
+    if (event.type === 'quiz_submitted') return '完成练习';
     return '学习活动';
   }
 
@@ -76,7 +77,7 @@ struct ActivityRecordsPage {
     }
     if (event.topic !== undefined) return event.topic;
     if (event.taskId !== undefined) return this.taskTitle(event.taskId);
-    return '本地学习记录';
+    return '';
   }
 
   private difficultyLabel(value: string): string {
@@ -177,8 +178,9 @@ struct ActivityRecordsPage {
 
   private activityWeeks(): ActivityDay[][] {
     const weeks: ActivityDay[][] = [];
-    for (let index = 0; index < this.recentDays.length; index += 7) {
-      weeks.push(this.recentDays.slice(index, index + 7));
+    const days = this.overviewExpanded ? this.recentDays : this.recentDays.slice(-7);
+    for (let index = 0; index < days.length; index += 7) {
+      weeks.push(days.slice(index, index + 7));
     }
     return weeks;
   }
@@ -350,17 +352,17 @@ struct ActivityRecordsPage {
     Column({ space: 12 }) {
       Row() {
         Column({ space: 3 }) {
-          Text('近 4 周学习节奏')
+          Text('学习节奏')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text('连续 ' + this.streakDays.toString() + ' 天 · ' + this.activeDaysCount().toString() + ' 天有学习')
+          Text('近 4 周学了 ' + this.activeDaysCount().toString() + ' 天 · 连续 ' + this.streakDays.toString() + ' 天')
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
-        Text(this.recentEventCount().toString() + ' 条')
+        Text(this.recentEventCount().toString() + ' 次')
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_BRAND)
@@ -393,21 +395,35 @@ struct ActivityRecordsPage {
       }
       .width('100%')
 
-      Column({ space: 8 }) {
-        Text('记录最多：' + this.bestDayLabel())
+      Row({ space: 8 }) {
+        Text(this.overviewExpanded ? '近 4 周' : '最近 7 天')
           .fontSize(11)
-          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        Blank()
+        Text(this.overviewExpanded ? '收起' : '查看 4 周')
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND)
+          .onClick((): void => { this.overviewExpanded = !this.overviewExpanded; })
+      }
+      .width('100%')
+      Row({ space: 12 }) {
         Row({ space: 5 }) {
-          Text('少').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_BG_TAG).borderRadius(4)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND_LIGHT).borderRadius(4)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_BRAND).borderRadius(4)
-          Column().width(14).height(8).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(4)
-          Text('多').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Column().width(10).height(10).backgroundColor(Constants.COLOR_BRAND).borderRadius(5)
+          Text('有学习').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        Row({ space: 5 }) {
+          Column().width(10).height(10).backgroundColor(Constants.COLOR_SUCCESS).borderRadius(5)
+          Text('完成目标').fontSize(10).fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+        Blank()
+        if (this.overviewExpanded) {
+          Text('最多 ' + this.bestDayLabel())
+            .fontSize(10)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
       }
       .width('100%')
-      .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
     .padding(16)
@@ -420,9 +436,9 @@ struct ActivityRecordsPage {
   build() {
     Column() {
       if (this.loading) {
-        TitleBar('学习记录', '正在读取本地记录', () => this.getUIContext().getRouter().back())
+        TitleBar('学习记录', '正在加载', () => this.getUIContext().getRouter().back())
       } else {
-        TitleBar('学习记录', this.events.length.toString() + ' 条活动 · 仅保存在本机',
+        TitleBar('学习记录', this.events.length.toString() + ' 次学习',
           () => this.getUIContext().getRouter().back())
       }
       if (this.loading) {
@@ -448,7 +464,7 @@ struct ActivityRecordsPage {
               .backgroundColor(Constants.COLOR_BG_CARD)
               .border({ width: 1, color: Constants.COLOR_BRAND })
               .borderRadius(24)
-              .accessibilityText('重新读取本机学习记录')
+              .accessibilityText('重新读取学习记录')
               .onClick((): void => { this.loadEvents(); })
           }
         }
@@ -483,7 +499,7 @@ struct ActivityRecordsPage {
                   .backgroundColor(Constants.COLOR_BG_CARD)
                   .border({ width: 1, color: Constants.COLOR_ERROR })
                   .borderRadius(24)
-                  .accessibilityText('重新读取本机学习记录')
+                  .accessibilityText('重新读取学习记录')
                   .onClick((): void => { this.loadEvents(); })
               }
               .width('100%')
@@ -506,9 +522,6 @@ struct ActivityRecordsPage {
                         .fontSize(10)
                         .fontWeight(FontWeight.Medium)
                         .fontColor(Constants.COLOR_BRAND)
-                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                        .borderRadius(Constants.RADIUS_SM)
                     }
                   }
                   .width('100%')

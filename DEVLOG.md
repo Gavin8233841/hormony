@@ -7995,3 +7995,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：API 12 增量 `assembleHap` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，产物仍未签名；Python 3.12 `unittest discover` 215/215，`test-product-experience-contracts.mjs` 17/17，`test-ws01-chat-plan-source-contract.mjs` 13/13，`git diff --check` exit 0。Pura X View 1320×2232 安装最终 HAP：计划页面截图 `.runtime/plan-after.png`；从课程详情打开知识检索，空态截图 `.runtime/knowledge-empty-final.png`，点击“图的遍历”后在线返回 5 条课程片段，结果截图 `.runtime/knowledge-result-final.png`；错题本最终截图 `.runtime/mistake-final.png`，点击未到期错题的“练同主题题目”进入“数据结构 · 数组与线性表”五题练习，返回后仍为“待复习 8 道 · 今天 0 道”。
 
 未验证：新生成计划的在线结果、所有知识搜索词和到期错题的实际重练结果；真机、横屏、大字号、签名发布包和正式提交仍需另行验收。其他未提交脚本与文档未纳入本批。
+
+---
+
+## 2026-09-25 [MAIN] 学习成长页面与产品文案规范
+
+背景：学习记录四周日期格占满首屏，最近练习被挤到下面；星图节点的课程动作位于长画布之后，点选节点时看不到结果。成就页和个人页仍有重复解释与内部数据措辞。用户要求把“下一步”式文字改成正常学习 App 的待办和操作语言，并写入长期规范。
+
+改动：`AGENTS.md` 增加学生端文案规则，要求短状态、动词加对象的按钮和逐屏朗读检查。学习记录默认展示最近一周日期格，可展开四周，图例改为“有学习／完成目标”，最近事件进入首屏；记录与成就页面返回时重新读取。个人页把待巩固主题及“继续练习”前移，后方知识点不重复展示该主题。成就页保留进度、具体目标与可达按钮，去掉逐项技术来源说明。星图把选中主题和主操作移至画布上方，点击节点后滚回顶部；所有节点显示主题名，层级改中文。已练过但先修未完成的节点显示实际正确率及“先修待巩固”，不再误标“未解锁”；按钮根据真实目标进入课程或练习。导航契约测试同步断言新文案仍与目标路由一致。
+
+验证：API 12 增量 `assembleHap` 最终 exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，HAP 未签名；Python 3.12 `unittest discover` 215/215，`test-product-experience-contracts.mjs` 17/17，`git diff --check` exit 0。Pura X View 1320×2232 安装最终 HAP：个人页首屏“接着练”及真实主题在 UI 树可见；学习记录默认一周并使最近三条事件进入首屏，展开四周可见更早日期，截图 `.runtime/activity-after.png`；成就页显示 2/4、待完成主题和“测验 链表”按钮。星图从“我的学习”进入，在画布下方点击“图的表示与遍历”后自动回到顶部，显示“已练习 · 20% · 先修待巩固”，截图 `.runtime/map-selected-final.png`；点击“练习 数组与线性表”实际进入该主题的五题练习。
+
+未验证：从练习提交返回后的记录和成就新增数据刷新、三门课所有节点的选择和横向滚动、横屏/大字号/真机、签名发布包与正式提交。其他未提交脚本与文档保留。

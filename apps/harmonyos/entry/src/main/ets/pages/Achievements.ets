@@ -21,7 +21,7 @@ struct AchievementsPage {
   @State loading: boolean = true;
   @State message: string = '';
 
-  aboutToAppear(): void {
+  onPageShow(): void {
     this.loadAchievements();
   }
 
@@ -191,33 +191,34 @@ struct AchievementsPage {
   private nextActionLabel(): string {
     const item = this.nextAchievement();
     if (item === null) return '查看学习记录';
-    if (this.needsActionContext(item) && !this.actionContextReady) return '重新准备学习入口';
-    if (item.id === 'first_quiz') return '完成一次精选练习';
-    if (item.id === 'active_learning_3') return '继续课程互动';
-    if (item.id === 'task_5') return '推进今日计划';
-    if (item.id === 'mastery_3') return '验证知识掌握';
+    if (this.needsActionContext(item) && !this.actionContextReady) return '重新加载';
+    if (item.id === 'task_5') return '打开今日计划';
+    const target = this.actionTarget(item);
+    if (item.id === 'first_quiz') return target === null ? '开始练习' : '练习 ' + target.topic;
+    if (item.id === 'active_learning_3') return target === null ? '继续学习' : '学习 ' + target.topic;
+    if (item.id === 'mastery_3') return target === null ? '开始测验' : '测验 ' + target.topic;
     return '查看目标详情';
   }
 
   private nextActionHint(): string {
     const item = this.nextAchievement();
-    if (item === null) return '全部里程碑已点亮，学习记录仍会继续保存在本机。';
+    if (item === null) return '所有成就已解锁。';
     const remaining = this.remainingCount(item).toString();
-    if (item.id === 'task_5') return '还差 ' + remaining + ' 项任务，从今日计划继续推进。';
-    if (!this.actionContextReady) return '成就已读取，但学习入口尚未准备好。重新读取后可继续推进。';
+    if (item.id === 'task_5') return '还差 ' + remaining + ' 项任务。';
+    if (!this.actionContextReady) return '课程暂时无法打开，请重新加载。';
     const target = this.actionTarget(item);
-    if (target === null) return '暂无能推进该成就的本地学习内容，请重新读取课程资产。';
+    if (target === null) return '暂时没有可继续的课程，请重新加载。';
     const context = target.course.title + ' · ' + target.topic;
     if (item.id === 'first_quiz') {
-      return '还差 ' + remaining + ' 次练习，下一步进入 ' + context + '，提交后写入本机。';
+      return '还差 ' + remaining + ' 次练习 · ' + context;
     }
     if (item.id === 'active_learning_3') {
-      return '还差 ' + remaining + ' 个课程互动，下一步进入 ' + context + ' 的未计数互动。';
+      return '还差 ' + remaining + ' 次互动 · ' + context;
     }
     if (item.id === 'mastery_3') {
-      return '还差 ' + remaining + ' 个知识点，下一步验证尚未掌握的 ' + context + '。';
+      return '还差 ' + remaining + ' 个主题 · ' + context;
     }
-    return '还差 ' + remaining + ' 项真实学习记录。';
+    return '还差 ' + remaining + ' 项。';
   }
 
   private unlockedAtLabel(item: AchievementProgress): string {
@@ -227,14 +228,6 @@ struct AchievementsPage {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     return date.getFullYear().toString() + '-' + month + '-' + day;
-  }
-
-  private achievementSource(item: AchievementProgress): string {
-    if (item.id === 'first_quiz') return '来源：本机练习提交记录';
-    if (item.id === 'active_learning_3') return '来源：课程互动完成记录';
-    if (item.id === 'task_5') return '来源：学习计划任务完成记录';
-    if (item.id === 'mastery_3') return '来源：正确率达到 80% 的主题记录';
-    return '来源：本机学习事件';
   }
 
   private achievementIcon(item: AchievementProgress): Resource {
@@ -275,7 +268,7 @@ struct AchievementsPage {
     }
     const target = this.actionTarget(item);
     if (target === null) {
-      this.message = '暂无能推进该成就的本地学习内容';
+      this.message = '暂时没有可继续的课程';
       return;
     }
     this.setCourseContext(target.course);
@@ -295,7 +288,7 @@ struct AchievementsPage {
       this.pushPage('pages/Quiz', '无法打开 AI 测验，请重试');
       return;
     }
-    this.message = '该里程碑暂未配置直达动作';
+    this.message = '暂时无法打开，请稍后再试';
   }
 
   @Builder
@@ -342,7 +335,7 @@ struct AchievementsPage {
 
   build() {
     Column() {
-      TitleBar('成就', '每个里程碑都来自真实学习记录', () => this.getUIContext().getRouter().back())
+      TitleBar('成就', '继续学习，解锁新目标', () => this.getUIContext().getRouter().back())
       if (this.loading) {
         this.AchievementsSkeleton()
       } else if (this.achievements.length === 0) {
@@ -373,11 +366,11 @@ struct AchievementsPage {
             Column({ space: 12 }) {
               Row() {
                 Column({ space: 3 }) {
-                  Text('里程碑进度')
+                  Text('已解锁')
                     .fontSize(16)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                  Text('坚持完成真实学习任务，逐步点亮成就')
+                  Text('学习进度')
                     .fontSize(12)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
                 }
@@ -401,7 +394,7 @@ struct AchievementsPage {
                   SymbolGlyph($r('sys.symbol.star_fill'))
                     .fontSize(15)
                     .fontColor([Constants.COLOR_WARNING])
-                  Text('下一目标 · ' + (this.nextAchievement()?.title ?? ''))
+                  Text('待完成 · ' + (this.nextAchievement()?.title ?? ''))
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
@@ -434,7 +427,7 @@ struct AchievementsPage {
                 .justifyContent(FlexAlign.Center)
               }
               .width('100%')
-              .height(44)
+              .constraintSize({ minHeight: 48 })
               .backgroundColor(Constants.COLOR_BRAND)
               .borderRadius(Constants.RADIUS_MD)
               .onClick((): void => { this.openNextAchievement(); })
@@ -506,20 +499,11 @@ struct AchievementsPage {
                       Text(item.description)
                         .fontSize(12)
                         .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      Row({ space: 8 }) {
-                        Text(this.achievementSource(item))
-                          .layoutWeight(1)
-                          .fontSize(11)
-                          .lineHeight(17)
-                          .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                          .maxLines(2)
-                        Text(this.isUnlocked(item) ? this.unlockedAtLabel(item) :
-                          '还差 ' + this.remainingCount(item).toString())
-                          .fontSize(11)
-                          .fontWeight(FontWeight.Medium)
-                          .fontColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-                      }
-                      .width('100%')
+                      Text(this.isUnlocked(item) ? this.unlockedAtLabel(item) :
+                        '还差 ' + this.remainingCount(item).toString())
+                        .fontSize(11)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(this.isUnlocked(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
                       Progress({ value: Math.min(item.current, item.target), total: item.target, type: ProgressType.Linear })
                         .width('100%')
                         .height(4)

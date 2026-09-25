@@ -80,6 +80,15 @@ export struct ProfileContent {
     return course === undefined ? '课程目录已更新' : course.title;
   }
 
+  private featuredMastery(): TopicMastery | null {
+    const first = this.topicMastery[0];
+    return first !== undefined && !first.mastered ? first : null;
+  }
+
+  private remainingMastery(): TopicMastery[] {
+    return this.featuredMastery() === null ? this.topicMastery : this.topicMastery.slice(1);
+  }
+
   private openFocusedQuiz(item: TopicMastery): void {
     const course = this.findCourse(item);
     if (course === undefined) {
@@ -166,11 +175,11 @@ export struct ProfileContent {
         ' 题 · ' + item.attempts.toString() + ' 次测验')
         .fontSize(11)
         .fontColor(Constants.COLOR_TEXT_SECONDARY)
-      Text(item.mastered ? '掌握依据：累计正确率达到 80%' : '下一步：继续测验，新的答题结果会更新这里')
+      Text(item.mastered ? '已经掌握' : '再练几题，巩固这个主题')
         .fontSize(11)
         .fontColor(Constants.COLOR_TEXT_TERTIARY)
         .lineHeight(18)
-      Button('练习 ' + item.topic)
+      Button('再练一次')
         .width('100%')
         .constraintSize({ minHeight: 48 })
         .fontSize(13)
@@ -179,7 +188,7 @@ export struct ProfileContent {
         .borderRadius(Constants.RADIUS_SM)
         .onClick((): void => { this.openFocusedQuiz(item); })
         .accessibilityText('练习' + this.topicCourseTitle(item) + item.topic)
-        .accessibilityDescription('打开测验，新结果将更新知识点画像')
+        .accessibilityDescription('打开这个主题的测验')
     }
     .width('100%')
   }
@@ -273,6 +282,39 @@ export struct ProfileContent {
             .accessibilityGroup(true)
             .accessibilityText(this.profile.name + '，' + this.profile.stage)
 
+            if (this.featuredMastery() !== null) {
+              ForEach(this.topicMastery.slice(0, 1), (item: TopicMastery): void => {
+                Column({ space: 9 }) {
+                  Text('接着练')
+                    .fontSize(12)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Constants.COLOR_BRAND)
+                  Text(item.topic)
+                    .fontSize(20)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  Text(this.topicCourseTitle(item) + ' · 目前答对 ' +
+                    Math.round(item.accuracy * 100).toString() + '%')
+                    .fontSize(12)
+                    .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                  Button('继续练习')
+                    .width('100%')
+                    .constraintSize({ minHeight: 48 })
+                    .fontSize(14)
+                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                    .backgroundColor(Constants.COLOR_BRAND)
+                    .borderRadius(Constants.RADIUS_MD)
+                    .onClick((): void => { this.openFocusedQuiz(item); })
+                }
+                .width('100%')
+                .padding(16)
+                .alignItems(HorizontalAlign.Start)
+                .backgroundColor(Constants.COLOR_BG_CARD)
+                .borderRadius(Constants.RADIUS_LG)
+                .border({ width: 1, color: Constants.COLOR_BORDER })
+              })
+            }
+
             Column() {
               this.GrowthEntry('学习记录', '按时间回看练习与任务', $r('sys.symbol.clock'), 'pages/ActivityRecords')
               Divider().color(Constants.COLOR_BORDER).margin({ left: 50 })
@@ -356,23 +398,20 @@ export struct ProfileContent {
             .accessibilityDescription('统计来自本机已保存的答题与学习事件')
 
             Column({ space: 12 }) {
-              Text('知识点画像')
+              Text('知识点')
                 .fontSize(15)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              Text('按课程与知识点汇总本机测验，优先显示尚未掌握且正确率较低的项目')
-                .fontSize(11)
-                .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                .lineHeight(18)
-              if (this.topicMastery.length === 0) {
-                Text('完成一次测验后，这里会显示累计答题、正确率与掌握依据')
+              if (this.remainingMastery().length === 0) {
+                Text(this.topicMastery.length === 0 ? '完成一次测验后，这里会显示学习进度' :
+                  '其他主题的进度会显示在这里')
                   .fontSize(12)
                   .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   .lineHeight(20)
               } else {
-                ForEach(this.topicMastery, (item: TopicMastery, index: number): void => {
+                ForEach(this.remainingMastery(), (item: TopicMastery, index: number): void => {
                   this.TopicMasteryRow(item)
-                  if (index < this.topicMastery.length - 1) {
+                  if (index < this.remainingMastery().length - 1) {
                     Divider().color(Constants.COLOR_BORDER)
                   }
                 })

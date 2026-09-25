@@ -46,19 +46,18 @@ class LearningMapNavigationContractTest(unittest.TestCase):
         run = compact(extract_method(self.source, "runNextAction"))
 
         self.assertIn(
-            "const relation = this.isReachableSuccessor(node, target) ? '后继主题' : '前置主题'",
-            label,
-        )
-        self.assertIn(
-            "(this.nextActionUsesPractice(node) ? '练习' : '学习') + relation",
+            "return (this.nextActionUsesPractice(node) ? '练习 ' : '学习 ') + target.topic",
             label,
         )
         self.assertIn(
             "const action = this.nextActionUsesPractice(node) ? '练习' : '学习'",
             description,
         )
-        self.assertIn("action + '后继", description)
-        self.assertIn("action + '前置", description)
+        self.assertIn(
+            "'接着' + action + ' ' + target.topic",
+            description,
+        )
+        self.assertIn("'先' + action + ' ' + target.topic", description)
         self.assertIn("const target = this.nextActionTarget(node)", run)
         practice = run.find("this.openPractice(target.topic)")
         lesson = run.find("this.openLesson(target.topic)")
