@@ -798,13 +798,13 @@ export struct ChatContent {
             .borderRadius(28)
             .shadow({ radius: 12, color: Constants.SHADOW_BRAND, offsetX: 0, offsetY: 4 })
 
-          Text('你好，我是鸿学伴 AI 助教')
+          Text('有问题，问鸿学伴')
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .margin({ top: 16 })
 
-          Text('可以问我任何学习相关的问题，我会从课程资料中检索并给出带引用的回答')
+          Text('问课程内容、正在做的题，或下一步学什么')
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 8, left: 32, right: 32 })
@@ -1125,6 +1125,7 @@ export struct ChatContent {
           this.receivedDone = true;
           if (!last.failed && !last.cancelled) {
             last.streaming = false;
+            last.agentExpanded = false;
           }
         }
 
@@ -1288,7 +1289,7 @@ export struct ChatContent {
 
   private agentDescription(agent: string): string {
     if (agent === 'Profile') return '结合本地学习记录';
-    if (agent === 'Retrieval') return '从课程资料中找证据';
+    if (agent === 'Retrieval') return '查找相关课程内容';
     if (agent === 'Tutor') return '把概念转成例子和步骤';
     if (agent === 'Planner') return '给出可执行学习顺序';
     if (agent === 'Quiz') return '补充适合当前难度的练习';
@@ -1338,7 +1339,7 @@ export struct ChatContent {
     if (msg.streaming) return '正在生成 · ' + count.toString() + ' 个步骤';
     if (msg.cancelled) return '已停止 · 已完成 ' + count.toString() + ' 个步骤';
     if (msg.failed) return '未完成 · 已执行 ' + count.toString() + ' 个步骤';
-    return '已完成 · ' + count.toString() + ' 个步骤 · ' + msg.citations.length.toString() + ' 条依据';
+    return '已完成 · ' + msg.citations.length.toString() + ' 条引用';
   }
 
   private traceDisplayText(trace: string): string {
@@ -1620,7 +1621,7 @@ export struct ChatContent {
             .fontColor([Constants.COLOR_SUCCESS])
         }
         Column({ space: 2 }) {
-          Text('回答生成过程')
+          Text('回答过程')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -1644,14 +1645,13 @@ export struct ChatContent {
         this.messages = this.messages.slice();
       })
 
-      Column({ space: 6 }) {
-        ForEach(this.agentFlow(msg), (agent: string): void => {
-          this.AgentStep(agent, msg)
-        })
-      }
-      .width('100%')
-
       if (msg.agentExpanded) {
+        Column({ space: 6 }) {
+          ForEach(this.agentFlow(msg), (agent: string): void => {
+            this.AgentStep(agent, msg)
+          })
+        }
+        .width('100%')
         Column({ space: 6 }) {
           ForEach(msg.agentTrace, (trace: string): void => {
             Text(this.traceDisplayText(trace))

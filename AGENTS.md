@@ -19,6 +19,7 @@
 
 3. 读取与任务直接相关的源码、配置和测试。不得凭记忆猜测键名、路径、字段、模型 ID、Bundle Name、API 响应或命令参数。
 4. 项目交接任务还需读取：
+   - 当前复赛入口：`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`（2026-09-25；先读本机状态、规则、已定方案和工具入口，再按批次读关联资料，避免重复全量调研）
    - `docs/CODEX-HANDOFF-HARMONY-1.1.md`
    - `docs/MODEL-ROLLOUT-STRATEGY.md`
    - `docs/FRONTEND-RESOURCE-ADOPTION.md`

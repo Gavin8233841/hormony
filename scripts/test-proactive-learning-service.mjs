@@ -308,7 +308,7 @@ test('无学习状态时返回明确计划空态', async () => {
   assert.equal(action.badge, '今日起步');
   assert.equal(action.cta, '制定计划');
   assert.equal(action.targetPage, 'pages/Plan');
-  assert.equal(action.evidence, '本机还没有可继续的课程状态或今日任务');
+  assert.equal(action.evidence, '还没有学习计划');
   assert.equal(action.progressText, '等待制定计划');
 });
 
@@ -327,7 +327,7 @@ test('今日任务全完成后保留完成事实，不回退到首次制定计�
   assert.equal(action.targetPage, 'pages/CourseDetail');
   assert.equal(action.courseId, 'cs101');
   assert.equal(action.progressText, '1/1 项已完成');
-  assert.match(action.evidence, /手动完成不代表通过测评/);
+  assert.equal(action.evidence, '今天的任务已勾选');
 });
 
 test('无课程可续时，今日已完成仍可打开课程入口', async () => {

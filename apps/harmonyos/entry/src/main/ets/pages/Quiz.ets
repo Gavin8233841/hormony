@@ -98,9 +98,9 @@ struct QuizPage {
     { value: 'hard', label: '挑战', description: '多步推理' }
   ];
   private quizLengthOptions: QuizLengthOption[] = [
-    { value: 5, label: '速练', description: '5题 · 快速校准' },
-    { value: 10, label: '标准', description: '10题 · 稳定证据' },
-    { value: 15, label: '挑战', description: '15题 · 深度检验' }
+    { value: 5, label: '速练', description: '5 题' },
+    { value: 10, label: '标准', description: '10 题' },
+    { value: 15, label: '挑战', description: '15 题' }
   ];
   private generationSteps: WorkStep[] = [
     { title: '检索', description: '匹配课程资料' },
@@ -599,13 +599,13 @@ struct QuizPage {
   private learningEvaluation(correctCount: number, totalQuestions: number): string {
     if (totalQuestions === 0) return '本轮暂无可评分题目。';
     if (correctCount === totalQuestions) {
-      return '本组题目全部答对，记录为本轮表现；后续仍需用新题检验。';
+      return '这组全对，做得好！';
     }
     const wrongCount = totalQuestions - correctCount;
     if (correctCount / totalQuestions >= 0.8) {
-      return '本组有 ' + wrongCount.toString() + ' 道错题，先核对判断步骤。';
+      return '错了 ' + wrongCount.toString() + ' 题，看看解析。';
     }
-    return '已记录本次答题结果，建议先按错因标签复盘，再做同标签短练。';
+    return '看看错题，再练习薄弱知识点。';
   }
 
   private coachTitle(wrongCount: number): string {
@@ -615,15 +615,15 @@ struct QuizPage {
 
   private coachBody(accuracy: number, wrongCount: number): string {
     if (wrongCount === 0) {
-      return '这轮题已写入本地画像。下一组换题检验能否稳定运用。';
+      return '换一组题，继续练习。';
     }
     if (accuracy >= 0.8) {
-      return '先看下方展开的错题解析，核对判断步骤。';
+      return '错题解析已展开。';
     }
     if (accuracy >= 0.6) {
-      return '先看下方展开的错题解析，再回课程资料核对概念条件。';
+      return '看看错题解析和课程内容。';
     }
-    return '先回课程资料核对核心定义和边界条件。';
+    return '回课程里巩固基础。';
   }
 
   private buildTagSummaries(details: QuizResultDetail[]): QuizTagSummary[] {
@@ -782,14 +782,14 @@ struct QuizPage {
     if (this.progressStep === 1) {
       return '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + ' · ' + this.questionCountLabel();
     }
-    if (this.focusTag.length > 0) return '先查课程资料，再聚焦“' + this.focusTag + '”出题';
-    return '先查课程资料，再让 AI 出题，避免凭空编题';
+    if (this.focusTag.length > 0) return '正在准备“' + this.focusTag + '”练习';
+    return '正在准备适合本主题的题目';
   }
 
   private generationWaitHint(): string {
-    if (this.progressTick >= 4) return '长题组仍在云端生成中：页面没有卡住，返回后会自动进入答题。';
-    if (this.questionCount >= 10) return '题量越长，云端会分批生成并校验，等待时间会更久。';
-    return '保持在当前页，题组生成后会直接展示第一题。';
+    if (this.progressTick >= 4) return '题目还在准备中，请稍等。';
+    if (this.questionCount >= 10) return '题目较多，可能需要多等一会儿。';
+    return '准备好后即可开始答题。';
   }
 
   private generationRequestSummary(): string {
@@ -911,7 +911,7 @@ struct QuizPage {
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('按题量、难度和标签生成真实 AI 题组，完成后立即查看解析')
+        Text('选好主题和难度，开始练习')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
       }
@@ -1092,7 +1092,7 @@ struct QuizPage {
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('本轮题组没有可展示的当前题，已保护页面不再崩溃。')
+        Text('这组题暂时无法显示，请重新生成。')
           .width('100%')
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)

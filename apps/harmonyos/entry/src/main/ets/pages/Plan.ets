@@ -376,10 +376,10 @@ struct PlanPage {
   }
 
   private readablePlanTrace(trace: string): string {
-    if (trace.startsWith('Profile Agent')) return '已结合你的学习阶段、习惯和薄弱项';
-    if (trace.startsWith('Planner Agent')) return '已从现有课程主题中安排可完成的任务';
-    if (trace.startsWith('Action Router')) return '每项任务都能直接进入学习、练习、测验或复盘';
-    if (trace.startsWith('Local-first Guard')) return '计划与完成状态只保存在本机';
+    if (trace.startsWith('Profile Agent')) return '参考了你的学习记录';
+    if (trace.startsWith('Planner Agent')) return '按课程主题安排任务';
+    if (trace.startsWith('Action Router')) return '任务可直接开始';
+    if (trace.startsWith('Local-first Guard')) return '进度保存在本机';
     return trace;
   }
 
@@ -686,22 +686,21 @@ struct PlanPage {
   }
 
   private planProgressSubtitle(): string {
-    if (this.progressStep >= 4) return '本机计划已写入，正在通知首页与服务卡片刷新';
-    if (this.progressStep === 3) return '任务已通过检查，正在写入本机学习计划';
-    if (this.progressStep === 2) return '核对日期、课程主题、入口和预计时长';
-    if (this.progressStep === 1) return '等待学伴从已有课程主题中安排每天的任务';
-    return '读取本机薄弱项与学习习惯，私人学习状态不会在云端保存';
+    if (this.progressStep >= 4) return '计划已保存，正在更新首页';
+    if (this.progressStep === 3) return '正在保存计划';
+    if (this.progressStep === 2) return '正在检查任务';
+    if (this.progressStep === 1) return '正在安排每天的任务';
+    return '正在读取学习记录';
   }
 
   private planWaitHint(): string {
-    if (this.progressStep >= 4) return '计划已保存，正在更新学习入口，请不要关闭页面。';
-    if (this.progressStep === 3) return '计划正在写入本机，此时不会再中断保存。';
-    if (this.progressStep === 2) return '计划已返回，正在确认每项任务都能直接开始。';
-    if (this.progressTick >= 3) return '规划需要更多时间。你可以继续等待，也可以取消后调整目标。';
-    if (this.progressTick >= 2) return '学伴仍在安排日期和任务入口，完成后会自动保存。';
-    if (this.progressTick >= 1) return '计划仍在生成中，页面没有卡住。';
-    if (this.days >= 21) return '周期较长，需要检查更多主题和日期，通常会多等一会儿。';
-    return '保持在当前页，计划生成后会直接展示可点击任务。';
+    if (this.progressStep >= 4) return '马上完成。';
+    if (this.progressStep === 3) return '正在保存，请稍等。';
+    if (this.progressStep === 2) return '正在检查计划。';
+    if (this.progressTick >= 3) return '还需要一点时间，也可以取消后重试。';
+    if (this.progressTick >= 1) return '正在生成计划，请稍等。';
+    if (this.days >= 21) return '计划周期较长，可能需要多等一会儿。';
+    return '生成后会显示每天的任务。';
   }
 
   private planRequestSummary(): string {
@@ -858,11 +857,11 @@ struct PlanPage {
           .fontSize(19)
           .fontColor([Constants.COLOR_BRAND])
         Column({ space: 3 }) {
-          Text('规划依据')
+          Text('计划怎么安排的')
             .fontSize(15)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text('已检查学习状态、课程主题和任务入口')
+          Text('学习记录与课程内容')
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }

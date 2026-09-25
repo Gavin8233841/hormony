@@ -451,7 +451,7 @@ struct KnowledgePage {
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text('输入概念、章节或问题，结果将限定在当前课程资料中')
+          Text('输入想查的知识点')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .textAlign(TextAlign.Center)

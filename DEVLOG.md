@@ -7842,3 +7842,73 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 - 正式 PDF、MP4、源码 ZIP、签名 HAP、证据索引、团队身份/权利确认和门户回执仍未验证；这些事实不能由代码生成或自行填写。
 - 外部 URL 当前实时可达性、横屏、平板、系统字号放大、读屏、真机、通知/服务卡片实际点击和线上 Health/Chat/Plan/Quiz 仍未验证。
 - `.trae/progress.json`、`.tmp/`、`assets/`、展示站、压缩包、本地提案、HAP 和截图均未暂存。
+
+---
+
+## 2026-09-25 [MAIN] 复赛实施知识入口与 Sol 交接
+
+用户要求创建同项目 GPT-6 Sol / high 实施线程，并将已知资产、规则和高效工作流写入本地，避免重复调研。本批新增 `docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`，在 `AGENTS.md` 加入首读索引；保存本轮已核验的就绪快照、PDF变更原因、官方规则与来源、Agent和五屏设计决策、CLI命令、验收/交付顺序及存储边界。
+
+这是一批文档变更，不表示计划功能已经实现。保留PDF、冒烟脚本、两份测试及其他准备文档的既有修改；未安装工具、启动模拟器、恢复PDF、修改产品代码或正式提交。仅需文档链接与 `git diff --check` 检查，不重复生产构建。线程创建结果以应用工具回执为准，不在创建前宣称成功。
+
+---
+
+## 2026-09-25 [SOL] 复赛首批实施：真实作答上下文与学习行动
+
+背景：按 `docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md` 的首批范围，保留三课程、ArkData 端侧状态和现有模型，修复首页陈旧态，将题目和实际作答传给云端学伴，并让安全审核后的下一步建议可由用户点击执行；同步改善计划、Lesson 与本轮结果的层级。
+
+改动：
+- `Index`、`HomeContent`、`Course` 返回或切换时刷新本机学习状态；今日任务全部完成时首页显示真实计划完成数量和“手动完成不代表通过测评”。
+- Web Chat 验证课程/Topic/题目/提交状态和长度，已提交的具体作答交 Evaluator，未提交交 Tutor 提示；Evaluator 检索限制课程并带引用；Safety 通过后发既有页面可消费的 `action` SSE。HarmonyOS Chat 展示来源上下文和行动卡，仅用户点击后导航；取消、失败和空回答不保存成功会话。
+- Plan 默认展开今天且今天先于历史任务；Lesson 为图遍历加入与活动数据对应的 BFS/DFS 推演；Practice/Quiz 结果突出本轮表现和错题补学，成功提交后刷新本机服务卡片。
+- `.gitignore` 屏蔽本地 `.runtime/` 与 HarmonyOS 缓存；`scripts/test-graph-lesson-contract.mjs` 验证图与活动及提交前提示边界。
+
+验证：
+- Web `pnpm lint && pnpm typecheck && pnpm test && pnpm build`：exit 0，36 文件、482/482，10 个静态页面；API 12 HAP 增量构建 exit 0，未签名产物 SHA-256 `32ee6654597373b3cfe87df43b91353ef0981187b329e80d9a2df6ffa4ad4704`。
+- `node scripts/test-graph-lesson-contract.mjs`：3/3；`node scripts/test-proactive-learning-service.mjs`：24/24。三项内容/关系/依赖校验均 exit 0。
+- Pura X View `127.0.0.1:5555`，模拟器安装 HAP、原有 UI 冒烟 64/64 exit 0，证据 `screenshots/trae-smoke-20260925-120400/`；最终安装版计划页今日任务首屏截图 `screenshots/semifinal-20260925-plan.jpeg`。
+- 宿主机 12:06 CST 线上旧部署 `/api/health`：HTTP 200、`status=ready`、模型 `doubao-seed-2-1-pro-260628`；模拟器经本机网关收到旧部署 Chat HTTP 200，UI 显示回答保存到本机。新 Chat 上下文和行动尚未部署，不能以此代表线上新闭环通过。
+- `git diff --check`：exit 0。
+
+失败或未验证：Python 215 项中 4 项仍因报名手册 PDF SHA-256 与官方锁定值不符失败，其他 211 项通过；该文件保留等待用户决定。NOTICE 的 3 项人工标记、正式 PDF/MP4/源码 ZIP、签名 HAP、学生测试、线上新接口以及门户回执未完成。本批没有正式部署或提交竞赛。
+
+---
+
+## 2026-09-25 [SOL] 路径与重复工具盘点
+
+用户要求清理无用资产、修正错误路径，并按约一小时的可验证目标自驱推进。本轮先核实删除影响，不对未确认目录动手。
+
+- Codex 当前保存项目 `鸿学伴` 指向已不存在的 `/Users/Admin/Desktop/鸿学伴`，应用项目列表将其标为非 Git 项目；真实仓库仍为 `/Users/Admin/Desktop/Hormony/hormony`。当前工具只有列项目能力，没有修改项目路径能力，需在 Codex 项目设置中重新选择。
+- Studio 内置 HDC 可列出 Pura X View `127.0.0.1:5555`；Studio 内置 Hvigor 在传入当前 Node/JDK/SDK/Hvigor home 后增量构建 exit 0。用这两份工具完成完整模拟器冒烟 64/64，证据 `screenshots/trae-smoke-20260925-122208/`。首次缺环境变量的 Studio Hvigor 调用 exit 255，补齐后通过。
+- `scripts/harmonyos-app-smoke.md` 的本机示例改为 Studio 内置工具，并记录必需环境变量，解除文档对重复工具包的依赖。
+- 候选旧目录：命令行工具 6.5 GB、Studio DMG 3.8 GB、失败浅克隆 6.3 MB；具体绝对路径、恢复方式和确认见交接文档第 10 节。三者均未删除。已有仓库脏状态、报名手册 PDF 和本地证据保持原样。
+
+用户随后明确同意推荐清理范围与报名手册恢复。逐项核对解析路径、目录形态和内容后，删除 `/Users/Admin/Desktop/Hormony/devecostudio-mac-arm-26.0.0.821`、`/Users/Admin/Desktop/Hormony/source-main`、`/Users/Admin/Desktop/Hormony/command-line-tools`；三处现均不存在。DMG/工具包可重新下载安装，失败浅克隆可从远端重新克隆。数据卷当前约 66 GiB 可用；Studio 内置 HDC 删除工具包后仍列出模拟器 `127.0.0.1:5555`。
+
+根报名手册恢复前确认单个文件仍为 974,529 bytes、SHA-256 `9feb04aab04028fe01b280b883f9687139ef0a2ed99fb5f014c61ac254faf6f9`；在 `.runtime/backups/registration-manual-reexport-20260925-9feb04aa.pdf` 保留同哈希副本，随后仅替换该文件为 Git HEAD 中已核对的官方原件，SHA-256 `6034aca8f908d76debd0ea1dc606c3f594df8fe29310866f1e5ef91d170bd26e`。Python 总门禁 `python3.12 -B -m unittest discover -s scripts -p 'test_*.py'`：exit 0，215/215。未修改测试预期或其他工作树文件。Codex 保存项目路径仍待用户在应用中修正。
+
+---
+
+## 2026-09-25 [SOL] 图遍历 Lesson 到学伴上下文模拟器验证
+
+设备：Pura X View，HarmonyOS 7 模拟器，竖屏 1320×2232，目标 `127.0.0.1:5555`，HAP 来自 `b5c3e10` 本机增量构建。用 Studio 内置 HDC 实时 UI 树取交互范围、截图核对画面；不将代码断言当作设备结果。
+
+- 打开 `cs101 / 图的表示与遍历`：Lesson BFS 图与队列可见。预测队首 0 后队列由 `[0]` 到 `[1,2]`；错选 2 时保持 `[1,2]` 并提示；再选 1 后队列到 `[2,3]`、访问序列到 `[0,1,2,3]`。
+- Lesson 4/4 的 DFS 图不同于 BFS 图。提交前跳 Chat 显示“正在作答”及题目；提交错误序列 `0 3 1 2 4` 后，5 步逐步核对完成才显示参考答案 `0 1 2 3 4`、来源 `cs101_k25`。自评“关键点有遗漏”显示本机保存回执；提交后跳 Chat 显示“已提交作答”，输入中包含原题、实际作答与参考答案。返回课程并重新打开主题，活动定位到 2/2。
+- 本轮图路径截图：`screenshots/semifinal-graph-start.jpeg`、`screenshots/semifinal-graph-predict.jpeg`、`screenshots/semifinal-dfs-pre.jpeg`、`screenshots/semifinal-dfs-input.jpeg`；实时 UI 树保存在 `.runtime/layout-graph-*.json`、`.runtime/layout-chat-context-*.json`，未暂存。
+
+边界：只证明本机原生界面、互动状态与 Chat 上下文传递；没有向新 Web 后端发出请求，因为提交 `b5c3e10` 的新 Chat API 尚未部署。服务端 Tutor/Evaluator 分流、SSE 行动、真实模型反馈和用户点击行动的端云闭环仍未线上验证。本批没有改产品代码或重跑既已通过的 Web 482 项检查。
+
+预览部署核查（GitHub API，12:40 CST）：`b5c3e10` 的 Vercel Preview deployment `6653572025` 状态为 `failure`，说明 `Deployment was blocked`；commit status `Vercel=failure`，指向 GWYY 团队针对 GitHub 账号 `DostiAziz` 的邀请页。`Vercel Preview Comments=success` 不是预览部署通过。该问题涉及团队权限，等待用户处理；未改账户、凭据、Git 历史或生产部署。
+
+---
+
+## 2026-09-25 [MAIN] 提交身份修正与复赛产品文案第一批
+
+原因：此前提交因仓库未配置作者邮箱，使用本机 `Admin@MacBook-Pro.local`，GitHub 将其关联到未知的 `DostiAziz`，Vercel Preview 被拦截。已核对当前 GitHub 登录为 `Gavin8233841`，前一笔正常提交也关联该账号；仅在本仓库设置对应的 `user.name` 和 `user.email`，不改全局配置、不改写历史、不邀请未知账号。新提交的 Preview 结果另行核验。
+
+改动：整理首页、计划、Lesson、练习/测验、知识搜索及 Chat 的学生可见文字；移除“稳定证据”“保护页面不再崩溃”等内部/机械表达。Chat 在回答完成时自动收起过程列表；首页主卡压缩标题与依据区。`ProactiveLearningService` 的说明语改为简短学习语言，保持状态选择逻辑。Web 题库汇总注释由过期的 186 修为生成器核实的 165；没有改题库内容。交接文档第 14–15 节增加文案整治、错因驱动行动、外部学习资源、财会/英语小试点、五屏升级的优先顺序和验收边界。
+
+验证：Web `pnpm lint && pnpm typecheck && pnpm test && pnpm build` exit 0，36 文件、482/482；`node scripts/generate-quizzes-json.mjs --check` exit 0，165 道源/产物一致；`node scripts/test-proactive-learning-service.mjs` exit 0，24/24；API 12 增量 HAP 构建 exit 0，未签名 HAP SHA-256 `429058fc87e679b09f3147fc0ac8d88d93bd7d7c7a5825b30792217a4ac0384f`。Pura X View 模拟器安装/启动成功，首页 UI 树显示“今天学什么”，截图 `.runtime/semifinal-copy-home-compact-20260925.png` 目视核对主卡高度及今日计划。`git diff --check` exit 0。
+
+未验证：本批未重新跑 64 项完整冒烟、Chat 新后端联调或其他屏幕的模拟器逐页视觉；外部资源没有接入页面，财会/英语没有进入主线。源码版 Preview 是否解除阻塞以 GitHub/Vercel 新提交的实际状态为准；没有正式部署或竞赛提交。

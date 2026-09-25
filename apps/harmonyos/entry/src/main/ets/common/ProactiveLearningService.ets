@@ -75,7 +75,7 @@ export class ProactiveLearningService {
         kind: 'plan',
         badge: '今日起步',
         title: '制定今天的学习计划',
-        subtitle: '让学伴把目标拆成可执行任务',
+        subtitle: '设定目标，安排每天的学习',
         cta: '制定计划',
         courseId: '',
         courseTitle: '',
@@ -83,7 +83,7 @@ export class ProactiveLearningService {
         focusTag: '',
         taskAction: 'plan',
         targetPage: 'pages/Plan',
-        evidence: '本机还没有可继续的课程状态或今日任务',
+        evidence: '还没有学习计划',
         progressText: '等待制定计划'
       };
     }
@@ -100,7 +100,7 @@ export class ProactiveLearningService {
       focusTag: '',
       taskAction: 'course',
       targetPage: 'pages/CourseDetail',
-      evidence: '当前没有到期复习或今日待办',
+      evidence: '接着上次的进度',
       progressText: percent.toString() + '% 课程进度'
     };
   }
@@ -213,7 +213,7 @@ export class ProactiveLearningService {
       focusTag: '',
       taskAction: 'review',
       targetPage: 'pages/MistakeBook',
-      evidence: '最早到期：' + stem + ' · 已练 ' + item.attempts.toString() + ' 次',
+      evidence: '上次错题：' + stem,
       progressText: dueCount.toString() + ' 道今日到期'
     };
   }
@@ -223,7 +223,7 @@ export class ProactiveLearningService {
       kind: 'plan',
       badge: '计划待修复',
       title: '重新生成今天的学习计划',
-      subtitle: invalidPendingCount.toString() + ' 项待办缺少可执行的课程、Topic 或动作',
+      subtitle: invalidPendingCount.toString() + ' 项任务需要更新',
       cta: '重新生成计划',
       courseId: '',
       courseTitle: '',
@@ -231,7 +231,7 @@ export class ProactiveLearningService {
       focusTag: '',
       taskAction: 'plan',
       targetPage: 'pages/Plan',
-      evidence: '旧计划任务未通过本机课程目录与动作枚举校验',
+      evidence: '课程内容或任务入口已变化',
       progressText: invalidPendingCount.toString() + ' 项需要更新'
     };
   }
@@ -249,7 +249,7 @@ export class ProactiveLearningService {
       focusTag: '',
       taskAction: 'course',
       targetPage: course === undefined ? 'pages/Index' : 'pages/CourseDetail',
-      evidence: '本机今日计划记录；手动完成不代表通过测评',
+      evidence: '今天的任务已勾选',
       progressText: count.toString() + '/' + count.toString() + ' 项已完成'
     };
   }
@@ -272,7 +272,7 @@ export class ProactiveLearningService {
       focusTag: '',
       taskAction: action,
       targetPage: ProactiveLearningService.taskTarget(action),
-      evidence: '今日计划中最早可执行的未完成任务 · 预计 ' + task.estimatedMin.toString() + ' 分钟',
+      evidence: '预计 ' + task.estimatedMin.toString() + ' 分钟',
       progressText: completed.toString() + '/' + todayTasks.length.toString() + ' 已完成'
     };
   }

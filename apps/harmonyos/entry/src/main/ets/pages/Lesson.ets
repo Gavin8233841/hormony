@@ -299,8 +299,8 @@ struct LessonPage {
       }
       if (selfAssessed) {
         this.activityEvidenceMessage = correct ?
-          '已记录本次自我对照：关键点已覆盖。请用同标签测验做客观验证。' :
-          '已记录本次自我对照：关键点有遗漏。建议先看对照重点再练习。';
+          '已记录。来做几道相关题。' :
+          '已记录。看看遗漏的关键点。';
       } else {
         this.activityEvidenceMessage = correct ?
           '已记录本次客观题结果：回答正确。' :
@@ -494,7 +494,7 @@ struct LessonPage {
   }
 
   private currentLearningFocus(): string {
-    if (this.hasBfsGraphSource() && this.showIntroExperience()) return '先预测队首，再观察队列和访问序列。';
+    if (this.hasBfsGraphSource() && this.showIntroExperience()) return '试着找出下一个出队的顶点。';
     if (this.hasBfsGraphSource() && this.showPracticeExperience()) {
       return this.activeActivityIndex === 0 ? '先写 DFS 输出，再逐步对照。' : '排列 BFS 的通用步骤。';
     }
@@ -690,12 +690,12 @@ struct LessonPage {
   private predictBfsNext(id: number): void {
     if (this.bfsGraphStepIndex >= BFS_NEXT.length) return;
     if (id !== BFS_NEXT[this.bfsGraphStepIndex]) {
-      this.bfsPredictionMessage = '再看队首：先进入队列的顶点先出队。';
+      this.bfsPredictionMessage = '看看队首：它最先进入队列。';
       return;
     }
     this.bfsGraphStepIndex += 1;
     this.bfsPredictionMessage = this.bfsGraphStepIndex >= BFS_NEXT.length ?
-      '队列已空。观察每个顶点何时首次标记为已访问。' : '预测正确，队列和访问序列已更新。';
+      '完成！队列已经清空。' : '答对了！';
   }
 
   @Builder
@@ -756,7 +756,7 @@ struct LessonPage {
   private BfsGraphExperience() {
     Column({ space: 12 }) {
       Row() {
-        Text('逐层推演 · 先预测队首')
+        Text('广度优先搜索')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -783,7 +783,7 @@ struct LessonPage {
         .fontColor(Constants.COLOR_TEXT_TERTIARY)
 
       if (this.bfsGraphStepIndex < BFS_NEXT.length) {
-        Text('下一步出队哪个顶点？先选，再看状态变化。')
+        Text('下一个出队的是谁？')
           .width('100%')
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
@@ -1378,7 +1378,7 @@ struct LessonPage {
             }
             .width('100%')
           } else {
-            TextArea({ placeholder: '先写下你的答案或推演过程', text: this.responseText })
+            TextArea({ placeholder: '写下你的答案', text: this.responseText })
               .width('100%')
               .height(132)
               .fontSize(14)
@@ -1393,7 +1393,7 @@ struct LessonPage {
               .onChange((value: string): void => {
                 if (!this.feedbackVisible) this.responseText = value;
               })
-            Button(this.feedbackVisible ? '已提交，向下对照答案' : '提交并对照答案')
+            Button(this.feedbackVisible ? '已提交' : '提交答案')
               .width('100%')
               .constraintSize({ minHeight: 48 })
               .enabled(!this.feedbackVisible)
@@ -1406,7 +1406,7 @@ struct LessonPage {
           if (this.feedbackVisible) {
             Column({ space: 12 }) {
               Text(this.activeActivity()!.interactionMode === 'free_response' ?
-                '自由回答 · 对照关键点' : (this.activityIsCorrect() ? '客观判定 · 回答正确' : '客观判定 · 需要复盘'))
+                '对照关键点' : (this.activityIsCorrect() ? '答对了' : '再看看这题'))
                 .fontSize(13)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
@@ -1417,7 +1417,7 @@ struct LessonPage {
                 this.FeedbackSection('参考答案', this.activeActivity()!.answer)
                 this.FeedbackSection('对照重点', this.activeActivity()!.feedback)
               } else {
-                Text('上方逐步核对访问序列，走完后再看参考答案与对照重点。')
+                Text('完成图中步骤后可看参考答案。')
                   .width('100%')
                   .fontSize(12)
                   .lineHeight(20)

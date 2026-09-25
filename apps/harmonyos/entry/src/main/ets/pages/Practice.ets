@@ -569,7 +569,7 @@ struct PracticePage {
           .lineHeight(22)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
         if (this.correctCount < this.questions.length) {
-          Text('先看下方展开的解析，核对判断步骤。')
+          Text('查看错题解析')
             .width('100%')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)

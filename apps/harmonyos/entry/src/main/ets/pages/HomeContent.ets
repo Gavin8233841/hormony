@@ -301,7 +301,7 @@ export struct HomeContent {
             .fontSize(30)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text('今天先完成最重要的一件事')
+          Text('今天学什么')
             .fontSize(15)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 5 })
@@ -455,11 +455,11 @@ export struct HomeContent {
             .fontSize(20)
             .fontColor([Constants.COLOR_ERROR])
           Column({ space: 4 }) {
-            Text('暂时无法读取学习下一步')
+            Text('暂时无法加载今日任务')
               .fontSize(16)
               .fontWeight(FontWeight.Bold)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text('本机学习状态没有被替换，可原地重新读取')
+            Text('请重试')
               .fontSize(12)
               .lineHeight(19)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -468,7 +468,7 @@ export struct HomeContent {
           .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
-        Button('重新读取下一步')
+        Button('重试')
           .width('100%')
           .constraintSize({ minHeight: 48 })
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
@@ -496,28 +496,16 @@ export struct HomeContent {
 
         Text(this.nextActionTitle)
           .width('100%')
-          .fontSize(24)
+          .fontSize(22)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_MAP_CORE)
-          .maxLines(3)
+          .maxLines(2)
 
-        Column({ space: 4 }) {
-          Text('推荐依据')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-          Text(this.nextActionEvidence)
-            .width('100%')
-            .fontSize(13)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_MAP_CORE)
-            .lineHeight(20)
-            .maxLines(3)
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-        .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-        .backgroundColor(Constants.COLOR_MAP_LINE)
-        .borderRadius(Constants.RADIUS_MD)
+        Text(this.nextActionEvidence)
+          .width('100%')
+          .fontSize(12)
+          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+          .maxLines(2)
 
         Column({ space: 4 }) {
           Text(this.nextActionSubtitle)
@@ -565,7 +553,7 @@ export struct HomeContent {
       }
     }
     .width('100%')
-    .padding(18)
+    .padding(16)
     .backgroundColor(this.nextActionReady && !this.nextActionLoading && !this.nextActionError ?
       Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
