@@ -216,8 +216,6 @@ export function AnswerOption(option: string, selected: boolean, onSelect: () => 
         .fontSize(14)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
         .textAlign(TextAlign.Start)
-        .maxLines(3)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
       if (selected) {
         SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
           .fontSize(19)
@@ -225,7 +223,7 @@ export function AnswerOption(option: string, selected: boolean, onSelect: () => 
       }
     }
     .width('100%')
-    .padding({ left: 13, right: 13 })
+    .padding({ left: 13, right: 13, top: 12, bottom: 12 })
   }
   .width('100%')
   .constraintSize({ minHeight: 58 })

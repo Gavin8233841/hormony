@@ -30,3 +30,5 @@
 首页保留一项由真实计划或学习状态生成的主任务，移走重复的今日任务行；另两门课按课程色展示，主题数量来自课程仓库。计划页把今天的待办数与剩余分钟并列，历史日期收成可展开列表，任务的学习与完成操作仍分开。课程目录沿用同一套识别色。
 
 Pura X View 竖屏截图存于 `.runtime/design-audit-20260925/23-home-final-d1.jpeg` 和 `22-plan-verified-d1.jpeg`。抽样验证了首页课程直达、首页进入计划、计划任务进入对应 Lesson；这些截图不代表大字号、横屏或真机验收。
+
+D2 把学习页的推演改成“当前步骤、下一步”的紧凑结构，未展开步骤不占整屏；练习页以课程色题干和独立选项替换整页大白卡。结果页将首道错题的所选答案、正确答案和原有解析放在学伴入口之前。布局比较见同目录 `24-lesson-before-d2.jpeg`、`32-lesson-inline-d2.jpeg`、`27-practice-before-d2.jpeg`、`33-practice-after-d2.jpeg`、`29-result-before-d2.jpeg`、`34-result-after-d2.jpeg`。本批继续使用 ArkUI 和现有数据，没有移植外部代码或设计素材。

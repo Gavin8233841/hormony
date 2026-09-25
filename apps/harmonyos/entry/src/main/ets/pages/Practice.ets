@@ -417,11 +417,11 @@ struct PracticePage {
   QuestionView() {
     Column({ space: 16 }) {
       Row() {
-        Text('本主题练习')
-          .fontSize(11)
-          .fontColor(Constants.COLOR_SUCCESS)
+        Text('练习 · ' + this.difficultyLabel(this.activeQuestion.difficulty))
+          .fontSize(12)
+          .fontColor(Constants.courseInk(this.courseId))
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-          .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
+          .backgroundColor(Constants.courseTint(this.courseId))
           .borderRadius(Constants.RADIUS_SM)
         Text((this.currentIndex + 1).toString() + ' / ' + this.questions.length.toString())
           .fontSize(12)
@@ -433,34 +433,19 @@ struct PracticePage {
         .width('100%')
         .color(Constants.COLOR_BRAND)
         .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
-      Text(this.activeQuestion.question)
-        .width('100%')
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        .lineHeight(27)
-      if ((this.activeQuestion.tags ?? []).length > 0 || this.activeQuestion.difficulty !== undefined) {
-        Flex({ wrap: FlexWrap.Wrap }) {
-          Text(this.difficultyLabel(this.activeQuestion.difficulty))
-            .fontSize(10)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
-            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-            .backgroundColor(Constants.COLOR_BG_TAG)
-            .borderRadius(9)
-            .margin({ right: 6, bottom: 6 })
-          ForEach(this.activeQuestion.tags ?? [], (tag: string): void => {
-            Text(tag)
-              .fontSize(10)
-              .fontColor(Constants.COLOR_BRAND)
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(9)
-              .margin({ right: 6, bottom: 6 })
-          })
-        }
-        .width('100%')
+      Column() {
+        Text(this.activeQuestion.question)
+          .width('100%')
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .lineHeight(27)
       }
-      Column({ space: 10 }) {
+      .width('100%')
+      .padding(18)
+      .backgroundColor(Constants.courseTint(this.courseId))
+      .borderRadius(Constants.RADIUS_LG)
+      Column({ space: 8 }) {
         ForEach(this.activeQuestion.options, (option: string): void => {
           AnswerOption(option, this.activeAnswer === option, (): void => { this.choose(option); })
         })
@@ -506,19 +491,12 @@ struct PracticePage {
       .width('100%')
     }
     .width('100%')
-    .padding(18)
-    .backgroundColor(Constants.COLOR_BG_CARD)
-    .borderRadius(Constants.RADIUS_LG)
+    .padding({ top: 8, bottom: 20 })
   }
 
   @Builder
   ResultView() {
     Column({ space: 16 }) {
-      Text('本轮表现')
-        .width('100%')
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Constants.COLOR_TEXT_PRIMARY)
       Row({ space: 18 }) {
         Stack({ alignContent: Alignment.Center }) {
           Progress({ value: this.correctCount, total: this.questions.length, type: ProgressType.Ring })
@@ -531,17 +509,12 @@ struct PracticePage {
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
         }
         Column({ space: 5 }) {
-          Text('本轮已完成')
+          Text('练习完成')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           Text(this.correctCount.toString() + ' / ' + this.questions.length.toString() + ' 题正确')
             .fontSize(14)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          Text(this.correctCount === this.questions.length ?
-            '全部答对，试试新题。' :
-            '有 ' + (this.questions.length - this.correctCount).toString() + ' 道题做错了。')
-            .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
         }
         .layoutWeight(1)
@@ -553,22 +526,32 @@ struct PracticePage {
       .borderRadius(Constants.RADIUS_LG)
 
       Column({ space: 8 }) {
-        Text(this.correctCount === this.questions.length ? '继续挑战' : '错题回顾')
+        Text(this.correctCount === this.questions.length ? '全部答对' : '错题解析')
           .width('100%')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
         Text(this.correctCount === this.questions.length ?
-          '这组全对，试试新题。' :
+          '可以继续测验这个主题。' :
           this.firstWrongDetail()?.stem ?? '')
           .width('100%')
           .fontSize(14)
           .lineHeight(22)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
         if (this.correctCount < this.questions.length) {
-          Text('你选了 ' + (this.firstWrongDetail()?.userAnswer || '未作答'))
+          Text('你的答案：' + (this.firstWrongDetail()?.userAnswer || '未作答'))
             .width('100%')
-            .fontSize(12)
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text('正确答案：' + (this.firstWrongDetail()?.correctAnswer || ''))
+            .width('100%')
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+          Text(this.firstWrongDetail()?.explanation ?? '')
+            .width('100%')
+            .fontSize(13)
+            .lineHeight(21)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
         Button(this.correctCount === this.questions.length ? '测验这个主题' : '问学伴')
@@ -603,27 +586,21 @@ struct PracticePage {
       .borderRadius(Constants.RADIUS_LG)
 
       if (this.writeBackTotalQuestions > 0) {
-        Column({ space: 9 }) {
-          Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-              .fontSize(18)
-              .fontColor([Constants.COLOR_SUCCESS])
-            Text('练习结果已保存')
-              .fontSize(15)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          }
-          .width('100%')
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+            .fontSize(16)
+            .fontColor([Constants.COLOR_SUCCESS])
+          Text('已保存')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_SUCCESS)
+          Blank()
           Text('累计答题 ' + this.writeBackTotalQuestions.toString() + ' 题 · 错题 ' +
             this.writeBackActiveReviews.toString() + ' 道')
-            .width('100%')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
         .width('100%')
-        .padding(16)
-        .backgroundColor(Constants.COLOR_SUCCESS_LIGHT)
-        .borderRadius(Constants.RADIUS_MD)
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
       }
 
       Text('逐题回看')

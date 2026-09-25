@@ -226,7 +226,7 @@ struct LessonPage {
     const total = this.conceptStepCount();
     if (total === 0) return '暂无推演步骤';
     if (this.conceptStepIndex >= total - 1) return '重新推演';
-    return '对照第 ' + (this.conceptStepIndex + 2).toString() + ' 步';
+    return '下一步';
   }
 
   private advanceConceptStep(): void {
@@ -437,7 +437,7 @@ struct LessonPage {
 
   private finalActionLabel(): string {
     if (this.saving) return '保存中...';
-    if (this.currentIndex < this.chunks.length - 1) return '学完本节，继续';
+    if (this.currentIndex < this.chunks.length - 1) return '读完，下一节';
     if (this.needsActivityResume() && this.experience !== null) {
       const nextIndex = this.nextPendingActivityIndex();
       return '继续练习 ' + (nextIndex + 1).toString() + '/' +
@@ -1145,13 +1145,14 @@ struct LessonPage {
               SymbolGlyph($r('sys.symbol.book_open_fill'))
                 .fontSize(18)
                 .fontColor([Constants.COLOR_BRAND])
-              Text('概念推演')
+              Text('跟着推演')
                 .fontSize(17)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(Constants.COLOR_TEXT_PRIMARY)
             }
-            Text((this.conceptStepIndex + 1).toString() + ' / ' + this.conceptStepCount().toString())
-              .fontSize(11)
+            Text('步骤 ' + (this.conceptStepIndex + 1).toString() + ' / ' +
+              this.conceptStepCount().toString())
+              .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
           }
           .width('100%')
@@ -1163,51 +1164,64 @@ struct LessonPage {
           Text(this.experience.visualTitle)
             .width('100%')
             .fontSize(13)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .lineHeight(21)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .padding(14)
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(Constants.RADIUS_MD)
 
           Column({ space: 8 }) {
-            ForEach(this.experience.visualSteps, (step: string, index: number): void => {
-            Row({ space: 10 }) {
-              Text((index + 1).toString())
-                .width(24)
-                .height(24)
-                .fontSize(11)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(index <= this.conceptStepIndex ?
-                  Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_SECONDARY)
-                .textAlign(TextAlign.Center)
-                .backgroundColor(index <= this.conceptStepIndex ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
-                .borderRadius(12)
-              Text(index <= this.conceptStepIndex ? step : '待推演')
-                .layoutWeight(1)
-                .constraintSize({ minHeight: 46 })
-                .fontSize(13)
-                .fontWeight(index === this.conceptStepIndex ? FontWeight.Bold : FontWeight.Regular)
-                .lineHeight(21)
-                .fontColor(index <= this.conceptStepIndex ?
-                  Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_PLACEHOLDER)
-                .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-                .backgroundColor(index === this.conceptStepIndex ?
-                  Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
-                .borderRadius(Constants.RADIUS_SM)
-            }
-            .width('100%')
+            ForEach(this.experience.visualSteps.slice(0, this.conceptStepIndex + 1),
+              (step: string, index: number): void => {
+                Row({ space: 10 }) {
+                  Text((index + 1).toString())
+                    .width(24)
+                    .height(24)
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                    .textAlign(TextAlign.Center)
+                    .backgroundColor(index === this.conceptStepIndex ? Constants.COLOR_BRAND :
+                      Constants.COLOR_TEXT_SECONDARY)
+                    .borderRadius(12)
+                  Text(step)
+                    .layoutWeight(1)
+                    .constraintSize({ minHeight: 46 })
+                    .fontSize(13)
+                    .fontWeight(index === this.conceptStepIndex ? FontWeight.Bold : FontWeight.Regular)
+                    .lineHeight(21)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+                    .backgroundColor(index === this.conceptStepIndex ?
+                      Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_CARD)
+                    .borderRadius(Constants.RADIUS_SM)
+                  if (index === this.conceptStepIndex) {
+                    Button(this.conceptStepButtonLabel())
+                      .constraintSize({ minWidth: 84, minHeight: 48 })
+                      .padding({ left: 10, right: 10 })
+                      .fontSize(12)
+                      .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+                      .backgroundColor(Constants.COLOR_BRAND)
+                      .borderRadius(Constants.RADIUS_MD)
+                      .onClick((): void => { this.advanceConceptStep(); })
+                  }
+                }
+                .width('100%')
             })
           }
           .width('100%')
 
-          Button(this.conceptStepButtonLabel())
+          Progress({ value: this.conceptStepIndex + 1, total: this.conceptStepCount(),
+            type: ProgressType.Linear })
             .width('100%')
-            .constraintSize({ minHeight: 48 })
-            .enabled(this.conceptStepCount() > 0)
-            .fontSize(13)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .backgroundColor(Constants.COLOR_BRAND)
-            .borderRadius(Constants.RADIUS_MD)
-            .onClick((): void => { this.advanceConceptStep(); })
+            .color(Constants.COLOR_BRAND)
+            .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
         }
       }
       .width('100%')
+      .padding(this.hasBfsGraphSource() ? 0 : 16)
+      .backgroundColor(this.hasBfsGraphSource() ? Constants.COLOR_BG_PAGE : Constants.COLOR_SURFACE_TINT)
+      .borderRadius(Constants.RADIUS_LG)
 
       Column({ space: 8 }) {
         Row({ space: 8 }) {
@@ -1584,16 +1598,10 @@ struct LessonPage {
   @Builder
   private LessonOpening() {
     Column({ space: 12 }) {
-      Row({ space: 8 }) {
-        SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
-          .fontSize(18)
-          .fontColor([Constants.COLOR_BRAND])
-        Text('这节讲什么')
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_BRAND_TEXT)
-      }
-      .width('100%')
+      Text('概念')
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_BRAND_TEXT)
 
       Text(this.contentBeats()[0] ?? this.activeChunk.text)
         .width('100%')
@@ -1603,8 +1611,8 @@ struct LessonPage {
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 16, bottom: 16 })
-    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+    .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
   }
 
@@ -1635,13 +1643,13 @@ struct LessonPage {
       } else {
         Column({ space: 10 }) {
           Row() {
-            Text('课程内容')
+            Text('第 ' + (this.currentIndex + 1).toString() + ' 节')
               .fontSize(11)
               .fontColor(Constants.COLOR_BRAND_TEXT)
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
               .backgroundColor(Constants.COLOR_BRAND_LIGHT)
               .borderRadius(Constants.RADIUS_SM)
-            Text((this.currentIndex + 1).toString() + ' / ' + this.chunks.length.toString())
+            Text('共 ' + this.chunks.length.toString() + ' 节')
               .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
           }
