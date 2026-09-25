@@ -90,6 +90,14 @@ struct CourseDetailPage {
     });
   }
 
+  private openKnowledge(): void {
+    AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle);
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/Knowledge' }).catch((): void => {
+      this.message = '课程资料暂时打不开，请重试';
+    });
+  }
+
   private topicStatusLabel(topic: string): string {
     return resolveTopicAction(topic, this.completedTopics, this.nextTopic(), this.resumeState());
   }
@@ -316,11 +324,22 @@ struct CourseDetailPage {
             .borderRadius(Constants.RADIUS_LG)
             .onClick((): void => { this.openResources(); })
 
-            Text('全部主题')
-              .width('100%')
-              .fontSize(Constants.PAGE_SECTION_SIZE)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            Row() {
+              Text('全部主题')
+                .layoutWeight(1)
+                .fontSize(Constants.PAGE_SECTION_SIZE)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              Button('搜课程资料')
+                .constraintSize({ minHeight: 48 })
+                .padding({ left: 12, right: 12 })
+                .fontSize(12)
+                .fontColor(Constants.COLOR_BRAND_TEXT)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                .borderRadius(Constants.RADIUS_MD)
+                .onClick((): void => { this.openKnowledge(); })
+            }
+            .width('100%')
 
             Column() {
               ForEach(this.topics, (topic: string, index: number): void => {

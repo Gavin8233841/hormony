@@ -51,6 +51,7 @@ struct PlanPage {
   @State updatingTaskId: string = '';
   @State collapsedDays: string[] = [];
   @State expandedFutureDays: string[] = [];
+  @State loadingDetailsExpanded: boolean = false;
   private activeRequest: HttpRequestCancellation | null = null;
   private generationRunId: number = 0;
   private planReadRunId: number = 0;
@@ -678,11 +679,11 @@ struct PlanPage {
   }
 
   private planProgressTitle(): string {
-    if (this.progressStep >= 4) return '正在更新学习入口';
-    if (this.progressStep === 3) return '正在保存到本机';
-    if (this.progressStep === 2) return '正在检查每项任务';
-    if (this.progressStep === 1) return '正在在线安排学习节奏';
-    return '正在读取本机学习状态';
+    if (this.progressStep >= 4) return '计划快准备好了';
+    if (this.progressStep === 3) return '正在保存计划';
+    if (this.progressStep === 2) return '正在整理任务';
+    if (this.progressStep === 1) return '正在安排每天的学习';
+    return '正在了解你的学习情况';
   }
 
   private planProgressSubtitle(): string {
@@ -796,7 +797,25 @@ struct PlanPage {
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
-      this.PlanProgress()
+      Row({ space: 8 }) {
+        LoadingProgress()
+          .width(18)
+          .height(18)
+          .color(Constants.COLOR_BRAND)
+        Text(this.planProgressTitle())
+          .layoutWeight(1)
+          .fontSize(14)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Button(this.loadingDetailsExpanded ? '收起' : '查看进度')
+          .constraintSize({ minHeight: 48 })
+          .padding({ left: 12, right: 12 })
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.loadingDetailsExpanded = !this.loadingDetailsExpanded; })
+      }
+      .width('100%')
 
       if (this.tasks.length > 0) {
         Row({ space: 8 }) {
@@ -815,17 +834,20 @@ struct PlanPage {
         .borderRadius(Constants.RADIUS_MD)
       }
 
-      Column({ space: 9 }) {
-        this.PlanCheckpoint('本机状态', '读取薄弱项、连续学习和练习表现', 0)
-        this.PlanCheckpoint('在线规划', '从已有课程主题中安排每天的任务', 1)
-        this.PlanCheckpoint('任务检查', '检查日期、课程入口和预计时长', 2)
-        this.PlanCheckpoint('本机保存', '写入计划并保留已有学习数据', 3)
-        this.PlanCheckpoint('入口更新', '通知首页与服务卡片刷新', 4)
+      if (this.loadingDetailsExpanded) {
+        this.PlanProgress()
+        Column({ space: 9 }) {
+          this.PlanCheckpoint('本机状态', '读取薄弱项、连续学习和练习表现', 0)
+          this.PlanCheckpoint('在线规划', '从已有课程主题中安排每天的任务', 1)
+          this.PlanCheckpoint('任务检查', '检查日期、课程入口和预计时长', 2)
+          this.PlanCheckpoint('本机保存', '写入计划并保留已有学习数据', 3)
+          this.PlanCheckpoint('入口更新', '通知首页与服务卡片刷新', 4)
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Constants.COLOR_SURFACE_TINT)
+        .borderRadius(Constants.RADIUS_MD)
       }
-      .width('100%')
-      .padding(12)
-      .backgroundColor(Constants.COLOR_SURFACE_TINT)
-      .borderRadius(Constants.RADIUS_MD)
 
       Row({ space: 8 }) {
         LoadingProgress()
@@ -843,7 +865,6 @@ struct PlanPage {
       .backgroundColor(Constants.COLOR_BRAND_LIGHT)
       .borderRadius(Constants.RADIUS_MD)
 
-      this.PlanSkeleton()
     }
     .width('100%')
     .padding({ top: 4, bottom: 4 })
@@ -914,7 +935,7 @@ struct PlanPage {
 
   build() {
     Column() {
-      GradientHeader('学习计划', '输入目标，自动拆解为每日任务', () => this.goBack())
+      GradientHeader('学习计划', '按目标安排每天的学习', () => this.goBack())
 
       if (!this.loading && !this.planLoading) {
         if (this.tasks.length === 0 || this.editorExpanded) {
@@ -1060,8 +1081,7 @@ struct PlanPage {
           .padding(12)
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(Constants.RADIUS_LG)
-          .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
-          .margin({ left: 16, right: 16, bottom: 8 })
+          .margin({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 8 })
           .constraintSize({ maxWidth: 760 })
         }
       }
@@ -1224,7 +1244,8 @@ struct PlanPage {
                 .onClick((): void => { this.toggleDay(day); })
                 if (this.isDayExpanded(day)) {
                   ForEach(this.tasksForDay(day), (t: PlanTask, i: number): void => {
-              Row({ space: 12 }) {
+              Column({ space: 12 }) {
+                Row({ space: 12 }) {
                 Stack({ alignContent: Alignment.Center }) {
                   Column()
                     .width(34)
@@ -1245,7 +1266,7 @@ struct PlanPage {
 
                 Column() {
                   Text(t.title)
-                    .fontSize(14)
+                    .fontSize(15)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(t.done ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_PRIMARY)
                   Text((this.hasTaskTarget(t) ? this.courseTitle(t.courseId) + ' · ' + (t.topic ?? '') : '重新生成后可直达学习环节'))
@@ -1258,10 +1279,6 @@ struct PlanPage {
                     .lineHeight(17)
                     .margin({ top: 5 })
                   Flex({ wrap: FlexWrap.Wrap }) {
-                    Text(t.date)
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      .margin({ right: 8, bottom: 4 })
                     Text(t.estimatedMin.toString() + ' 分钟')
                       .fontSize(11)
                       .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -1280,9 +1297,13 @@ struct PlanPage {
                 .layoutWeight(1)
                 .accessibilityGroup(true)
                 .accessibilityText(this.taskAccessibilityText(t))
+                }
+                .width('100%')
+                .alignItems(VerticalAlign.Top)
 
-                Column({ space: 6 }) {
+                Row({ space: 10 }) {
                   Button(this.actionLabel(t))
+                    .layoutWeight(1)
                     .constraintSize({ minWidth: 64, minHeight: 48 })
                     .padding({ left: 12, right: 12, top: 10, bottom: 10 })
                     .fontSize(12)
@@ -1294,6 +1315,7 @@ struct PlanPage {
                     .accessibilityDescription('打开该计划任务对应的真实学习环节')
                     .onClick(() => { this.openTask(t); })
                   Button(this.updatingTaskId === t.id ? '保存中' : (t.done ? '恢复' : '完成'))
+                    .layoutWeight(1)
                     .constraintSize({ minWidth: 64, minHeight: 48 })
                     .padding({ left: 12, right: 12, top: 10, bottom: 10 })
                     .fontSize(12)
@@ -1305,6 +1327,7 @@ struct PlanPage {
                     .accessibilityDescription('手动设置任务状态并保存到本机；这不代表通过测评')
                     .onClick(() => { this.toggleTask(t); })
                 }
+                .width('100%')
               }
               .width('100%')
               .padding(14)
@@ -1367,6 +1390,7 @@ struct PlanPage {
     this.activeRequest = request;
     this.pendingPlan = null;
     this.dismissGoalInput();
+    this.loadingDetailsExpanded = false;
     this.loading = true;
     this.message = '';
     this.hasError = false;

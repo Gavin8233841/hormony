@@ -7983,3 +7983,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：首次 API 12 构建发现 ArkTS 不接受对象字面量类型、目标 SDK 无 `book_closed_fill`，改用命名接口和已有 Symbol 后，增量 `assembleHap` 最终 exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成；签名仍未配置。Python 3.12 `unittest discover` 215/215，`node scripts/generate-learning-content-json.test.mjs` 4/4，`git diff --check` exit 0。Pura X View 模拟器 1320×2232 竖屏安装最终 HAP，从课程详情进入资料页，UI 树显示链表主题、三条推荐与来源域名，最终截图 `.runtime/resource-library-final.png`。此前同批构建点击 Princeton 项，系统浏览器地址显示 `algs4.cs.princeton.edu`；回到应用后点击“做几道题”，练习页显示“数据结构 · 链表”与真实 5 题；点击“和老师聊聊”，学伴输入框出现对应资料标题与链表主题的预填问题。最后调整展示文案、栏目和推荐顺序后已重新构建并安装，最终截图确认更新内容。
 
 未验证：没有逐个在模拟器打开全部课程资源，也没有证明所有第三方页面可在该设备完成加载；资料阅读时长、真实理解程度、学伴对这条预填问题的完整云端回答、真机、横屏、大字号及正式签名包尚未验证。其他未提交脚本和审计文档保留。
+
+---
+
+## 2026-09-25 [MAIN] 学习计划、知识检索与错题本统一
+
+背景：主路径升级后，计划、知识检索和错题本仍保留拥挤的操作排列和较机械的反馈。尤其错题均未到复习日时，页面缺少当天可执行的学习动作；课程详情里也难以发现知识检索。
+
+改动：计划任务将内容与操作分行，阶段进度默认摘要展示，需要时再展开；保持原有生成、保存和任务状态逻辑。课程详情增加“搜课程资料”入口，知识页收紧搜索与空状态，结果以主题、出处、摘要、原文操作依次呈现，只有关联主题时才显示测验入口。错题本区分到期重练与提前练同主题：尚未到期时进入普通主题练习，不把原题误记为到期复习；到期时仍可重练原题。相关学生文案改为更短的日常表达，静态契约测试同步适配计划按钮的横向布局，保留尺寸和可访问性断言。
+
+验证：API 12 增量 `assembleHap` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，产物仍未签名；Python 3.12 `unittest discover` 215/215，`test-product-experience-contracts.mjs` 17/17，`test-ws01-chat-plan-source-contract.mjs` 13/13，`git diff --check` exit 0。Pura X View 1320×2232 安装最终 HAP：计划页面截图 `.runtime/plan-after.png`；从课程详情打开知识检索，空态截图 `.runtime/knowledge-empty-final.png`，点击“图的遍历”后在线返回 5 条课程片段，结果截图 `.runtime/knowledge-result-final.png`；错题本最终截图 `.runtime/mistake-final.png`，点击未到期错题的“练同主题题目”进入“数据结构 · 数组与线性表”五题练习，返回后仍为“待复习 8 道 · 今天 0 道”。
+
+未验证：新生成计划的在线结果、所有知识搜索词和到期错题的实际重练结果；真机、横屏、大字号、签名发布包和正式提交仍需另行验收。其他未提交脚本与文档未纳入本批。

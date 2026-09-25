@@ -10,7 +10,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 @Component
 struct MistakeBookPage {
   @State items: ReviewItem[] = [];
-  @State reviewSummary: string = '0 道待巩固 · 0 道已到期';
+  @State reviewSummary: string = '待复习 0 道 · 今天 0 道';
   @State expandedId: string = '';
   @State loading: boolean = true;
   @State message: string = '';
@@ -41,8 +41,8 @@ struct MistakeBookPage {
         });
       this.nowTimestamp = nowTimestamp;
       this.items = dueItems.concat(pendingItems);
-      this.reviewSummary = this.items.length.toString() + ' 道待巩固 · ' +
-        dueItems.length.toString() + ' 道已到期';
+      this.reviewSummary = '待复习 ' + this.items.length.toString() + ' 道 · 今天 ' +
+        dueItems.length.toString() + ' 道';
     } catch (error) {
       if (this.loadRunId !== runId) return;
       this.items = [];
@@ -66,7 +66,7 @@ struct MistakeBookPage {
   }
 
   private reviewTimeLabel(item: ReviewItem): string {
-    if (this.isDue(item)) return '现在复习';
+    if (this.isDue(item)) return '今天复习';
     const nextReview = new Date(item.nextReviewAt);
     if (Number.isNaN(nextReview.getTime())) return '复习时间待同步';
     return (nextReview.getMonth() + 1).toString() + '月' + nextReview.getDate().toString() + '日复习';
@@ -82,10 +82,6 @@ struct MistakeBookPage {
   }
 
   private retry(item: ReviewItem): void {
-    if (!this.isDue(item)) {
-      this.message = '这道题尚未到复习时间，请按计划巩固';
-      return;
-    }
     if (!LearningContentRepository.getTopics(item.courseId).includes(item.topic)) {
       this.message = '错题主题已失效，无法进入练习';
       return;
@@ -94,7 +90,7 @@ struct MistakeBookPage {
     AppStorage.setOrCreate<string>('selectedCourseId', item.courseId);
     AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(item.courseId));
     AppStorage.setOrCreate<string>('selectedPracticeTopic', item.topic);
-    AppStorage.setOrCreate<string>('selectedReviewItemId', item.id);
+    AppStorage.setOrCreate<string>('selectedReviewItemId', this.isDue(item) ? item.id : '');
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Practice' }).catch((error: Error): void => {
       AppStorage.setOrCreate<string>('selectedReviewItemId', '');
       this.message = '无法打开复习，请重试';
@@ -121,7 +117,7 @@ struct MistakeBookPage {
   build() {
     Column() {
       if (this.loading) {
-        TitleBar('错题本', '正在读取本地复习队列', () => this.getUIContext().getRouter().back())
+        TitleBar('错题本', '正在加载', () => this.getUIContext().getRouter().back())
       } else {
         TitleBar('错题本', this.reviewSummary, () => this.getUIContext().getRouter().back())
       }
@@ -134,7 +130,7 @@ struct MistakeBookPage {
             .fontSize(15)
             .fontColor(Constants.COLOR_ERROR)
           Button('重新读取')
-            .height(40)
+            .constraintSize({ minHeight: 48 })
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
             .backgroundColor(Constants.COLOR_BRAND)
@@ -146,10 +142,10 @@ struct MistakeBookPage {
       } else if (this.items.length === 0) {
         Column({ space: 9 }) {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(42).fontColor([Constants.COLOR_SUCCESS])
-          Text('当前没有待巩固错题')
+          Text('暂时没有要复习的错题')
             .fontSize(15)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text('完成精选练习或 AI 测验后会自动整理')
+          Text('练习和测验中的错题会保存在这里')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_PLACEHOLDER)
         }
@@ -177,42 +173,21 @@ struct MistakeBookPage {
                 Row({ space: 8 }) {
                   Text(item.topic)
                     .layoutWeight(1)
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .fontSize(11)
-                    .fontColor(Constants.COLOR_ERROR)
-                    .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-                    .backgroundColor(Constants.COLOR_ERROR_LIGHT)
-                    .borderRadius(Constants.RADIUS_SM)
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   Row({ space: 6 }) {
                     Text('练 ' + item.attempts.toString() + ' 次')
                       .fontSize(11)
                       .fontColor(Constants.COLOR_TEXT_SECONDARY)
                     Text(this.reviewTimeLabel(item))
-                      .fontSize(10)
+                      .fontSize(11)
                       .fontWeight(FontWeight.Medium)
-                      .fontColor(this.isDue(item) ? Constants.COLOR_ERROR : Constants.COLOR_WARNING)
-                      .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-                      .backgroundColor(this.isDue(item) ? Constants.COLOR_ERROR_LIGHT : Constants.COLOR_BG_TAG)
-                      .borderRadius(Constants.RADIUS_SM)
+                      .fontColor(this.isDue(item) ? Constants.COLOR_BRAND_TEXT : Constants.COLOR_TEXT_SECONDARY)
                   }
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.SpaceBetween)
-                if ((item.tags ?? []).length > 0) {
-                  Flex({ wrap: FlexWrap.Wrap }) {
-                    ForEach(item.tags ?? [], (tag: string): void => {
-                      Text(tag)
-                        .fontSize(10)
-                        .fontColor(Constants.COLOR_BRAND)
-                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                        .borderRadius(9)
-                        .margin({ right: 6, bottom: 2 })
-                    })
-                  }
-                  .width('100%')
-                }
                 Text(item.stem)
                   .width('100%')
                   .fontSize(15)
@@ -232,21 +207,21 @@ struct MistakeBookPage {
                   .borderRadius(Constants.RADIUS_MD)
                 }
                 if (!this.hasOriginalQuestion(item)) {
-                  Text('此记录未保留完整选项，将使用同主题精选题巩固')
+                  Text('这道题暂无完整选项，可练习同主题题目')
                     .width('100%')
                     .fontSize(11)
                     .fontColor(Constants.COLOR_TEXT_TERTIARY)
                 }
-                Button('请学伴讲解')
+                Button(this.isDue(item) && this.hasOriginalQuestion(item) ? '重练这道题' : '练同主题题目')
                   .width('100%')
                   .height(48)
                   .fontSize(14)
                   .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                   .backgroundColor(Constants.COLOR_BRAND)
                   .borderRadius(Constants.RADIUS_MD)
-                  .onClick((): void => { this.askTutor(item); })
+                  .onClick((): void => { this.retry(item); })
                 Row({ space: 10 }) {
-                  Button(this.expandedId === item.id ? '收起解析' : '查看解析')
+                  Button(this.expandedId === item.id ? '收起解析' : '看解析')
                     .layoutWeight(1)
                     .height(48)
                     .fontSize(12)
@@ -254,16 +229,14 @@ struct MistakeBookPage {
                     .backgroundColor(Constants.COLOR_BG_TAG)
                     .borderRadius(Constants.RADIUS_MD)
                     .onClick((): void => { this.expandedId = this.expandedId === item.id ? '' : item.id; })
-                  Button(this.isDue(item) ?
-                    (this.hasOriginalQuestion(item) ? '重练原题' : '练同主题精选题') : '等待到期')
+                  Button('问学伴')
                     .layoutWeight(1)
                     .height(48)
                     .fontSize(12)
-                    .fontColor(this.isDue(item) ? Constants.COLOR_BRAND_TEXT : Constants.COLOR_TEXT_SECONDARY)
-                    .backgroundColor(this.isDue(item) ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
+                    .fontColor(Constants.COLOR_BRAND_TEXT)
+                    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                     .borderRadius(Constants.RADIUS_MD)
-                    .enabled(this.isDue(item))
-                    .onClick((): void => { this.retry(item); })
+                    .onClick((): void => { this.askTutor(item); })
                 }
                 .width('100%')
               }
@@ -276,7 +249,8 @@ struct MistakeBookPage {
         }
         .width('100%')
         .layoutWeight(1)
-        .padding({ left: 16, right: 16, bottom: 24 + SafeAreaInsets.bottomVp() })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER,
+          bottom: 24 + SafeAreaInsets.bottomVp() })
         .scrollBar(BarState.Off)
       }
     }

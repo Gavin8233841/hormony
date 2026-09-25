@@ -249,50 +249,37 @@ struct KnowledgePage {
     Column({ space: 10 }) {
       Row({ space: 10 }) {
         Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.book_pages_fill_1'))
-            .fontSize(16)
-            .fontColor([Constants.COLOR_BRAND])
           Text(item.source.trim())
-            .fontSize(13)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_BRAND)
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .layoutWeight(1)
-        Text(this.scoreLabel(item))
-          .fontSize(11)
-          .fontColor(this.hasNumericScore(item) ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
       }
       .width('100%')
 
       if (this.exactTopic(item).length > 0) {
         Text(this.exactTopic(item))
-          .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_BRAND)
-          .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-          .borderRadius(Constants.RADIUS_SM)
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
           .alignSelf(ItemAlign.Start)
       }
 
       Column({ space: 5 }) {
         Text(this.evidenceFor(item).label)
           .width('100%')
-          .fontSize(11)
-          .fontWeight(FontWeight.Bold)
+          .fontSize(10)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
         Text(this.evidenceFor(item).text)
           .width('100%')
-          .fontSize(14)
+          .fontSize(15)
           .lineHeight(23)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
       }
       .width('100%')
-      .padding(12)
-      .backgroundColor(Constants.COLOR_SURFACE_TINT)
-      .borderRadius(Constants.RADIUS_SM)
+      .padding({ top: 6, bottom: 6 })
 
       if (this.expandedIndex === index) {
         Text(item.text)
@@ -300,12 +287,10 @@ struct KnowledgePage {
           .fontSize(13)
           .lineHeight(22)
           .fontColor(Constants.COLOR_TEXT_TERTIARY)
-          .maxLines(40)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
 
       Row({ space: 5 }) {
-        Text(this.expandedIndex === index ? '收起全文' : '展开全文')
+        Text(this.expandedIndex === index ? '收起' : '阅读全文')
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
         if (this.expandedIndex === index) {
@@ -318,7 +303,7 @@ struct KnowledgePage {
             .fontColor([Constants.COLOR_TEXT_SECONDARY])
         }
       }
-      .height(32)
+      .constraintSize({ minHeight: 48 })
       .alignSelf(ItemAlign.Start)
       .onClick((): void => { this.expandedIndex = this.expandedIndex === index ? -1 : index; })
 
@@ -336,13 +321,13 @@ struct KnowledgePage {
             }
           }
           .layoutWeight(1)
-          .height(44)
+          .height(48)
           .backgroundColor(Constants.COLOR_BRAND)
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => { this.openLesson(item); })
           Button('问学伴')
             .width(94)
-            .height(44)
+            .height(48)
             .fontSize(12)
             .fontColor(Constants.COLOR_BRAND)
             .backgroundColor(Constants.COLOR_BRAND_LIGHT)
@@ -353,7 +338,7 @@ struct KnowledgePage {
       } else {
         Button('问学伴解释这段资料')
           .width('100%')
-          .height(44)
+          .height(48)
           .fontSize(13)
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           .backgroundColor(Constants.COLOR_BRAND)
@@ -364,27 +349,27 @@ struct KnowledgePage {
     .width('100%')
     .padding(16)
     .backgroundColor(Constants.COLOR_BG_CARD)
-    .borderRadius(Constants.RADIUS_MD)
+    .borderRadius(Constants.RADIUS_LG)
     .alignItems(HorizontalAlign.Start)
   }
 
   build() {
     Column() {
-      GradientHeader('搜课程资料', '在' + this.courseTitle + '资料中检索', () => this.getUIContext().getRouter().back())
+      GradientHeader('课程资料', this.courseTitle, () => this.getUIContext().getRouter().back())
 
       // 搜索栏
       Row({ space: 12 }) {
-        TextInput({ text: this.query, placeholder: '输入关键词...' })
+        TextInput({ text: this.query, placeholder: '搜索知识点' })
           .layoutWeight(1)
-          .height(44)
+          .height(48)
           .fontSize(14)
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(12)
           .onChange((v: string) => { this.query = v; })
           .onSubmit(() => { this.search(); })
 
-        Button('检索')
-          .height(44)
+        Button('搜索')
+          .height(48)
           .fontSize(14)
           .backgroundColor(this.canSearch ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
           .fontColor(this.canSearch ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
@@ -393,7 +378,7 @@ struct KnowledgePage {
           .onClick(() => { this.search(); })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 16 })
+      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 16 })
 
       if (this.message.length > 0) {
         Row({ space: 8 }) {
@@ -415,19 +400,24 @@ struct KnowledgePage {
         this.SearchSkeleton()
       } else if (this.results.length > 0) {
         // 结果列表
-        Text('找到 ' + this.results.length + ' 条相关资料')
-          .fontSize(12)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          .margin({ left: 16, bottom: 8 })
-
-        Button('复习后，开始“' + this.resultTopic() + '”测验')
-          .height(42)
-          .fontSize(13)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(Constants.COLOR_BRAND)
-          .borderRadius(Constants.RADIUS_MD)
-          .margin({ left: 16, right: 16, bottom: 10 })
-          .onClick(() => { this.startTopicQuiz(); })
+        Row() {
+          Text(this.results.length.toString() + ' 条相关资料')
+            .layoutWeight(1)
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          if (this.resultTopic().length > 0) {
+            Button('测验 · ' + this.resultTopic())
+              .constraintSize({ minHeight: 48 })
+              .padding({ left: 12, right: 12 })
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.startTopicQuiz(); })
+          }
+        }
+        .width('100%')
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 10 })
 
         List({ space: 12 }) {
           ForEach(this.results, (item: KnowledgeChunk, i: number) => {
@@ -441,28 +431,24 @@ struct KnowledgePage {
         .layoutWeight(1)
         .cachedCount(5)
         .scrollBar(BarState.Off)
-        .padding({ left: 16, right: 16, bottom: 20 + SafeAreaInsets.bottomVp() })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER,
+          bottom: 20 + SafeAreaInsets.bottomVp() })
       } else {
-        Column({ space: 12 }) {
-          SymbolGlyph($r('sys.symbol.magnifyingglass'))
-            .fontSize(44)
-            .fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
-          Text('搜索' + this.courseTitle + '知识点')
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
+        Column({ space: 14 }) {
+          Text('推荐搜索')
+            .width('100%')
+            .fontSize(Constants.PAGE_SECTION_SIZE)
+            .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text('输入想查的知识点')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-            .textAlign(TextAlign.Center)
-          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
+          Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.suggestions, (suggestion: string) => {
               Button(suggestion)
-                .height(40)
+                .constraintSize({ minHeight: 48 })
+                .padding({ left: 16, right: 16 })
                 .fontSize(12)
-                .fontColor(Constants.COLOR_BRAND)
+                .fontColor(Constants.COLOR_BRAND_TEXT)
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                .borderRadius(20)
+                .borderRadius(Constants.RADIUS_MD)
                 .margin({ right: 8, bottom: 8 })
                 .onClick(() => {
                   this.query = suggestion;
@@ -470,12 +456,17 @@ struct KnowledgePage {
                 })
             })
           }
-          .margin({ top: 8 })
+          Text('也可以输入其他知识点，从本课程资料中查找。')
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
         .width('100%')
         .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .padding({ left: 28, right: 28, bottom: 24 + SafeAreaInsets.bottomVp() })
+        .alignItems(HorizontalAlign.Start)
+        .justifyContent(FlexAlign.Start)
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER,
+          top: 24, bottom: 24 + SafeAreaInsets.bottomVp() })
       }
     }
     .width('100%')
@@ -512,7 +503,7 @@ struct KnowledgePage {
         this.results = this.searchLocal(q);
         this.message = this.results.length > 0 ? '云端未命中，以下来自本地课程资料' : '未找到相关资料，试试更具体的关键词';
       } else {
-        this.message = '已返回当前课程的相关资料';
+        this.message = '';
       }
     } catch (e) {
       if (requestVersion !== this.searchRequestVersion) return;
