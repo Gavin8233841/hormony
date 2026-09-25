@@ -64,7 +64,7 @@ struct CourseDetailPage {
     } catch (error) {
       if (this.loadRunId !== runId) return;
       this.progressReady = false;
-      this.message = '本地学习进度加载失败';
+      this.message = '学习进度暂时打不开';
     } finally {
       if (this.loadRunId === runId) this.loading = false;
     }

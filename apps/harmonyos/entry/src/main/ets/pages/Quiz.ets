@@ -684,8 +684,8 @@ struct QuizPage {
     const question = '请帮我复盘这次《' + this.courseTitle + '》' + this.topic +
       '测验：正确率 ' + Math.round(this.resultAccuracy * 100).toString() + '%，' +
       '错题 ' + (this.resultTotalQuestions - this.resultCorrectCount).toString() + ' 道。' +
-      (weakTags.length > 0 ? '薄弱标签是：' + weakTags + '。' : '') +
-      '请给我一个三步复习方案，并说明下一组题应该怎么练。';
+      (weakTags.length > 0 ? '需要复习：' + weakTags + '。' : '') +
+      '请指出最该复习的知识点，并推荐一组练习。';
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';
@@ -786,7 +786,7 @@ struct QuizPage {
   }
 
   private generationRequestSummary(): string {
-    const focus = this.focusTag.length > 0 ? ' · 标签 ' + this.focusTag : '';
+    const focus = this.focusTag.length > 0 ? ' · 重点 ' + this.focusTag : '';
     return this.courseTitle + ' · ' + this.topic + ' · ' + this.difficultyLabel() + ' · ' +
       this.questionCountLabel() + focus;
   }
@@ -1252,7 +1252,7 @@ struct QuizPage {
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           if (this.focusTag.length > 0) {
-            Text('重点标签：' + this.focusTag)
+            Text('练习重点：' + this.focusTag)
               .fontSize(11)
               .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           }
@@ -1345,7 +1345,7 @@ struct QuizPage {
 
       if (this.resultTagSummaries.length > 0) {
         Column({ space: 12 }) {
-          Text(this.resultCorrectCount === this.resultTotalQuestions ? '本轮涉及的标签' : '待澄清标签')
+          Text(this.resultCorrectCount === this.resultTotalQuestions ? '本轮知识点' : '要复习的知识点')
             .width('100%')
             .fontSize(16)
             .fontWeight(FontWeight.Bold)

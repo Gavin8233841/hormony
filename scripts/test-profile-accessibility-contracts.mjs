@@ -43,11 +43,11 @@ test('画像快照完整读取后一次提交且失败可恢复', () => {
   assert.equal(masteryRead < profileCommit, true,
     'profile state must not expose a partially loaded evidence snapshot');
   for (const reset of ['this.profile = null;', 'this.courses = [];', 'this.topicMastery = [];',
-    "this.message = '本地学习画像加载失败';"]) {
+    "this.message = '学习记录暂时打不开';"]) {
     assert.equal(loadProfile.includes(reset), true, `failed load missing reset: ${reset}`);
   }
 
-  const retryNames = source.match(/\.accessibilityText\('重新加载学习画像'\)/g) ?? [];
+  const retryNames = source.match(/\.accessibilityText\('重新加载我的学习'\)/g) ?? [];
   const retryActions = source.match(/\.onClick\(\(\): void => \{ this\.loadProfile\(\); \}\)/g) ?? [];
   assert.equal(retryNames.length, 2, 'both profile error states need an explicit screen-reader name');
   assert.equal(retryActions.length, 2, 'both profile error states must retry the same snapshot load');
@@ -93,8 +93,8 @@ test('画像操作具备明确名称与可随字体增长的触控区', () => {
     'profile destinations need stable screen-reader names');
   assert.equal(topicRow.includes('.constraintSize({ minHeight: 48 })'), true,
     'topic practice needs a 48vp minimum touch target');
-  assert.equal(topicRow.includes(".accessibilityDescription('打开测验，新结果将更新知识点画像')"), true,
-    'topic action must explain its state-changing result');
+  assert.equal(topicRow.includes(".accessibilityDescription('打开这个主题的测验')"), true,
+    'topic action must name its destination');
   assert.equal(source.includes('.position('), false,
     'profile content must not depend on fixed x/y positions on narrow screens');
   assert.equal(source.includes(".accessibilityText('打开学习星图')"), true,
@@ -115,13 +115,13 @@ test('画像操作具备明确名称与可随字体增长的触控区', () => {
     'dark primary text is invisible on the dark map surface');
 });
 
-test('统计播报明确真实证据来源且颜色引用均已定义', () => {
+test('统计播报保留学习记录来源且颜色引用均已定义', () => {
   const source = readSource(profilePath);
   const constants = readSource(constantsPath);
-  assert.equal(source.includes('来自本机答题与学习事件'), true,
-    'visible statistics must state their local evidence source');
-  assert.equal(source.includes(".accessibilityDescription('统计来自本机已保存的答题与学习事件')"), true,
-    'screen-reader statistics must state their evidence source');
+  assert.equal(source.includes("Text('已学习 ' + this.profile.stats.studyDays.toString() + ' 天')"), true,
+    'visible statistics must explain the displayed count');
+  assert.equal(source.includes(".accessibilityDescription('根据已保存的学习记录统计')"), true,
+    'screen-reader statistics must state their source');
 
   const references = [...source.matchAll(/Constants\.(\w+)/g)].map((match) => match[1]);
   for (const reference of new Set(references)) {

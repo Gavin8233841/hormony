@@ -492,7 +492,7 @@ struct KnowledgePage {
       this.results = response.chunks.filter((item: KnowledgeChunk): boolean => this.validCourseResult(item)).slice(0, 5);
       if (this.results.length === 0) {
         this.results = this.searchLocal(q);
-        this.message = this.results.length > 0 ? '云端未命中，以下来自本地课程资料' : '未找到相关资料，试试更具体的关键词';
+        this.message = this.results.length > 0 ? '在线搜索没有结果，已显示课程资料' : '未找到相关资料，试试更具体的关键词';
       } else {
         this.message = '';
       }
@@ -501,8 +501,8 @@ struct KnowledgePage {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage API failed: %{public}s', (e as Error).message);
       this.results = this.searchLocal(q);
-      this.message = this.results.length > 0 ? '云端检索暂不可用，以下来自本地课程资料' :
-        '云端检索暂不可用，本地课程资料也未命中';
+      this.message = this.results.length > 0 ? '在线搜索暂不可用，已显示课程资料' :
+        '在线搜索暂不可用，已收录资料中也没有结果';
       this.hasError = this.results.length === 0;
     } finally {
       if (requestVersion === this.searchRequestVersion) this.loading = false;

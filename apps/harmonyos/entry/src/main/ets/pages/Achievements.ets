@@ -43,7 +43,7 @@ struct AchievementsPage {
       this.courses = await LocalLearningRepository.getCourses() ?? [];
       this.studyEvents = await LocalLearningRepository.getStudyEvents();
       if (this.courses.length === 0) {
-        this.message = '本地课程目录为空，请重新读取';
+        this.message = '暂时没有课程，请重试';
       } else {
         this.actionContextReady = true;
       }

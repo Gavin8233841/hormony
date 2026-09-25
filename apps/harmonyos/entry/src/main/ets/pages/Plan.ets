@@ -139,7 +139,7 @@ struct PlanPage {
       return;
     }
     if (!this.hasTaskTarget(task)) {
-      this.message = '旧计划缺少课程主题，请重新生成可执行计划';
+      this.message = '这项任务暂时打不开，请重新生成计划';
       this.hasError = true;
       this.retryAction = 'none';
       this.clearErrorEvidence();

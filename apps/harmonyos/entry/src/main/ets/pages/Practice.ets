@@ -116,7 +116,7 @@ struct PracticePage {
       this.answers = [];
       this.activeAnswer = '';
       this.reviewItemIds = [];
-      this.message = '本地练习加载失败，请重试';
+      this.message = '练习暂时打不开，请重试';
       this.hasError = true;
       this.loadRetryAvailable = true;
     } finally {
@@ -686,7 +686,7 @@ struct PracticePage {
                 .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
                 .backgroundColor(Constants.COLOR_BRAND)
                 .borderRadius(Constants.RADIUS_MD)
-                .accessibilityText('重新加载本地练习')
+                .accessibilityText('重新加载练习')
                 .accessibilityDescription('再次读取原错题与同主题精选题')
                 .onClick((): void => { this.reloadQuestions(); })
             }

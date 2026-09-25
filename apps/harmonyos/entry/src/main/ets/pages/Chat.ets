@@ -173,7 +173,7 @@ export struct ChatContent {
       ProactiveLearningService.applySelection(selection);
       await this.getUIContext().getRouter().pushUrl({ url: targetPage });
     } catch (_) {
-      this.actionMessage = '暂时无法打开学习行动，请重试';
+      this.actionMessage = '暂时打不开，请重试';
     } finally {
       this.actionOpening = false;
     }
@@ -1125,7 +1125,7 @@ export struct ChatContent {
         }
         if (!this.receivedDone) {
           last.failed = true;
-          last.statusMessage = '连接提前结束，这次回答不会保存，请重试';
+          last.statusMessage = '连接中断，这次回答未完成，请重试';
           this.messages = this.messages.slice();
           return;
         }

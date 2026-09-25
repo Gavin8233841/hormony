@@ -84,7 +84,7 @@ struct LearningMapPage {
     } catch (error) {
       if (requestVersion === this.requestVersion) {
         this.clearMapSnapshot();
-        this.message = '本地学习星图加载失败，请重新读取';
+        this.message = '学习星图暂时打不开，请重试';
         this.mapLoadFailed = true;
         this.failedCourseId = '';
       }

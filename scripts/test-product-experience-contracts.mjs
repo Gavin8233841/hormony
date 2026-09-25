@@ -135,7 +135,7 @@ test('Lesson 真实后续动作路由失败时保留可见重试反馈', () => {
   const practice = methodBlock(lesson, 'openPractice');
 
   assert.match(quiz, /pushUrl\(\{ url: 'pages\/Quiz' \}\)/);
-  assert.match(quiz, /this\.message = '同标签测验打开失败，请重试';/);
+  assert.match(quiz, /this\.message = '专项测验暂时打不开，请重试';/);
   assert.match(practice, /pushUrl\(\{ url: 'pages\/Practice' \}\)/);
   assert.match(practice, /this\.message = '本节进度已保存，但主题练习打开失败，请重试';/);
 });

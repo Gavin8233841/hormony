@@ -39,7 +39,7 @@ export struct ProfileContent {
       this.profile = null;
       this.courses = [];
       this.topicMastery = [];
-      this.message = '本地学习画像加载失败';
+      this.message = '学习记录暂时打不开';
     } finally {
       this.loading = false;
     }
@@ -92,7 +92,7 @@ export struct ProfileContent {
   private openFocusedQuiz(item: TopicMastery): void {
     const course = this.findCourse(item);
     if (course === undefined) {
-      this.message = '课程目录已更新，请重新加载画像';
+      this.message = '课程已更新，请重新加载';
       return;
     }
     AppStorage.setOrCreate<string>('selectedCourseId', course.id);
@@ -210,7 +210,7 @@ export struct ProfileContent {
     .width('100%')
     .padding(16)
     .accessibilityGroup(true)
-    .accessibilityText('正在加载学习画像')
+    .accessibilityText('正在加载我的学习')
   }
 
   build() {
@@ -243,7 +243,7 @@ export struct ProfileContent {
                   .backgroundColor(Constants.COLOR_ERROR)
                   .borderRadius(Constants.RADIUS_SM)
                   .onClick((): void => { this.loadProfile(); })
-                  .accessibilityText('重新加载学习画像')
+                  .accessibilityText('重新加载我的学习')
               }
               .width('100%')
               .padding({ left: 14, right: 14, top: 8, bottom: 8 })
@@ -393,7 +393,7 @@ export struct ProfileContent {
             .accessibilityGroup(true)
             .accessibilityText('学习统计，正确率' + Math.round(this.profile.stats.accuracy * 100).toString() +
               '%，累计答题' + this.profile.stats.totalQuestions.toString() + '题，连续学习' +
-              this.profile.stats.streakDays.toString() + '天，累计活跃' +
+              this.profile.stats.streakDays.toString() + '天，已学习' +
               this.profile.stats.studyDays.toString() + '天')
             .accessibilityDescription('根据已保存的学习记录统计')
 
@@ -434,7 +434,7 @@ export struct ProfileContent {
           SymbolGlyph($r('sys.symbol.person'))
             .fontSize(42)
             .fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
-          Text(this.message.length > 0 ? this.message : '暂无学习画像')
+          Text(this.message.length > 0 ? this.message : '还没有学习记录')
             .fontSize(15)
             .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
             .textAlign(TextAlign.Center)
@@ -446,7 +446,7 @@ export struct ProfileContent {
             .backgroundColor(Constants.COLOR_BRAND)
             .borderRadius(Constants.RADIUS_SM)
             .onClick((): void => { this.loadProfile(); })
-            .accessibilityText('重新加载学习画像')
+            .accessibilityText('重新加载我的学习')
         }
         .width('100%')
         .layoutWeight(1)

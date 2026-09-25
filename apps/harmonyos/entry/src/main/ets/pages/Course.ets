@@ -48,7 +48,7 @@ export struct CourseContent {
       this.message = progressMessage;
     } catch (e) {
       if (this.loadRunId !== runId) return;
-      this.message = '本地课程加载失败，请重试';
+      this.message = '课程暂时打不开，请重试';
     } finally {
       if (this.loadRunId === runId) this.loading = false;
     }
@@ -277,9 +277,11 @@ export struct CourseContent {
           Text(this.message.length > 0 ? this.message : '还没有课程')
             .fontSize(15)
             .fontColor(this.message.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
-          Text(this.message.length > 0 ? '重新读取不会修改已保存的学习记录' : '课程加入后会在这里显示学习进度')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          if (this.message.length === 0) {
+            Text('课程加入后会在这里显示学习进度')
+              .fontSize(12)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
           if (this.message.length > 0) {
             Button('重新加载课程')
               .constraintSize({ minHeight: 48 })

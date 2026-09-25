@@ -314,8 +314,8 @@ struct LessonPage {
           '已记录。看看遗漏的关键点。';
       } else {
         this.activityEvidenceMessage = correct ?
-          '已记录本次客观题结果：回答正确。' :
-          '已记录本次客观题结果：回答有误，建议查看对照重点。';
+          '答对了，已保存。' :
+          '答错了，看看解析。';
       }
     }).catch((): void => {
       if (this.courseId !== courseId || this.topic !== topic) return;
@@ -511,7 +511,7 @@ struct LessonPage {
     }
     if (this.showIntroExperience()) return '看一个例子，弄清这个概念。';
     if (this.showPracticeExperience()) return '试着完成这道题。';
-    return '把正文拆成判断点，逐条确认自己是否能复述。';
+    return '读完后，试着复述重点。';
   }
 
   private activityProgressText(): string {
@@ -528,9 +528,9 @@ struct LessonPage {
     const lastLine = contentLines.length > 1 ? contentLines[contentLines.length - 1] : firstLine;
     const answer = activity.answer.length > 36 ? activity.answer.substring(0, 36) + '…' : activity.answer;
     return [
-      '入口：从「' + firstLine + '」开始，圈出输入、状态变量和输出位置。',
-      '状态：逐行更新变量或指针，遇到空缺先写下自己的预测，不急着看答案。',
-      '出口：走到「' + lastLine + '」，代入答案「' + answer + '」并检查是否满足题意。'
+      '看「' + firstLine + '」，找出输入、变量和输出。',
+      '逐行记下变量或指针的变化，先猜下一步。',
+      '走到「' + lastLine + '」，用答案「' + answer + '」核对结果。'
     ];
   }
 
@@ -580,12 +580,12 @@ struct LessonPage {
         '”。我还没有提交，请只给一条思考提示，不透露答案或完整访问顺序。';
     }
     const question = '请结合课程资料讲解这道互动练习：' + this.tutorExcerpt(activity.prompt, 620) +
-      '。主题是“' + this.tutorExcerpt(this.topic, 80) + '”，专项标签是“' +
+      '。主题是“' + this.tutorExcerpt(this.topic, 80) + '”，练习重点是“' +
       this.tutorExcerpt(activity.focusTag, 24) + '”，我的答案是“' +
       this.tutorExcerpt(this.activityAnswerText(activity), 360) + '”，参考答案是“' +
-      this.tutorExcerpt(activity.answer, 400) + '”。资料依据是“' +
+      this.tutorExcerpt(activity.answer, 400) + '”。来源是“' +
       this.tutorExcerpt(activity.source, 160) +
-      '”。请以这条资料依据为边界，先指出关键概念与错因，再给一个同标签的下一步练习建议。';
+      '”。请结合这条资料指出我哪里理解错了，并推荐一道相关练习。';
     return question.length <= 1800 ? question : question.substring(0, 1797) + '...';
   }
 
@@ -616,7 +616,7 @@ struct LessonPage {
 
   private openFocusedQuizForActivity(activity: LearningActivity): void {
     if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
-      this.message = '当前主题无效，无法生成专项测验';
+      this.message = '当前主题不可用，请返回课程重试';
       return;
     }
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);
@@ -626,7 +626,7 @@ struct LessonPage {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Quiz' }).catch((error: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'LessonPage focused quiz navigation failed: %{public}s', error.message);
-      this.message = '同标签测验打开失败，请重试';
+      this.message = '专项测验暂时打不开，请重试';
     });
   }
 
@@ -1510,7 +1510,7 @@ struct LessonPage {
                 .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_MD)
                 .onClick((): void => { this.askTutorForActivity(this.activeActivity()!); })
-              Button('同标签测验')
+              Button('专项测验')
                 .layoutWeight(1)
                 .constraintSize({ minHeight: 48 })
                 .fontSize(12)

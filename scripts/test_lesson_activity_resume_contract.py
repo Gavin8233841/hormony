@@ -244,7 +244,7 @@ class LessonActivityResumeContractTest(unittest.TestCase):
         focus_value = practice.find("Text(this.activeActivity()!.focusTag)")
         prompt = practice.find("Text(this.activeActivity()!.prompt)")
         ask_tutor = practice.find("Button('问学伴讲解')")
-        same_tag_quiz = practice.find("Button('同标签测验')")
+        same_tag_quiz = practice.find("Button('专项测验')")
         self.assertGreaterEqual(focus_label, 0)
         self.assertGreater(focus_value, focus_label)
         self.assertGreater(prompt, focus_value)

@@ -8061,3 +8061,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 ### 验证与文件
 
 Python 3.12 `unittest discover` 215/215；`test-product-experience-contracts.mjs` 17/17；`test-proactive-delivery-contracts.mjs` 26/26；`test-ws01-chat-plan-source-contract.mjs` 13/13；`test-learning-map-contracts.mjs` 7/7。HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 安装到 Pura X View；1320×2232 UI 树确认首页与计划页都显示“学习哈希表”，计划页保留 45 分钟和“学习／完成”。涉及 `ProactiveLearningService.ets`、`HomeContent.ets`、`Plan.ets`、三份 JS 契约及 `DEVLOG.md`。
+
+---
+
+## [2026-09-25T11:02:20Z] [2026-09-25 19:02:20 CST] 模型: Codex (GPT-6)
+
+### 操作
+
+全页面再查学生可见长句与技术词：课程、进度、练习、星图和成就失败态不再强调“本地”；计划旧任务提示不写“可执行计划”；个人页空态、加载及读屏改成“我的学习／学习记录”；课程互动反馈改成答对、答错与保存结果；专项测验、测验结果与资料检索用“练习重点／知识点／在线搜索”等明确说法。需要区分在线搜索和已收录课程资料时仍保留来源事实。画像契约中旧的“本机证据”断言与当前用户视角文案冲突，同步改为检查可见统计和读屏来源，保留恢复、点击尺寸及真实数据断言。
+
+### 验证与文件
+
+Python 3.12 `unittest discover` 215/215；`test-product-experience-contracts.mjs` 17/17；`test-profile-accessibility-contracts.mjs` 6/6；`test-ws01-chat-plan-source-contract.mjs` 13/13；`test-learning-map-contracts.mjs` 7/7；HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 已安装至 Pura X View。1320×2232 竖屏抽样查看“我的学习”和“课程”首屏，截图位于 `.runtime/copy-profile-followup.png` 与 `.runtime/copy-course-followup.png`。在线错误分支和新测验生成本批未触发。涉及 `apps/harmonyos/entry/src/main/ets/pages/` 的 11 个页面、三份相关契约及 `DEVLOG.md`；其他任务已有的未提交文件保留。
