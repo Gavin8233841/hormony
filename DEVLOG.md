@@ -8019,3 +8019,21 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：Python 3.12 `unittest discover` 215/215，`test-product-experience-contracts.mjs` 17/17，`test-ws01-chat-plan-source-contract.mjs` 13/13，`test-learning-map-contracts.mjs` 7/7，最终 API 12 `assembleHap` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成；产物未签名。Pura X View 1320×2232 安装最终 HAP 后，首页 UI 树显示“预计 45 分钟 · 数据结构 · 哈希表”及“继续学习”，没有旧的“依据”说明；学伴页显示真实错题讲解、“去练习”行动和折叠的“回答过程”。计划在线生成、测验生成及结果新文案本批只通过源码、契约和构建检查，没有逐一触发云端流程。
 
 遗留：知识检索结果的“检索词命中／Topic 关联”标签及其学伴预填问题仍偏技术化。相关 `test_knowledge_navigation_contract.py` 是其他任务已有的未提交修改，本批不覆盖该文件，待文件归属协调后一起调整页面和契约。旧模型回答本身的措辞与所有课程题目全文也未在本批审读；真机、横屏、大字号和正式签名包仍未验证。其他未提交脚本与文档保留。
+
+---
+
+## [2026-09-25T10:46:13Z] [2026-09-25 18:46:13 CST] 模型: Codex (GPT-6)
+
+### 操作
+
+继续按学生视角收口文案：计划任务卡去掉未经核实且在模拟器中出现错误关联的生成理由，保留任务、课程、预计时间和操作；学伴页删去 Agent 过程卡及重复的行动理由，回答中只显示“正在回答”，资料入口继续保留；测验生成、课程互动、提醒反馈改为简短状态与具体动作。`AGENTS.md` 补充模型生成内容及加载状态的文案要求。相关契约同步检查“无过程卡”和任务可读性。
+
+### 验证
+
+- Python 3.12 `unittest discover` 215/215；`test-product-experience-contracts.mjs` 17/17；`test-proactive-delivery-contracts.mjs` 25/25；`test-ws01-chat-plan-source-contract.mjs` 13/13。
+- HarmonyOS API 12 增量 `assembleHap` exit 0，产物未签名；仅有既有 `TextInputController` syscap 提示。
+- Pura X View 1320×2232 安装当前 HAP：计划页 UI 树显示任务、课程、45 分钟及“学习／完成”，不再显示原错误理由；学伴旧会话保留答案、去练习和参考资料，行动理由及 Agent 流程卡已从 UI 树消失。截图存放在 `.runtime/`，不纳入 Git。
+
+### 涉及文件与边界
+
+`AGENTS.md`、`DEVLOG.md`、`apps/harmonyos/entry/src/main/ets/pages/{Chat,HomeContent,Lesson,Plan,Practice,Quiz}.ets`、`scripts/test-product-experience-contracts.mjs`、`scripts/test-proactive-delivery-contracts.mjs`。知识检索标签及其契约文件仍待归属协调；未触发新的在线计划或测验生成，真机与签名包未验证。保留其他任务已有未提交文件。

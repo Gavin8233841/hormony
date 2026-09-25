@@ -1178,8 +1178,8 @@ test('首页提醒和卡片同步入口具备动态播报与 48vp 触控区', ()
   assert.notEqual(warningRetryStart, -1);
   assert.notEqual(warningRetryEnd, -1);
   assert.equal(warningRetry.includes('.height(48)'), true);
-  assert.equal(warningRetry.includes("'根据当前学习行动重新创建系统提醒'"), true);
-  assert.equal(warningRetry.includes("'重试同步当前学习任务到服务卡片'"), true);
+  assert.equal(warningRetry.includes("'为当前待办重新创建提醒'"), true);
+  assert.equal(warningRetry.includes("'重试同步桌面卡片'"), true);
   assert.equal(header.includes("this.notificationState !== 'warning'"), true);
 });
 

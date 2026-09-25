@@ -280,7 +280,7 @@ struct PracticePage {
 
   private openQuiz(): void {
     if (!LearningContentRepository.getTopics(this.courseId).includes(this.topic)) {
-      this.message = '当前主题无效，无法进入 AI 测验';
+      this.message = '当前主题不可用，请返回课程重试';
       return;
     }
     AppStorage.setOrCreate<string>('selectedCourseId', this.courseId);

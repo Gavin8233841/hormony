@@ -18,7 +18,6 @@ interface DisplayMessage {
   citations: Citation[];
   agentTrace: string[];
   thinking: string[];
-  agentExpanded: boolean;
   citationExpanded: boolean;
   streaming: boolean;
   failed: boolean;
@@ -165,7 +164,8 @@ export struct ChatContent {
         return;
       }
       const selection: ProactiveLearningAction = {
-        kind: action.kind, badge: '学伴建议', title: action.title, subtitle: action.reason,
+        kind: action.kind, badge: '学伴建议', title: action.title,
+        subtitle: launch.courseTitle + ' · ' + launch.topic,
         cta: action.title, courseId: launch.courseId, courseTitle: launch.courseTitle,
         topic: launch.topic, focusTag: '', taskAction: action.kind, targetPage: targetPage,
         evidence: '本次回答建议', progressText: ''
@@ -567,22 +567,6 @@ export struct ChatContent {
     return block.meta === 'done';
   }
 
-  private answerProgressIndex(msg: DisplayMessage): number {
-    if (msg.content.length > 0 || msg.citations.length > 0) return 3;
-    if (this.agentSeen(msg, 'Tutor') || this.agentSeen(msg, 'Planner') ||
-      this.agentSeen(msg, 'Quiz') || this.agentSeen(msg, 'Evaluator')) return 2;
-    if (this.agentSeen(msg, 'Retrieval')) return 1;
-    return 0;
-  }
-
-  private answerProgressTitle(msg: DisplayMessage): string {
-    if (msg.content.length > 0) return '回答已生成';
-    const index = this.answerProgressIndex(msg);
-    if (index >= 2) return '正在组织讲解';
-    if (index === 1) return '正在查找相关课程内容';
-    return '正在理解你的问题';
-  }
-
   private async loadLocalHistory(lifecycleRunId: number): Promise<void> {
     try {
       const history = await LocalLearningRepository.getChatHistory();
@@ -595,7 +579,6 @@ export struct ChatContent {
           citations: item.citations ?? [],
           agentTrace: item.agentTrace ?? [],
           thinking: item.thinking ?? [],
-          agentExpanded: false,
           citationExpanded: false,
           streaming: false,
           failed: false,
@@ -1001,7 +984,6 @@ export struct ChatContent {
       citations: [],
       agentTrace: [],
       thinking: [],
-      agentExpanded: false,
       citationExpanded: false,
       streaming: false,
       failed: false,
@@ -1021,7 +1003,6 @@ export struct ChatContent {
       citations: [],
       agentTrace: [],
       thinking: [],
-      agentExpanded: true,
       citationExpanded: false,
       streaming: true,
       failed: false,
@@ -1122,7 +1103,6 @@ export struct ChatContent {
           this.receivedDone = true;
           if (!last.failed && !last.cancelled) {
             last.streaming = false;
-            last.agentExpanded = false;
           }
         }
 
@@ -1273,80 +1253,6 @@ export struct ChatContent {
     this.saveLocalHistory();
   }
 
-  private agentLabel(agent: string): string {
-    if (agent === 'Profile') return '理解你的学习情况';
-    if (agent === 'Retrieval') return '查找课程内容';
-    if (agent === 'Tutor') return '组织讲解';
-    if (agent === 'Planner') return '拆解学习路径';
-    if (agent === 'Quiz') return '生成练习';
-    if (agent === 'Evaluator') return '定位薄弱点';
-    if (agent === 'Safety') return '检查回答';
-    return agent;
-  }
-
-  private agentDescription(agent: string): string {
-    if (agent === 'Profile') return '结合本地学习记录';
-    if (agent === 'Retrieval') return '查找相关课程内容';
-    if (agent === 'Tutor') return '把概念转成例子和步骤';
-    if (agent === 'Planner') return '给出可执行学习顺序';
-    if (agent === 'Quiz') return '补充适合当前难度的练习';
-    if (agent === 'Evaluator') return '标出需要回头补的知识点';
-    if (agent === 'Safety') return '检查表达是否可靠';
-    return '处理当前步骤';
-  }
-
-  private agentSeen(msg: DisplayMessage, agent: string): boolean {
-    if (msg.thinking.includes(agent)) return true;
-    for (const trace of msg.agentTrace) {
-      if (trace.startsWith(agent + ':')) return true;
-    }
-    return false;
-  }
-
-  private traceAgent(trace: string): string {
-    const splitIndex = trace.indexOf(':');
-    if (splitIndex <= 0) return '';
-    return trace.slice(0, splitIndex);
-  }
-
-  private appendAgent(flow: string[], agent: string): void {
-    if (agent.length === 0 || flow.includes(agent)) return;
-    flow.push(agent);
-  }
-
-  private agentFlow(msg: DisplayMessage): string[] {
-    const flow: string[] = [];
-    const knownOrder: string[] = ['Profile', 'Retrieval', 'Planner', 'Tutor', 'Quiz', 'Evaluator', 'Safety'];
-    for (const agent of knownOrder) {
-      if (this.agentSeen(msg, agent)) {
-        this.appendAgent(flow, agent);
-      }
-    }
-    for (const agent of msg.thinking) {
-      this.appendAgent(flow, agent);
-    }
-    for (const trace of msg.agentTrace) {
-      this.appendAgent(flow, this.traceAgent(trace));
-    }
-    return flow;
-  }
-
-  private agentSummary(msg: DisplayMessage): string {
-    if (msg.streaming) return '正在整理回答';
-    if (msg.cancelled) return '已停止';
-    if (msg.failed) return '未完成';
-    return '已完成';
-  }
-
-  private traceDisplayText(trace: string): string {
-    const splitIndex = trace.indexOf(':');
-    if (splitIndex <= 0) return trace;
-    const agent = trace.slice(0, splitIndex);
-    const content = trace.slice(splitIndex + 1).trim();
-    if (content.length === 0) return this.agentLabel(agent);
-    return this.agentLabel(agent) + '：' + content;
-  }
-
   @Builder
   MessageBubble(msg: DisplayMessage) {
     Column() {
@@ -1436,8 +1342,17 @@ export struct ChatContent {
               }
             }
 
-            if (msg.thinking.length > 0 || msg.agentTrace.length > 0 || msg.streaming) {
-              this.AnswerProcessCard(msg)
+            if (msg.streaming) {
+              Row({ space: 8 }) {
+                LoadingProgress()
+                  .width(16)
+                  .height(16)
+                  .color(Constants.COLOR_BRAND)
+                Text('正在回答')
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              }
+              .margin({ top: 10 })
             }
           }
           .width('100%')
@@ -1470,9 +1385,6 @@ export struct ChatContent {
           .onClick((): void => { this.openAction(action); })
       }
       .width('100%')
-      Text(action.reason)
-        .fontSize(12)
-        .fontColor(Constants.COLOR_TEXT_SECONDARY)
       if (this.actionMessage.length > 0) {
         Text(this.actionMessage)
           .fontSize(11)
@@ -1572,95 +1484,6 @@ export struct ChatContent {
     .backgroundColor(msg.cancelled ? Constants.COLOR_SURFACE_TINT : Constants.COLOR_ERROR_LIGHT)
     .borderRadius(Constants.RADIUS_MD)
     .margin({ top: 6 })
-    .alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
-  AnswerProcessCard(msg: DisplayMessage) {
-    Column({ space: 6 }) {
-      Row({ space: 8 }) {
-        if (msg.streaming) {
-          LoadingProgress()
-            .width(16)
-            .height(16)
-            .color(Constants.COLOR_BRAND)
-        } else if (msg.failed) {
-          SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
-            .width(16)
-            .height(16)
-            .fontSize(16)
-            .fontColor([Constants.COLOR_ERROR])
-        } else if (msg.cancelled) {
-          SymbolGlyph($r('sys.symbol.stop_circle_fill'))
-            .width(16)
-            .height(16)
-            .fontSize(16)
-            .fontColor([Constants.COLOR_TEXT_SECONDARY])
-        } else {
-          SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-            .width(16)
-            .height(16)
-            .fontSize(16)
-            .fontColor([Constants.COLOR_SUCCESS])
-        }
-        Text(msg.streaming ? this.answerProgressTitle(msg) : '回答过程')
-          .layoutWeight(1)
-          .fontSize(12)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        Text(msg.agentExpanded ? '收起' : '查看')
-          .fontSize(12)
-          .fontColor(Constants.COLOR_BRAND_TEXT)
-      }
-      .width('100%')
-      .constraintSize({ minHeight: 48 })
-      .focusable(true)
-      .accessibilityText(msg.agentExpanded ? '收起回答生成过程' : '展开回答生成过程')
-      .accessibilityDescription(this.agentSummary(msg))
-      .onClick((): void => {
-        msg.agentExpanded = !msg.agentExpanded;
-        this.messages = this.messages.slice();
-      })
-
-      if (msg.agentExpanded) {
-        Column({ space: 6 }) {
-          ForEach(this.agentFlow(msg), (agent: string): void => {
-            this.AgentStep(agent, msg)
-          })
-        }
-        .width('100%')
-        Column({ space: 6 }) {
-          ForEach(msg.agentTrace, (trace: string): void => {
-            Text(this.traceDisplayText(trace))
-              .width('100%')
-              .fontSize(11)
-              .lineHeight(17)
-              .fontColor(Constants.COLOR_TEXT_TERTIARY)
-          })
-        }
-        .width('100%')
-      }
-    }
-    .width('100%')
-    .padding({ top: 2, bottom: 2 })
-    .margin({ bottom: 2 })
-  }
-
-  @Builder
-  AgentStep(agent: string, msg: DisplayMessage) {
-    Column({ space: 4 }) {
-      Text(this.agentLabel(agent))
-        .fontSize(11)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(this.agentSeen(msg, agent) ? Constants.COLOR_BRAND : Constants.COLOR_TEXT_PLACEHOLDER)
-      Text(this.agentDescription(agent))
-        .fontSize(9)
-        .fontColor(Constants.COLOR_TEXT_SECONDARY)
-    }
-    .width('100%')
-    .constraintSize({ minHeight: 48 })
-    .padding({ left: 7, right: 7, top: 6, bottom: 6 })
-    .backgroundColor(this.agentSeen(msg, agent) ? Constants.COLOR_BRAND_LIGHT : Constants.COLOR_BG_TAG)
-    .borderRadius(Constants.RADIUS_SM)
     .alignItems(HorizontalAlign.Start)
   }
 

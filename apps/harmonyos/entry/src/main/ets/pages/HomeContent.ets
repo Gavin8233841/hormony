@@ -153,7 +153,7 @@ export struct HomeContent {
         this.reminderAction = null;
         this.reminderActionRunId = -1;
         this.notificationState = 'warning';
-        this.notificationMessage = '系统提醒已创建；当前学习行动已更新，请重新创建提醒';
+        this.notificationMessage = '待办已更新，请重新创建提醒';
         return;
       }
       this.reminderAction = action;
@@ -176,8 +176,8 @@ export struct HomeContent {
     if (!result.lookupFailed && result.failed === 0) return true;
     this.notificationState = 'warning';
     this.notificationMessage = result.lookupFailed ?
-      '系统提醒已创建；暂时无法读取服务卡片，请重试同步' :
-      '系统提醒已创建；服务卡片已同步 ' + result.updated.toString() + '/' + result.registered.toString();
+      '提醒已创建，桌面卡片暂未同步' :
+      '提醒已创建，桌面卡片已同步 ' + result.updated.toString() + '/' + result.registered.toString();
     return false;
   }
 
@@ -188,14 +188,14 @@ export struct HomeContent {
       this.reminderAction = null;
       this.reminderActionRunId = -1;
       this.notificationState = 'warning';
-      this.notificationMessage = '当前学习行动已更新，请重新创建系统提醒';
+      this.notificationMessage = '待办已更新，请重新创建提醒';
       return;
     }
     this.notificationState = 'loading';
-    this.notificationMessage = '正在重新同步服务卡片';
+    this.notificationMessage = '正在同步桌面卡片';
     if (!(await this.syncReminderCards(action))) return;
     this.notificationState = 'success';
-    this.notificationMessage = '系统提醒和服务卡片已同步：' + action.title;
+    this.notificationMessage = '提醒已同步：' + action.title;
   }
 
   private hasCurrentReminderAction(): boolean {
@@ -378,8 +378,8 @@ export struct HomeContent {
               .borderRadius(24)
               .enabled(this.updatingTaskId.length === 0)
               .accessibilityText(this.updatingTaskId.length > 0 ? '正在保存学习任务，稍后可处理系统提醒' :
-                this.hasCurrentReminderAction() ? '重试同步当前学习任务到服务卡片' :
-                  '根据当前学习行动重新创建系统提醒')
+                this.hasCurrentReminderAction() ? '重试同步桌面卡片' :
+                  '为当前待办重新创建提醒')
               .onClick(() => {
                 if (this.hasCurrentReminderAction()) {
                   this.retryReminderCards();
@@ -666,7 +666,7 @@ export struct HomeContent {
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text('设定目标后，学伴会生成可打卡的任务')
+            Text('设好目标，安排每天的学习')
               .fontSize(12)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Button('制定计划')

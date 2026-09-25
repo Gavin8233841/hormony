@@ -1072,7 +1072,7 @@ struct LessonPage {
       .width('100%')
 
       if (this.codeRunStepIndex >= this.codeRunSteps(activity).length - 1) {
-        Text(this.feedbackVisible ? '固定示例、作答和对照均已完成。' : '固定示例推演完成：现在作答，再用解析检查状态链。')
+        Text(this.feedbackVisible ? '本节练习已完成' : '示例看完了，试着做题')
           .width('100%')
           .fontSize(12)
           .fontWeight(FontWeight.Medium)

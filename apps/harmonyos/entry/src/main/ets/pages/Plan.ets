@@ -62,11 +62,11 @@ struct PlanPage {
   private durationOptions: number[] = [7, 14, 21];
   private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
   private planSteps: WorkStep[] = [
-    { title: '准备', description: '看看最近的学习进度' },
-    { title: '规划', description: '等待在线学伴安排节奏' },
-    { title: '检查', description: '核对任务能否直接开始' },
-    { title: '保存', description: '保存学习计划' },
-    { title: '更新', description: '通知首页与服务卡片' }
+    { title: '准备', description: '读取学习进度' },
+    { title: '规划', description: '安排每日任务' },
+    { title: '检查', description: '确认课程入口' },
+    { title: '保存', description: '保存计划' },
+    { title: '完成', description: '计划已就绪' }
   ];
 
   onPageShow(): void {
@@ -310,11 +310,6 @@ struct PlanPage {
     .width('100%')
   }
 
-  private taskReason(task: PlanTask): string {
-    const reason = (task as AgentPlanTask).reason ?? '';
-    return reason.trim().length > 0 ? reason.trim() : '围绕你的目标安排练习';
-  }
-
   private durationAccessibilityText(option: number): string {
     return (this.days === option ? '已选择学习周期：' : '选择学习周期：') + option.toString() + ' 天';
   }
@@ -360,7 +355,7 @@ struct PlanPage {
     const state = task.done ? '已完成' : '待完成';
     const target = this.hasTaskTarget(task) ?
       this.courseTitle(task.courseId) + '，' + (task.topic ?? '') : '学习入口需要重新生成';
-    return state + '计划任务：' + task.title + '。' + target + '。' + this.taskReason(task) + '。' +
+    return state + '计划任务：' + task.title + '。' + target + '。' +
       task.date + '，预计 ' + task.estimatedMin.toString() + ' 分钟，' + this.taskTypeLabel(task.type);
   }
 
@@ -679,19 +674,14 @@ struct PlanPage {
   }
 
   private planProgressTitle(): string {
-    if (this.progressStep >= 4) return '计划快准备好了';
     if (this.progressStep === 3) return '正在保存计划';
-    if (this.progressStep === 2) return '正在整理任务';
-    if (this.progressStep === 1) return '正在安排每天的学习';
-    return '正在了解你的学习情况';
+    if (this.progressStep >= 4) return '计划已生成';
+    return '正在生成计划';
   }
 
   private planProgressSubtitle(): string {
-    if (this.progressStep >= 4) return '计划已保存，正在更新首页';
-    if (this.progressStep === 3) return '正在保存计划';
-    if (this.progressStep === 2) return '正在检查任务';
-    if (this.progressStep === 1) return '正在安排每天的任务';
-    return '正在读取学习记录';
+    if (this.progressStep >= 4) return '可开始今天的任务';
+    return this.days.toString() + ' 天 · 每天 90 分钟';
   }
 
   private planWaitHint(): string {
@@ -710,7 +700,7 @@ struct PlanPage {
 
   private planErrorMessage(error: Error): string {
     const code = error instanceof HttpStatusError ? error.errorCode : '';
-    const retained = this.tasks.length > 0 ? '，上一版计划仍可继续执行' : '';
+    const retained = this.tasks.length > 0 ? '，原计划已保留' : '';
     if (code === 'MODEL_UNAVAILABLE') return '在线规划暂不可用，请稍后重试' + retained;
     if (code === 'MODEL_TIMEOUT') return '规划等待超时，目标和周期已保留' + retained;
     if (code === 'MODEL_INVALID_RESPONSE') return '返回的计划无法正常显示，请重新生成' + retained;
@@ -822,7 +812,7 @@ struct PlanPage {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(17)
             .fontColor([Constants.COLOR_SUCCESS])
-          Text(this.savedPlanLabel() + '仍可继续执行')
+          Text('原计划已保留')
             .layoutWeight(1)
             .fontSize(12)
             .lineHeight(18)
@@ -1167,8 +1157,7 @@ struct PlanPage {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(16)
             .fontColor([Constants.COLOR_SUCCESS])
-          Text(this.retryAction === 'save' ? this.savedPlanLabel() + '仍可继续执行，也可重试保存' :
-            this.savedPlanLabel() + '仍可继续执行，也可重新生成')
+          Text('原计划已保留')
             .layoutWeight(1)
             .fontSize(12)
             .lineHeight(18)
@@ -1272,11 +1261,6 @@ struct PlanPage {
                   Text((this.hasTaskTarget(t) ? this.courseTitle(t.courseId) + ' · ' + (t.topic ?? '') : '重新生成后可直达学习环节'))
                     .fontSize(11)
                     .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_WARNING)
-                    .margin({ top: 5 })
-                  Text(this.taskReason(t))
-                    .fontSize(11)
-                    .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                    .lineHeight(17)
                     .margin({ top: 5 })
                   Flex({ wrap: FlexWrap.Wrap }) {
                     Text(t.estimatedMin.toString() + ' 分钟')
@@ -1427,7 +1411,7 @@ struct PlanPage {
     } catch (e) {
       if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;
       const error = e instanceof Error ? e : new Error('Network request failed');
-      const retained = this.tasks.length > 0 ? '，上一版计划仍可继续执行' : '';
+      const retained = this.tasks.length > 0 ? '，原计划已保留' : '';
       this.message = this.progressStep === 0 ? '学习进度读取失败，请稍后重试' + retained :
         this.planErrorMessage(error);
       this.hasError = true;

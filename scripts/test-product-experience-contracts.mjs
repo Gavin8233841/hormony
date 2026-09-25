@@ -226,7 +226,6 @@ test('Chat 核心操作在大字号与读屏下保留 48vp 和对象化语义', 
   const build = methodBlock(chat, 'build');
   const bubble = methodBlock(chat, 'MessageBubble');
   const status = methodBlock(chat, 'MessageStatus');
-  const process = methodBlock(chat, 'AnswerProcessCard');
   const markdown = methodBlock(chat, 'MarkdownContent');
 
   for (const label of ['停止回答', '发送问题', '重新连接云端学伴', '正在连接云端学伴', '发送问题不可用']) {
@@ -240,7 +239,7 @@ test('Chat 核心操作在大字号与读屏下保留 48vp 和对象化语义', 
   assert.doesNotMatch(build, /\.height\((?:28|32|44)\)/);
   assert.doesNotMatch(build, /\.maxLines\(1\)\s*\.textOverflow\(\{ overflow: TextOverflow\.Ellipsis \}\)/);
 
-  for (const block of [bubble, status, process]) {
+  for (const block of [bubble, status]) {
     assert.match(block, /\.constraintSize\(\{ minHeight: 48 \}\)/);
     assert.match(block, /\.focusable\(true\)/);
     assert.match(block, /\.accessibilityText\(/);
@@ -248,7 +247,8 @@ test('Chat 核心操作在大字号与读屏下保留 48vp 和对象化语义', 
   assert.match(bubble, /'参考资料，共 ' \+\s*msg\.citations\.length\.toString\(\) \+ ' 条'/);
   assert.match(status, /'展开这次回答的错误详情'/);
   assert.match(status, /'重试上一条问题'/);
-  assert.match(process, /'展开回答生成过程'/);
+  assert.match(bubble, /if \(msg\.streaming\) \{[\s\S]*?Text\('正在回答'\)/);
+  assert.doesNotMatch(bubble, /AnswerProcessCard|AgentStep/);
   assert.doesNotMatch(status, /\.height\((?:28|36)\)/);
   assert.match(markdown, /Button\('解释这段'\)/);
   assert.match(markdown, /\.accessibilityText\('让学伴解释当前代码片段'\)/);
@@ -319,7 +319,7 @@ test('Plan 任务文本和宽屏阅读层级不会依赖省略', () => {
   assert.equal(flexibleTaskActions.length, 2, 'Plan task actions must grow beyond their 64 x 48 vp minimum');
   assert.doesNotMatch(build, /\.width\(64\)|\.height\(48\)/);
   assert.match(taskName, /task\.title/);
-  assert.match(taskName, /this\.taskReason\(task\)/);
+  assert.doesNotMatch(build, /Text\(this\.taskReason\(t\)\)/);
   assert.match(taskName, /task\.estimatedMin\.toString\(\)/);
   const contentLimits = build.match(/\.constraintSize\(\{ maxWidth: 760 \}\)/g) ?? [];
   assert.ok(contentLimits.length >= 6, 'Plan must constrain form, status and task reading width');
@@ -357,7 +357,7 @@ test('首页任务写回与系统提醒共享互斥门禁且迟到提醒不能�
   assert.match(publish, /this\.notificationState === 'loading' \|\| this\.updatingTaskId\.length > 0/);
   assert.match(publish, /const actionRunId: number = this\.nextActionRunId;/);
   assert.match(publish, /if \(this\.nextActionRunId !== actionRunId\) \{\s*this\.reminderAction = null;\s*this\.reminderActionRunId = -1;/);
-  assert.match(publish, /当前学习行动已更新，请重新创建提醒/);
+  assert.match(publish, /待办已更新，请重新创建提醒/);
   assert.ok(publish.indexOf('this.reminderAction = action;') >
     publish.indexOf('if (this.nextActionRunId !== actionRunId)'));
   assert.match(publish, /this\.reminderAction = action;\s*this\.reminderActionRunId = actionRunId;/);

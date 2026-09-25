@@ -104,15 +104,15 @@ struct QuizPage {
     { value: 15, label: '挑战', description: '15 题' }
   ];
   private generationSteps: WorkStep[] = [
-    { title: '检索', description: '匹配课程资料' },
-    { title: '构题', description: '控制难度与题型' },
-    { title: '校验', description: '检查 A-D 与解析' },
-    { title: '装配', description: '写入标签与答题卡' }
+    { title: '准备', description: '准备课程题目' },
+    { title: '出题', description: '生成练习' },
+    { title: '检查', description: '确认题目可作答' },
+    { title: '完成', description: '即将开始' }
   ];
   private scoringSteps: WorkStep[] = [
-    { title: '核对', description: '比对 A-D 答案' },
-    { title: '归因', description: '统计错因标签' },
-    { title: '记录', description: '保存学习记录' }
+    { title: '批改', description: '核对答案' },
+    { title: '反馈', description: '整理错题' },
+    { title: '保存', description: '保存结果' }
   ];
 
   aboutToAppear(): void {
@@ -739,7 +739,7 @@ struct QuizPage {
       return '当前主题缺少课程资料，请换一个主题或先学习相关课程。';
     }
     if (message.includes('SAFETY_BLOCKED')) {
-      return '这组题目没有通过安全审核，请重新生成一组。';
+      return '这组题目暂不可用，请重新生成';
     }
     if (message.startsWith('HTTP ')) {
       return '云端出题暂时失败，未保存题组。请检查网络后重试。';
@@ -772,20 +772,11 @@ struct QuizPage {
   }
 
   private generationTitle(): string {
-    if (this.progressStep >= 3) return '正在装配题组';
-    if (this.progressStep === 2) return '正在校验题目结构';
-    if (this.progressStep === 1) return '正在控制难度与题型';
-    return '正在查找课程内容';
+    return '正在准备题目';
   }
 
   private generationSubtitle(): string {
-    if (this.progressStep >= 3) return '把题干、选项、解析和标签整理成可答题卡';
-    if (this.progressStep === 2) return '检查 A-D 选项、答案、解析和标签是否完整';
-    if (this.progressStep === 1) {
-      return '围绕“' + this.topic + '”生成 ' + this.difficultyLabel() + ' · ' + this.questionCountLabel();
-    }
-    if (this.focusTag.length > 0) return '正在准备“' + this.focusTag + '”练习';
-    return '正在准备适合本主题的题目';
+    return this.topic + ' · ' + this.difficultyLabel() + ' · ' + this.questionCountLabel();
   }
 
   private generationWaitHint(): string {
