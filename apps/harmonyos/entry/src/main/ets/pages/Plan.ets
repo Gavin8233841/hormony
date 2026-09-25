@@ -12,6 +12,7 @@ import { StudyPlan, PlanTask, PlanRequest, PlanTaskUpdateReceipt } from '../mode
 import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
+import { ProactiveLearningService } from '../common/ProactiveLearningService';
 
 interface AgentPlanTask extends PlanTask {
   reason?: string;
@@ -355,7 +356,7 @@ struct PlanPage {
     const state = task.done ? '已完成' : '待完成';
     const target = this.hasTaskTarget(task) ?
       this.courseTitle(task.courseId) + '，' + (task.topic ?? '') : '学习入口需要重新生成';
-    return state + '计划任务：' + task.title + '。' + target + '。' +
+    return state + '计划任务：' + ProactiveLearningService.planTaskTitle(task) + '。' + target + '。' +
       task.date + '，预计 ' + task.estimatedMin.toString() + ' 分钟，' + this.taskTypeLabel(task.type);
   }
 
@@ -1254,7 +1255,7 @@ struct PlanPage {
                 }
 
                 Column() {
-                  Text(t.title)
+                  Text(ProactiveLearningService.planTaskTitle(t))
                     .fontSize(15)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(t.done ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_PRIMARY)
@@ -1295,7 +1296,7 @@ struct PlanPage {
                     .backgroundColor(this.hasTaskTarget(t) ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
                     .borderRadius(Constants.RADIUS_SM)
                     .enabled(this.hasTaskTarget(t) && this.updatingTaskId.length === 0)
-                    .accessibilityText(this.actionLabel(t) + '：' + t.title)
+                    .accessibilityText(this.actionLabel(t) + '：' + ProactiveLearningService.planTaskTitle(t))
                     .accessibilityDescription('打开任务对应的课程或练习')
                     .onClick(() => { this.openTask(t); })
                   Button(this.updatingTaskId === t.id ? '保存中' : (t.done ? '恢复' : '完成'))
@@ -1307,7 +1308,8 @@ struct PlanPage {
                     .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)
                     .borderRadius(Constants.RADIUS_SM)
                     .enabled(this.updatingTaskId.length === 0)
-                    .accessibilityText((t.done ? '恢复待完成：' : '标记完成：') + t.title)
+                    .accessibilityText((t.done ? '恢复待完成：' : '标记完成：') +
+                      ProactiveLearningService.planTaskTitle(t))
                     .accessibilityDescription('手动标记任务完成，测验成绩另计')
                     .onClick(() => { this.toggleTask(t); })
                 }

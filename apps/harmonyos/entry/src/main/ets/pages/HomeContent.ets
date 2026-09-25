@@ -563,7 +563,7 @@ export struct HomeContent {
       }
 
       Column() {
-        Text(task.title)
+        Text(ProactiveLearningService.planTaskTitle(task))
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -589,7 +589,7 @@ export struct HomeContent {
     .scale({ x: this.pressedTask === index ? 0.98 : 1, y: this.pressedTask === index ? 0.98 : 1 })
     .animation({ duration: Constants.ANIM_FAST, curve: Curve.EaseOut })
     .enabled(this.updatingTaskId.length === 0 && this.notificationState !== 'loading')
-    .accessibilityText(task.title + '，' + this.taskStatus(task) +
+    .accessibilityText(ProactiveLearningService.planTaskTitle(task) + '，' + this.taskStatus(task) +
       (this.updatingTaskId.length > 0 ? '，正在保存学习任务' :
         this.notificationState === 'loading' ? '，系统提醒创建期间暂不可切换' : '，点击切换任务状态'))
     .onTouch((event?: TouchEvent) => {

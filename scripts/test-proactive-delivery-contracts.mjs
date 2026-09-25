@@ -313,6 +313,17 @@ function resolverFromProduct() {
   };
 }
 
+test('计划待办标题由已核实主题生成，旧模型标题不进入主要界面', async () => {
+  const service = loadService();
+  const task = { title: '哈希表原理与冲突解决讲解', topic: '哈希表', action: 'lesson' };
+  assert.equal(service.planTaskTitle(task), '学习哈希表');
+  assert.equal(service.planTaskTitle({ ...task, action: 'practice' }), '练习哈希表');
+  assert.equal(service.planTaskTitle({ ...task, action: 'quiz' }), '测验哈希表');
+  assert.equal(service.planTaskTitle({ ...task, action: 'review' }), '复习哈希表');
+  assert.equal(service.planTaskTitle({ ...task, topic: '' }), task.title);
+  assert.equal(readSource(homeContentPath).includes('Text(ProactiveLearningService.planTaskTitle(task))'), true);
+});
+
 function loadReminder(service, notificationManager, wantAgent) {
   const context = vm.createContext({
     __service: service,

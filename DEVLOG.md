@@ -8049,3 +8049,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 ### 验证与文件
 
 `scripts.test_knowledge_navigation_contract` 8/8；API 12 增量 `assembleHap` exit 0，最终未签名 HAP 已安装至 Pura X View，未触发新的在线检索。涉及 `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets` 与 `DEVLOG.md`；其他未提交文件保留。
+
+---
+
+## [2026-09-25T10:53:57Z] [2026-09-25 18:53:57 CST] 模型: Codex (GPT-6)
+
+### 操作
+
+计划任务在首页、计划页、系统提醒与桌面卡片统一用已校验的动作和课程主题生成待办标题，例如“学习哈希表”；保留数据库内原始模型标题，不迁移用户计划。已核对旧计划标题“哈希表原理与冲突解决讲解”在当前模拟器首页和计划页都不再显示。契约补充四种任务类型、无主题兜底及跨入口展示检查。
+
+### 验证与文件
+
+Python 3.12 `unittest discover` 215/215；`test-product-experience-contracts.mjs` 17/17；`test-proactive-delivery-contracts.mjs` 26/26；`test-ws01-chat-plan-source-contract.mjs` 13/13；`test-learning-map-contracts.mjs` 7/7。HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 安装到 Pura X View；1320×2232 UI 树确认首页与计划页都显示“学习哈希表”，计划页保留 45 分钟和“学习／完成”。涉及 `ProactiveLearningService.ets`、`HomeContent.ets`、`Plan.ets`、三份 JS 契约及 `DEVLOG.md`。

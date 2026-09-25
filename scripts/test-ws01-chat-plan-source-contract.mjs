@@ -626,8 +626,8 @@ test('Plan serializes task writes against the latest persisted plan and conflict
   assert.equal(occurrences(taskControls, '.constraintSize({ minWidth: 64, minHeight: 48 })'), 2);
   assert.equal(occurrences(taskControls, '.width(64)'), 0);
   assert.equal(occurrences(taskControls, '.height(48)'), 0);
-  assert.match(taskControls, /\.accessibilityText\(this\.actionLabel\(t\) \+ '：' \+ t\.title\)/);
-  assert.match(taskControls, /\.accessibilityText\(\(t\.done \? '恢复待完成：' : '标记完成：'\) \+ t\.title\)/);
+  assert.match(taskControls, /\.accessibilityText\(this\.actionLabel\(t\) \+ '：' \+ ProactiveLearningService\.planTaskTitle\(t\)\)/);
+  assert.match(taskControls, /\.accessibilityText\(\(t\.done \? '恢复待完成：' : '标记完成：'\) \+\s*ProactiveLearningService\.planTaskTitle\(t\)\)/);
 
   const retryControls = section(plan, "              Button(this.retryAction === 'load' ? '重新读取' :",
     '            }\n          }', 'Plan retry control guard');

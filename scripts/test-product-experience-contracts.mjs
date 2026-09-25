@@ -318,7 +318,8 @@ test('Plan 任务文本和宽屏阅读层级不会依赖省略', () => {
   const flexibleTaskActions = build.match(/\.constraintSize\(\{ minWidth: 64, minHeight: 48 \}\)/g) ?? [];
   assert.equal(flexibleTaskActions.length, 2, 'Plan task actions must grow beyond their 64 x 48 vp minimum');
   assert.doesNotMatch(build, /\.width\(64\)|\.height\(48\)/);
-  assert.match(taskName, /task\.title/);
+  assert.match(taskName, /ProactiveLearningService\.planTaskTitle\(task\)/);
+  assert.match(build, /Text\(ProactiveLearningService\.planTaskTitle\(t\)\)/);
   assert.doesNotMatch(build, /Text\(this\.taskReason\(t\)\)/);
   assert.match(taskName, /task\.estimatedMin\.toString\(\)/);
   const contentLimits = build.match(/\.constraintSize\(\{ maxWidth: 760 \}\)/g) ?? [];

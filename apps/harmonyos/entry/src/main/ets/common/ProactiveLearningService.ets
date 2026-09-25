@@ -33,6 +33,16 @@ export interface ProactiveLearningLaunch {
 }
 
 export class ProactiveLearningService {
+  static planTaskTitle(task: PlanTask): string {
+    const topic = task.topic?.trim() ?? '';
+    if (topic.length === 0) return task.title;
+    if (task.action === 'lesson') return '学习' + topic;
+    if (task.action === 'practice') return '练习' + topic;
+    if (task.action === 'quiz') return '测验' + topic;
+    if (task.action === 'review') return '复习' + topic;
+    return task.title;
+  }
+
   static async resolve(now: Date = new Date()): Promise<ProactiveLearningAction> {
     const courses = await LocalLearningRepository.getCourses() ?? [];
     const events = await LocalLearningRepository.getStudyEvents();
@@ -262,7 +272,7 @@ export class ProactiveLearningService {
     return {
       kind: 'task',
       badge: '今日任务',
-      title: task.title,
+      title: ProactiveLearningService.planTaskTitle(task),
       subtitle: task.topic !== undefined && task.topic.length > 0 ?
         courseTitle + ' · ' + task.topic : task.estimatedMin.toString() + ' 分钟',
       cta: ProactiveLearningService.taskCta(action),
