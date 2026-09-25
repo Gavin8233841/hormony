@@ -1,6 +1,7 @@
 import { TitleBar } from '../common/Builders';
 import { Constants } from '../common/Constants';
 import { LearningContentRepository } from '../common/LearningContentRepository';
+import { LearningFormUpdater } from '../common/LearningFormUpdater';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { CuratedKnowledgeChunk, LearningActivity, LessonExperience, LessonProgress } from '../model/DataModels';
 import { LearningStudyEvent } from '../model/LearningMetadataModels';
@@ -13,6 +14,44 @@ const EMPTY_CHUNK: CuratedKnowledgeChunk = {
   courseId: '',
   topic: ''
 };
+
+interface LessonGraphNode {
+  id: number;
+  x: number;
+  y: number;
+}
+
+interface LessonGraphEdge {
+  from: number;
+  to: number;
+}
+
+interface LessonChatContext {
+  courseId: string;
+  topic: string;
+  question: string;
+  userAnswer: string;
+  submitted: boolean;
+  correctAnswer?: string;
+}
+
+// 坐标只负责绘制。边分别与 lesson-experiences.json 中两张题图对应。
+const GRAPH_NODES: LessonGraphNode[] = [
+  { id: 0, x: 95, y: 12 }, { id: 1, x: 15, y: 82 }, { id: 2, x: 175, y: 82 },
+  { id: 3, x: 15, y: 152 }, { id: 4, x: 175, y: 152 }
+];
+const BFS_EDGES: LessonGraphEdge[] = [
+  { from: 0, to: 1 }, { from: 0, to: 2 }, { from: 1, to: 3 }, { from: 2, to: 4 }
+];
+const DFS_EDGES: LessonGraphEdge[] = [
+  { from: 0, to: 1 }, { from: 0, to: 3 }, { from: 1, to: 2 },
+  { from: 1, to: 4 }, { from: 2, to: 3 }, { from: 3, to: 4 }
+];
+const BFS_QUEUES: string[] = ['0', '1 → 2', '2 → 3', '3 → 4', '4', '空'];
+const BFS_VISITS: string[] = ['0', '0 → 1 → 2', '0 → 1 → 2 → 3',
+  '0 → 1 → 2 → 3 → 4', '0 → 1 → 2 → 3 → 4', '0 → 1 → 2 → 3 → 4'];
+const BFS_NEXT: number[] = [0, 1, 2, 3, 4];
+const BFS_VISITED_COUNT: number[] = [1, 3, 4, 5, 5, 5];
 
 @Entry
 @Component
@@ -38,6 +77,10 @@ struct LessonPage {
   @State pendingActivityIds: string[] = [];
   private pendingActivityEvents: LearningStudyEvent[] = [];
   @State conceptStepIndex: number = 0;
+  @State bfsGraphStepIndex: number = 0;
+  @State bfsPredictionMessage: string = '';
+  @State dfsGraphStepIndex: number = 0;
+  @State graphPromptExpanded: boolean = false;
   @State codeRunStepIndex: number = -1;
   @State workedExampleRevealCount: number = 0;
   @State activityEvidenceMessage: string = '';
@@ -62,6 +105,10 @@ struct LessonPage {
     const content = LearningContentRepository.getKnowledge(this.courseId, this.topic);
     this.experience = LearningContentRepository.getLessonExperience(this.courseId, this.topic);
     this.conceptStepIndex = 0;
+    this.bfsGraphStepIndex = 0;
+    this.bfsPredictionMessage = '';
+    this.dfsGraphStepIndex = 0;
+    this.graphPromptExpanded = false;
     this.chunks = content;
     this.activeChunk = content.length > 0 ? content[0] : EMPTY_CHUNK;
     this.loadProgress();
@@ -137,6 +184,8 @@ struct LessonPage {
     this.codeRunStepIndex = -1;
     this.workedExampleRevealCount = 0;
     this.activityEvidenceMessage = '';
+    this.dfsGraphStepIndex = 0;
+    this.graphPromptExpanded = false;
   }
 
   private visibleWorkedExampleStepCount(): number {
@@ -201,6 +250,7 @@ struct LessonPage {
   }
 
   private revealFreeResponse(): void {
+    const activity = this.activeActivity();
     const answer: string = this.responseText.trim();
     if (answer.length === 0) {
       this.message = '请先写下你的推演或填空答案';
@@ -210,6 +260,15 @@ struct LessonPage {
     this.responseText = answer;
     this.submittedResponseText = answer;
     this.feedbackVisible = true;
+    if (activity !== null && this.hasDfsGraphSource(activity)) {
+      setTimeout((): void => {
+        this.contentScroller.scrollTo({
+          xOffset: 0,
+          yOffset: Math.max(this.activityOffset - 12, 0),
+          animation: true
+        });
+      }, 50);
+    }
   }
 
   private activityOptionAccessibilityDescription(index: number, ordered: boolean): string {
@@ -295,6 +354,7 @@ struct LessonPage {
     await LocalLearningRepository.appendStudyEvent(event);
     this.pendingActivityEvents = this.pendingActivityEvents.filter((item: LearningStudyEvent): boolean =>
       item.id !== event.id);
+    LearningFormUpdater.refreshAll().catch((): void => {});
   }
 
   private appendUniqueTag(tags: string[], value: string): void {
@@ -422,6 +482,9 @@ struct LessonPage {
   }
 
   private masteryGoal(): string {
+    if (this.hasBfsGraphSource()) {
+      return '能说清 BFS 怎样用队列逐层扩展，并用 DFS 递归预测另一张图的访问顺序。';
+    }
     if (this.experience !== null && this.experience.visualSteps.length > 0) {
       const first = this.experience.visualSteps[0];
       const last = this.experience.visualSteps[this.experience.visualSteps.length - 1];
@@ -431,6 +494,10 @@ struct LessonPage {
   }
 
   private currentLearningFocus(): string {
+    if (this.hasBfsGraphSource() && this.showIntroExperience()) return '先预测队首，再观察队列和访问序列。';
+    if (this.hasBfsGraphSource() && this.showPracticeExperience()) {
+      return this.activeActivityIndex === 0 ? '先写 DFS 输出，再逐步对照。' : '排列 BFS 的通用步骤。';
+    }
     if (this.showIntroExperience()) return '先建立概念图，再用现实案例落地。';
     if (this.showPracticeExperience()) return '看一遍分步示例，再亲手做题验证。';
     return '把正文拆成判断点，逐条确认自己是否能复述。';
@@ -494,6 +561,13 @@ struct LessonPage {
   }
 
   private buildTutorQuestion(activity: LearningActivity): string {
+    if (!this.feedbackVisible) {
+      const answer = this.activityAnswerText(activity);
+      return '我正在学习“' + this.tutorExcerpt(this.topic, 80) + '”。题目是“' +
+        this.tutorExcerpt(activity.prompt, 500) + '”，当前作答是“' +
+        this.tutorExcerpt(answer === '未作答' ? '' : answer, 300) +
+        '”。我还没有提交，请只给一条思考提示，不透露答案或完整访问顺序。';
+    }
     const question = '请结合课程资料讲解这道互动练习：' + this.tutorExcerpt(activity.prompt, 620) +
       '。主题是“' + this.tutorExcerpt(this.topic, 80) + '”，专项标签是“' +
       this.tutorExcerpt(activity.focusTag, 24) + '”，我的答案是“' +
@@ -506,7 +580,24 @@ struct LessonPage {
 
   private askTutorForActivity(activity: LearningActivity): void {
     const question = this.buildTutorQuestion(activity);
+    const answer = this.activityAnswerText(activity);
+    const baseContext: LessonChatContext = {
+      courseId: this.courseId,
+      topic: this.topic,
+      question: activity.prompt.substring(0, 500),
+      userAnswer: (answer === '未作答' ? '' : answer).substring(0, 300),
+      submitted: this.feedbackVisible
+    };
+    const context: LessonChatContext = this.feedbackVisible ? {
+      courseId: baseContext.courseId,
+      topic: baseContext.topic,
+      question: baseContext.question,
+      userAnswer: baseContext.userAnswer,
+      submitted: true,
+      correctAnswer: activity.answer.substring(0, 300)
+    } : baseContext;
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
+    AppStorage.setOrCreate<string>('pendingChatContextJson', JSON.stringify(context));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';
     });
@@ -544,6 +635,7 @@ struct LessonPage {
         this.activeChunk.id,
         this.chunks.length
       );
+      LearningFormUpdater.refreshAll().catch((): void => {});
       if (!this.completedChunkIds.includes(this.activeChunk.id)) {
         this.completedChunkIds = this.completedChunkIds.concat([this.activeChunk.id]);
       }
@@ -568,6 +660,237 @@ struct LessonPage {
     });
   }
 
+  private hasBfsGraphSource(): boolean {
+    return this.courseId === 'cs101' &&
+      this.topic === '图的表示与遍历' && this.experience !== null &&
+      this.experience.visualTitle.includes('边:   0-1, 0-2, 1-3, 2-4') &&
+      this.experience.workedExampleSteps.length === BFS_QUEUES.length &&
+      this.experience.workedExampleSteps[0].includes('队列: [0]') &&
+      this.experience.workedExampleSteps[5].includes('队列为空');
+  }
+
+  private hasDfsGraphSource(activity: LearningActivity): boolean {
+    return this.courseId === 'cs101' &&
+      this.topic === '图的表示与遍历' &&
+      activity.id === 'cs101-图的表示与遍历-1' &&
+      activity.prompt.includes('0: [1, 3]') && activity.prompt.includes('1: [0, 2, 4]') &&
+      activity.prompt.includes('2: [1, 3]') && activity.prompt.includes('3: [0, 2, 4]') &&
+      activity.prompt.includes('4: [1, 3]') && activity.answer.includes('0 1 2 3 4');
+  }
+
+  private graphNode(id: number): LessonGraphNode {
+    return GRAPH_NODES[id];
+  }
+
+  private graphNodeVisited(id: number, dfs: boolean): boolean {
+    return dfs ? this.feedbackVisible && id <= this.dfsGraphStepIndex :
+      id < BFS_VISITED_COUNT[this.bfsGraphStepIndex];
+  }
+
+  private predictBfsNext(id: number): void {
+    if (this.bfsGraphStepIndex >= BFS_NEXT.length) return;
+    if (id !== BFS_NEXT[this.bfsGraphStepIndex]) {
+      this.bfsPredictionMessage = '再看队首：先进入队列的顶点先出队。';
+      return;
+    }
+    this.bfsGraphStepIndex += 1;
+    this.bfsPredictionMessage = this.bfsGraphStepIndex >= BFS_NEXT.length ?
+      '队列已空。观察每个顶点何时首次标记为已访问。' : '预测正确，队列和访问序列已更新。';
+  }
+
+  @Builder
+  private GraphBoard(dfs: boolean) {
+    Column({ space: 10 }) {
+      Row() {
+        Text(dfs ? 'DFS 练习图 · 无向' : 'BFS 示例图 · 无向')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_MAP_CORE)
+        Text('起点 0')
+          .fontSize(11)
+          .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Stack({ alignContent: Alignment.TopStart }) {
+        ForEach(dfs ? DFS_EDGES : BFS_EDGES, (edge: LessonGraphEdge): void => {
+          Line()
+            .width(220)
+            .height(190)
+            .startPoint([this.graphNode(edge.from).x + 15, this.graphNode(edge.from).y + 15])
+            .endPoint([this.graphNode(edge.to).x + 15, this.graphNode(edge.to).y + 15])
+            .stroke(Constants.COLOR_MAP_LINE_ACTIVE)
+            .strokeWidth(2)
+        })
+        ForEach(GRAPH_NODES, (node: LessonGraphNode): void => {
+          Text(node.id.toString())
+            .width(30)
+            .height(30)
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            .textAlign(TextAlign.Center)
+            .backgroundColor(this.graphNodeVisited(node.id, dfs) ?
+              Constants.COLOR_BRAND : Constants.COLOR_MAP_NODE_IDLE)
+            .borderRadius(15)
+            .position({ x: node.x, y: node.y })
+            .accessibilityText('顶点 ' + node.id.toString() +
+              (this.graphNodeVisited(node.id, dfs) ? '，已访问' : '，尚未访问'))
+        })
+      }
+      .width(220)
+      .height(190)
+      .alignSelf(ItemAlign.Center)
+      .accessibilityGroup(true)
+      .accessibilityDescription(dfs ? '深度优先搜索活动图，按邻接表升序遍历' :
+        '广度优先搜索概念示例图，边为 0-1、0-2、1-3、2-4')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_MAP_SURFACE)
+    .borderRadius(Constants.RADIUS_LG)
+  }
+
+  @Builder
+  private BfsGraphExperience() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('逐层推演 · 先预测队首')
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text((this.bfsGraphStepIndex + 1).toString() + ' / ' + BFS_QUEUES.length.toString())
+          .fontSize(11)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      this.GraphBoard(false)
+      Text('队列（左侧为队首）：' + BFS_QUEUES[this.bfsGraphStepIndex])
+        .width('100%')
+        .fontSize(14)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      Text('已访问：' + BFS_VISITS[this.bfsGraphStepIndex])
+        .width('100%')
+        .fontSize(13)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Text(this.experience!.workedExampleSteps[this.bfsGraphStepIndex])
+        .width('100%')
+        .fontSize(13)
+        .lineHeight(21)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+
+      if (this.bfsGraphStepIndex < BFS_NEXT.length) {
+        Text('下一步出队哪个顶点？先选，再看状态变化。')
+          .width('100%')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Row({ space: 8 }) {
+          ForEach(GRAPH_NODES.slice(0, 3), (node: LessonGraphNode): void => {
+            Button(node.id.toString())
+              .layoutWeight(1)
+              .constraintSize({ minHeight: 48 })
+              .fontSize(13)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_SM)
+              .accessibilityText('预测顶点 ' + node.id.toString() + ' 下一个出队')
+              .onClick((): void => { this.predictBfsNext(node.id); })
+          })
+        }
+        .width('100%')
+        Row({ space: 8 }) {
+          ForEach(GRAPH_NODES.slice(3), (node: LessonGraphNode): void => {
+            Button(node.id.toString())
+              .layoutWeight(1)
+              .constraintSize({ minHeight: 48 })
+              .fontSize(13)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_SM)
+              .accessibilityText('预测顶点 ' + node.id.toString() + ' 下一个出队')
+              .onClick((): void => { this.predictBfsNext(node.id); })
+          })
+        }
+        .width('100%')
+      } else {
+        Button('重新推演')
+          .width('100%')
+          .constraintSize({ minHeight: 48 })
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => {
+            this.bfsGraphStepIndex = 0;
+            this.bfsPredictionMessage = '';
+          })
+      }
+      if (this.bfsPredictionMessage.length > 0) {
+        Text(this.bfsPredictionMessage)
+          .width('100%')
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_LG)
+  }
+
+  @Builder
+  private DfsGraphExperience(activity: LearningActivity) {
+    Column({ space: 12 }) {
+      this.GraphBoard(true)
+      Text('按邻接表升序，从 0 递归访问；先写输出序列，再逐步核对。')
+        .width('100%')
+        .fontSize(14)
+        .lineHeight(23)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      Button(this.graphPromptExpanded ? '收起原题和代码' : '查看原题和代码')
+        .width('100%')
+        .constraintSize({ minHeight: 48 })
+        .fontSize(12)
+        .fontColor(Constants.COLOR_BRAND_TEXT)
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+        .onClick((): void => { this.graphPromptExpanded = !this.graphPromptExpanded; })
+      if (this.graphPromptExpanded) {
+        Text(activity.prompt)
+          .width('100%')
+          .fontSize(12)
+          .lineHeight(20)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+      }
+      if (this.feedbackVisible) {
+        Text('单步对照 · 已访问 ' + (this.dfsGraphStepIndex + 1).toString() + '/5')
+          .width('100%')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text('访问序列：' + GRAPH_NODES.slice(0, this.dfsGraphStepIndex + 1)
+          .map((node: LessonGraphNode): string => node.id.toString()).join(' → '))
+          .width('100%')
+          .fontSize(13)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+        Button(this.dfsGraphStepIndex >= GRAPH_NODES.length - 1 ? '重新对照' : '查看下一步')
+          .width('100%')
+          .constraintSize({ minHeight: 48 })
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => {
+            this.dfsGraphStepIndex = this.dfsGraphStepIndex >= GRAPH_NODES.length - 1 ?
+              0 : this.dfsGraphStepIndex + 1;
+          })
+      }
+    }
+    .width('100%')
+  }
+
   @Builder
   private MasteryBrief() {
     Column({ space: 12 }) {
@@ -585,9 +908,9 @@ struct LessonPage {
 
       Text(this.masteryGoal())
         .width('100%')
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .lineHeight(28)
+        .fontSize(15)
+        .fontWeight(FontWeight.Regular)
+        .lineHeight(24)
         .fontColor(Constants.COLOR_TEXT_PRIMARY)
 
       Column({ space: 8 }) {
@@ -810,19 +1133,24 @@ struct LessonPage {
               .fontWeight(FontWeight.Bold)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
           }
-          Text((this.conceptStepIndex + 1).toString() + ' / ' + this.conceptStepCount().toString())
+          Text(this.hasBfsGraphSource() ?
+            (this.bfsGraphStepIndex + 1).toString() + ' / ' + BFS_QUEUES.length.toString() :
+            (this.conceptStepIndex + 1).toString() + ' / ' + this.conceptStepCount().toString())
             .fontSize(11)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
         }
         .width('100%')
         .justifyContent(FlexAlign.SpaceBetween)
-        Text(this.experience.visualTitle)
-          .width('100%')
-          .fontSize(13)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        if (this.hasBfsGraphSource()) {
+          this.BfsGraphExperience()
+        } else {
+          Text(this.experience.visualTitle)
+            .width('100%')
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
 
-        Column({ space: 8 }) {
-          ForEach(this.experience.visualSteps, (step: string, index: number): void => {
+          Column({ space: 8 }) {
+            ForEach(this.experience.visualSteps, (step: string, index: number): void => {
             Row({ space: 10 }) {
               Text((index + 1).toString())
                 .width(24)
@@ -848,19 +1176,20 @@ struct LessonPage {
                 .borderRadius(Constants.RADIUS_SM)
             }
             .width('100%')
-          })
-        }
-        .width('100%')
-
-        Button(this.conceptStepButtonLabel())
+            })
+          }
           .width('100%')
-          .constraintSize({ minHeight: 48 })
-          .enabled(this.conceptStepCount() > 0)
-          .fontSize(13)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(Constants.COLOR_BRAND)
-          .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => { this.advanceConceptStep(); })
+
+          Button(this.conceptStepButtonLabel())
+            .width('100%')
+            .constraintSize({ minHeight: 48 })
+            .enabled(this.conceptStepCount() > 0)
+            .fontSize(13)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => { this.advanceConceptStep(); })
+        }
       }
       .width('100%')
 
@@ -892,7 +1221,8 @@ struct LessonPage {
   @Builder
   private PracticeExperience() {
     if (this.experience !== null) {
-      Column({ space: 10 }) {
+      if (!this.hasBfsGraphSource()) {
+        Column({ space: 10 }) {
         Row() {
           Text('分步示例')
             .fontSize(12)
@@ -946,7 +1276,8 @@ struct LessonPage {
       .padding(16)
       .backgroundColor(Constants.COLOR_BG_CARD)
       .border({ width: 1, color: Constants.COLOR_BORDER })
-      .borderRadius(Constants.RADIUS_MD)
+        .borderRadius(Constants.RADIUS_MD)
+      }
 
       if (this.activeActivity() !== null) {
         Column({ space: 12 }) {
@@ -975,16 +1306,39 @@ struct LessonPage {
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .width('100%')
-          Text(this.activeActivity()!.prompt)
-            .width('100%')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .lineHeight(25)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          if (this.hasDfsGraphSource(this.activeActivity()!)) {
+            this.DfsGraphExperience(this.activeActivity()!)
+          } else {
+            Text(this.activeActivity()!.prompt)
+              .width('100%')
+              .fontSize(16)
+              .fontWeight(FontWeight.Regular)
+              .lineHeight(25)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          }
+
+          if (this.activeActivity()!.id === 'cs101-图的表示与遍历-2') {
+            Text('提示：上方概念示例是无向图；这道题考查有向图 BFS 的通用步骤。')
+              .width('100%')
+              .fontSize(12)
+              .lineHeight(20)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          }
 
           if (this.activeActivity()!.content.length > 0) {
             this.CodeBlock(this.activeActivity()!)
             this.CodeRunPanel(this.activeActivity()!)
+          }
+
+          if (!this.feedbackVisible) {
+            Button('问学伴给一条提示')
+              .width('100%')
+              .constraintSize({ minHeight: 48 })
+              .fontSize(12)
+              .fontColor(Constants.COLOR_BRAND_TEXT)
+              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .borderRadius(Constants.RADIUS_MD)
+              .onClick((): void => { this.askTutorForActivity(this.activeActivity()!); })
           }
 
           if (this.activeActivity()!.interactionMode === 'single_choice') {
@@ -1058,8 +1412,17 @@ struct LessonPage {
                 .fontColor(this.activeActivity()!.interactionMode === 'free_response' || this.activityIsCorrect() ?
                   Constants.COLOR_SUCCESS : Constants.COLOR_ERROR)
               this.FeedbackSection('你的回答', this.activityAnswerText(this.activeActivity()!))
-              this.FeedbackSection('参考答案', this.activeActivity()!.answer)
-              this.FeedbackSection('对照重点', this.activeActivity()!.feedback)
+              if (!this.hasDfsGraphSource(this.activeActivity()!) ||
+                this.dfsGraphStepIndex >= GRAPH_NODES.length - 1) {
+                this.FeedbackSection('参考答案', this.activeActivity()!.answer)
+                this.FeedbackSection('对照重点', this.activeActivity()!.feedback)
+              } else {
+                Text('上方逐步核对访问序列，走完后再看参考答案与对照重点。')
+                  .width('100%')
+                  .fontSize(12)
+                  .lineHeight(20)
+                  .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              }
               Text('来源：' + this.activeActivity()!.source)
                 .width('100%')
                 .fontSize(11)
@@ -1082,7 +1445,9 @@ struct LessonPage {
             .borderRadius(Constants.RADIUS_SM)
 
             if (this.activeActivity()!.interactionMode === 'free_response' &&
-              !this.attemptedActivityIds.includes(this.activeActivity()!.id)) {
+              !this.attemptedActivityIds.includes(this.activeActivity()!.id) &&
+              (!this.hasDfsGraphSource(this.activeActivity()!) ||
+                this.dfsGraphStepIndex >= GRAPH_NODES.length - 1)) {
               Row({ space: 10 }) {
                 Button('关键点有遗漏')
                   .layoutWeight(1)
@@ -1250,8 +1615,6 @@ struct LessonPage {
 
         Scroll(this.contentScroller) {
           Column({ space: 24 }) {
-            this.MasteryBrief()
-
             Column({ space: 12 }) {
               Row({ space: 8 }) {
                 SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
@@ -1266,13 +1629,13 @@ struct LessonPage {
 
               Text(this.contentBeats()[0] ?? this.activeChunk.text)
                 .width('100%')
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .lineHeight(34)
+                .fontSize(16)
+                .fontWeight(FontWeight.Regular)
+                .lineHeight(26)
                 .fontColor(Constants.COLOR_TEXT_PRIMARY)
             }
             .width('100%')
-            .padding({ left: 20, right: 20, top: 22, bottom: 22 })
+            .padding({ left: 16, right: 16, top: 16, bottom: 16 })
             .backgroundColor(Constants.COLOR_SURFACE_TINT)
             .borderRadius(Constants.RADIUS_LG)
 
@@ -1283,6 +1646,8 @@ struct LessonPage {
             if (this.showPracticeExperience()) {
               this.PracticeExperience()
             }
+
+            this.MasteryBrief()
 
             if (this.contentBeats().length > 1) {
               Column({ space: 16 }) {

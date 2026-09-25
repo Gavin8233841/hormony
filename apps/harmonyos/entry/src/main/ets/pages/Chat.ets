@@ -6,8 +6,10 @@
 import http from '@ohos.net.http';
 import { HttpClient, HttpRequestCancellation, HttpStreamError } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
-import { Citation, StreamEvent, ChatRequest, ChatMessage, HealthResponse } from '../model/DataModels';
+import { Citation, StreamEvent, ChatRequest, ChatMessage, ChatContext, ChatAction, Course,
+  HealthResponse } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { ProactiveLearningAction, ProactiveLearningLaunch, ProactiveLearningService } from '../common/ProactiveLearningService';
 import { StagedProgress, WorkStep } from '../common/Builders';
 
 interface DisplayMessage {
@@ -26,6 +28,7 @@ interface DisplayMessage {
   errorCode: string;
   statusExpanded: boolean;
   retryQuestion: string;
+  action: ChatAction | null;
 }
 
 interface MarkdownBlock {
@@ -48,6 +51,11 @@ export struct ChatContent {
   @State historySaveFailed: boolean = false;
   @StorageLink('cloudAgentReady') cloudAgentReady: boolean = false;
   @State serviceMessage: string = '正在连接云端学伴';
+  @State contextSummary: string = '';
+  @State contextQuestion: string = '';
+  @State actionMessage: string = '';
+  @State actionOpening: boolean = false;
+  private activeChatContext: ChatContext | null = null;
   private scroller: Scroller = new Scroller();
   private inputController: TextInputController = new TextInputController();
   private currentRequest: http.HttpRequest | null = null;
@@ -91,6 +99,81 @@ export struct ChatContent {
     const pendingQuestion = AppStorage.get<string>('pendingChatQuestion') ?? '';
     this.inputText = this.quickQuestion.trim().length > 0 ? this.quickQuestion.trim() : pendingQuestion.trim();
     AppStorage.setOrCreate<string>('pendingChatQuestion', '');
+    if (this.quickQuestion.trim().length === 0 && pendingQuestion.trim().length > 0) {
+      this.loadPendingContext();
+    } else {
+      AppStorage.setOrCreate<string>('pendingChatContextJson', '');
+      this.activeChatContext = null;
+      this.contextSummary = '';
+      this.contextQuestion = '';
+    }
+  }
+
+  private loadPendingContext(): void {
+    this.activeChatContext = null;
+    this.contextSummary = '';
+    this.contextQuestion = '';
+    const pending = AppStorage.get<string>('pendingChatContextJson') ?? '';
+    AppStorage.setOrCreate<string>('pendingChatContextJson', '');
+    if (pending.length === 0) return;
+    try {
+      const context: ChatContext = JSON.parse(pending);
+      if (context.courseId === undefined || context.topic === undefined ||
+        context.question === undefined || context.courseId.length === 0 ||
+        context.topic.length === 0 || context.question.length === 0) return;
+      this.activeChatContext = context;
+      this.contextSummary = context.submitted === true ?
+        '已提交作答 · ' + context.topic : '正在作答 · ' + context.topic;
+      this.contextQuestion = context.question;
+    } catch (_) {
+      this.contextSummary = '题目上下文无法读取，请重新从题目进入';
+    }
+  }
+
+  private validAction(action: ChatAction): boolean {
+    return action !== null && typeof action.kind === 'string' &&
+      typeof action.courseId === 'string' && typeof action.topic === 'string' &&
+      typeof action.title === 'string' && typeof action.reason === 'string' &&
+      (action.kind === 'lesson' || action.kind === 'practice' ||
+      action.kind === 'quiz' || action.kind === 'review') &&
+      action.courseId.length > 0 && action.courseId.length <= 128 &&
+      action.topic.length > 0 && action.topic.length <= 128 &&
+      action.title.length > 0 && action.title.length <= 120 &&
+      action.reason.length > 0 && action.reason.length <= 200;
+  }
+
+  private actionTarget(kind: string): string {
+    if (kind === 'lesson') return 'pages/Lesson';
+    if (kind === 'quiz') return 'pages/Quiz';
+    return 'pages/Practice';
+  }
+
+  private async openAction(action: ChatAction): Promise<void> {
+    if (this.actionOpening || this.loading || !this.validAction(action)) return;
+    this.actionOpening = true;
+    this.actionMessage = '';
+    try {
+      const courses: Course[] = await LocalLearningRepository.getCourses() ?? [];
+      const targetPage = this.actionTarget(action.kind);
+      const launch: ProactiveLearningLaunch | undefined = ProactiveLearningService.validateChatAction(
+        courses, targetPage, action.courseId, action.topic, action.kind);
+      if (launch === undefined) {
+        this.actionMessage = '当前课程或主题已变化，请重新提问';
+        return;
+      }
+      const selection: ProactiveLearningAction = {
+        kind: action.kind, badge: '学伴建议', title: action.title, subtitle: action.reason,
+        cta: action.title, courseId: launch.courseId, courseTitle: launch.courseTitle,
+        topic: launch.topic, focusTag: '', taskAction: action.kind, targetPage: targetPage,
+        evidence: '本次回答建议', progressText: ''
+      };
+      ProactiveLearningService.applySelection(selection);
+      await this.getUIContext().getRouter().pushUrl({ url: targetPage });
+    } catch (_) {
+      this.actionMessage = '暂时无法打开学习行动，请重试';
+    } finally {
+      this.actionOpening = false;
+    }
   }
 
   aboutToDisappear(): void {
@@ -529,7 +612,8 @@ export struct ChatContent {
           httpStatus: 0,
           errorCode: '',
           statusExpanded: false,
-          retryQuestion: ''
+          retryQuestion: '',
+          action: item.action && this.validAction(item.action) ? item.action : null
         };
         restored.push(message);
       }
@@ -666,6 +750,39 @@ export struct ChatContent {
       .width('100%')
       .alignItems(HorizontalAlign.Start)
       .padding({ left: 22, right: 22, top: 24, bottom: 12 })
+
+      if (this.contextSummary.length > 0) {
+        Row({ space: 10 }) {
+          Column({ space: 4 }) {
+            Text(this.contextSummary)
+              .fontSize(12)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_BRAND)
+            Text(this.contextQuestion.length > 0 ? this.contextQuestion : this.contextSummary)
+              .fontSize(13)
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          Button('移除')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .backgroundColor(Constants.COLOR_BG_TAG)
+            .constraintSize({ minHeight: 48 })
+            .onClick((): void => {
+              this.activeChatContext = null;
+              this.contextSummary = '';
+              this.contextQuestion = '';
+            })
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+        .margin({ left: 16, right: 16, bottom: 8 })
+      }
 
       // 消息列表 / 欢迎页
       if (this.messages.length === 0) {
@@ -897,6 +1014,7 @@ export struct ChatContent {
       errorCode: '',
       statusExpanded: false,
       retryQuestion: '',
+      action: null,
     };
     this.messages.push(userMsg);
 
@@ -916,6 +1034,7 @@ export struct ChatContent {
       errorCode: '',
       statusExpanded: false,
       retryQuestion: content,
+      action: null,
     };
     this.messages.push(assistantMsg);
 
@@ -946,7 +1065,12 @@ export struct ChatContent {
       startDate: this.localDateKey(),
       history: requestHistory,
       context: {
-        courseId: AppStorage.get<string>('selectedCourseId') ?? 'cs101'
+        courseId: this.activeChatContext?.courseId ?? AppStorage.get<string>('selectedCourseId') ?? 'cs101',
+        topic: this.activeChatContext?.topic,
+        question: this.activeChatContext?.question,
+        userAnswer: this.activeChatContext?.userAnswer,
+        correctAnswer: this.activeChatContext?.correctAnswer,
+        submitted: this.activeChatContext?.submitted
       }
     };
     LocalLearningRepository.getProfile().then((profile): void => {
@@ -983,6 +1107,8 @@ export struct ChatContent {
           last.content += evt.content;
         } else if (evt.type === 'citation' && evt.source) {
           last.citations.push(evt.source);
+        } else if (evt.type === 'action' && evt.action && this.validAction(evt.action)) {
+          last.action = evt.action;
         } else if (evt.type === 'error') {
           last.streaming = false;
           last.failed = true;
@@ -1113,7 +1239,8 @@ export struct ChatContent {
         content: assistantMessage.content,
         citations: assistantMessage.citations,
         agentTrace: includeLocalEvidence ? assistantMessage.agentTrace : undefined,
-        thinking: includeLocalEvidence ? assistantMessage.thinking : undefined
+        thinking: includeLocalEvidence ? assistantMessage.thinking : undefined,
+        action: assistantMessage.action ?? undefined
       });
       index += 1;
     }
@@ -1270,6 +1397,11 @@ export struct ChatContent {
                 .width('100%')
             }
 
+            if (msg.action !== null && !msg.streaming && !msg.failed && !msg.cancelled &&
+              msg.content.length > 0) {
+              this.ActionCard(msg.action)
+            }
+
             if (msg.failed || msg.cancelled) {
               this.MessageStatus(msg)
             }
@@ -1332,6 +1464,39 @@ export struct ChatContent {
     }
     .width('100%')
     .padding({ top: 8, bottom: 8 })
+  }
+
+  @Builder
+  ActionCard(action: ChatAction) {
+    Column({ space: 8 }) {
+      Text('建议的下一步')
+        .fontSize(12)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Text(action.title)
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      Text(action.reason)
+        .fontSize(12)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      Button('打开并开始')
+        .height(48)
+        .width('100%')
+        .enabled(!this.actionOpening)
+        .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+        .backgroundColor(Constants.COLOR_BRAND)
+        .onClick((): void => { this.openAction(action); })
+      if (this.actionMessage.length > 0) {
+        Text(this.actionMessage)
+          .fontSize(11)
+          .fontColor(Constants.COLOR_ERROR)
+      }
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .borderRadius(Constants.RADIUS_MD)
+    .margin({ top: 8 })
   }
 
   @Builder

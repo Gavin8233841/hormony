@@ -148,6 +148,24 @@ export interface ChatMessage {
   agentTrace?: string[];
 }
 
+export interface ChatAction {
+  kind: "lesson" | "practice" | "quiz" | "review";
+  courseId: string;
+  topic: string;
+  title: string;
+  reason: string;
+}
+
+export interface ChatContext {
+  courseId?: string;
+  topic?: string;
+  question?: string;
+  userAnswer?: string;
+  correctAnswer?: string;
+  submitted?: boolean;
+  sessionId?: string;
+}
+
 export interface SafetyResult {
   passed: boolean;
   flags: string[];
@@ -178,10 +196,7 @@ export interface ChatRequest {
   startDate: string;
   history?: ChatMessage[];
   profile?: LearningProfileSnapshot;
-  context?: {
-    courseId?: string;
-    sessionId?: string;
-  };
+  context?: ChatContext;
 }
 
 // SSE 流式事件
@@ -190,6 +205,7 @@ export type StreamEvent =
   | { type: "delta"; content: string }
   | { type: "citation"; source: Citation }
   | { type: "trace"; agent: AgentName; content: string }
+  | { type: "action"; action: ChatAction }
   | { type: "error"; code: string; message: string }
   | { type: "done"; sessionId: string };
 

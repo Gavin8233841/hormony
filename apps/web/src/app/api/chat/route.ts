@@ -23,7 +23,7 @@ import {
   sanitizeLearningProfile,
   validationError,
 } from "@/lib/api-validation";
-import { isCourseId } from "@/lib/data";
+import { isCourseId, isCourseTopic } from "@/lib/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,6 +96,17 @@ export async function POST(req: NextRequest) {
 
   const context = sanitizeContext(body.context);
   if (!context.ok) return context.response;
+  const contextSafetyFlags = validateUserInput([
+    context.value?.question ?? "",
+    context.value?.userAnswer ?? "",
+    context.value?.correctAnswer ?? "",
+  ].join("\n"));
+  if (contextSafetyFlags.length > 0) {
+    return Response.json(
+      { error: "学习上下文不符合安全要求", code: "INPUT_REJECTED" },
+      { status: 400 }
+    );
+  }
 
   const history = sanitizeHistory(body.history);
   if (!history.ok) return history.response;
@@ -372,7 +383,42 @@ function sanitizeContext(value: unknown): ReturnType<typeof validationError> | {
     sessionId = trimmed.length > 0 ? trimmed : undefined;
   }
 
-  return { ok: true, value: { courseId, sessionId } };
+  let topic: string | undefined;
+  if (value.topic !== undefined) {
+    if (typeof value.topic !== "string" || value.topic.length === 0 || value.topic.length > 100 ||
+      courseId === undefined || !isCourseTopic(courseId, value.topic)) {
+      return validationError("context.topic 与课程不匹配", "INVALID_TOPIC");
+    }
+    topic = value.topic;
+  }
+
+  const readText = (key: "question" | "userAnswer" | "correctAnswer", maxLength: number):
+    string | null | undefined => {
+    const candidate = value[key];
+    if (candidate === undefined) return undefined;
+    if (typeof candidate !== "string" || candidate.length > maxLength) return null;
+    return candidate.trim();
+  };
+  const question = readText("question", 500);
+  const userAnswer = readText("userAnswer", 300);
+  const correctAnswer = readText("correctAnswer", 300);
+  if (question === null || userAnswer === null || correctAnswer === null) {
+    return validationError("context 作答字段格式或长度无效", "INVALID_CONTEXT");
+  }
+  if (value.submitted !== undefined && typeof value.submitted !== "boolean") {
+    return validationError("context.submitted 必须是布尔值", "INVALID_CONTEXT");
+  }
+  const submitted = value.submitted;
+  if ((question !== undefined && (question.length === 0 || topic === undefined)) ||
+    (userAnswer !== undefined && question === undefined) ||
+    (correctAnswer !== undefined && (submitted !== true || question === undefined)) ||
+    (submitted === true && (question === undefined || userAnswer === undefined ||
+      correctAnswer === undefined || correctAnswer.length === 0))) {
+    return validationError("context 作答字段缺少配套题目或提交状态", "INVALID_CONTEXT");
+  }
+
+  return { ok: true, value: { courseId, sessionId, topic, question, userAnswer,
+    correctAnswer, submitted } };
 }
 
 function sanitizeHistory(value: unknown): ReturnType<typeof validationError> | {

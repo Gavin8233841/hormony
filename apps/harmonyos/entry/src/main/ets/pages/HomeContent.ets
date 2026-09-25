@@ -12,6 +12,7 @@ import { common } from '@kit.AbilityKit';
 export struct HomeContent {
   @Link selectedTab: number;
   @Link quickQuestion: string;
+  @Prop @Watch('refreshLearningView') learningViewVersion: number = 0;
 
   @State quickAsk: string = '';
   @State notificationOpen: boolean = false;
@@ -50,12 +51,17 @@ export struct HomeContent {
     this.loadNextAction();
   }
 
+  private refreshLearningView(): void {
+    this.loadPlan();
+    this.loadNextAction();
+  }
+
   private async loadPlan(): Promise<void> {
     this.planLoading = true;
     this.planError = false;
     try {
       const plan = await LocalLearningRepository.getPlan();
-      if (plan !== null) this.planTasks = plan.tasks;
+      this.planTasks = plan?.tasks ?? [];
     } catch (e) {
       this.planError = true;
     } finally {
@@ -484,7 +490,7 @@ export struct HomeContent {
           Text(this.nextActionBadge)
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .fontColor(Constants.COLOR_MAP_CORE)
         }
         .width('100%')
 
@@ -492,25 +498,25 @@ export struct HomeContent {
           .width('100%')
           .fontSize(24)
           .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .fontColor(Constants.COLOR_MAP_CORE)
           .maxLines(3)
 
         Column({ space: 4 }) {
           Text('推荐依据')
             .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
           Text(this.nextActionEvidence)
             .width('100%')
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .fontColor(Constants.COLOR_MAP_CORE)
             .lineHeight(20)
             .maxLines(3)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
         .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .backgroundColor(Constants.COLOR_MAP_LINE)
         .borderRadius(Constants.RADIUS_MD)
 
         Column({ space: 4 }) {
@@ -518,12 +524,12 @@ export struct HomeContent {
             .width('100%')
             .fontSize(13)
             .lineHeight(20)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
           Text(this.nextActionProgressText)
             .width('100%')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .fontColor(Constants.COLOR_MAP_CORE)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -560,7 +566,8 @@ export struct HomeContent {
     }
     .width('100%')
     .padding(18)
-    .backgroundColor(Constants.COLOR_BG_CARD)
+    .backgroundColor(this.nextActionReady && !this.nextActionLoading && !this.nextActionError ?
+      Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
     .shadow({ radius: 8, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
   }

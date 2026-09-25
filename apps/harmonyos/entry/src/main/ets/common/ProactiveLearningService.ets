@@ -60,6 +60,12 @@ export class ProactiveLearningService {
       return ProactiveLearningService.repairPlanAction(invalidPendingCount);
     }
 
+    if (todayTasks.length > 0 && todayTasks.every((task: PlanTask): boolean => task.done === true)) {
+      const completedCourse = executableTasks.length > 0 ?
+        courses.find((course: Course): boolean => course.id === executableTasks[0].courseId) : undefined;
+      return ProactiveLearningService.completedTodayAction(todayTasks.length, completedCourse ?? currentCourse);
+    }
+
     return ProactiveLearningService.fallback(currentCourse);
   }
 
@@ -186,6 +192,12 @@ export class ProactiveLearningService {
     return source === 'proactive_learning_card' || source === 'proactive_learning_reminder';
   }
 
+  static validateChatAction(courses: Course[], targetPage: string, courseId: string,
+    topic: string, kind: string): ProactiveLearningLaunch | undefined {
+    return ProactiveLearningService.validateLaunch(courses, 'proactive_learning_card',
+      targetPage, courseId, topic, '', kind);
+  }
+
   private static reviewAction(item: ReviewItem, dueCount: number, courses: Course[]): ProactiveLearningAction {
     const title = ProactiveLearningService.courseTitle(courses, item.courseId);
     const stem = item.stem.length > 34 ? item.stem.slice(0, 34) + '…' : item.stem;
@@ -221,6 +233,24 @@ export class ProactiveLearningService {
       targetPage: 'pages/Plan',
       evidence: '旧计划任务未通过本机课程目录与动作枚举校验',
       progressText: invalidPendingCount.toString() + ' 项需要更新'
+    };
+  }
+
+  private static completedTodayAction(count: number, course?: Course): ProactiveLearningAction {
+    return {
+      kind: 'course',
+      badge: '今日已完成',
+      title: '今天的计划已完成',
+      subtitle: '已完成 ' + count.toString() + '/' + count.toString() + ' 项计划任务',
+      cta: course === undefined ? '浏览课程' : '继续课程',
+      courseId: course?.id ?? '',
+      courseTitle: course?.title ?? '',
+      topic: '',
+      focusTag: '',
+      taskAction: 'course',
+      targetPage: course === undefined ? 'pages/Index' : 'pages/CourseDetail',
+      evidence: '本机今日计划记录；手动完成不代表通过测评',
+      progressText: count.toString() + '/' + count.toString() + ' 项已完成'
     };
   }
 

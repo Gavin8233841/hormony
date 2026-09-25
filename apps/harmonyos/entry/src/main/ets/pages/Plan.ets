@@ -49,6 +49,8 @@ struct PlanPage {
   @State errorExpanded: boolean = false;
   @State retryAction: string = 'none';
   @State updatingTaskId: string = '';
+  @State collapsedDays: string[] = [];
+  @State expandedFutureDays: string[] = [];
   private activeRequest: HttpRequestCancellation | null = null;
   private generationRunId: number = 0;
   private planReadRunId: number = 0;
@@ -450,6 +452,8 @@ struct PlanPage {
     this.savedPlanGoal = plan.goal;
     this.agentTrace = plan.agentTrace ?? [];
     this.evidenceExpanded = false;
+    this.collapsedDays = [];
+    this.expandedFutureDays = [];
     this.pendingPlan = null;
     this.progressStep = 4;
     try {
@@ -489,6 +493,55 @@ struct PlanPage {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     return date.getFullYear().toString() + '-' + month + '-' + day;
+  }
+
+  private taskDays(): string[] {
+    const days: string[] = [];
+    for (const task of this.tasks) {
+      if (!days.includes(task.date)) days.push(task.date);
+    }
+    const today = this.localDateKey();
+    return days.sort((left: string, right: string): number => {
+      if (left === today) return -1;
+      if (right === today) return 1;
+      if (left < today && right < today) return right.localeCompare(left);
+      if (left < today) return -1;
+      if (right < today) return 1;
+      return left.localeCompare(right);
+    });
+  }
+
+  private tasksForDay(day: string): PlanTask[] {
+    return this.tasks.filter((task: PlanTask): boolean => task.date === day);
+  }
+
+  private isDayExpanded(day: string): boolean {
+    if (this.collapsedDays.includes(day)) return false;
+    if (this.expandedFutureDays.includes(day)) return true;
+    return day === this.localDateKey();
+  }
+
+  private toggleDay(day: string): void {
+    if (this.isDayExpanded(day)) {
+      this.expandedFutureDays = this.expandedFutureDays.filter((value: string): boolean => value !== day);
+      this.collapsedDays = [...this.collapsedDays, day];
+    } else {
+      this.collapsedDays = this.collapsedDays.filter((value: string): boolean => value !== day);
+      this.expandedFutureDays = [...this.expandedFutureDays, day];
+    }
+  }
+
+  private dayLabel(day: string): string {
+    if (day === this.localDateKey()) return '今天 · ' + day.slice(5, 7) + '月' + day.slice(8) + '日';
+    if (day < this.localDateKey()) return '此前 · ' + day.slice(5, 7) + '月' + day.slice(8) + '日';
+    return day.slice(5, 7) + '月' + day.slice(8) + '日';
+  }
+
+  private daySummary(day: string): string {
+    const tasks = this.tasksForDay(day);
+    const pending = tasks.filter((task: PlanTask): boolean => task.done !== true).length;
+    if (pending === 0) return tasks.length.toString() + ' 项已完成';
+    return pending.toString() + ' 项待做 · 共 ' + tasks.length.toString() + ' 项';
   }
 
   private validCourseId(courseId: string): boolean {
@@ -978,24 +1031,21 @@ struct PlanPage {
           .margin({ left: 16, right: 16, bottom: 16 })
           .constraintSize({ maxWidth: 760 })
         } else {
-          Column({ space: 10 }) {
-          Text('当前计划')
-            .width('100%')
-            .fontSize(13)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text(this.savedPlanGoal.trim().length > 0 ? this.savedPlanGoal : this.goal)
-            .width('100%')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(this.tasks.length.toString() + ' 项任务，可从下方继续执行')
-            .width('100%')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Row({ space: 12 }) {
+            Column({ space: 4 }) {
+              Text('当前目标')
+                .fontSize(12)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              Text(this.savedPlanGoal.trim().length > 0 ? this.savedPlanGoal : this.goal)
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
           Button('调整目标与周期')
-            .width('100%')
             .constraintSize({ minHeight: 48 })
+            .padding({ left: 12, right: 12 })
             .fontSize(13)
             .fontColor(Constants.COLOR_BRAND)
             .backgroundColor(Constants.COLOR_BRAND_LIGHT)
@@ -1007,12 +1057,12 @@ struct PlanPage {
             .onClick((): void => { this.editorExpanded = true; })
           }
           .width('100%')
-          .alignItems(HorizontalAlign.Start)
-          .padding(16)
+          .alignItems(VerticalAlign.Center)
+          .padding(12)
           .backgroundColor(Constants.COLOR_BG_CARD)
           .borderRadius(Constants.RADIUS_LG)
           .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 2 })
-          .margin({ left: 16, right: 16, bottom: 16 })
+          .margin({ left: 16, right: 16, bottom: 8 })
           .constraintSize({ maxWidth: 760 })
         }
       }
@@ -1143,33 +1193,38 @@ struct PlanPage {
         .layoutWeight(1)
         .scrollBar(BarState.Off)
       } else if (this.tasks.length > 0) {
-        if (this.agentTrace.length > 0) {
-          this.AgentTraceCard()
-        }
-        Row() {
-          Column() {
-            Text('今日起步')
-              .fontSize(19)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text(this.tasks.length.toString() + ' 项任务 · 每天约 90 分钟')
-              .fontSize(12)
-              .fontColor(Constants.COLOR_TEXT_SECONDARY)
-              .margin({ top: 4 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-          SymbolGlyph($r('sys.symbol.calendar_fill'))
-            .fontSize(26)
-            .fontColor([Constants.COLOR_BRAND])
-        }
-        .width('100%')
-        .padding({ left: 18, right: 18, bottom: 10 })
-        .constraintSize({ maxWidth: 760 })
-
         List({ space: 8 }) {
-          ForEach(this.tasks, (t: PlanTask, i: number) => {
+          ForEach(this.taskDays(), (day: string): void => {
             ListItem() {
+              Column({ space: 8 }) {
+                Row({ space: 12 }) {
+                  Column({ space: 4 }) {
+                    Text(this.dayLabel(day))
+                      .fontSize(18)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(day === this.localDateKey() ? Constants.COLOR_MAP_CORE : Constants.COLOR_TEXT_PRIMARY)
+                    Text(this.daySummary(day))
+                      .fontSize(12)
+                      .fontColor(day === this.localDateKey() ? Constants.COLOR_MAP_TEXT_MUTED : Constants.COLOR_TEXT_SECONDARY)
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
+                  SymbolGlyph($r(this.isDayExpanded(day) ? 'sys.symbol.chevron_up' : 'sys.symbol.chevron_down'))
+                    .fontSize(16)
+                    .fontColor([day === this.localDateKey() ? Constants.COLOR_MAP_CORE : Constants.COLOR_BRAND])
+                }
+                .width('100%')
+                .constraintSize({ minHeight: 56 })
+                .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+                .backgroundColor(day === this.localDateKey() ? Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_CARD)
+                .borderRadius(Constants.RADIUS_MD)
+                .focusable(true)
+                .accessibilityText(this.dayLabel(day) + '，' + this.daySummary(day) + '，' +
+                  (this.isDayExpanded(day) ? '已展开' : '已折叠'))
+                .accessibilityDescription('点击' + (this.isDayExpanded(day) ? '收起' : '展开') + '该日任务')
+                .onClick((): void => { this.toggleDay(day); })
+                if (this.isDayExpanded(day)) {
+                  ForEach(this.tasksForDay(day), (t: PlanTask, i: number): void => {
               Row({ space: 12 }) {
                 Stack({ alignContent: Alignment.Center }) {
                   Column()
@@ -1248,7 +1303,7 @@ struct PlanPage {
                     .borderRadius(Constants.RADIUS_SM)
                     .enabled(this.updatingTaskId.length === 0)
                     .accessibilityText((t.done ? '恢复待完成：' : '标记完成：') + t.title)
-                    .accessibilityDescription('将任务状态保存到本机学习计划')
+                    .accessibilityDescription('手动设置任务状态并保存到本机；这不代表通过测评')
                     .onClick(() => { this.toggleTask(t); })
                 }
               }
@@ -1256,8 +1311,17 @@ struct PlanPage {
               .padding(14)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_MD)
+                  }, (task: PlanTask): string => task.id)
+                }
+              }
+              .width('100%')
             }
-          })
+          }, (day: string): string => day)
+          if (this.agentTrace.length > 0) {
+            ListItem() {
+              this.AgentTraceCard()
+            }
+          }
         }
         .width('100%')
         .height('100%')

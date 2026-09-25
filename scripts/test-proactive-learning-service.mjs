@@ -312,6 +312,36 @@ test('无学习状态时返回明确计划空态', async () => {
   assert.equal(action.progressText, '等待制定计划');
 });
 
+test('今日任务全完成后保留完成事实，不回退到首次制定计划', async () => {
+  const service = loadService(repositoryFor({
+    courses: [{ id: 'cs101', title: '数据结构', progress: 0, topics: ['图的表示与遍历'] }],
+    plan: {
+      tasks: [{ id: 'today_graph', date: '2026-07-17', title: '学习图遍历',
+        estimatedMin: 20, type: 'lesson', action: 'lesson', courseId: 'cs101',
+        topic: '图的表示与遍历', done: true }]
+    }
+  }));
+
+  const action = await service.resolve(now);
+  assert.equal(action.badge, '今日已完成');
+  assert.equal(action.targetPage, 'pages/CourseDetail');
+  assert.equal(action.courseId, 'cs101');
+  assert.equal(action.progressText, '1/1 项已完成');
+  assert.match(action.evidence, /手动完成不代表通过测评/);
+});
+
+test('无课程可续时，今日已完成仍可打开课程入口', async () => {
+  const service = loadService(repositoryFor({
+    courses: [],
+    plan: { tasks: [{ id: 'legacy_done', date: '2026-07-17', done: true }] }
+  }));
+
+  const action = await service.resolve(now);
+  assert.equal(action.badge, '今日已完成');
+  assert.equal(action.targetPage, 'pages/Index');
+  assert.equal(action.cta, '浏览课程');
+});
+
 test('生产初始化的三门零进度目录课程仍返回制定计划动作', async () => {
   const service = loadService(repositoryFor({
     courses: [

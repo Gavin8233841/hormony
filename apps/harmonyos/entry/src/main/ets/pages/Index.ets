@@ -18,6 +18,7 @@ struct Index {
   @State quickQuestion: string = '';
   @State contentOpacity: number = 1;
   @State contentOffset: number = 0;
+  @State learningViewVersion: number = 0;
   @StorageProp('safeAreaTopVp') safeAreaTopVpValue: number = 0;
   @StorageProp('safeAreaBottomVp') safeAreaBottomVpValue: number = 0;
   @StorageLink('proactiveLaunchVersion') @Watch('consumeProactiveLaunch') proactiveLaunchVersion: number = 0;
@@ -27,6 +28,10 @@ struct Index {
 
   aboutToAppear(): void {
     this.consumeProactiveLaunch();
+  }
+
+  onPageShow(): void {
+    this.learningViewVersion += 1;
   }
 
   private safeAreaTopVp(): number {
@@ -146,6 +151,7 @@ struct Index {
       return;
     }
     this.currentIndex = index;
+    this.learningViewVersion += 1;
     this.contentOpacity = 0.86;
     this.contentOffset = 6;
     this.getUIContext().animateTo({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut }, (): void => {
@@ -201,6 +207,7 @@ struct Index {
             HomeContent({
               selectedTab: $currentIndex,
               quickQuestion: $quickQuestion,
+              learningViewVersion: this.learningViewVersion,
             })
           }
           .width('100%')
@@ -208,7 +215,7 @@ struct Index {
           .padding({ bottom: this.contentBottomPadding() })
         } else if (this.currentIndex === 1) {
           Column() {
-            CourseContent()
+            CourseContent({ learningViewVersion: this.learningViewVersion })
           }
           .width('100%')
           .height('100%')

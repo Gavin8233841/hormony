@@ -67,6 +67,15 @@ export interface ChatMessage {
   citations?: Citation[];
   agentTrace?: string[];
   thinking?: string[];
+  action?: ChatAction;
+}
+
+export interface ChatAction {
+  kind: string;
+  courseId: string;
+  topic: string;
+  title: string;
+  reason: string;
 }
 
 export interface Citation {
@@ -289,13 +298,14 @@ export interface ExternalLearningResource {
 
 // SSE 流式事件
 export interface StreamEvent {
-  type: string; // 'thinking' | 'delta' | 'citation' | 'trace' | 'done'
+  type: string; // 'thinking' | 'delta' | 'citation' | 'trace' | 'action' | 'done'
   agent?: string;
   content?: string;
   source?: Citation;
   sessionId?: string;
   code?: string;
   message?: string;
+  action?: ChatAction;
 }
 
 // API 请求体接口
@@ -325,6 +335,11 @@ export interface ChatRequest {
 
 export interface ChatContext {
   courseId?: string;
+  topic?: string;
+  question?: string;
+  userAnswer?: string;
+  correctAnswer?: string;
+  submitted?: boolean;
   sessionId?: string;
 }
 

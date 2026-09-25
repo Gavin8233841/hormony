@@ -12,14 +12,16 @@ import { runPlannerAgent } from "./planner-agent";
 import { runQuizAgent } from "./quiz-agent";
 import { runEvaluatorAgent } from "./evaluator-agent";
 import { runSafetyAgent } from "./safety-agent";
-import type { AgentResult, Citation, StreamEvent, ChatRequest, ChatMessage, SafetyResult } from "@/lib/types";
+import type { AgentResult, Citation, StreamEvent, ChatRequest, ChatMessage, SafetyResult, ChatAction } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { SafetyBlockedError } from "@/lib/api-errors";
+import { isCourseTopic } from "@/lib/data";
 
 // 简易意图识别（关键词路由）
 type Intent = "tutor" | "plan" | "quiz" | "evaluate" | "general";
 
-function detectIntent(message: string): Intent {
+function detectIntent(message: string, context?: ChatRequest["context"]): Intent {
+  if (context?.question) return context.submitted === true ? "evaluate" : "tutor";
   const m = message.toLowerCase();
   if (/(制定|生成|安排).*(计划|复习|学习|规划)|计划|时间表|日程|备考/.test(m)) return "plan";
   if (/(出题|测验|测试|练习题|考题|quiz|刷题)/.test(m)) return "quiz";
@@ -36,6 +38,7 @@ export interface OrchestrationResult {
   citations: Citation[];
   safetyPassed: boolean;
   safetySuggestion?: string;
+  action?: ChatAction;
 }
 
 // ========== 公共编排逻辑（orchestrate / orchestrateStream 共享） ==========
@@ -46,7 +49,7 @@ function prepareContext(req: ChatRequest): {
   sessionId: string;
   history: ChatMessage[];
 } {
-  const intent = detectIntent(req.message);
+  const intent = detectIntent(req.message, req.context);
   const sessionId = req.context?.sessionId ?? generateId("session");
   const history: ChatMessage[] = req.history ?? [];
   return { intent, sessionId, history };
@@ -73,7 +76,8 @@ async function runPreAgents(
   const [profileResult, retrievalResult] = shouldRetrieve
     ? await Promise.all([
         runProfileAgent(req.profile),
-        runRetrievalAgent(req.message, req.context?.courseId),
+        runRetrievalAgent(req.context?.question ?
+          `${req.context.topic ?? ""} ${req.context.question}` : req.message, req.context?.courseId),
       ])
     : [await runProfileAgent(req.profile), skippedRetrievalResult(intent)];
 
@@ -174,7 +178,13 @@ async function routeMainAgent(
       break;
     case "evaluate":
       emit?.({ type: "thinking", agent: "Evaluator" });
-      mainResult = await runEvaluatorAgent(req.userId, [], req.profile, signal);
+      mainResult = await runEvaluatorAgent(req.userId,
+        req.context?.submitted === true && req.context.question !== undefined &&
+          req.context.userAnswer !== undefined && req.context.correctAnswer !== undefined ? [{
+            question: req.context.question,
+            userAnswer: req.context.userAnswer,
+            correctAnswer: req.context.correctAnswer,
+          }] : [], req.profile, signal, req.context?.courseId);
       break;
     case "tutor":
     case "general":
@@ -182,7 +192,9 @@ async function routeMainAgent(
       emit?.({ type: "thinking", agent: "Tutor" });
       mainResult = await runTutorAgent(
           req.userId,
-          req.message,
+          req.context?.question ?
+            `当前题目：${req.context.question}\n学生当前作答：${req.context.userAnswer ?? "尚未作答"}\n` +
+            `此题尚未提交，请先给思考提示，不直接给答案。学生问题：${req.message}` : req.message,
           retrievalResult.content,
           retrievalResult.citations ?? [],
           history,
@@ -215,10 +227,23 @@ async function runSafetyCheck(
     type: "trace",
     agent: "Safety",
     content: safety.passed
-      ? "内容安全检查通过，幻觉风险低。"
+      ? "内容安全检查通过。"
       : `安全检查：${safety.flags.join("；")}，幻觉风险：${safety.hallucinationRisk}。${safety.suggestion ?? ""}`,
   });
   return { safety, safetyAgentResult };
+}
+
+function nextAction(req: ChatRequest, intent: Intent): ChatAction | undefined {
+  const courseId = req.context?.courseId;
+  const topic = req.context?.topic;
+  if (!courseId || !topic || !isCourseTopic(courseId, topic)) return undefined;
+  const kind: ChatAction["kind"] = intent === "quiz" ? "quiz" :
+    intent === "evaluate" && req.context?.submitted === true ? "practice" : "lesson";
+  const title = kind === "quiz" ? `开始${topic}测验` :
+    kind === "practice" ? `练习${topic}` : `学习${topic}`;
+  const reason = kind === "practice" ? "依据刚提交的本轮作答，做一组针对性练习" :
+    kind === "quiz" ? "在专用测验页生成并提交题目" : "打开课程内容，先整理概念和解题步骤";
+  return { kind, courseId, topic, title, reason };
 }
 
 // ========== 入口函数 ==========
@@ -258,6 +283,7 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
     citations: mainResult.citations ?? [],
     safetyPassed: safety.passed,
     safetySuggestion: safety.suggestion,
+    action: safety.passed ? nextAction(req, intent) : undefined,
   };
 }
 
@@ -305,6 +331,8 @@ export async function orchestrateStream(
   for (const c of mainResult.citations ?? []) {
     emit({ type: "citation", source: c });
   }
+  const action = nextAction(req, intent);
+  if (action) emit({ type: "action", action });
 
   // 5. 完成。会话由 HarmonyOS 本地仓库持久化。
   emit({ type: "done", sessionId });

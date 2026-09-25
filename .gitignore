@@ -9,11 +9,13 @@ build/
 dist/
 *.tsbuildinfo
 apps/web/.runtime/
+.runtime/
 
 # HarmonyOS / DevEco
 build/
 oh_modules/
 .hvigor/
+apps/harmonyos/.cache/
 .cxx/
 .idea/
 *.hap

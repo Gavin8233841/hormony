@@ -3,7 +3,7 @@
 
 import { callModel } from "./model";
 import { retrieve } from "@/lib/rag";
-import type { AgentResult, LearningProfileSnapshot } from "@/lib/types";
+import type { AgentResult, Citation, LearningProfileSnapshot } from "@/lib/types";
 
 interface AnswerRecord {
   question: string;
@@ -15,11 +15,12 @@ export async function runEvaluatorAgent(
   userId: string,
   answers: AnswerRecord[],
   profile?: LearningProfileSnapshot,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  courseId?: string
 ): Promise<AgentResult> {
   // 模式 1：有答题记录 → 详细错题分析
   if (answers.length > 0) {
-    return analyzeAnswers(userId, answers, signal);
+    return analyzeAnswers(userId, answers, signal, courseId);
   }
 
   // 模式 2：无答题记录 → 基于画像的薄弱点分析
@@ -30,7 +31,8 @@ export async function runEvaluatorAgent(
 async function analyzeAnswers(
   userId: string,
   answers: AnswerRecord[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  courseId?: string
 ): Promise<AgentResult> {
   const correct = answers.filter((a) => a.userAnswer.trim().toUpperCase() === a.correctAnswer.trim().toUpperCase()).length;
   const accuracy = answers.length > 0 ? correct / answers.length : 0;
@@ -38,11 +40,14 @@ async function analyzeAnswers(
 
   // 从错题中提取关键词，检索相关知识
   let relatedKnowledge = "";
+  let citations: Citation[] = [];
   if (wrongAnswers.length > 0) {
     const wrongTexts = wrongAnswers.map((a) => a.question).join(" ");
-    const chunks = retrieve(wrongTexts, undefined, 3);
+    const chunks = retrieve(wrongTexts, courseId, 3)
+      .filter((chunk) => courseId === undefined || chunk.courseId === courseId);
     if (chunks.length > 0) {
       relatedKnowledge = chunks.map((c) => `• ${c.source}：${c.text.slice(0, 100)}...`).join("\n");
+      citations = chunks.map((chunk) => ({ doc: chunk.source, snippet: chunk.text.slice(0, 120) }));
     }
   }
 
@@ -92,6 +97,7 @@ ${relatedKnowledge ? `相关参考资料：\n${relatedKnowledge}` : ""}`;
   return {
     agent: "Evaluator",
     content: `## 学习诊断报告\n\n正确率：${(accuracy * 100).toFixed(0)}%（${correct}/${answers.length}）\n\n${content}`,
+    citations,
     metadata: { accuracy, correct, total: answers.length, wrongCount: wrongAnswers.length },
   };
 }

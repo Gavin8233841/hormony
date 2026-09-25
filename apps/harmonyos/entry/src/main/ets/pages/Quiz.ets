@@ -20,6 +20,7 @@ import {
   QuizWriteReceipt
 } from '../model/LearningMetadataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { LearningFormUpdater } from '../common/LearningFormUpdater';
 
 interface DifficultyOption {
   value: string;
@@ -71,7 +72,7 @@ struct QuizPage {
   @State resultCorrectCount: number = 0;
   @State resultTotalQuestions: number = 0;
   @State resultDetails: QuizResultDetail[] = [];
-  @State expandedResultId: string = '';
+  @State toggledResultIds: string[] = [];
   @State evaluation: string = '';
   @State weakTopics: string[] = [];
   @State resultCoachTitle: string = '';
@@ -185,13 +186,38 @@ struct QuizPage {
   }
 
   private askTutor(detail: QuizResultDetail): void {
+    if (!this.resultReady) return;
     const question = '请结合课程资料讲解这道题：' + detail.stem +
       '。我的答案是“' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答') +
       '”，正确答案是“' + detail.correctAnswer + '”。请指出关键概念和判断步骤。';
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
+    AppStorage.setOrCreate<string>('pendingChatContextJson', JSON.stringify({
+      courseId: this.courseId,
+      topic: this.topic,
+      question: detail.stem,
+      userAnswer: detail.userAnswer,
+      correctAnswer: detail.correctAnswer,
+      submitted: true
+    }));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';
     });
+  }
+
+  private isDetailExpanded(detail: QuizResultDetail): boolean {
+    const toggled = this.toggledResultIds.includes(detail.questionId);
+    return detail.isCorrect ? toggled : !toggled;
+  }
+
+  private toggleDetail(questionId: string): void {
+    this.toggledResultIds = this.toggledResultIds.includes(questionId) ?
+      this.toggledResultIds.filter((id: string): boolean => id !== questionId) :
+      [...this.toggledResultIds, questionId];
+  }
+
+  private firstWrongQuestion(): string {
+    const detail = this.resultDetails.find((item: QuizResultDetail): boolean => !item.isCorrect);
+    return detail === undefined ? '' : detail.stem;
   }
 
   private resetQuiz(): void {
@@ -203,7 +229,7 @@ struct QuizPage {
     this.hasError = false;
     this.resultReady = false;
     this.resultDetails = [];
-    this.expandedResultId = '';
+    this.toggledResultIds = [];
     this.evaluation = '';
     this.weakTopics = [];
     this.resultCoachTitle = '';
@@ -386,14 +412,19 @@ struct QuizPage {
       this.resultCorrectCount = result.correctCount;
       this.resultTotalQuestions = result.totalQuestions;
       this.resultDetails = result.details;
-      this.expandedResultId = result.details.find((detail: QuizResultDetail): boolean => !detail.isCorrect)?.questionId ?? '';
+      this.toggledResultIds = [];
       this.evaluation = result.evaluation;
       this.weakTopics = result.weakTopics;
-      this.resultCoachTitle = this.coachTitle(result.accuracy, wrongCount);
+      this.resultCoachTitle = this.coachTitle(wrongCount);
       this.resultCoachBody = this.coachBody(result.accuracy, wrongCount);
       this.resultTagSummaries = this.buildTagSummaries(result.details);
       this.applyWriteReceipt(receipt);
       this.resultReady = true;
+      try {
+        await LearningFormUpdater.refreshAll();
+      } catch (_) {
+        // 答题记录已保存；服务卡片可在下次系统刷新时重读本机状态。
+      }
     } catch (e) {
       this.message = '答题结果保存失败，请稍后重试';
     } finally {
@@ -568,33 +599,31 @@ struct QuizPage {
   private learningEvaluation(correctCount: number, totalQuestions: number): string {
     if (totalQuestions === 0) return '本轮暂无可评分题目。';
     if (correctCount === totalQuestions) {
-      return '本组题目全部答对，已形成一次高质量掌握证据。';
+      return '本组题目全部答对，记录为本轮表现；后续仍需用新题检验。';
     }
     const wrongCount = totalQuestions - correctCount;
     if (correctCount / totalQuestions >= 0.8) {
-      return '整体掌握稳定，建议只复盘 ' + wrongCount.toString() + ' 道失误题。';
+      return '本组有 ' + wrongCount.toString() + ' 道错题，先核对判断步骤。';
     }
     return '已记录本次答题结果，建议先按错因标签复盘，再做同标签短练。';
   }
 
-  private coachTitle(accuracy: number, wrongCount: number): string {
-    if (wrongCount === 0) return '掌握判定：可以前进';
-    if (accuracy >= 0.8) return '掌握判定：接近掌握';
-    if (accuracy >= 0.6) return '掌握判定：需要巩固';
-    return '掌握判定：先补基础';
+  private coachTitle(wrongCount: number): string {
+    if (wrongCount === 0) return '本组没有待澄清错题';
+    return '待澄清 ' + wrongCount.toString() + ' 道错题';
   }
 
   private coachBody(accuracy: number, wrongCount: number): string {
     if (wrongCount === 0) {
-      return '这轮题已经写入本地画像。你可以挑战更高难度，或去学习星图解锁下一个主题。';
+      return '这轮题已写入本地画像。下一组换题检验能否稳定运用。';
     }
     if (accuracy >= 0.8) {
-      return '错题会进入错题本和间隔复习队列。建议先看解析，再用最弱标签加练一组。';
+      return '先看下方展开的错题解析，核对判断步骤。';
     }
     if (accuracy >= 0.6) {
-      return '当前不是简单刷题问题，更像概念条件没有稳定提取。先复习资料，再练同标签题。';
+      return '先看下方展开的错题解析，再回课程资料核对概念条件。';
     }
-    return '先降低难度复盘核心定义，确认关键词和边界条件后，再回到本主题进阶题。';
+    return '先回课程资料核对核心定义和边界条件。';
   }
 
   private buildTagSummaries(details: QuizResultDetail[]): QuizTagSummary[] {
@@ -1181,31 +1210,38 @@ struct QuizPage {
   @Builder
   ResultState() {
     Column({ space: 16 }) {
+      Text('本轮表现')
+        .width('100%')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
       Row() {
         Column({ space: 3 }) {
           Text(Math.round(this.resultAccuracy * 100).toString() + '%')
             .fontSize(34)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.resultAccuracy >= 0.6 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
-          Text('正确率')
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          Text('本轮正确率')
             .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
         }
         Column({ space: 4 }) {
           Text(this.resultCorrectCount.toString() + ' / ' + this.resultTotalQuestions.toString() + ' 题正确')
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(this.resultAccuracy >= 0.8 ? '掌握得很好，可以进入下一主题' : '查看解析后，再练一组巩固薄弱点')
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          Text(this.resultCorrectCount === this.resultTotalQuestions ?
+            '本组全对，下一组继续检验。' :
+            '有 ' + (this.resultTotalQuestions - this.resultCorrectCount).toString() + ' 道题需要澄清。')
             .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           Text('本次难度：' + this.difficultyLabel())
             .fontSize(11)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           if (this.focusTag.length > 0) {
             Text('重点标签：' + this.focusTag)
               .fontSize(11)
-              .fontColor(Constants.COLOR_BRAND)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           }
         }
         .layoutWeight(1)
@@ -1214,7 +1250,7 @@ struct QuizPage {
       }
       .width('100%')
       .padding(18)
-      .backgroundColor(Constants.COLOR_BG_CARD)
+      .backgroundColor(Constants.COLOR_TEXT_PRIMARY)
       .borderRadius(Constants.RADIUS_LG)
 
       if (this.writeBackStatus.length > 0) {
@@ -1252,10 +1288,14 @@ struct QuizPage {
 
       if (this.resultCoachTitle.length > 0) {
         Column({ space: 10 }) {
+          Text('本轮下一步')
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
           Row({ space: 8 }) {
-            SymbolGlyph($r(this.resultAccuracy >= 0.8 ? 'sys.symbol.sparkles' : 'sys.symbol.lightbulb_fill'))
+            SymbolGlyph($r('sys.symbol.lightbulb_fill'))
               .fontSize(18)
-              .fontColor([this.resultAccuracy >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING])
+              .fontColor([Constants.COLOR_BRAND])
             Text(this.resultCoachTitle)
               .layoutWeight(1)
               .fontSize(16)
@@ -1263,6 +1303,13 @@ struct QuizPage {
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
           }
           .width('100%')
+          if (this.resultCorrectCount < this.resultTotalQuestions) {
+            Text(this.firstWrongQuestion())
+              .width('100%')
+              .fontSize(14)
+              .lineHeight(22)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          }
           Text(this.resultCoachBody)
             .width('100%')
             .fontSize(13)
@@ -1273,25 +1320,18 @@ struct QuizPage {
             .fontSize(12)
             .lineHeight(19)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
-          Row({ space: 10 }) {
-            Button('问学伴复盘')
-              .layoutWeight(1)
-              .height(42)
-              .fontSize(12)
-              .fontColor(Constants.COLOR_BRAND)
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(Constants.RADIUS_MD)
-              .onClick((): void => { this.askTutorForResult(); })
-            Button('复习资料')
-              .layoutWeight(1)
-              .height(42)
-              .fontSize(12)
-              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-              .backgroundColor(Constants.COLOR_BRAND)
-              .borderRadius(Constants.RADIUS_MD)
-              .onClick((): void => { this.reviewTopic(this.topic); })
-          }
-          .width('100%')
+          Button(this.resultCorrectCount === this.resultTotalQuestions ?
+            this.nextQuizLabel() : '先复习本主题')
+            .width('100%')
+            .height(48)
+            .fontSize(15)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+            .backgroundColor(Constants.COLOR_BRAND)
+            .borderRadius(Constants.RADIUS_MD)
+            .onClick((): void => {
+              if (this.resultCorrectCount === this.resultTotalQuestions) this.startNextQuiz();
+              else this.reviewTopic(this.topic);
+            })
         }
         .width('100%')
         .padding(16)
@@ -1301,7 +1341,7 @@ struct QuizPage {
 
       if (this.resultTagSummaries.length > 0) {
         Column({ space: 12 }) {
-          Text('错因标签')
+          Text(this.resultCorrectCount === this.resultTotalQuestions ? '本轮涉及的标签' : '待澄清标签')
             .width('100%')
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
@@ -1324,20 +1364,6 @@ struct QuizPage {
                 .color(this.tagProgressColor(item))
                 .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
                 .borderRadius(4)
-              Row({ space: 8 }) {
-                Text(item.action)
-                  .layoutWeight(1)
-                  .fontSize(11)
-                  .fontColor(Constants.COLOR_TEXT_TERTIARY)
-                Button('练这个标签')
-                  .height(30)
-                  .fontSize(11)
-                  .fontColor(Constants.COLOR_BRAND)
-                  .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                  .borderRadius(Constants.RADIUS_SM)
-                  .onClick((): void => { this.startFocusedTagDrill(item.tag); })
-              }
-              .width('100%')
             }
             .width('100%')
             .padding(12)
@@ -1351,35 +1377,8 @@ struct QuizPage {
         .borderRadius(Constants.RADIUS_LG)
       }
 
-      if (this.weakTopics.length > 0) {
-        Column({ space: 10 }) {
-          Text('建议复习')
-            .width('100%')
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Flex({ wrap: FlexWrap.Wrap }) {
-            ForEach(this.weakTopics, (topic: string): void => {
-              Button(topic)
-                .height(38)
-                .fontSize(12)
-                .fontColor(Constants.COLOR_WARNING)
-                .padding({ left: 12, right: 12 })
-                .backgroundColor(Constants.COLOR_BG_CARD)
-                .borderRadius(Constants.RADIUS_SM)
-                .margin({ right: 8, bottom: 8 })
-                .onClick(() => { this.reviewTopic(topic); })
-            })
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(Constants.COLOR_SURFACE_TINT)
-        .borderRadius(Constants.RADIUS_MD)
-      }
-
-      Text('逐题解析')
+      Text(this.resultCorrectCount === this.resultTotalQuestions ? '逐题解析 · 正确题默认收起' :
+        '逐题解析 · 错题默认展开')
         .width('100%')
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
@@ -1387,8 +1386,8 @@ struct QuizPage {
 
       Column() {
         ForEach(this.resultDetails, (detail: QuizResultDetail, index: number): void => {
-          ReviewDetailRow(detail, index, this.expandedResultId === detail.questionId, (): void => {
-            this.expandedResultId = this.expandedResultId === detail.questionId ? '' : detail.questionId;
+          ReviewDetailRow(detail, index, this.isDetailExpanded(detail), (): void => {
+            this.toggleDetail(detail.questionId);
           }, (): void => { this.askTutor(detail); })
           if (index < this.resultDetails.length - 1) {
             Divider().color(Constants.COLOR_BORDER).margin({ left: 44 })
@@ -1403,31 +1402,22 @@ struct QuizPage {
         Row({ space: 10 }) {
           Button('查看错题本')
             .layoutWeight(1)
-            .height(50)
+            .height(48)
             .fontSize(14)
-            .fontColor(Constants.COLOR_WARNING)
-            .backgroundColor(Constants.COLOR_BG_TAG)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => { this.openMistakeBook(); })
-          Button(this.nextQuizLabel())
+          Button('自主再练一组')
             .layoutWeight(1)
-            .height(50)
+            .height(48)
             .fontSize(14)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .backgroundColor(Constants.COLOR_BRAND)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
             .borderRadius(Constants.RADIUS_MD)
             .onClick((): void => { this.startNextQuiz(); })
         }
         .width('100%')
-      } else {
-        Button(this.nextQuizLabel())
-          .width('100%')
-          .height(50)
-          .fontSize(15)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(Constants.COLOR_BRAND)
-          .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => { this.startNextQuiz(); })
       }
     }
     .width('100%')

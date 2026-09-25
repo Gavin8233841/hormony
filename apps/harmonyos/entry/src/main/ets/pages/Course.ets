@@ -10,6 +10,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct CourseContent {
+  @Prop @Watch('refreshLearningView') learningViewVersion: number = 0;
   @State courses: Course[] = [];
   @State lessonProgress: LessonProgress[] = [];
   @State loading: boolean = false;
@@ -18,6 +19,11 @@ export struct CourseContent {
 
   aboutToAppear() {
     this.loading = true;
+    this.loadCourses();
+  }
+
+
+  private refreshLearningView(): void {
     this.loadCourses();
   }
 

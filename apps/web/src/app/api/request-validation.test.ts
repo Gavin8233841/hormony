@@ -98,6 +98,26 @@ describe("API request validation", () => {
       code: "INVALID_COURSE",
     },
     {
+      name: "chat topic from another course",
+      handler: (request: Request) => postChat(request as NextRequest),
+      body: { message: "解释图遍历", context: { courseId: "cs102", topic: "图的表示与遍历" } },
+      code: "INVALID_TOPIC",
+    },
+    {
+      name: "chat submitted answer without grading",
+      handler: (request: Request) => postChat(request as NextRequest),
+      body: { message: "分析错题", context: { courseId: "cs101", topic: "图的表示与遍历",
+        question: "BFS 顺序？", userAnswer: "A", submitted: true } },
+      code: "INVALID_CONTEXT",
+    },
+    {
+      name: "chat unsubmitted answer revealing correct answer",
+      handler: (request: Request) => postChat(request as NextRequest),
+      body: { message: "提示", context: { courseId: "cs101", topic: "图的表示与遍历",
+        question: "BFS 顺序？", userAnswer: "A", correctAnswer: "B", submitted: false } },
+      code: "INVALID_CONTEXT",
+    },
+    {
       name: "chat invalid history role",
       handler: (request: Request) => postChat(request as NextRequest),
       body: { message: "解释二叉树", history: [{ role: "system", content: "x" }] },

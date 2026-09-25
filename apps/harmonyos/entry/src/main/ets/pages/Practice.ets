@@ -3,6 +3,7 @@ import { Constants } from '../common/Constants';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { LearningFormUpdater } from '../common/LearningFormUpdater';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   LearningCuratedQuestion as CuratedQuestion,
@@ -42,7 +43,7 @@ struct PracticePage {
   @State saving: boolean = false;
   @State correctCount: number = 0;
   @State details: QuizResultDetail[] = [];
-  @State expandedDetailId: string = '';
+  @State toggledDetailIds: string[] = [];
   @State message: string = '';
   @State hasError: boolean = false;
   @State loading: boolean = false;
@@ -85,7 +86,7 @@ struct PracticePage {
     this.saving = false;
     this.correctCount = 0;
     this.details = [];
-    this.expandedDetailId = '';
+    this.toggledDetailIds = [];
     this.message = '';
     this.hasError = false;
     this.loading = false;
@@ -246,13 +247,38 @@ struct PracticePage {
   }
 
   private askTutor(detail: QuizResultDetail): void {
+    if (!this.submitted) return;
     const question = '请结合课程资料讲解这道题：' + detail.stem +
       '。我的答案是“' + (detail.userAnswer.length > 0 ? detail.userAnswer : '未作答') +
       '”，正确答案是“' + detail.correctAnswer + '”。请指出关键概念和判断步骤。';
     AppStorage.setOrCreate<string>('pendingChatQuestion', question);
+    AppStorage.setOrCreate<string>('pendingChatContextJson', JSON.stringify({
+      courseId: this.courseId,
+      topic: this.topic,
+      question: detail.stem,
+      userAnswer: detail.userAnswer,
+      correctAnswer: detail.correctAnswer,
+      submitted: true
+    }));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';
     });
+  }
+
+  private isDetailExpanded(detail: QuizResultDetail): boolean {
+    const toggled = this.toggledDetailIds.includes(detail.questionId);
+    return detail.isCorrect ? toggled : !toggled;
+  }
+
+  private toggleDetail(questionId: string): void {
+    this.toggledDetailIds = this.toggledDetailIds.includes(questionId) ?
+      this.toggledDetailIds.filter((id: string): boolean => id !== questionId) :
+      [...this.toggledDetailIds, questionId];
+  }
+
+  private firstWrongQuestion(): string {
+    const detail = this.details.find((item: QuizResultDetail): boolean => !item.isCorrect);
+    return detail === undefined ? '' : detail.stem;
   }
 
   private openQuiz(): void {
@@ -337,11 +363,16 @@ struct PracticePage {
       const receipt = await LocalLearningRepository.appendQuizResult(result);
       this.correctCount = totalCorrect;
       this.details = nextDetails;
-      this.expandedDetailId = nextDetails.find((detail: QuizResultDetail): boolean => !detail.isCorrect)?.questionId ?? '';
+      this.toggledDetailIds = [];
       this.applyWriteReceipt(receipt);
       this.message = '';
       this.hasError = false;
       this.submitted = true;
+      try {
+        await LearningFormUpdater.refreshAll();
+      } catch (_) {
+        // 本轮作答已写回，卡片同步失败不改变保存结果。
+      }
     } catch (error) {
       this.message = '答题记录保存失败，请重试';
       this.hasError = true;
@@ -486,6 +517,11 @@ struct PracticePage {
   @Builder
   ResultView() {
     Column({ space: 16 }) {
+      Text('本轮表现')
+        .width('100%')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
       Row({ space: 18 }) {
         Stack({ alignContent: Alignment.Center }) {
           Progress({ value: this.correctCount, total: this.questions.length, type: ProgressType.Ring })
@@ -495,25 +531,63 @@ struct PracticePage {
           Text(Math.round(this.correctCount / this.questions.length * 100).toString() + '%')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
         }
         Column({ space: 5 }) {
           Text('本轮已完成')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           Text(this.correctCount.toString() + ' / ' + this.questions.length.toString() + ' 题正确')
             .fontSize(14)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text(this.correctCount === this.questions.length ? '已全部掌握，可以继续新主题' : '先复盘错题，再进入下一组')
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          Text(this.correctCount === this.questions.length ?
+            '本组全部答对；换一组题再检验理解。' :
+            '本组有 ' + (this.questions.length - this.correctCount).toString() + ' 道题需要澄清。')
             .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
       .padding(18)
+      .backgroundColor(Constants.COLOR_TEXT_PRIMARY)
+      .borderRadius(Constants.RADIUS_LG)
+
+      Column({ space: 8 }) {
+        Text(this.correctCount === this.questions.length ? '下一步' : '待澄清问题')
+          .width('100%')
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(this.correctCount === this.questions.length ?
+          '这组没有错题。用新题检验能否稳定运用本主题。' :
+          this.firstWrongQuestion())
+          .width('100%')
+          .fontSize(14)
+          .lineHeight(22)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        if (this.correctCount < this.questions.length) {
+          Text('先看下方展开的解析，核对判断步骤。')
+            .width('100%')
+            .fontSize(12)
+            .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        }
+        Button(this.correctCount === this.questions.length ? '进入 AI 测验' : '去错题本重练')
+          .width('100%')
+          .height(48)
+          .fontSize(15)
+          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+          .backgroundColor(Constants.COLOR_BRAND)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => {
+            if (this.correctCount < this.questions.length) this.openMistakeBook();
+            else this.openQuiz();
+          })
+      }
+      .width('100%')
+      .padding(16)
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
 
@@ -550,7 +624,8 @@ struct PracticePage {
         .borderRadius(Constants.RADIUS_MD)
       }
 
-      Text('逐题复盘')
+      Text(this.correctCount === this.questions.length ? '逐题复盘 · 正确题默认收起' :
+        '逐题复盘 · 错题默认展开')
         .width('100%')
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
@@ -558,8 +633,8 @@ struct PracticePage {
 
       Column() {
         ForEach(this.details, (detail: QuizResultDetail, index: number): void => {
-          ReviewDetailRow(detail, index, this.expandedDetailId === detail.questionId, (): void => {
-            this.expandedDetailId = this.expandedDetailId === detail.questionId ? '' : detail.questionId;
+          ReviewDetailRow(detail, index, this.isDetailExpanded(detail), (): void => {
+            this.toggleDetail(detail.questionId);
           }, (): void => { this.askTutor(detail); })
           if (index < this.details.length - 1) {
             Divider().color(Constants.COLOR_BORDER).margin({ left: 44 })
@@ -569,26 +644,13 @@ struct PracticePage {
       .width('100%')
       .backgroundColor(Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
-      Row({ space: 10 }) {
-        Button('返回课程')
-          .layoutWeight(1)
-          .height(48)
-          .fontColor(Constants.COLOR_BRAND)
-          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-          .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => { this.getUIContext().getRouter().back(); })
-        Button(this.correctCount < this.questions.length ? '查看错题本' : '进入 AI 测验')
-          .layoutWeight(1)
-          .height(48)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(this.correctCount < this.questions.length ? Constants.COLOR_WARNING : Constants.COLOR_BRAND)
-          .borderRadius(Constants.RADIUS_MD)
-          .onClick((): void => {
-            if (this.correctCount < this.questions.length) this.openMistakeBook();
-            else this.openQuiz();
-          })
-      }
+      Button('返回课程')
         .width('100%')
+        .height(48)
+        .fontColor(Constants.COLOR_BRAND_TEXT)
+        .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+        .borderRadius(Constants.RADIUS_MD)
+        .onClick((): void => { this.getUIContext().getRouter().back(); })
     }
     .width('100%')
   }

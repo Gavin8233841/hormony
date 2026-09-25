@@ -27,6 +27,36 @@ afterEach(() => {
 });
 
 describe("orchestrator 前置检索调度", () => {
+  it("已提交的具体作答优先进入 Evaluator，并给出可执行练习", async () => {
+    process.env.TEST_MODEL_RESPONSE = "学生混淆了遍历访问顺序，应先演练队列变化。";
+    const events: StreamEvent[] = [];
+    await orchestrateStream({
+      userId: "demo", message: "请解释这道题", startDate: "2026-09-25",
+      context: { courseId: "cs101", topic: "图的表示与遍历", question: "BFS 的访问顺序？",
+        userAnswer: "深度优先", correctAnswer: "广度优先", submitted: true },
+    }, (event) => events.push(event));
+
+    expect(events).toContainEqual({ type: "thinking", agent: "Evaluator" });
+    expect(events).toContainEqual({ type: "action", action: {
+      kind: "practice", courseId: "cs101", topic: "图的表示与遍历",
+      title: "练习图的表示与遍历", reason: "依据刚提交的本轮作答，做一组针对性练习",
+    } });
+    expect(events.at(-1)).toMatchObject({ type: "done" });
+  });
+
+  it("未提交题目只给提示，不进入评估或引用正确答案", async () => {
+    process.env.TEST_MODEL_RESPONSE = "先观察队列中最早进入的节点。";
+    const events: StreamEvent[] = [];
+    await orchestrateStream({
+      userId: "demo", message: "给我一个提示", startDate: "2026-09-25",
+      context: { courseId: "cs101", topic: "图的表示与遍历", question: "BFS 下一步访问谁？",
+        userAnswer: "节点 C", submitted: false },
+    }, (event) => events.push(event));
+
+    expect(events).toContainEqual({ type: "thinking", agent: "Tutor" });
+    expect(events.some((event) => event.type === "thinking" && event.agent === "Evaluator")).toBe(false);
+    expect(events).toContainEqual({ type: "action", action: expect.objectContaining({ kind: "lesson" }) });
+  });
   it("计划意图不应执行通用前置检索", async () => {
     process.env.TEST_MODEL_RESPONSE = JSON.stringify([
       {
