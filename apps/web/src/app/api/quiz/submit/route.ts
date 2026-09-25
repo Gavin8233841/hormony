@@ -118,7 +118,7 @@ export async function POST(req: Request) {
     let evaluation = "";
     let weakTopics: string[] = [];
     try {
-      const evalResult = await runEvaluatorAgent(userId.value, evaluatorInput);
+      const evalResult = await runEvaluatorAgent(evaluatorInput);
       evaluation = evalResult.content;
     } catch (err) {
       console.error("[quiz/submit] evaluator error:", err instanceof Error ? err.message : String(err));

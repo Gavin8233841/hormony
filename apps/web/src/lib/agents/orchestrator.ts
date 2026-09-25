@@ -178,13 +178,13 @@ async function routeMainAgent(
       break;
     case "evaluate":
       emit?.({ type: "thinking", agent: "Evaluator" });
-      mainResult = await runEvaluatorAgent(req.userId,
+      mainResult = await runEvaluatorAgent(
         req.context?.submitted === true && req.context.question !== undefined &&
           req.context.userAnswer !== undefined && req.context.correctAnswer !== undefined ? [{
             question: req.context.question,
             userAnswer: req.context.userAnswer,
             correctAnswer: req.context.correctAnswer,
-          }] : [], req.profile, signal, req.context?.courseId);
+          }] : [], req.profile, signal, req.context?.courseId, req.message);
       break;
     case "tutor":
     case "general":
@@ -241,7 +241,7 @@ function nextAction(req: ChatRequest, intent: Intent): ChatAction | undefined {
     intent === "evaluate" && req.context?.submitted === true ? "practice" : "lesson";
   const title = kind === "quiz" ? `开始${topic}测验` :
     kind === "practice" ? `练习${topic}` : `学习${topic}`;
-  const reason = kind === "practice" ? "依据刚提交的本轮作答，做一组针对性练习" :
+  const reason = kind === "practice" ? "再做一组本主题练习，检查刚才的错因" :
     kind === "quiz" ? "在专用测验页生成并提交题目" : "打开课程内容，先整理概念和解题步骤";
   return { kind, courseId, topic, title, reason };
 }

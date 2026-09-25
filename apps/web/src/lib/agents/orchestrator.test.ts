@@ -39,7 +39,7 @@ describe("orchestrator 前置检索调度", () => {
     expect(events).toContainEqual({ type: "thinking", agent: "Evaluator" });
     expect(events).toContainEqual({ type: "action", action: {
       kind: "practice", courseId: "cs101", topic: "图的表示与遍历",
-      title: "练习图的表示与遍历", reason: "依据刚提交的本轮作答，做一组针对性练习",
+      title: "练习图的表示与遍历", reason: "再做一组本主题练习，检查刚才的错因",
     } });
     expect(events.at(-1)).toMatchObject({ type: "done" });
   });

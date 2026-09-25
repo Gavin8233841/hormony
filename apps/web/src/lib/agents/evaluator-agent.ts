@@ -12,27 +12,27 @@ interface AnswerRecord {
 }
 
 export async function runEvaluatorAgent(
-  userId: string,
   answers: AnswerRecord[],
   profile?: LearningProfileSnapshot,
   signal?: AbortSignal,
-  courseId?: string
+  courseId?: string,
+  studentQuestion?: string
 ): Promise<AgentResult> {
-  // 模式 1：有答题记录 → 详细错题分析
+  // 模式 1：有答题记录 → 针对实际作答反馈
   if (answers.length > 0) {
-    return analyzeAnswers(userId, answers, signal, courseId);
+    return analyzeAnswers(answers, signal, courseId, studentQuestion);
   }
 
   // 模式 2：无答题记录 → 基于画像的薄弱点分析
   return analyzeProfile(profile, signal);
 }
 
-// 基于答题记录的详细分析
+// 基于答题记录反馈
 async function analyzeAnswers(
-  userId: string,
   answers: AnswerRecord[],
   signal?: AbortSignal,
-  courseId?: string
+  courseId?: string,
+  studentQuestion?: string
 ): Promise<AgentResult> {
   const correct = answers.filter((a) => a.userAnswer.trim().toUpperCase() === a.correctAnswer.trim().toUpperCase()).length;
   const accuracy = answers.length > 0 ? correct / answers.length : 0;
@@ -51,35 +51,11 @@ async function analyzeAnswers(
     }
   }
 
-  const systemPrompt = `你是一位资深学习诊断专家，擅长分析学生的错题模式并给出精准的改进建议。
+  const systemPrompt = `你是大学课程学伴。根据实际作答，用自然、简短的中文回应学生。
+单题先回答学生的问题，指出答案中一个具体差异及原因，再给一个能立刻完成的练习。多题只归纳最重要的一个共性问题，举一道题说明，再给一个练习。全部正确时说明做对的关键点，并给一个进阶练习。
+只依据题目条件、作答和提供的资料判断；不要推测学生的学习能力或心理，也不要编造教材章节。最多三句话，不写标题、报告、分类、百分比或建议清单。`;
 
-请按以下结构输出分析报告：
-
-【总体表现】
-正确率评价和总体表现描述。
-
-【错题分类】
-将错题分为以下类别：
-- 概念误解：对核心概念理解有偏差
-- 粗心失误：思路正确但执行出错
-- 知识盲区：完全未掌握的知识点
-- 混淆易错：相似概念混淆
-
-【薄弱知识点】
-列出需要重点复习的知识点（2-5个）。
-
-【复习建议】
-针对每个薄弱知识点给出具体的复习建议，包括：
-1. 推荐复习的资料章节
-2. 建议练习的题型
-3. 学习方法建议
-
-【下一步行动】
-给出 2-3 个可操作的下一步学习行动。`;
-
-  const userPrompt = `学生ID：${userId}
-正确率：${(accuracy * 100).toFixed(0)}%（${correct}/${answers.length}）
-
+  const userPrompt = `${studentQuestion ? `学生的问题：${studentQuestion}\n\n` : ""}本次答对 ${correct}/${answers.length} 题。
 答题记录：
 ${answers.map((a, i) => {
   const isCorrect = a.userAnswer.trim().toUpperCase() === a.correctAnswer.trim().toUpperCase();
@@ -90,13 +66,13 @@ ${relatedKnowledge ? `相关参考资料：\n${relatedKnowledge}` : ""}`;
 
   const content = await callModel(systemPrompt, userPrompt, {
     temperature: 0.3,
-    maxTokens: 2048,
+    maxTokens: 512,
     signal,
   });
 
   return {
     agent: "Evaluator",
-    content: `## 学习诊断报告\n\n正确率：${(accuracy * 100).toFixed(0)}%（${correct}/${answers.length}）\n\n${content}`,
+    content,
     citations,
     metadata: { accuracy, correct, total: answers.length, wrongCount: wrongAnswers.length },
   };

@@ -16,13 +16,9 @@ export async function runTutorAgent(
 ): Promise<AgentResult> {
   const profile = getProfileContext(profileSnapshot);
 
-  const systemPrompt = `你是一位耐心的大学课程辅导老师。根据学生画像和检索到的课程资料回答问题。
-要求：
-1. 优先依据提供的课程资料作答，并在回答末尾标注资料来源
-2. 如资料不足，明确说明并基于通用知识补充
-3. 针对学生的薄弱知识点给予针对性讲解
-4. 语言清晰、结构化，适合大学生理解
-5. 结合对话历史，保持上下文连贯，避免重复已解答的内容`;
+  const systemPrompt = `你是大学课程学伴。先回答学生当前的问题，像面对面讲题一样说清关键一步。
+优先依据课程资料和题目条件；资料不足时说明无法确认，不编造来源。题目尚未提交时只给一个思考提示，不直接说出答案。
+通常用两到四个短句，不写标题、报告或建议清单，不复述画像与对话历史。资料来源会由界面另行展示，正文不用重复列出。`;
 
   const userPrompt = `学生画像：${JSON.stringify(profile)}
 课程资料：
@@ -42,12 +38,12 @@ ${ragContext || "（无相关资料）"}
   const content = recentHistory.length > 0
     ? await callModelWithHistory(systemPrompt, userPrompt, recentHistory, {
         temperature: 0.3,
-        maxTokens: 1024,
+        maxTokens: 512,
         signal,
       })
     : await callModel(systemPrompt, userPrompt, {
         temperature: 0.3,
-        maxTokens: 1024,
+        maxTokens: 512,
         signal,
       });
 
