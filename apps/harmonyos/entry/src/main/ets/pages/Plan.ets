@@ -206,7 +206,7 @@ struct PlanPage {
       this.hasError = false;
     } catch (e) {
       if (this.planReadRunId !== readRunId || this.loading) return;
-      this.message = '本机计划读取失败，请重新读取';
+      this.message = '计划加载失败，请重试';
       this.hasError = true;
       this.retryAction = 'load';
     } finally {
@@ -433,7 +433,7 @@ struct PlanPage {
   }
 
   private planSavedMessage(): string {
-    return '计划已保存到本机，首页已更新；已发起服务卡片更新';
+    return '计划已保存';
   }
 
   private async persistGeneratedPlan(plan: AgentStudyPlan): Promise<boolean> {
@@ -441,7 +441,7 @@ struct PlanPage {
       await LocalLearningRepository.savePlan(plan);
     } catch (_) {
       const retained = this.tasks.length > 0 ? '；' + this.savedPlanLabel() + '仍可继续执行' : '';
-      this.message = '计划已生成，但未能保存到本机' + retained;
+      this.message = '计划保存失败' + retained;
       this.hasError = true;
       this.retryAction = 'save';
       this.clearErrorEvidence();

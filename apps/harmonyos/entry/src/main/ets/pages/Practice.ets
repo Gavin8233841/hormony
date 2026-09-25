@@ -597,7 +597,7 @@ struct PracticePage {
             SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
               .fontSize(18)
               .fontColor([Constants.COLOR_SUCCESS])
-            Text('本机学习闭环已更新')
+            Text('练习结果已保存')
               .fontSize(15)
               .fontWeight(FontWeight.Bold)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)

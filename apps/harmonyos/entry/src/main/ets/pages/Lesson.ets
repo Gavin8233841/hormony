@@ -496,10 +496,10 @@ struct LessonPage {
   private currentLearningFocus(): string {
     if (this.hasBfsGraphSource() && this.showIntroExperience()) return '试着找出下一个出队的顶点。';
     if (this.hasBfsGraphSource() && this.showPracticeExperience()) {
-      return this.activeActivityIndex === 0 ? '先写 DFS 输出，再逐步对照。' : '排列 BFS 的通用步骤。';
+      return this.activeActivityIndex === 0 ? '写出 DFS 的访问顺序。' : '排列 BFS 的通用步骤。';
     }
-    if (this.showIntroExperience()) return '先建立概念图，再用现实案例落地。';
-    if (this.showPracticeExperience()) return '看一遍分步示例，再亲手做题验证。';
+    if (this.showIntroExperience()) return '看一个例子，弄清这个概念。';
+    if (this.showPracticeExperience()) return '试着完成这道题。';
     return '把正文拆成判断点，逐条确认自己是否能复述。';
   }
 
@@ -845,7 +845,7 @@ struct LessonPage {
   private DfsGraphExperience(activity: LearningActivity) {
     Column({ space: 12 }) {
       this.GraphBoard(true)
-      Text('按邻接表升序，从 0 递归访问；先写输出序列，再逐步核对。')
+      Text('从 0 开始，按邻接表升序访问。写出输出序列。')
         .width('100%')
         .fontSize(14)
         .lineHeight(23)
@@ -990,14 +990,14 @@ struct LessonPage {
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
         }
-        Text('只读状态演算')
+        Text('看代码怎么运行')
           .fontSize(11)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      Text('按课程内容给定的“入口 → 状态 → 出口”展示变化；不执行输入内容，也不连接代码沙盒。')
+      Text('观察变量和指针如何变化。')
         .width('100%')
         .fontSize(12)
         .lineHeight(19)
@@ -1620,7 +1620,7 @@ struct LessonPage {
                 SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
                   .fontSize(18)
                   .fontColor([Constants.COLOR_BRAND])
-                Text('先抓住核心')
+                Text('这节讲什么')
                   .fontSize(13)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(Constants.COLOR_BRAND_TEXT)

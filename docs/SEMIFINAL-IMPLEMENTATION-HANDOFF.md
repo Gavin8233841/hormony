@@ -211,6 +211,8 @@ Pura X View 竖屏 1320×2232，安装的是提交 `b5c3e10` 对应的未签名 
 
 ## 13. 9/25 Preview 部署阻塞（12:40 CST）
 
+本节记录当时失败现场；身份配置及部署状态已按第 16 节更新。
+
 已推送的 `b5c3e10d451b1f6ccacdbdf72731391122153874` 在 GitHub 上产生 Vercel `Preview` deployment `6653572025`，但状态为 `failure`、说明 `Deployment was blocked`。GitHub 的 Vercel commit status 同为 `failure`，目标是 GWYY 团队对提交作者 GitHub 账号 `DostiAziz` 的邀请页面。`Vercel Preview Comments` check 显示 success 只代表评论检查通过，不代表部署可用。不能把返回的 Preview URL 当作新 API 已上线。
 
 进一步核对 GitHub API：该提交的作者和提交者字段均为 `郭泳延 <Admin@MacBook-Pro.local>`，GitHub 将该邮箱关联到 `DostiAziz`；仓库此前提交使用 `Gavin8233841 <guo8233841@gmail.com>`。本次提交由当前实施过程生成，当时未设仓库级 Git 邮箱，回退成了本机邮箱。这是提交身份配置问题，不能据此判断陌生账号参与开发、获得仓库权限或应被邀请进 Vercel。当前 GitHub 登录账号仍为 `Gavin8233841`，查询 `DostiAziz` 对私有仓库的权限为 `none`。
@@ -238,6 +240,14 @@ Codex 保存项目现已由用户改到 `/Users/Admin/Desktop/Hormony`，但 `li
 3. 五屏压实：首页首屏直接看到当前学习动作；计划今天优先；Lesson 图和预测操作尽量同屏；Chat 回答与下一步优先、技术过程默认折叠；结果聚焦本轮表现、错题和唯一补学动作。沿用 ArkUI 原生组件与现有设计令牌，改善层级、留白和信息密度，不以装饰动画替代交互。
 4. 第 14 节文案整治与上述交互同时完成。正式录制前用最终 HAP 检查主要屏幕、字号与截断；断网、取消、重试和重复点击在功能稳定后集中回归。
 
-**P1，建立扩科与外部题源能力，不挤占复赛闭环。** 财务会计先做一个“交易→分录→报表影响”原创案例试点，英语先做一个“阅读证据→推断→迁移题”试点；分别确认课程目标、来源许可、题目答案与评价方式，再决定是否进主线。外部题库优先接权利明确、答案可核验的小题包；记录来源、版本、适用课程/主题和题目质量，不开放抓取或直接复制第三方练习。OpenStax 财务会计页当前提示生成式 AI 使用须另得书面许可，只能先作外链/研究，不纳入 RAG；British Council 分级阅读可作为站外资源候选，复制与模型摄入未获核实授权。
+**P1，建立扩科与外部题源能力，不挤占复赛闭环。** 财务会计先做一个“交易→分录→报表影响”原创案例试点，英语先做一个“阅读证据→推断→迁移题”试点；分别确认课程目标、来源许可、题目答案与评价方式，再决定是否进主线。外部题库优先接权利明确、答案可核验的小题包；记录来源、版本、适用课程/主题和题目质量，不开放抓取或直接复制第三方练习。[OpenStax 财务会计页](https://openstax.org/books/principles-financial-accounting/pages/preface)当前提示生成式 AI 使用须另得书面许可，只能先作外链/研究，不纳入 RAG；[British Council 分级阅读](https://learnenglish.britishcouncil.org/free-resources/reading)可作为站外资源候选，复制与模型摄入未获核实授权。
 
 验收顺序：先证明两种作答引发不同下一步及回写，再证明外链入口和返回检查，随后做五屏体验及教学案例，最后产出同版本 PDF/视频/源码包。当前生成器核对 Web 唯一源与端侧产物为 **165 题**；`apps/web/src/lib/data/index.ts` 原“186”注释是旧数，已改正。36 条资源的旧访问记录不等于当前链接全部可用。
+
+## 16. 9/25 提交身份与 Preview 状态更新
+
+仓库级 Git 作者已设置为此前合法提交使用的 `Gavin8233841 <guo8233841@gmail.com>`，没有改全局配置或已推送历史。新提交 `8021d6c8b0c4df0fddc16722820a00c2d4271d72` 在 GitHub 的作者与提交者均关联 `Gavin8233841`；Vercel Preview deployment `6654188982` 状态为 `success`、说明 `Deployment has completed`。原 `DostiAziz` 身份拦截已解除。
+
+Preview 地址 `https://hormony-jymx3ippv-gwyy8233841.vercel.app` 当前受 Vercel 登录保护；未认证请求访问 `/api/health` 最终收到 `vercel.com/login` 的 HTML，不能将 HTTP 200 登录页认作 API 通过。需要项目账号的受限访问方式后再测新 Chat/Evaluator/action SSE，且不应为了测试公开整个项目。
+
+主演示路径的静态文案已做第二批精简：Chat 让回答和行动先于技术过程显示；首页主卡压缩；Lesson、Plan、Practice、Quiz 删除开发/验收式措辞。Pura X View 模拟器的 Chat UI 树显示回答正文先于过程卡，截图 `.runtime/semifinal-copy-chat-answer-first-20260925b.png`。此项仍须在真实新回答、五屏截图及学生短任务中复核，不能仅凭旧会话宣布全部完成；模型输出本身也需要减少报告式长文，待可访问新版 API 后校准提示与案例。

@@ -332,7 +332,7 @@ struct QuizPage {
         this.message = '当前主题暂时没有可用题目';
         this.hasError = true;
       } else {
-        this.message = '题目已生成，完成后会按标签记录到本机';
+        this.message = '题目准备好了';
         this.hasError = false;
       }
     } catch (e) {
@@ -728,10 +728,10 @@ struct QuizPage {
   private quizErrorMessage(error: Error): string {
     const message = error.message;
     if (message.includes('MODEL_INVALID_RESPONSE')) {
-      return '这组 AI 题目格式没过校验，答案不会保存。请点重试重新生成。';
+      return '题目生成失败，请重试。';
     }
     if (message.includes('MODEL_TIMEOUT')) {
-      return 'AI 出题超时了，当前主题和难度已保留，请稍后重试。';
+      return '题目准备超时，请重试。';
     }
     if (message.includes('KNOWLEDGE_UNAVAILABLE')) {
       return '当前主题缺少课程资料，请换一个主题或先学习相关课程。';
@@ -773,7 +773,7 @@ struct QuizPage {
     if (this.progressStep >= 3) return '正在装配题组';
     if (this.progressStep === 2) return '正在校验题目结构';
     if (this.progressStep === 1) return '正在控制难度与题型';
-    return '正在检索课程依据';
+    return '正在查找课程内容';
   }
 
   private generationSubtitle(): string {
@@ -810,7 +810,7 @@ struct QuizPage {
           .backgroundColor(Constants.COLOR_BRAND)
           .borderRadius(21)
         Column({ space: 4 }) {
-          Text('AI 正在生成题组')
+          Text('正在准备题目')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
@@ -942,7 +942,7 @@ struct QuizPage {
               .fontSize(13)
               .fontWeight(FontWeight.Medium)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text('AI 会围绕这个薄弱标签出题，完成后继续写入标签画像')
+            Text('多练这类知识点')
               .fontSize(11)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
           }
@@ -1087,7 +1087,7 @@ struct QuizPage {
   QuestionState() {
     Column({ space: 16 }) {
       if (!this.currentQuestionReady()) {
-        Text('题目状态异常，请重新生成')
+        Text('题目加载失败')
           .width('100%')
           .fontSize(18)
           .fontWeight(FontWeight.Bold)

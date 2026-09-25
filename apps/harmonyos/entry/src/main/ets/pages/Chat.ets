@@ -218,8 +218,8 @@ export struct ChatContent {
 
   private sendButtonHint(): string {
     if (this.loading) return '学伴正在回答，点击右侧按钮可停止';
-    if (this.historyLoading) return '正在恢复本机会话';
-    if (this.historySaving) return '正在把回答保存到本机';
+    if (this.historyLoading) return '正在加载对话';
+    if (this.historySaving) return '正在保存对话';
     if (this.historyMessage.length > 0) return this.historyMessage;
     if (this.probing) return '正在连接云端学伴';
     if (!this.cloudAgentReady) return '云端未连接，点击右侧按钮重试';
@@ -579,7 +579,7 @@ export struct ChatContent {
     if (msg.content.length > 0) return '回答已生成';
     const index = this.answerProgressIndex(msg);
     if (index >= 2) return '正在组织讲解';
-    if (index === 1) return '正在查找课程依据';
+    if (index === 1) return '正在查找相关课程内容';
     return '正在理解你的问题';
   }
 
@@ -742,7 +742,7 @@ export struct ChatContent {
           .fontSize(28)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('基于课程资料，为每个问题给出依据')
+        Text('课程有疑问，来这里聊聊')
           .fontSize(14)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ top: 6 })
@@ -1278,12 +1278,12 @@ export struct ChatContent {
 
   private agentLabel(agent: string): string {
     if (agent === 'Profile') return '理解你的学习情况';
-    if (agent === 'Retrieval') return '查找课程依据';
+    if (agent === 'Retrieval') return '查找课程内容';
     if (agent === 'Tutor') return '组织讲解';
     if (agent === 'Planner') return '拆解学习路径';
     if (agent === 'Quiz') return '生成练习';
     if (agent === 'Evaluator') return '定位薄弱点';
-    if (agent === 'Safety') return '核对安全与依据';
+    if (agent === 'Safety') return '检查回答';
     return agent;
   }
 
@@ -1383,10 +1383,6 @@ export struct ChatContent {
             .borderRadius(16)
 
           Column() {
-            if (msg.thinking.length > 0 || msg.agentTrace.length > 0 || msg.streaming) {
-              this.AnswerProcessCard(msg)
-            }
-
             if (msg.content.length > 0) {
               Column() {
                 this.MarkdownContent(this.readableMarkdown(msg.content), msg.failed)
@@ -1401,6 +1397,10 @@ export struct ChatContent {
             if (msg.action !== null && !msg.streaming && !msg.failed && !msg.cancelled &&
               msg.content.length > 0) {
               this.ActionCard(msg.action)
+            }
+
+            if (msg.thinking.length > 0 || msg.agentTrace.length > 0 || msg.streaming) {
+              this.AnswerProcessCard(msg)
             }
 
             if (msg.failed || msg.cancelled) {
@@ -1470,7 +1470,7 @@ export struct ChatContent {
   @Builder
   ActionCard(action: ChatAction) {
     Column({ space: 8 }) {
-      Text('建议的下一步')
+      Text('接下来')
         .fontSize(12)
         .fontColor(Constants.COLOR_TEXT_SECONDARY)
       Text(action.title)

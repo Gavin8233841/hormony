@@ -7912,3 +7912,11 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：Web `pnpm lint && pnpm typecheck && pnpm test && pnpm build` exit 0，36 文件、482/482；`node scripts/generate-quizzes-json.mjs --check` exit 0，165 道源/产物一致；`node scripts/test-proactive-learning-service.mjs` exit 0，24/24；API 12 增量 HAP 构建 exit 0，未签名 HAP SHA-256 `429058fc87e679b09f3147fc0ac8d88d93bd7d7c7a5825b30792217a4ac0384f`。Pura X View 模拟器安装/启动成功，首页 UI 树显示“今天学什么”，截图 `.runtime/semifinal-copy-home-compact-20260925.png` 目视核对主卡高度及今日计划。`git diff --check` exit 0。
 
 未验证：本批未重新跑 64 项完整冒烟、Chat 新后端联调或其他屏幕的模拟器逐页视觉；外部资源没有接入页面，财会/英语没有进入主线。源码版 Preview 是否解除阻塞以 GitHub/Vercel 新提交的实际状态为准；没有正式部署或竞赛提交。
+
+---
+
+## 2026-09-25 [MAIN] Preview 身份解除与学生文案第二批
+
+提交 `8021d6c` 推送后，GitHub API 显示 author/committer 均为 `Gavin8233841`；对应 Vercel Preview deployment `6654188982` 状态 `success`。旧 `DostiAziz` 作者关联问题不再阻断构建。Preview `/api/health` 的未认证请求被重定向至 `vercel.com/login`，响应是 HTML 登录页，不能当新接口通过；需项目账号访问后联调。
+
+本批继续删去主页演示路径中的“依据/闭环/校验”等内部话术，精简 Chat、Lesson、Plan、Practice、Quiz 的标题、等待态和反馈。Chat 消息把回答与行动放在过程卡前，旧对话在 Pura X View 模拟器的实时 UI 树和截图 `.runtime/semifinal-copy-chat-answer-first-20260925b.png` 中已显示回答先于过程；这不代表新模型回答的语气已校准。HAP 增量构建 exit 0，未签名产物 SHA-256 `9f5240e035a4f9f895000fb67302f2ca426349bf1cf8d3111c6e97ebb652eb18`。其他既有未提交脚本、审计文档和截图未改动。
