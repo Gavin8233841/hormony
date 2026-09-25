@@ -8037,3 +8037,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 ### 涉及文件与边界
 
 `AGENTS.md`、`DEVLOG.md`、`apps/harmonyos/entry/src/main/ets/pages/{Chat,HomeContent,Lesson,Plan,Practice,Quiz}.ets`、`scripts/test-product-experience-contracts.mjs`、`scripts/test-proactive-delivery-contracts.mjs`。知识检索标签及其契约文件仍待归属协调；未触发新的在线计划或测验生成，真机与签名包未验证。保留其他任务已有未提交文件。
+
+---
+
+## [2026-09-25T10:49:28Z] [2026-09-25 18:49:28 CST] 模型: Codex (GPT-6)
+
+### 操作
+
+知识资料页将失效主题提示和发给学伴的预填问题改为学生能读懂的语言，保留搜索词、课程主题、来源和原文段落。删去已不被页面调用的检索分数显示函数，避免把相关度百分比误当成资料正确率。证据标签“检索词命中／Topic 关联”仍被另一任务的未提交契约精确断言，本批不改该文件及对应标签。
+
+### 验证与文件
+
+`scripts.test_knowledge_navigation_contract` 8/8；API 12 增量 `assembleHap` exit 0，最终未签名 HAP 已安装至 Pura X View，未触发新的在线检索。涉及 `apps/harmonyos/entry/src/main/ets/pages/Knowledge.ets` 与 `DEVLOG.md`；其他未提交文件保留。

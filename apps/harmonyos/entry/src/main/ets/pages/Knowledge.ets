@@ -131,16 +131,6 @@ struct KnowledgePage {
     return { label: '课程资料摘要', text: this.firstSentence(item.text) };
   }
 
-  private scoreLabel(item: KnowledgeChunk): string {
-    if (item.score === undefined || typeof item.score !== 'number') return '课程资料';
-    const score = Math.max(0, Math.min(item.score, 1));
-    return '相关度 ' + (score * 100).toFixed(0) + '%';
-  }
-
-  private hasNumericScore(item: KnowledgeChunk): boolean {
-    return item.score !== undefined && typeof item.score === 'number';
-  }
-
   private validCourseResult(item: KnowledgeChunk): boolean {
     if (typeof item.text !== 'string' || typeof item.source !== 'string') return false;
     if (item.text.trim().length === 0 || item.source.trim().length === 0) return false;
@@ -166,7 +156,7 @@ struct KnowledgePage {
   private startTopicQuiz(): void {
     const topic = this.resultTopic();
     if (topic.length === 0) {
-      this.message = '检索结果未对应当前课程的正式主题，无法开始测验';
+      this.message = '课程主题已变化，请重新搜索';
       this.hasError = true;
       return;
     }
@@ -182,11 +172,12 @@ struct KnowledgePage {
   private askTutor(item: KnowledgeChunk): void {
     const topic = this.exactTopic(item);
     const evidence = this.evidenceFor(item);
-    const context = topic.length > 0 ? '课程 Topic 是“' + topic + '”' : '当前结果没有精确 Topic';
+    const context = topic.length > 0 ? '对应课程主题“' + topic + '”' : '这条资料暂无对应的课程主题';
+    const label = evidence.label === '课程资料摘要' ? '资料摘要' : '相关段落';
     AppStorage.setOrCreate<string>('pendingChatQuestion',
-      '我在“' + this.courseTitle + '”中检索“' + this.resultQuery + '”时读到以下课程资料，' + context +
-        '。请只结合这段资料解释关键概念，给出一个例子和两个主动回忆问题。来源：' + item.source.trim() +
-        '。匹配依据（' + evidence.label + '）：' + evidence.text);
+      '请解释这段课程资料，举一个例子，再出两道自测题。课程：' + this.courseTitle +
+        '；搜索词：' + this.resultQuery + '；' + context + '。来源：' + item.source.trim() +
+        '。' + label + '：' + evidence.text);
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'KnowledgePage Chat router.pushUrl failed: %{public}s', err.message);
