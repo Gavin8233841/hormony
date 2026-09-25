@@ -27,7 +27,7 @@ export struct HomeContent {
   @State nextActionKind: string = 'course';
   @State nextActionBadge: string = '继续';
   @State nextActionTitle: string = '继续当前课程';
-  @State nextActionSubtitle: string = '从课程页进入主题学习、练习和 AI 测验';
+  @State nextActionSubtitle: string = '挑一个主题开始学';
   @State nextActionCta: string = '进入课程';
   @State nextActionCourseId: string = 'cs101';
   @State nextActionCourseTitle: string = '数据结构';
@@ -35,7 +35,7 @@ export struct HomeContent {
   @State nextActionFocusTag: string = '';
   @State nextActionTaskAction: string = '';
   @State nextActionTargetPage: string = 'pages/Index';
-  @State nextActionEvidence: string = '正在读取本机学习状态';
+  @State nextActionEvidence: string = '';
   @State nextActionProgressText: string = '等待同步';
   @State nextActionLoading: boolean = true;
   @State nextActionReady: boolean = false;
@@ -103,7 +103,7 @@ export struct HomeContent {
         this.planTasks = nextTasks;
         this.reminderAction = null;
         this.reminderActionRunId = -1;
-        this.taskUpdateMessage = receipt.task.done === true ? '任务已完成并保存到本机' : '任务已恢复为待完成';
+        this.taskUpdateMessage = receipt.task.done === true ? '任务已完成' : '已改为待完成';
       } catch (e) {
         this.taskUpdateMessage = '任务状态保存失败，请重试';
         this.taskUpdateFailed = true;
@@ -280,7 +280,7 @@ export struct HomeContent {
     this.getUIContext().getRouter().pushUrl({ url: this.nextActionTargetPage }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'HomeContent proactive action navigation failed: %{public}s', err.message);
-      this.nextActionNavigationMessage = '暂时无法打开下一步，请重试';
+      this.nextActionNavigationMessage = '暂时无法打开学习内容，请重试';
     });
   }
 
@@ -490,7 +490,8 @@ export struct HomeContent {
           .fontColor(Constants.COLOR_MAP_CORE)
           .maxLines(2)
 
-        Text(this.nextActionEvidence + ' · ' + this.nextActionSubtitle)
+        Text(this.nextActionEvidence.length > 0 ?
+          this.nextActionEvidence + ' · ' + this.nextActionSubtitle : this.nextActionSubtitle)
         .width('100%')
           .fontSize(12)
           .lineHeight(19)

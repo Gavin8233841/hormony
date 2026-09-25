@@ -90,10 +90,10 @@ struct ResourceLibraryPage {
     if (resource === undefined) return;
     const topicText = this.topic.length > 0 ? '，正在学“' + this.topic + '”' : '';
     AppStorage.setOrCreate<string>('pendingChatQuestion',
-      '我看了“' + resource.title + '”' + topicText +
-        '。先问问我理解了什么，再出一道小题。');
+      '我刚读了《' + resource.title + '》' + topicText +
+        '。问我一道小题，看看我是否理解了。');
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
-      this.message = '老师暂时打不开，请重试';
+      this.message = '暂时无法打开学伴，请重试';
     });
   }
 

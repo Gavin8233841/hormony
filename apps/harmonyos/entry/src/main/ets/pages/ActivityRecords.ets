@@ -207,7 +207,7 @@ struct ActivityRecordsPage {
   private activityOverviewAccessibilityText(): string {
     return '近 4 周学习节奏，连续 ' + this.streakDays.toString() + ' 天，' +
       this.activeDaysCount().toString() + ' 天有学习，共 ' + this.recentEventCount().toString() +
-      ' 条本机学习事件，记录最多：' + this.bestDayLabel();
+      ' 次学习，学习最多的日期：' + this.bestDayLabel();
   }
 
   private activityDayColor(day: ActivityDay): string {
@@ -448,7 +448,7 @@ struct ActivityRecordsPage {
           .backgroundColor(Constants.COLOR_BG_SKELETON)
           .borderRadius(Constants.RADIUS_LG)
           .accessibilityGroup(true)
-          .accessibilityText('正在读取本机学习记录')
+          .accessibilityText('正在加载学习记录')
       } else if (this.events.length === 0) {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.clock')).fontSize(38).fontColor([Constants.COLOR_TEXT_PLACEHOLDER])

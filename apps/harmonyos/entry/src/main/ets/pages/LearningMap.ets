@@ -435,7 +435,7 @@ struct LearningMapPage {
 
   private nextActionDescription(node: MapNode): string {
     const target = this.nextActionTarget(node);
-    if (target === null) return '暂时无法找到下一步课程';
+    if (target === null) return '暂时没有可继续的课程';
     if (target.id !== node.id) {
       const action = this.nextActionUsesPractice(node) ? '练习' : '学习';
       return this.isReachableSuccessor(node, target) ? '接着' + action + ' ' + target.topic :
@@ -450,7 +450,7 @@ struct LearningMapPage {
   private runNextAction(node: MapNode): void {
     const target = this.nextActionTarget(node);
     if (target === null) {
-      this.message = '暂时无法找到下一步课程';
+      this.message = '暂时没有可继续的课程';
       return;
     }
     if (this.nextActionUsesPractice(node)) this.openPractice(target.topic);
@@ -509,7 +509,7 @@ struct LearningMapPage {
           .borderRadius(Constants.RADIUS_MD)
           .onClick((): void => { this.selectCourse(course); })
           .accessibilityText(course.title + (this.selectedCourseId === course.id ? '，已选择' : '，未选择'))
-          .accessibilityDescription('切换后读取该课程的本机掌握状态与先修关系')
+          .accessibilityDescription('切换课程，查看主题和学习进度')
       })
     }
     .width('100%')
@@ -637,7 +637,7 @@ struct LearningMapPage {
         })
         .accessibilityGroup(true)
         .accessibilityText(this.nodeAccessibilityText(node))
-        .accessibilityDescription('选择后查看真实掌握依据与下一步动作')
+        .accessibilityDescription('选择后查看主题状态和练习入口')
       })
     }
     .width(this.canvasWidth)
@@ -748,7 +748,7 @@ struct LearningMapPage {
     .accessibilityGroup(true)
     .accessibilityText(this.selectedCourseTitle + '学习星图，已掌握' + this.masteredCount().toString() +
       '个，共' + this.nodes.length.toString() + '个主题，当前推荐' + this.nextTopicLabel())
-    .accessibilityDescription('数据来自本机测验掌握记录、课程学习进度与课程先修关系')
+    .accessibilityDescription('显示这门课的主题和已保存的学习进度')
   }
 
   build() {
@@ -791,7 +791,7 @@ struct LearningMapPage {
               .backgroundColor(Constants.COLOR_BG_SKELETON)
               .borderRadius(Constants.RADIUS_LG)
               .accessibilityGroup(true)
-              .accessibilityText('正在读取本机学习星图')
+              .accessibilityText('正在加载学习星图')
           } else if (this.nodes.length === 0) {
             Column({ space: 14 }) {
               Text(this.message.length > 0 ? this.message : '还没有可展示的课程主题')
@@ -806,7 +806,7 @@ struct LearningMapPage {
                   .backgroundColor(Constants.COLOR_BRAND)
                   .borderRadius(Constants.RADIUS_MD)
                   .onClick((): void => { this.retryMapLoad(); })
-                  .accessibilityText('重新读取本机学习星图')
+                  .accessibilityText('重新加载学习星图')
               }
             }
             .width('100%')

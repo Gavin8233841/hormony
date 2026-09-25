@@ -309,21 +309,20 @@ test('已掌握节点只在全部可达后继掌握后才回到自身复习', ()
     '  private masteryLabel(node: MapNode): string {',
     '\n  private masteredCount(');
   const masteredLabelBranch = masteryLabel.indexOf('if (node.mastery !== null && node.mastery.mastered)');
+  const practicedLockedBranch = masteryLabel.indexOf('if (node.mastery !== null && !node.unlocked)');
   const lockedLabelBranch = masteryLabel.indexOf('if (!node.unlocked)');
-  assert.equal(masteredLabelBranch >= 0 && lockedLabelBranch > masteredLabelBranch &&
-    masteryLabel.includes("' · 前置未完成'"), true,
-  'a mastered but relation-locked Topic must announce mastery first and retain the unmet prerequisite fact');
-  const recommendationLabel = sourceSection(learningMapSource,
-    '  private recommendationLabel(node: MapNode): string {',
-    '\n  private selectedNode(');
-  assert.equal(recommendationLabel.indexOf('if (node.mastery?.mastered === true)') <
-    recommendationLabel.indexOf('if (!node.unlocked)') &&
-    recommendationLabel.includes('保留本机测验掌握事实'), true,
-  'the detail explanation must not replace persistent mastery with a locked-only description');
+  assert.equal(masteredLabelBranch >= 0 && practicedLockedBranch > masteredLabelBranch &&
+    lockedLabelBranch > practicedLockedBranch && masteryLabel.includes('先修待巩固'), true,
+    'mastered and practiced Topics retain their saved result before prerequisite guidance');
+  const selectedCard = sourceSection(learningMapSource,
+    '  SelectedTopicCard() {', '\n  @Builder\n  MapSummary()');
+  assert.equal(selectedCard.includes('Text(this.masteryLabel(node))') &&
+    selectedCard.includes('Button(this.nextActionLabel(node))'), true,
+    'the visible selected Topic card must show the saved result and the routed action');
   const opacity = sourceSection(learningMapSource,
     '  private nodeOpacity(node: MapNode): number {',
     '\n  private nodeOuterOpacity(');
-  assert.equal(opacity.includes('(node.mastery?.mastered === true || node.unlocked) ? 1 : 0.58'), true,
+  assert.equal(opacity.includes('(node.mastery?.mastered === true || node.unlocked) ? 1 : 0.78'), true,
     'a mastered Topic must remain visually present even when its prerequisite relation is incomplete');
   assert.equal(learningMapSource.includes('private firstIncompleteSuccessor('), false,
     'the one-hop successor shortcut must not return');
@@ -366,8 +365,8 @@ test('课程、节点、摘要和主动作具备响应式读屏与 48vp 契约',
     'course switches need selected-state screen-reader text');
   assert.equal(mapCanvas.includes('.accessibilityText(this.nodeAccessibilityText(node))'), true,
     'each visual node needs a complete screen-reader name');
-  assert.equal(summary.includes('数据来自本机测验掌握记录、课程学习进度与课程先修关系'), true,
-    'the map summary must explain its real local evidence sources');
+  assert.equal(summary.includes('显示这门课的主题和已保存的学习进度'), true,
+    'the map summary should describe its saved learning progress in user language');
   assert.equal(learningMapSource.includes('Flex({ wrap: FlexWrap.Wrap'), true,
     'the four-item legend must wrap on narrow or enlarged-text layouts');
   assert.equal(learningMapSource.includes('.accessibilityText(this.actionAccessibilityText(node))'), true,

@@ -541,7 +541,7 @@ struct LessonPage {
 
   private codeRunButtonLabel(activity: LearningActivity): string {
     if (this.codeRunStepIndex < 0) return '开始逐步推演';
-    if (this.codeRunStepIndex < this.codeRunSteps(activity).length - 1) return '对照下一步';
+    if (this.codeRunStepIndex < this.codeRunSteps(activity).length - 1) return '继续对照';
     return '推演完成';
   }
 
@@ -892,7 +892,7 @@ struct LessonPage {
           .width('100%')
           .fontSize(13)
           .fontColor(Constants.COLOR_BRAND_TEXT)
-        Button(this.dfsGraphStepIndex >= GRAPH_NODES.length - 1 ? '重新对照' : '查看下一步')
+        Button(this.dfsGraphStepIndex >= GRAPH_NODES.length - 1 ? '重新对照' : '继续推演')
           .width('100%')
           .constraintSize({ minHeight: 48 })
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)

@@ -62,10 +62,10 @@ struct PlanPage {
   private durationOptions: number[] = [7, 14, 21];
   private goalSuggestions: string[] = ['两周复习数据结构', '一周掌握 TCP 基础', '三周准备操作系统考试'];
   private planSteps: WorkStep[] = [
-    { title: '准备', description: '读取本机学习状态' },
+    { title: '准备', description: '看看最近的学习进度' },
     { title: '规划', description: '等待在线学伴安排节奏' },
     { title: '检查', description: '核对任务能否直接开始' },
-    { title: '保存', description: '写入本机学习计划' },
+    { title: '保存', description: '保存学习计划' },
     { title: '更新', description: '通知首页与服务卡片' }
   ];
 
@@ -86,12 +86,12 @@ struct PlanPage {
 
   onBackPress(): boolean {
     if (this.updatingTaskId.length > 0) {
-      this.message = '任务状态正在保存到本机，请稍候';
+      this.message = '正在保存任务，请稍候';
       this.hasError = false;
       return true;
     }
     if (this.loading && this.progressStep >= 3) {
-      this.message = '计划正在保存到本机，请稍候';
+      this.message = '正在保存计划，请稍候';
       this.hasError = false;
       return true;
     }
@@ -133,7 +133,7 @@ struct PlanPage {
 
   private openTask(task: PlanTask): void {
     if (this.updatingTaskId.length > 0) {
-      this.message = '任务状态正在保存到本机，请稍候';
+      this.message = '正在保存任务，请稍候';
       this.hasError = false;
       return;
     }
@@ -227,7 +227,7 @@ struct PlanPage {
     try {
       receipt = await LocalLearningRepository.updatePlanTask(taskId, desiredDone);
       this.tasks = receipt.plan.tasks;
-      this.message = receipt.task.done === true ? '任务已完成，进度已保存到本机' : '任务已恢复为待完成';
+      this.message = receipt.task.done === true ? '任务已完成' : '已改为待完成';
       this.hasError = false;
       this.retryAction = 'none';
       this.clearErrorEvidence();
@@ -312,7 +312,7 @@ struct PlanPage {
 
   private taskReason(task: PlanTask): string {
     const reason = (task as AgentPlanTask).reason ?? '';
-    return reason.trim().length > 0 ? reason.trim() : '学伴根据目标拆出的可执行下一步';
+    return reason.trim().length > 0 ? reason.trim() : '围绕你的目标安排练习';
   }
 
   private durationAccessibilityText(option: number): string {
@@ -321,7 +321,7 @@ struct PlanPage {
 
   private generateAccessibilityText(): string {
     if (this.loading) return '正在生成学习计划';
-    if (this.planLoading) return '正在恢复本机计划';
+    if (this.planLoading) return '正在打开计划';
     if (this.updatingTaskId.length > 0) return '任务状态保存中，暂不能生成学习计划';
     if (this.retryAction === 'save') return '请先保存刚生成的计划';
     if (this.goal.trim().length === 0) return '请先输入学习目标';
@@ -336,7 +336,7 @@ struct PlanPage {
   }
 
   private retryAccessibilityText(): string {
-    if (this.retryAction === 'load') return '重新读取本机计划';
+    if (this.retryAction === 'load') return '重新打开计划';
     if (this.retryAction === 'save') return '保存刚生成的学习计划';
     if (this.retryAction === 'generate' && this.shouldAdjustPlanInput()) return '调整学习目标后重新生成';
     if (this.retryAction === 'generate') return '重新生成学习计划';
@@ -380,7 +380,7 @@ struct PlanPage {
     if (trace.startsWith('Profile Agent')) return '参考了你的学习记录';
     if (trace.startsWith('Planner Agent')) return '按课程主题安排任务';
     if (trace.startsWith('Action Router')) return '任务可直接开始';
-    if (trace.startsWith('Local-first Guard')) return '进度保存在本机';
+    if (trace.startsWith('Local-first Guard')) return '进度已保存';
     return trace;
   }
 
@@ -395,12 +395,12 @@ struct PlanPage {
   private goBack(): void {
     this.dismissGoalInput();
     if (this.updatingTaskId.length > 0) {
-      this.message = '任务状态正在保存到本机，请稍候';
+      this.message = '正在保存任务，请稍候';
       this.hasError = false;
       return;
     }
     if (this.loading && this.progressStep >= 3) {
-      this.message = '计划正在保存到本机，请稍候';
+      this.message = '正在保存计划，请稍候';
       this.hasError = false;
       return;
     }
@@ -624,7 +624,7 @@ struct PlanPage {
         courseId: courseId,
         topic: topic,
         action: action,
-        reason: reason.length > 0 ? reason : '学伴根据目标拆出的可执行下一步',
+        reason: reason.length > 0 ? reason : '围绕你的目标安排练习',
         done: source.done === true
       } as AgentPlanTask;
       tasks.push(task);
@@ -837,11 +837,11 @@ struct PlanPage {
       if (this.loadingDetailsExpanded) {
         this.PlanProgress()
         Column({ space: 9 }) {
-          this.PlanCheckpoint('本机状态', '读取薄弱项、连续学习和练习表现', 0)
-          this.PlanCheckpoint('在线规划', '从已有课程主题中安排每天的任务', 1)
-          this.PlanCheckpoint('任务检查', '检查日期、课程入口和预计时长', 2)
-          this.PlanCheckpoint('本机保存', '写入计划并保留已有学习数据', 3)
-          this.PlanCheckpoint('入口更新', '通知首页与服务卡片刷新', 4)
+          this.PlanCheckpoint('了解进度', '看看最近学过的内容', 0)
+          this.PlanCheckpoint('安排学习', '分配每天的课程和练习', 1)
+          this.PlanCheckpoint('检查计划', '核对日期和学习时间', 2)
+          this.PlanCheckpoint('保存计划', '保存今天的任务', 3)
+          this.PlanCheckpoint('准备完成', '更新首页任务', 4)
         }
         .width('100%')
         .padding(12)
@@ -899,7 +899,7 @@ struct PlanPage {
       .constraintSize({ minHeight: 48 })
       .alignItems(VerticalAlign.Center)
       .focusable(true)
-      .accessibilityText((this.evidenceExpanded ? '收起' : '展开') + '规划依据，共 ' +
+      .accessibilityText((this.evidenceExpanded ? '收起' : '展开') + '计划安排，共 ' +
         this.agentTrace.length.toString() + ' 条')
       .accessibilityDescription('查看学习状态、课程主题和任务入口的检查结果')
       .onClick((): void => { this.evidenceExpanded = !this.evidenceExpanded; })
@@ -1037,7 +1037,7 @@ struct PlanPage {
           .borderRadius(Constants.RADIUS_MD)
           .enabled(this.canGenerate && this.retryAction !== 'save')
           .accessibilityText(this.generateAccessibilityText())
-          .accessibilityDescription('根据目标和学习周期生成可执行任务并保存到本机')
+          .accessibilityDescription('根据目标和学习周期安排任务')
           .onClick(() => {
             this.editorExpanded = false;
             this.generate();
@@ -1198,7 +1198,7 @@ struct PlanPage {
                 .width(18)
                 .height(18)
                 .color(Constants.COLOR_BRAND)
-              Text('正在恢复本机计划')
+              Text('正在打开计划')
                 .fontSize(12)
                 .fontColor(Constants.COLOR_TEXT_SECONDARY)
             }
@@ -1312,7 +1312,7 @@ struct PlanPage {
                     .borderRadius(Constants.RADIUS_SM)
                     .enabled(this.hasTaskTarget(t) && this.updatingTaskId.length === 0)
                     .accessibilityText(this.actionLabel(t) + '：' + t.title)
-                    .accessibilityDescription('打开该计划任务对应的真实学习环节')
+                    .accessibilityDescription('打开任务对应的课程或练习')
                     .onClick(() => { this.openTask(t); })
                   Button(this.updatingTaskId === t.id ? '保存中' : (t.done ? '恢复' : '完成'))
                     .layoutWeight(1)
@@ -1324,7 +1324,7 @@ struct PlanPage {
                     .borderRadius(Constants.RADIUS_SM)
                     .enabled(this.updatingTaskId.length === 0)
                     .accessibilityText((t.done ? '恢复待完成：' : '标记完成：') + t.title)
-                    .accessibilityDescription('手动设置任务状态并保存到本机；这不代表通过测评')
+                    .accessibilityDescription('手动标记任务完成，测验成绩另计')
                     .onClick(() => { this.toggleTask(t); })
                 }
                 .width('100%')
@@ -1428,7 +1428,7 @@ struct PlanPage {
       if (!this.isActiveGeneration(runId, lifecycleRunId, request)) return;
       const error = e instanceof Error ? e : new Error('Network request failed');
       const retained = this.tasks.length > 0 ? '，上一版计划仍可继续执行' : '';
-      this.message = this.progressStep === 0 ? '本机学习状态读取失败，请稍后重试' + retained :
+      this.message = this.progressStep === 0 ? '学习进度读取失败，请稍后重试' + retained :
         this.planErrorMessage(error);
       this.hasError = true;
       this.retryAction = 'generate';

@@ -118,7 +118,7 @@ class CourseResumeContractTest(unittest.TestCase):
         )
         self.assertIn("resolveNextTopic(this.topics, this.completedTopics", next_topic)
         self.assertIn("this.resumeState().recentTopic", next_hint)
-        self.assertIn("? '继续 · ' + topic : '下一步 · ' + topic", next_hint)
+        self.assertIn("? '接着学 · ' + topic : '待学 · ' + topic", next_hint)
 
 
 if __name__ == "__main__":

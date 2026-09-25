@@ -395,7 +395,7 @@ export struct ProfileContent {
               '%，累计答题' + this.profile.stats.totalQuestions.toString() + '题，连续学习' +
               this.profile.stats.streakDays.toString() + '天，累计活跃' +
               this.profile.stats.studyDays.toString() + '天')
-            .accessibilityDescription('统计来自本机已保存的答题与学习事件')
+            .accessibilityDescription('根据已保存的学习记录统计')
 
             Column({ space: 12 }) {
               Text('知识点')

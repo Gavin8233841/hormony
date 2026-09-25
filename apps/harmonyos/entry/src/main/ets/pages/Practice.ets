@@ -553,7 +553,7 @@ struct PracticePage {
       .borderRadius(Constants.RADIUS_LG)
 
       Column({ space: 8 }) {
-        Text(this.correctCount === this.questions.length ? '下一步' : '先看这道错题')
+        Text(this.correctCount === this.questions.length ? '继续挑战' : '错题回顾')
           .width('100%')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
@@ -571,7 +571,7 @@ struct PracticePage {
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
-        Button(this.correctCount === this.questions.length ? '进入 AI 测验' : '请学伴讲解这道错题')
+        Button(this.correctCount === this.questions.length ? '测验这个主题' : '问学伴')
           .width('100%')
           .height(48)
           .fontSize(15)

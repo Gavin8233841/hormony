@@ -613,11 +613,11 @@ export struct ChatContent {
       this.historyLoadFailed = false;
       this.historySaveFailed = false;
       this.historyMessage = restored.length > 0 ?
-        '已恢复最近 ' + restored.length.toString() + ' 条本机会话' : '';
+        '已恢复 ' + restored.length.toString() + ' 条对话' : '';
     } catch (error) {
       if (!this.isActiveLifecycle(lifecycleRunId)) return;
       this.historyLoadFailed = true;
-      this.historyMessage = '本机会话暂时无法读取';
+      this.historyMessage = '对话暂时无法打开';
     } finally {
       if (this.isActiveLifecycle(lifecycleRunId)) {
         this.historyLoading = false;
@@ -630,7 +630,7 @@ export struct ChatContent {
     if (this.historyLoading || this.historySaving || this.loading) return;
     this.historyLoading = true;
     this.historyLoadFailed = false;
-    this.historyMessage = '正在恢复本机会话';
+    this.historyMessage = '正在打开对话';
     this.loadLocalHistory(this.lifecycleRunId);
   }
 
@@ -668,7 +668,7 @@ export struct ChatContent {
     last.errorCode = '';
     last.statusExpanded = false;
     last.statusMessage = last.content.length > 0 ?
-      '已停止继续生成，上方内容不会保存到本机' : '已停止回答，可以重新提问';
+      '已停止回答，这段内容未保存' : '已停止回答，可以重新提问';
     this.inputText = last.retryQuestion;
     this.messages = this.messages.slice();
   }
@@ -800,7 +800,7 @@ export struct ChatContent {
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .margin({ top: 16 })
 
-          Text('问课程内容、正在做的题，或下一步学什么')
+          Text('想学什么，或哪道题卡住了？')
             .fontSize(13)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .margin({ top: 8, left: 32, right: 32 })
@@ -960,7 +960,7 @@ export struct ChatContent {
                 .borderRadius(Constants.RADIUS_MD)
                 .padding({ left: 12, right: 12 })
                 .enabled(!this.loading && !this.historySaving && !this.historyLoading)
-                .accessibilityText(this.historyLoadFailed ? '重新读取本机会话' : '重试保存本机会话')
+                .accessibilityText(this.historyLoadFailed ? '重新打开对话' : '重试保存对话')
                 .onClick((): void => {
                   if (this.historyLoadFailed) this.retryLocalHistoryLoad();
                   else this.retryLocalHistorySave();
@@ -1255,10 +1255,10 @@ export struct ChatContent {
     try {
       await LocalLearningRepository.saveChatHistory(history);
       this.historySaveFailed = false;
-      this.historyMessage = '回答已保存到本机';
+      this.historyMessage = '回答已保存';
     } catch (_) {
       this.historySaveFailed = true;
-      this.historyMessage = '回答已完成，但未能保存到本机';
+      this.historyMessage = '回答已完成，保存失败';
     } finally {
       this.historySaving = false;
       if (this.historySaveQueued) {
@@ -1603,7 +1603,7 @@ export struct ChatContent {
             .fontSize(16)
             .fontColor([Constants.COLOR_SUCCESS])
         }
-        Text(msg.streaming ? this.answerProgressTitle(msg) : '处理记录')
+        Text(msg.streaming ? this.answerProgressTitle(msg) : '回答过程')
           .layoutWeight(1)
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)

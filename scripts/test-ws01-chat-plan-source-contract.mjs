@@ -353,7 +353,7 @@ test('Chat restores and serializes only complete local conversation turns', () =
     'this.activeRequestId = 0;',
     'cancellation.cancel();',
     'last.cancelled = true;',
-    "'已停止继续生成，上方内容不会保存到本机'"
+    "'已停止回答，这段内容未保存'"
   ], 'Chat cancellation state');
   assert.doesNotMatch(cancel, /saveLocalHistory/);
 });
@@ -489,10 +489,10 @@ test('Plan preserves a failed pending save across re-entry and rejects stale gen
     'Plan system back');
   assertOrder(backPress, [
     'if (this.updatingTaskId.length > 0) {',
-    "this.message = '任务状态正在保存到本机，请稍候';",
+    "this.message = '正在保存任务，请稍候';",
     'return true;',
     'if (this.loading && this.progressStep >= 3) {',
-    "this.message = '计划正在保存到本机，请稍候';",
+    "this.message = '正在保存计划，请稍候';",
     'return true;',
     'this.cancelPlanGeneration(false);',
     'return false;'
@@ -573,7 +573,7 @@ test('Plan serializes task writes against the latest persisted plan and conflict
   const openTask = section(plan, '  private openTask(', '  private pushPage(', 'Plan task navigation guard');
   assertOrder(openTask, [
     'if (this.updatingTaskId.length > 0) {',
-    "this.message = '任务状态正在保存到本机，请稍候';",
+    "this.message = '正在保存任务，请稍候';",
     'return;',
     'if (!this.hasTaskTarget(task)) {'
   ], 'Plan blocks task navigation while a task write is pending');
@@ -611,7 +611,7 @@ test('Plan serializes task writes against the latest persisted plan and conflict
     'Plan task-write back guard');
   assertOrder(goBack, [
     'if (this.updatingTaskId.length > 0) {',
-    "this.message = '任务状态正在保存到本机，请稍候';",
+    "this.message = '正在保存任务，请稍候';",
     'return;',
     'if (this.loading && this.progressStep >= 3) {'
   ], 'Plan keeps the page mounted until the task write settles');
@@ -774,8 +774,8 @@ test('Plan exposes cancellable wait stages, keyboard dismissal, and safe-area sp
   const loadingState = section(plan, '  PlanLoadingState() {', '  @Builder\n  AgentTraceCard()', 'Plan loading UI');
   assert.match(loadingState, /Button\('取消'\)/);
   assert.match(loadingState, /\.enabled\(this\.progressStep < 3\)/);
-  assert.match(loadingState, /this\.PlanCheckpoint\('本机状态'/);
-  assert.match(loadingState, /this\.PlanCheckpoint\('入口更新'/);
+  assert.match(loadingState, /this\.PlanCheckpoint\('了解进度'/);
+  assert.match(loadingState, /this\.PlanCheckpoint\('准备完成'/);
 
   assert.match(plan, /private goalInputController: TextInputController = new TextInputController\(\);/);
   assert.match(plan, /this\.goalInputController\.stopEditing\(\);/);

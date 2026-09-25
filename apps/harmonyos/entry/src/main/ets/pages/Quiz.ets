@@ -611,8 +611,8 @@ struct QuizPage {
   }
 
   private coachTitle(wrongCount: number): string {
-    if (wrongCount === 0) return '本组没有待澄清错题';
-    return '待澄清 ' + wrongCount.toString() + ' 道错题';
+    if (wrongCount === 0) return '这组全部答对';
+    return '错了 ' + wrongCount.toString() + ' 道题';
   }
 
   private coachBody(accuracy: number, wrongCount: number): string {
@@ -664,10 +664,10 @@ struct QuizPage {
   }
 
   private tagAction(item: QuizTagSummary): string {
-    if (item.wrongQuestions === 0) return '保持节奏，挑战高难度';
-    if (item.accuracy < 0.6) return '先看资料，再练基础题';
-    if (item.wrongQuestions >= 2) return '集中复盘错因';
-    return '短练一组巩固';
+    if (item.wrongQuestions === 0) return '试试进阶题';
+    if (item.accuracy < 0.6) return '从基础题练起';
+    if (item.wrongQuestions >= 2) return '集中复习';
+    return '再练一组';
   }
 
   private tagProgressColor(item: QuizTagSummary): string {
@@ -830,10 +830,10 @@ struct QuizPage {
       this.GenerationProgress()
 
       Column({ space: 9 }) {
-        this.GenerationCheckpoint('课程依据', '检索课程资料和最近薄弱标签', this.progressStep >= 0)
-        this.GenerationCheckpoint('题目生成', '按难度分层组织题干和选项', this.progressStep >= 1)
-        this.GenerationCheckpoint('结构校验', '检查 A-D、答案、解析和标签', this.progressStep >= 2)
-        this.GenerationCheckpoint('答题卡装配', '准备首题、进度条和本地记录字段', this.progressStep >= 3)
+        this.GenerationCheckpoint('了解课程', '看看本节内容', this.progressStep >= 0)
+        this.GenerationCheckpoint('准备题目', '安排不同难度的题目', this.progressStep >= 1)
+        this.GenerationCheckpoint('检查题目', '核对题目与答案', this.progressStep >= 2)
+        this.GenerationCheckpoint('准备开始', '马上可以答题', this.progressStep >= 3)
       }
       .width('100%')
       .padding(12)
@@ -1301,7 +1301,7 @@ struct QuizPage {
 
       if (this.resultCoachTitle.length > 0) {
         Column({ space: 10 }) {
-          Text('本轮下一步')
+          Text(this.resultCorrectCount === this.resultTotalQuestions ? '继续练习' : '错题回顾')
             .width('100%')
             .fontSize(12)
             .fontColor(Constants.COLOR_BRAND_TEXT)

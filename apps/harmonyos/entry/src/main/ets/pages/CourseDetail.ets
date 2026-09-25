@@ -113,7 +113,7 @@ struct CourseDetailPage {
   private nextTopicHint(): string {
     const topic = this.nextTopic();
     if (topic.length === 0) return '';
-    return topic === this.resumeState().recentTopic ? '继续 · ' + topic : '下一步 · ' + topic;
+    return topic === this.resumeState().recentTopic ? '接着学 · ' + topic : '待学 · ' + topic;
   }
 
   private completedTopicCount(): number {

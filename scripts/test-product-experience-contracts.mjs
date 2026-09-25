@@ -236,7 +236,7 @@ test('Chat 核心操作在大字号与读屏下保留 48vp 和对象化语义', 
   assert.match(build, /\.accessibilityText\(this\.sendButtonAccessibilityText\(\)\)/);
   assert.match(build, /\.accessibilityText\('输入学习问题'\)/);
   assert.match(build, /\.accessibilityText\('重新连接云端学伴'\)/);
-  assert.match(build, /\.accessibilityText\(this\.historyLoadFailed \? '重新读取本机会话' : '重试保存本机会话'\)/);
+  assert.match(build, /\.accessibilityText\(this\.historyLoadFailed \? '重新打开对话' : '重试保存对话'\)/);
   assert.doesNotMatch(build, /\.height\((?:28|32|44)\)/);
   assert.doesNotMatch(build, /\.maxLines\(1\)\s*\.textOverflow\(\{ overflow: TextOverflow\.Ellipsis \}\)/);
 
@@ -272,7 +272,7 @@ test('Plan 制定与恢复操作在大字号和读屏下保持完整', () => {
   assert.doesNotMatch(loading, /\.maxLines\(2\)|TextOverflow\.Ellipsis/);
   assert.match(evidence, /\.constraintSize\(\{ minHeight: 48 \}\)/);
   assert.match(evidence, /\.focusable\(true\)/);
-  assert.match(evidence, /'展开'\) \+ '规划依据，共 '/);
+  assert.match(evidence, /'展开'\) \+ '计划安排，共 '/);
   assert.match(checkpoint, /\.accessibilityGroup\(true\)\s*\.accessibilityText\(this\.checkpointAccessibilityText\(title, detail, index\)\)/);
   for (const state of ['已完成', '进行中', '未开始']) {
     assert.match(checkpointName, new RegExp(`'${state}'`));
