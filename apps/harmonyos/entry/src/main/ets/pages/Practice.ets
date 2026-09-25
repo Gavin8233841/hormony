@@ -42,6 +42,7 @@ struct PracticePage {
   @State submitted: boolean = false;
   @State saving: boolean = false;
   @State correctCount: number = 0;
+  @State resultRingValue: number = 0;
   @State details: QuizResultDetail[] = [];
   @State toggledDetailIds: string[] = [];
   @State message: string = '';
@@ -85,6 +86,7 @@ struct PracticePage {
     this.submitted = false;
     this.saving = false;
     this.correctCount = 0;
+    this.resultRingValue = 0;
     this.details = [];
     this.toggledDetailIds = [];
     this.message = '';
@@ -365,6 +367,12 @@ struct PracticePage {
       this.message = '';
       this.hasError = false;
       this.submitted = true;
+      setTimeout((): void => {
+        if (!this.submitted) return;
+        this.getUIContext().animateTo({ duration: 420, curve: Curve.EaseOut }, (): void => {
+          this.resultRingValue = totalCorrect;
+        });
+      }, 60);
       try {
         await LearningFormUpdater.refreshAll();
       } catch (_) {
@@ -499,7 +507,7 @@ struct PracticePage {
     Column({ space: 16 }) {
       Row({ space: 18 }) {
         Stack({ alignContent: Alignment.Center }) {
-          Progress({ value: this.correctCount, total: this.questions.length, type: ProgressType.Ring })
+          Progress({ value: this.resultRingValue, total: this.questions.length, type: ProgressType.Ring })
             .width(86)
             .height(86)
             .color(this.correctCount / this.questions.length >= 0.8 ? Constants.COLOR_SUCCESS : Constants.COLOR_WARNING)
@@ -519,10 +527,17 @@ struct PracticePage {
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
+        if (this.correctCount === this.questions.length) {
+          Image($r('app.media.mascot_xiaohong_welcome'))
+            .width(68)
+            .height(86)
+            .objectFit(ImageFit.Contain)
+            .accessibilityText('小鸿为本轮全部答对喝彩')
+        }
       }
       .width('100%')
       .padding(18)
-      .backgroundColor(Constants.COLOR_TEXT_PRIMARY)
+      .backgroundColor(Constants.COLOR_HERO_SURFACE)
       .borderRadius(Constants.RADIUS_LG)
 
       Column({ space: 8 }) {
@@ -531,14 +546,12 @@ struct PracticePage {
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text(this.correctCount === this.questions.length ?
-          '可以继续测验这个主题。' :
-          this.firstWrongDetail()?.stem ?? '')
-          .width('100%')
-          .fontSize(14)
-          .lineHeight(22)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
         if (this.correctCount < this.questions.length) {
+          Text(this.firstWrongDetail()?.stem ?? '')
+            .width('100%')
+            .fontSize(14)
+            .lineHeight(22)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
           Text('你的答案：' + (this.firstWrongDetail()?.userAnswer || '未作答'))
             .width('100%')
             .fontSize(13)
@@ -582,7 +595,8 @@ struct PracticePage {
       }
       .width('100%')
       .padding(16)
-      .backgroundColor(Constants.COLOR_BG_CARD)
+      .backgroundColor(this.correctCount === this.questions.length ?
+        Constants.COLOR_HERO_INSET : Constants.COLOR_BG_CARD)
       .borderRadius(Constants.RADIUS_LG)
 
       if (this.writeBackTotalQuestions > 0) {

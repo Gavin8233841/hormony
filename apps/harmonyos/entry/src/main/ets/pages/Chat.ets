@@ -790,79 +790,83 @@ export struct ChatContent {
       // 消息列表 / 欢迎页
       if (this.messages.length === 0) {
         // 欢迎引导：角色只在空状态完整出现，不挤占回答区域。
-        Column() {
-          Row() {
-            Column({ space: 8 }) {
-              Text('小鸿在这儿')
-                .fontSize(24)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Constants.COLOR_MAP_CORE)
-              Text('课程、错题，都可以问。')
-                .fontSize(13)
-                .lineHeight(19)
-                .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
-
-            Image($r('app.media.mascot_xiaohong_welcome'))
-              .width(112)
-              .height(142)
-              .objectFit(ImageFit.Contain)
-              .accessibilityText('小鸿挥手欢迎')
-          }
-          .width('100%')
-          .height(176)
-          .padding({ left: 20, right: 8, top: 12, bottom: 8 })
-          .backgroundColor(Constants.COLOR_HERO_SURFACE)
-          .borderRadius(Constants.RADIUS_XL)
-          .opacity(this.welcomeOpacity)
-          .translate({ y: this.welcomeOffset })
-
-          Text('试试这样问')
-            .width('100%')
-            .fontSize(17)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            .margin({ top: 24, bottom: 12 })
-
-          Column({ space: 8 }) {
-            ForEach(this.suggestions, (s: string, index: number) => {
-              Button({ type: ButtonType.Normal }) {
-                Row() {
-                  Text(s)
-                    .layoutWeight(1)
-                    .fontSize(14)
-                    .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                  SymbolGlyph($r('sys.symbol.chevron_right'))
-                    .fontSize(13)
-                    .fontColor([Constants.COLOR_TEXT_SECONDARY])
-                }
-                .width('100%')
+        Scroll() {
+          Column() {
+            Row() {
+              Column({ space: 8 }) {
+                Text('小鸿在这儿')
+                  .fontSize(24)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Constants.COLOR_MAP_CORE)
+                Text('课程、错题，都可以问。')
+                  .fontSize(13)
+                  .lineHeight(19)
+                  .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
               }
-                .width('100%')
-                .constraintSize({ minHeight: 56 })
-                .padding({ left: 16, right: 16 })
-                .backgroundColor(index === 0 ? Constants.COLOR_BRAND_LIGHT :
-                  (index === 1 ? Constants.COLOR_COURSE_OS_LIGHT : Constants.COLOR_HERO_INSET))
-                .borderRadius(Constants.RADIUS_LG)
-                .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
-                  !this.historyLoadFailed)
-                .accessibilityText('提问：' + s)
-                .accessibilityDescription('使用该问题向云端学伴提问')
-                .onClick(() => {
-                  this.inputText = s;
-                  this.sendMessage();
-                })
-            })
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+
+              Image($r('app.media.mascot_xiaohong_welcome'))
+                .width(112)
+                .height(142)
+                .objectFit(ImageFit.Contain)
+                .accessibilityText('小鸿挥手欢迎')
+            }
+            .width('100%')
+            .height(176)
+            .padding({ left: 20, right: 8, top: 12, bottom: 8 })
+            .backgroundColor(Constants.COLOR_HERO_SURFACE)
+            .borderRadius(Constants.RADIUS_XL)
+            .opacity(this.welcomeOpacity)
+            .translate({ y: this.welcomeOffset })
+
+            Text('试试这样问')
+              .width('100%')
+              .fontSize(17)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+              .margin({ top: 24, bottom: 12 })
+
+            Column({ space: 8 }) {
+              ForEach(this.suggestions, (s: string, index: number) => {
+                Button({ type: ButtonType.Normal }) {
+                  Row() {
+                    Text(s)
+                      .layoutWeight(1)
+                      .fontSize(14)
+                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                    SymbolGlyph($r('sys.symbol.chevron_right'))
+                      .fontSize(13)
+                      .fontColor([Constants.COLOR_TEXT_SECONDARY])
+                  }
+                  .width('100%')
+                }
+                  .width('100%')
+                  .constraintSize({ minHeight: 56 })
+                  .padding({ left: 16, right: 16 })
+                  .backgroundColor(index === 0 ? Constants.COLOR_BRAND_LIGHT :
+                    (index === 1 ? Constants.COLOR_COURSE_OS_LIGHT : Constants.COLOR_HERO_INSET))
+                  .borderRadius(Constants.RADIUS_LG)
+                  .enabled(this.cloudAgentReady && !this.loading && !this.historyLoading && !this.historySaving &&
+                    !this.historyLoadFailed)
+                  .accessibilityText('提问：' + s)
+                  .accessibilityDescription('使用该问题向云端学伴提问')
+                  .onClick(() => {
+                    this.inputText = s;
+                    this.sendMessage();
+                  })
+              })
+            }
+            .width('100%')
           }
           .width('100%')
+          .justifyContent(FlexAlign.Start)
+          .alignItems(HorizontalAlign.Center)
+          .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 20, bottom: 20 })
         }
         .width('100%')
         .layoutWeight(1)
-        .justifyContent(FlexAlign.Start)
-        .alignItems(HorizontalAlign.Center)
-        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 20 })
+        .scrollBar(BarState.Off)
         .constraintSize({ maxWidth: 760 })
       } else {
         // 消息列表

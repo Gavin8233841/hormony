@@ -8169,3 +8169,21 @@ Python 3.12 `unittest discover` 215/215，三份相关 Node 契约 46/46，`git 
 ### 涉及文件
 
 `Constants.ets`、`Builders.ets`、`HomeContent.ets`、`Course.ets`、`Chat.ets`、`Index.ets`、六张原创 PNG、两份设计文档、实施交接和本日志。其他任务的未提交文件保留。
+
+---
+
+## [2026-09-25T17:18:29Z] [2026-09-26 01:18:29 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+上一批“小鸿”已经进学伴会话，但无历史欢迎页未看过真实设备画面。为了保留原模拟器学习记录，在 `.runtime/isolated-visual/` 从已提交源码构建独立包 `com.c4ai.hormony.visualqa`，只在隔离包注入练习入口测试状态；正式包 Bundle Name 与仓库入口不变。无历史页面第一张截图发现四条推荐问题被输入栏盖住，学伴欢迎区因此改为可滚动，四条问题上滑后都可见，输入栏固定。
+
+练习结果页只在本轮全部答对且写回成功后于主卡右侧显示一次“小鸿”挥手图，环形得分用 ArkUI `animateTo` 到达真实正确数；未全对保留错题解析。满分操作卡改为暖纸色，移除重复解释，只留下“全部答对”与“测验这个主题”。人物没有在每条消息或普通课程卡重复出现。角色仍是首批头像和全身像，尚未达到严格锁定的多姿态母版；本批没有调用付费生成服务。
+
+### 验证与边界
+
+Python 3.12 `unittest discover` 215/215、Node 三份相关契约 46/46、HarmonyOS API 12 增量 `assembleHap` exit 0、`git diff --check` exit 0。隔离包在 Pura X View 1320×2232 竖屏无历史聊天页截图：`.runtime/design-audit-20260925/47-chat-empty-isolated.jpeg`（问题被盖）、`50-chat-empty-scroll-final.jpeg`（修后首屏）、`52-chat-empty-scrolled.jpeg`（四题可见）。隔离包按题库逐题选择 5 个答案并保存，结果图 `62-result-all-correct-final.jpeg` 显示 5/5、100% 环、角色和行动卡；隔离包随后重复一次，累计答题显示 10 题。正式包已用本批最终 HAP 安装并启动，原有学习数据没有清空。未逐帧录制 420ms 动画，未验横屏、大字号、真机、在线新回答或签名包。隔离包与其本地证据仍在忽略目录 `.runtime/`，未纳入提交。
+
+### 涉及文件
+
+`Chat.ets`、`Practice.ets`、`docs/DESIGN-REFERENCE-20260925.md`、`docs/VISUAL-IDENTITY-XIAOHONG-20260926.md`、本日志。其他任务的未提交文件保留。
