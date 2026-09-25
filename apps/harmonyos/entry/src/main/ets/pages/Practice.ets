@@ -417,7 +417,7 @@ struct PracticePage {
   QuestionView() {
     Column({ space: 16 }) {
       Row() {
-        Text('离线精选题库')
+        Text('本主题练习')
           .fontSize(11)
           .fontColor(Constants.COLOR_SUCCESS)
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
@@ -469,7 +469,7 @@ struct PracticePage {
       Row({ space: 10 }) {
         Button('上一题')
           .layoutWeight(1)
-          .height(46)
+          .height(48)
           .enabled(this.currentIndex > 0)
           .fontColor(this.currentIndex > 0 ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_BUTTON_DISABLED_TEXT)
           .backgroundColor(Constants.COLOR_BG_TAG)
@@ -482,7 +482,7 @@ struct PracticePage {
         if (this.currentIndex < this.questions.length - 1) {
           Button('下一题')
             .layoutWeight(1)
-            .height(46)
+            .height(48)
             .enabled(this.activeAnswer.length > 0)
             .fontColor(this.activeAnswer.length > 0 ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
             .backgroundColor(this.activeAnswer.length > 0 ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
@@ -495,7 +495,7 @@ struct PracticePage {
         } else {
           Button(this.saving ? '保存中...' : '提交评分')
             .layoutWeight(1)
-            .height(46)
+            .height(48)
             .enabled(this.allAnswered() && !this.saving)
             .fontColor(this.allAnswered() ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_BUTTON_DISABLED_TEXT)
             .backgroundColor(this.allAnswered() ? Constants.COLOR_BRAND : Constants.COLOR_BUTTON_DISABLED_BG)
@@ -539,8 +539,8 @@ struct PracticePage {
             .fontSize(14)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           Text(this.correctCount === this.questions.length ?
-            '本组全部答对；换一组题再检验理解。' :
-            '本组有 ' + (this.questions.length - this.correctCount).toString() + ' 道题需要澄清。')
+            '全部答对，试试新题。' :
+            '有 ' + (this.questions.length - this.correctCount).toString() + ' 道题做错了。')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
         }
@@ -553,13 +553,13 @@ struct PracticePage {
       .borderRadius(Constants.RADIUS_LG)
 
       Column({ space: 8 }) {
-        Text(this.correctCount === this.questions.length ? '下一步' : '待澄清问题')
+        Text(this.correctCount === this.questions.length ? '下一步' : '先看这道错题')
           .width('100%')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
         Text(this.correctCount === this.questions.length ?
-          '这组没有错题。用新题检验能否稳定运用本主题。' :
+          '这组全对，试试新题。' :
           this.firstWrongDetail()?.stem ?? '')
           .width('100%')
           .fontSize(14)
@@ -614,20 +614,11 @@ struct PracticePage {
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
           }
           .width('100%')
-          Text('累计答题 ' + this.writeBackTotalQuestions.toString() + ' 题 · 当前错题 ' +
+          Text('累计答题 ' + this.writeBackTotalQuestions.toString() + ' 题 · 错题 ' +
             this.writeBackActiveReviews.toString() + ' 道')
             .width('100%')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text(this.topic + ' 掌握度 ' + Math.round(this.writeBackTopicAccuracy * 100).toString() +
-            '% · 学习活动累计 ' + this.writeBackActivityCount.toString() + ' 次')
-            .width('100%')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text('课程进度 ' + Math.round(this.writeBackCourseProgress * 100).toString() + '%')
-            .width('100%')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_BRAND)
         }
         .width('100%')
         .padding(16)
@@ -635,8 +626,7 @@ struct PracticePage {
         .borderRadius(Constants.RADIUS_MD)
       }
 
-      Text(this.correctCount === this.questions.length ? '逐题复盘 · 正确题默认收起' :
-        '逐题复盘 · 错题默认展开')
+      Text('逐题回看')
         .width('100%')
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
@@ -668,7 +658,7 @@ struct PracticePage {
 
   build() {
     Column() {
-      GradientHeader('精选练习', this.courseTitle + (this.topic.length > 0 ? ' · ' + this.topic : ''),
+      GradientHeader('练习', this.courseTitle + (this.topic.length > 0 ? ' · ' + this.topic : ''),
         () => this.getUIContext().getRouter().back())
       if (this.message.length > 0) {
         Text(this.message)

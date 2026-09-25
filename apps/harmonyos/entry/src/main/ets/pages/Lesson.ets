@@ -431,7 +431,7 @@ struct LessonPage {
     if (this.currentIndex < this.chunks.length - 1) return '学完本节，继续';
     if (this.needsActivityResume() && this.experience !== null) {
       const nextIndex = this.nextPendingActivityIndex();
-      return '继续互动 ' + (nextIndex + 1).toString() + '/' +
+      return '继续练习 ' + (nextIndex + 1).toString() + '/' +
         this.experience.activities.length.toString();
     }
     return '完成主题并练习';
@@ -453,11 +453,11 @@ struct LessonPage {
       if (this.activityOffset > 0) {
         this.contentScroller.scrollTo({
           xOffset: 0,
-          yOffset: Math.max(this.activityOffset - 12, 0),
+          yOffset: Math.max(this.activityOffset + 160, 0),
           animation: true
         });
       } else {
-        this.contentScroller.scrollPage({ next: true });
+        this.contentScroller.scrollTo({ xOffset: 0, yOffset: 160, animation: true });
       }
     }, 50);
   }
@@ -1289,7 +1289,7 @@ struct LessonPage {
       if (this.activeActivity() !== null) {
         Column({ space: 12 }) {
           Row() {
-            Text('主动练习 · ' + this.activeActivity()!.title)
+            Text('练一练 · ' + this.activeActivity()!.title)
               .fontSize(13)
               .fontWeight(FontWeight.Bold)
               .fontColor(Constants.COLOR_BRAND_TEXT)
@@ -1301,7 +1301,7 @@ struct LessonPage {
           .width('100%')
           .justifyContent(FlexAlign.SpaceBetween)
           Row({ space: 8 }) {
-            Text('本练聚焦')
+            Text('练习重点')
               .fontSize(11)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
             Text(this.activeActivity()!.focusTag)
@@ -1325,7 +1325,7 @@ struct LessonPage {
           }
 
           if (this.activeActivity()!.id === 'cs101-图的表示与遍历-2') {
-            Text('提示：上方概念示例是无向图；这道题考查有向图 BFS 的通用步骤。')
+            Text('这题按有向图作答，留意边的方向。')
               .width('100%')
               .fontSize(12)
               .lineHeight(20)
@@ -1626,7 +1626,7 @@ struct LessonPage {
       } else {
         Column({ space: 10 }) {
           Row() {
-            Text('精选课程内容')
+            Text('课程内容')
               .fontSize(11)
               .fontColor(Constants.COLOR_BRAND_TEXT)
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
@@ -1648,19 +1648,19 @@ struct LessonPage {
         .padding({ left: 18, right: 18, top: 4, bottom: 12 })
 
         Scroll(this.contentScroller) {
-          Column({ space: 24 }) {
+          Column({ space: 16 }) {
             if (this.hasBfsGraphSource() && this.showIntroExperience()) {
               this.IntroExperience()
+            }
+
+            if (this.showPracticeExperience()) {
+              this.PracticeExperience()
             }
 
             this.LessonOpening()
 
             if (this.showIntroExperience() && !this.hasBfsGraphSource()) {
               this.IntroExperience()
-            }
-
-            if (this.showPracticeExperience()) {
-              this.PracticeExperience()
             }
 
             this.MasteryBrief()
@@ -1725,12 +1725,12 @@ struct LessonPage {
           .width('100%')
           .constraintSize({ minHeight: '100%', maxWidth: 720 })
           .justifyContent(FlexAlign.Start)
-          .padding({ left: 18, right: 18, top: 4, bottom: 24 + this.safeAreaBottomVp() })
+          .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER,
+            top: 4, bottom: 24 + this.safeAreaBottomVp() })
         }
         .width('100%')
         .layoutWeight(1)
         .scrollBar(BarState.Off)
-        .padding({ left: 16, right: 16 })
 
         if (this.message.length > 0) {
           Row({ space: 10 }) {

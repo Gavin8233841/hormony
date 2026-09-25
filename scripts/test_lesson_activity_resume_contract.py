@@ -83,10 +83,11 @@ class LessonActivityResumeContractTest(unittest.TestCase):
         self.assertGreater(reset_input, selected_activity)
 
         self.assertIn("this.needsActivityResume()", label)
-        self.assertIn("'继续互动 '", label)
+        self.assertIn("'继续练习 '", label)
         self.assertIn("this.activityOffset", focus)
         self.assertIn("this.contentScroller.scrollTo", focus)
-        self.assertIn("this.contentScroller.scrollPage({ next: true })", focus)
+        self.assertIn("this.activityOffset + 160", focus)
+        self.assertIn("yOffset: 160", focus)
 
         focus_call = primary.find("this.focusActiveActivity()")
         return_call = primary.find("return;", focus_call)
@@ -239,7 +240,7 @@ class LessonActivityResumeContractTest(unittest.TestCase):
     def test_activity_focus_is_named_before_prompt_and_follow_up_actions(self):
         practice = compact(extract_method(self.source, "PracticeExperience"))
 
-        focus_label = practice.find("Text('本练聚焦')")
+        focus_label = practice.find("Text('练习重点')")
         focus_value = practice.find("Text(this.activeActivity()!.focusTag)")
         prompt = practice.find("Text(this.activeActivity()!.prompt)")
         ask_tutor = practice.find("Button('问学伴讲解')")

@@ -185,8 +185,7 @@ struct CourseDetailPage {
       .padding({ left: 16, right: 16, top: 12, bottom: 12 })
       .backgroundColor(Constants.COLOR_BRAND_LIGHT)
       .borderRadius(Constants.RADIUS_LG)
-      .accessibilityText((this.nextTopic() === this.resumeState().recentTopic ? '继续上次主题，' : '开始下一主题，') +
-        this.nextTopic())
+      .accessibilityText(this.nextTopicHint())
       .onClick((): void => { this.openTopic(this.nextTopic()); })
     }
   }
@@ -213,7 +212,7 @@ struct CourseDetailPage {
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text('课程内容没有被修改，可在当前页面重新读取')
+          Text('稍后重试，或返回课程列表')
             .fontSize(12)
             .lineHeight(19)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
@@ -243,12 +242,14 @@ struct CourseDetailPage {
         .justifyContent(FlexAlign.Center)
       } else {
         Scroll() {
-          Column({ space: 20 }) {
+          Column({ space: 16 }) {
+            this.NextTopicAction()
+
             Column({ space: 12 }) {
               Row() {
                 Column({ space: 3 }) {
-                  Text('课程进度')
-                    .fontSize(17)
+                  Text('学习进度')
+                    .fontSize(Constants.PAGE_SECTION_SIZE)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(Constants.COLOR_TEXT_PRIMARY)
                   Text('完成 ' + this.completedTopicCount().toString() + ' / ' + this.topics.length.toString() + ' 个主题')
@@ -277,34 +278,23 @@ struct CourseDetailPage {
                 .fontColor(Constants.COLOR_ERROR)
             }
 
-            this.NextTopicAction()
-
             Row() {
               Text('全部主题')
-                .fontSize(18)
+                .fontSize(Constants.PAGE_SECTION_SIZE)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              if (this.nextTopic().length > 0) {
-                Text(this.nextTopicHint())
-                  .fontSize(11)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(Constants.COLOR_BRAND_TEXT)
-                  .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-                  .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                  .borderRadius(Constants.RADIUS_SM)
-              }
             }
             .width('100%')
             .justifyContent(FlexAlign.SpaceBetween)
 
-            Column({ space: 8 }) {
+            Column() {
               ForEach(this.topics, (topic: string, index: number): void => {
                 Button({ type: ButtonType.Normal }) {
                   Row({ space: 12 }) {
                     Stack({ alignContent: Alignment.Center }) {
                       Column()
-                        .width(38)
-                        .height(38)
+                        .width(36)
+                        .height(36)
                         .borderRadius(12)
                         .backgroundColor(this.topicSurfaceColor(topic))
                       Text((index + 1).toString())
@@ -342,19 +332,24 @@ struct CourseDetailPage {
                   .width('100%')
                 }
                 .width('100%')
-                .constraintSize({ minHeight: 82 })
-                .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-                .backgroundColor(this.topicSurfaceColor(topic))
-                .borderRadius(Constants.RADIUS_MD)
+                .constraintSize({ minHeight: 72 })
+                .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+                .backgroundColor(Constants.COLOR_BG_CARD)
                 .accessibilityText(topic + '，' + this.topicStatusLabel(topic))
                 .onClick((): void => { this.openTopic(topic); })
+                if (index < this.topics.length - 1) {
+                  Divider().color(Constants.COLOR_BORDER).margin({ left: 62 })
+                }
               })
             }
             .width('100%')
+            .borderRadius(Constants.RADIUS_LG)
+            .backgroundColor(Constants.COLOR_BG_CARD)
           }
           .width('100%')
           .constraintSize({ maxWidth: 760 })
-          .padding({ left: 16, right: 16, bottom: 28 + this.safeAreaBottomVp() })
+          .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER,
+            bottom: 28 + this.safeAreaBottomVp() })
         }
         .layoutWeight(1)
         .scrollBar(BarState.Off)

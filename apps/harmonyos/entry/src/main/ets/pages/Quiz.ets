@@ -56,6 +56,7 @@ struct QuizPage {
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '';
+  @State topicPickerExpanded: boolean = false;
   @State focusTag: string = '';
   @State quizId: string = '';
   @State questions: QuizQuestionView[] = [];
@@ -111,10 +112,11 @@ struct QuizPage {
   private scoringSteps: WorkStep[] = [
     { title: '核对', description: '比对 A-D 答案' },
     { title: '归因', description: '统计错因标签' },
-    { title: '记录', description: '写入本地画像' }
+    { title: '记录', description: '保存学习记录' }
   ];
 
   aboutToAppear(): void {
+    this.topicPickerExpanded = false;
     this.courseId = AppStorage.get<string>('selectedCourseId') ?? 'cs101';
     this.courseTitle = AppStorage.get<string>('selectedCourseTitle') ?? '数据结构';
     this.suggestions = LearningContentRepository.getTopics(this.courseId);
@@ -332,7 +334,7 @@ struct QuizPage {
         this.message = '当前主题暂时没有可用题目';
         this.hasError = true;
       } else {
-        this.message = '题目准备好了';
+        this.message = '';
         this.hasError = false;
       }
     } catch (e) {
@@ -433,7 +435,7 @@ struct QuizPage {
   }
 
   private applyWriteReceipt(receipt: QuizWriteReceipt): void {
-    this.writeBackStatus = receipt.applied ? '本次真实答题已写回本机' : '已恢复上次写回，未重复累计';
+    this.writeBackStatus = receipt.applied ? '测验结果已保存' : '上次结果已保存';
     this.writeBackTotalQuestions = receipt.totalQuestions;
     this.writeBackActiveReviews = receipt.activeReviewCount;
     this.writeBackTopicAccuracy = receipt.topicAccuracy;
@@ -905,32 +907,52 @@ struct QuizPage {
 
   @Builder
   SetupState() {
-    Column({ space: 18 }) {
-      Column({ space: 6 }) {
-        Text('选择本次练习主题')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text('选好主题和难度，开始练习')
-          .fontSize(13)
-          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+    Column({ space: 14 }) {
+      Row({ space: 12 }) {
+        Column({ space: 2 }) {
+          Text('主题')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          Text(this.topic)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Button(this.topicPickerExpanded ? '收起' : '更换')
+          .constraintSize({ minHeight: 48 })
+          .padding({ left: 14, right: 14 })
+          .fontSize(12)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .borderRadius(Constants.RADIUS_MD)
+          .onClick((): void => { this.topicPickerExpanded = !this.topicPickerExpanded; })
       }
       .width('100%')
-      .alignItems(HorizontalAlign.Start)
+      .padding(12)
+      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+      .borderRadius(Constants.RADIUS_MD)
 
-      Column({ space: 10 }) {
-        ForEach(this.suggestions, (suggestion: string): void => {
-          Button(suggestion)
-            .width('100%')
-            .height(48)
-            .fontSize(14)
-            .fontColor(this.topic === suggestion ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
-            .backgroundColor(this.topic === suggestion ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
-            .borderRadius(Constants.RADIUS_MD)
-            .onClick(() => { this.selectTopic(suggestion); })
-        })
+      if (this.topicPickerExpanded) {
+        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+          ForEach(this.suggestions, (suggestion: string): void => {
+            Button(suggestion)
+              .width('48%')
+              .constraintSize({ minHeight: 52 })
+              .fontSize(13)
+              .fontColor(this.topic === suggestion ? Constants.COLOR_TEXT_ON_GRADIENT : Constants.COLOR_TEXT_PRIMARY)
+              .backgroundColor(this.topic === suggestion ? Constants.COLOR_BRAND : Constants.COLOR_BG_TAG)
+              .borderRadius(Constants.RADIUS_MD)
+              .margin({ bottom: 8 })
+              .onClick(() => {
+                this.selectTopic(suggestion);
+                this.topicPickerExpanded = false;
+              })
+          })
+        }
+        .width('100%')
       }
-      .width('100%')
 
       if (this.focusTag.length > 0) {
         Row({ space: 9 }) {
@@ -938,18 +960,18 @@ struct QuizPage {
             .fontSize(18)
             .fontColor([Constants.COLOR_BRAND])
           Column({ space: 3 }) {
-            Text('本轮重点标签：' + this.focusTag)
+            Text('重点练习：' + this.focusTag)
               .fontSize(13)
               .fontWeight(FontWeight.Medium)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
-            Text('多练这类知识点')
+            Text('优先练这类题')
               .fontSize(11)
               .fontColor(Constants.COLOR_TEXT_SECONDARY)
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
           Button('取消')
-            .height(30)
+            .constraintSize({ minHeight: 48 })
             .fontSize(11)
             .fontColor(Constants.COLOR_BRAND)
             .backgroundColor(Constants.COLOR_BRAND_LIGHT)
@@ -963,7 +985,7 @@ struct QuizPage {
       }
 
       Column({ space: 8 }) {
-        Text('挑战长度')
+        Text('题量')
           .width('100%')
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
@@ -993,7 +1015,7 @@ struct QuizPage {
       .width('100%')
 
       Column({ space: 8 }) {
-        Text('难度分层')
+        Text('难度')
           .width('100%')
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
@@ -1037,10 +1059,10 @@ struct QuizPage {
       }
     }
     .width('100%')
-    .padding(18)
+    .padding(16)
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
-    .shadow({ radius: 8, color: Constants.SHADOW_CARD, offsetX: 0, offsetY: 1 })
+    .border({ width: 1, color: Constants.COLOR_BORDER })
   }
 
   @Builder
@@ -1080,7 +1102,7 @@ struct QuizPage {
 
   @Builder
   ScoringProgress() {
-    StagedProgress('正在生成学习反馈', '评分、错因标签和本地画像同步中', this.progressStep, this.scoringSteps)
+    StagedProgress('正在评分', '检查答案并整理反馈', this.progressStep, this.scoringSteps)
   }
 
   @Builder
@@ -1231,8 +1253,8 @@ struct QuizPage {
             .fontWeight(FontWeight.Bold)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           Text(this.resultCorrectCount === this.resultTotalQuestions ?
-            '本组全对，下一组继续检验。' :
-            '有 ' + (this.resultTotalQuestions - this.resultCorrectCount).toString() + ' 道题需要澄清。')
+            '全部答对，试试新题。' :
+            '有 ' + (this.resultTotalQuestions - this.resultCorrectCount).toString() + ' 道题做错了。')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
           Text('本次难度：' + this.difficultyLabel())
@@ -1265,20 +1287,11 @@ struct QuizPage {
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
           }
           .width('100%')
-          Text('累计答题 ' + this.writeBackTotalQuestions.toString() + ' 题 · 当前错题 ' +
+          Text('累计答题 ' + this.writeBackTotalQuestions.toString() + ' 题 · 错题 ' +
             this.writeBackActiveReviews.toString() + ' 道')
             .width('100%')
             .fontSize(12)
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text(this.topic + ' 掌握度 ' + Math.round(this.writeBackTopicAccuracy * 100).toString() +
-            '% · 学习活动累计 ' + this.writeBackActivityCount.toString() + ' 次')
-            .width('100%')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Text('课程进度 ' + Math.round(this.writeBackCourseProgress * 100).toString() + '%')
-            .width('100%')
-            .fontSize(12)
-            .fontColor(Constants.COLOR_BRAND)
         }
         .width('100%')
         .padding(16)
@@ -1377,8 +1390,7 @@ struct QuizPage {
         .borderRadius(Constants.RADIUS_LG)
       }
 
-      Text(this.resultCorrectCount === this.resultTotalQuestions ? '逐题解析 · 正确题默认收起' :
-        '逐题解析 · 错题默认展开')
+      Text('逐题回看')
         .width('100%')
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
@@ -1425,7 +1437,7 @@ struct QuizPage {
 
   build() {
     Column() {
-      GradientHeader('课程测验', this.courseTitle + ' · 即时评分', () => this.getUIContext().getRouter().back())
+      GradientHeader('测验', this.courseTitle, () => this.getUIContext().getRouter().back())
 
       if (this.message.length > 0) {
         this.MessageBanner()
@@ -1444,6 +1456,8 @@ struct QuizPage {
           }
         }
         .width('100%')
+        .constraintSize({ minHeight: '100%' })
+        .justifyContent(FlexAlign.Start)
         .padding({ left: 16, right: 16, bottom: 28 + SafeAreaInsets.bottomVp() })
       }
       .width('100%')

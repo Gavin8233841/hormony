@@ -7959,3 +7959,15 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 验证：API 12 `assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon` exit 0，行动卡左对齐微调后再次构建 exit 0；`node scripts/test-product-experience-contracts.mjs` 17/17、`node scripts/test-ws01-chat-plan-source-contract.mjs` 13/13、`node scripts/test-proactive-learning-service.mjs` 24/24，均 exit 0。Pura X View 模拟器安装并逐屏目视检查首页、课程、学伴及“我的学习”，截图位于忽略目录 `.runtime/visual-home2.png`、`.runtime/visual-course.png`、`.runtime/visual-chat-final3.png`、`.runtime/visual-profile.png`。学伴最新消息显示错题讲解、练习行动、引用与折叠处理记录；按钮保持 48vp。
 
 未验证：四个入口之外的课程详情、计划、练习、测验、错题本等页面尚未在本批逐屏统一；真机、横屏、系统大字号与签名发布包仍需后续验收。保留原有未提交脚本与审计文档，不纳入本批提交。
+
+---
+
+## 2026-09-25 [MAIN] 课程到测验主路径第二批
+
+背景：课程详情每个主题都是大卡片，复赛演示中难以看清课程范围；Lesson 已进入互动时仍先显示长说明；测验预选主题仍展开全部主题，题量、难度和开始按钮落在首屏以下。
+
+改动：课程详情先显示续学主题，进度随后，主题改为有分隔线的紧凑列表。Lesson 在末节先显示互动，再给课程说明；收窄左右留白，底部“继续练习”会滚到选项区域，相关提示改为学生语言。练习将题目操作保留 48vp，结果页简化统计与复盘说明。测验默认折叠主题列表，传入主题、题量、难度与开始按钮同屏；“更换”可展开双列主题，选择后收起；题目生成成功后不保留多余状态横幅。两页的保存状态与阶段文案精简，未改答案、评分或写回算法。`test_lesson_activity_resume_contract.py` 只同步更新续练滚动与文案对应的静态断言，原有状态与保存断言保留。
+
+验证：API 12 HAP 增量构建 exit 0，去掉多余成功横幅后最终构建再次 exit 0；Python `unittest discover` 215/215，`test-product-experience-contracts.mjs` 17/17、`test-graph-lesson-contract.mjs` 3/3、`test-ws01-chat-plan-source-contract.mjs` 13/13，最终均 exit 0。Pura X View 1320×2232：课程详情截图 `.runtime/learning-detail-v2.png`，Lesson 末节互动 `.runtime/learning-lesson-v2.png`，底部续练后选项区域 `.runtime/learning-lesson-focused.png`；排序活动按 3→1→2→4→5→6 提交显示“答对了”，底部进入练习。练习五题作答并提交后首屏显示 1/5、首道错题与学伴讲解按钮，截图 `.runtime/learning-practice-v2.png`、`.runtime/learning-practice-result-v2.png`。通过“我的学习”待巩固入口打开测验，主题折叠/展开/更换行为在 UI 树验证，紧凑首屏 `.runtime/learning-quiz-compact.png`；经模拟器网关调用线上测验 API 后实际拿到 5 题，首题截图 `.runtime/learning-quiz-question.png`。
+
+未验证：本批没有提交这组 AI 测验的评分结果；全对路径、大字号、横屏、真机与签名发布 HAP 尚未验收。计划、知识搜索、错题本及学习记录子页待后续统一。工作区其他未提交脚本与审计文档保留。
