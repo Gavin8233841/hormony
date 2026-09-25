@@ -243,7 +243,7 @@ test('有效今日计划返回可直达测验任务', async () => {
 
   const action = await service.resolve(now);
   assert.equal(action.kind, 'task');
-  assert.equal(action.title, '完成二叉树测验');
+  assert.equal(action.title, '测验二叉树');
   assert.equal(action.targetPage, 'pages/Quiz');
 });
 
@@ -413,7 +413,7 @@ test('今日计划跳过跨课程错配 Topic 并选择后续可执行任务', a
 
   const action = await service.resolve(now);
   assert.equal(action.kind, 'task');
-  assert.equal(action.title, '完成进程调度测验');
+  assert.equal(action.title, '测验进程调度');
   assert.equal(action.courseId, 'cs102');
   assert.equal(action.courseTitle, '操作系统');
   assert.equal(action.topic, '进程调度');

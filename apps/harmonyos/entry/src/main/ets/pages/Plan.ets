@@ -529,16 +529,17 @@ struct PlanPage {
   }
 
   private dayLabel(day: string): string {
-    if (day === this.localDateKey()) return '今天 · ' + day.slice(5, 7) + '月' + day.slice(8) + '日';
-    if (day < this.localDateKey()) return '此前 · ' + day.slice(5, 7) + '月' + day.slice(8) + '日';
-    return day.slice(5, 7) + '月' + day.slice(8) + '日';
+    const date = Number(day.slice(5, 7)).toString() + '月' + Number(day.slice(8, 10)).toString() + '日';
+    return day === this.localDateKey() ? '今天 · ' + date : date;
   }
 
   private daySummary(day: string): string {
     const tasks = this.tasksForDay(day);
-    const pending = tasks.filter((task: PlanTask): boolean => task.done !== true).length;
+    const remaining = tasks.filter((task: PlanTask): boolean => task.done !== true);
+    const pending = remaining.length;
     if (pending === 0) return tasks.length.toString() + ' 项已完成';
-    return pending.toString() + ' 项待做 · 共 ' + tasks.length.toString() + ' 项';
+    const minutes = remaining.reduce((total: number, task: PlanTask): number => total + task.estimatedMin, 0);
+    return pending.toString() + ' 项待做 · ' + minutes.toString() + ' 分钟';
   }
 
   private validCourseId(courseId: string): boolean {
@@ -1058,8 +1059,9 @@ struct PlanPage {
             .constraintSize({ minHeight: 48 })
             .padding({ left: 12, right: 12 })
             .fontSize(13)
-            .fontColor(Constants.COLOR_BRAND)
-            .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .border({ width: 1, color: Constants.COLOR_BORDER })
             .borderRadius(Constants.RADIUS_MD)
             .enabled(!this.loading && !this.planLoading && this.updatingTaskId.length === 0 &&
               this.retryAction !== 'save')
@@ -1067,12 +1069,13 @@ struct PlanPage {
             .accessibilityDescription('展开计划编辑器，当前任务在保存新计划前保持不变')
             .onClick((): void => { this.editorExpanded = true; })
           }
-          .width('100%')
+          .width('94%')
           .alignItems(VerticalAlign.Center)
-          .padding(12)
-          .backgroundColor(Constants.COLOR_BG_CARD)
+          .padding(16)
+          .backgroundColor(Constants.COLOR_SURFACE_TINT)
+          .border({ width: 1, color: Constants.COLOR_BORDER })
           .borderRadius(Constants.RADIUS_LG)
-          .margin({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 8 })
+          .margin({ bottom: 8 })
           .constraintSize({ maxWidth: 760 })
         }
       }
@@ -1209,7 +1212,7 @@ struct PlanPage {
                 Row({ space: 12 }) {
                   Column({ space: 4 }) {
                     Text(this.dayLabel(day))
-                      .fontSize(18)
+                      .fontSize(day === this.localDateKey() ? 18 : 16)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(day === this.localDateKey() ? Constants.COLOR_MAP_CORE : Constants.COLOR_TEXT_PRIMARY)
                     Text(this.daySummary(day))
@@ -1224,9 +1227,10 @@ struct PlanPage {
                 }
                 .width('100%')
                 .constraintSize({ minHeight: 56 })
-                .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-                .backgroundColor(day === this.localDateKey() ? Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_CARD)
-                .borderRadius(Constants.RADIUS_MD)
+                .padding({ left: day === this.localDateKey() ? 16 : 4,
+                  right: day === this.localDateKey() ? 16 : 4, top: 8, bottom: 8 })
+                .backgroundColor(day === this.localDateKey() ? Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_PAGE)
+                .borderRadius(day === this.localDateKey() ? Constants.RADIUS_MD : 0)
                 .focusable(true)
                 .accessibilityText(this.dayLabel(day) + '，' + this.daySummary(day) + '，' +
                   (this.isDayExpanded(day) ? '已展开' : '已折叠'))
@@ -1240,7 +1244,7 @@ struct PlanPage {
                   Column()
                     .width(34)
                     .height(34)
-                    .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BRAND_LIGHT)
+                    .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.courseTint(t.courseId ?? ''))
                     .borderRadius(17)
                   if (t.done) {
                     SymbolGlyph($r('sys.symbol.checkmark'))
@@ -1250,7 +1254,7 @@ struct PlanPage {
                     Text((i + 1).toString())
                       .fontSize(13)
                       .fontWeight(FontWeight.Medium)
-                      .fontColor(Constants.COLOR_BRAND)
+                      .fontColor(Constants.courseInk(t.courseId ?? ''))
                   }
                 }
 
@@ -1259,22 +1263,14 @@ struct PlanPage {
                     .fontSize(15)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(t.done ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_TEXT_PRIMARY)
-                  Text((this.hasTaskTarget(t) ? this.courseTitle(t.courseId) + ' · ' + (t.topic ?? '') : '重新生成后可直达学习环节'))
-                    .fontSize(11)
-                    .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_WARNING)
-                    .margin({ top: 5 })
                   Flex({ wrap: FlexWrap.Wrap }) {
+                    Text(this.hasTaskTarget(t) ? this.courseTitle(t.courseId) : '课程入口待更新')
+                      .fontSize(12)
+                      .fontColor(this.hasTaskTarget(t) ? Constants.COLOR_TEXT_SECONDARY : Constants.COLOR_WARNING)
+                      .margin({ right: 8 })
                     Text(t.estimatedMin.toString() + ' 分钟')
-                      .fontSize(11)
+                      .fontSize(12)
                       .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      .margin({ right: 8, bottom: 4 })
-                    Text(this.taskTypeLabel(t.type))
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_BRAND)
-                      .padding({ left: 7, right: 7, top: 2, bottom: 2 })
-                      .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-                      .borderRadius(7)
-                      .margin({ bottom: 4 })
                   }
                   .margin({ top: 5 })
                 }
@@ -1303,9 +1299,10 @@ struct PlanPage {
                     .layoutWeight(1)
                     .constraintSize({ minWidth: 64, minHeight: 48 })
                     .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-                    .fontSize(12)
+                    .fontSize(13)
                     .fontColor(t.done ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT_SECONDARY)
-                    .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_TAG)
+                    .backgroundColor(t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BG_CARD)
+                    .border({ width: 1, color: t.done ? Constants.COLOR_SUCCESS_LIGHT : Constants.COLOR_BORDER })
                     .borderRadius(Constants.RADIUS_SM)
                     .enabled(this.updatingTaskId.length === 0)
                     .accessibilityText((t.done ? '恢复待完成：' : '标记完成：') +

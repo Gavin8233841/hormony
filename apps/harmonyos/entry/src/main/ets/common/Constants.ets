@@ -60,6 +60,11 @@ export class Constants {
   static readonly COLOR_CHAT_USER: string = '#e8f0ff';
   static readonly COLOR_ERROR_LIGHT: string = '#fff0f1';
   static readonly COLOR_SUCCESS_LIGHT: string = '#eaf8ef';
+  // 三门课程的识别色；状态仍由独立的成功、警告、错误色表达。
+  static readonly COLOR_COURSE_OS_LIGHT: string = '#f1edff';
+  static readonly COLOR_COURSE_OS_INK: string = '#6651a8';
+  static readonly COLOR_COURSE_NETWORK_LIGHT: string = '#e6f6f3';
+  static readonly COLOR_COURSE_NETWORK_INK: string = '#17766c';
   // 学习图谱：深色星云画布 + 真实状态色，不用装饰线冒充先修关系。
   static readonly COLOR_MAP_SURFACE: string = '#111827';
   static readonly COLOR_MAP_LINE: string = '#34415c';
@@ -102,4 +107,16 @@ export class Constants {
   // hilog 日志
   static readonly HILOG_DOMAIN: number = 0x0001;
   static readonly HILOG_TAG: string = 'HongXueBan';
+
+  static courseTint(courseId: string): string {
+    if (courseId === 'cs102') return Constants.COLOR_COURSE_OS_LIGHT;
+    if (courseId === 'cs103') return Constants.COLOR_COURSE_NETWORK_LIGHT;
+    return Constants.COLOR_BRAND_LIGHT;
+  }
+
+  static courseInk(courseId: string): string {
+    if (courseId === 'cs102') return Constants.COLOR_COURSE_OS_INK;
+    if (courseId === 'cs103') return Constants.COLOR_COURSE_NETWORK_INK;
+    return Constants.COLOR_BRAND_TEXT;
+  }
 }

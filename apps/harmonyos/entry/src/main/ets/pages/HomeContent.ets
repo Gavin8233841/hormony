@@ -6,6 +6,7 @@ import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningReminder } from '../common/LearningReminder';
 import { LearningFormRefreshResult, LearningFormUpdater } from '../common/LearningFormUpdater';
 import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
+import { LearningContentRepository } from '../common/LearningContentRepository';
 import { common } from '@kit.AbilityKit';
 
 @Component
@@ -41,6 +42,7 @@ export struct HomeContent {
   @State nextActionReady: boolean = false;
   @State nextActionError: boolean = false;
   @State nextActionNavigationMessage: string = '';
+  @State courseNavigationMessage: string = '';
   @StorageLink('currentPlanTasks') planTasks: PlanTask[] = [];
   private reminderAction: ProactiveLearningAction | null = null;
   private reminderActionRunId: number = -1;
@@ -80,6 +82,16 @@ export struct HomeContent {
   private todayTasks(): PlanTask[] {
     const today = this.todayDate();
     return this.planTasks.filter((task: PlanTask): boolean => task.date === today);
+  }
+
+  private otherTodayTasks(): PlanTask[] {
+    const tasks = this.todayTasks();
+    if (!this.nextActionReady || this.nextActionKind !== 'task') return tasks;
+    const featuredIndex = tasks.findIndex((task: PlanTask): boolean =>
+      ProactiveLearningService.planTaskTitle(task) === this.nextActionTitle &&
+        task.courseId === this.nextActionCourseId && task.topic === this.nextActionTopic &&
+        task.action === this.nextActionTaskAction);
+    return featuredIndex < 0 ? tasks : tasks.filter((_: PlanTask, index: number): boolean => index !== featuredIndex);
   }
 
   private taskStatus(task: PlanTask): string {
@@ -217,6 +229,26 @@ export struct HomeContent {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Plan' }).catch((err: Error): void => {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'HomeContent router.pushUrl failed: %{public}s', err.message);
+    });
+  }
+
+  private courseTitle(courseId: string): string {
+    if (courseId === 'cs102') return '操作系统';
+    if (courseId === 'cs103') return '计算机网络';
+    return '数据结构';
+  }
+
+  private alternativeCourseIds(): string[] {
+    return ['cs101', 'cs102', 'cs103'].filter((courseId: string): boolean =>
+      courseId !== this.nextActionCourseId).slice(0, 2);
+  }
+
+  private openCourse(courseId: string): void {
+    this.courseNavigationMessage = '';
+    AppStorage.setOrCreate<string>('selectedCourseId', courseId);
+    AppStorage.setOrCreate<string>('selectedCourseTitle', this.courseTitle(courseId));
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/CourseDetail' }).catch((): void => {
+      this.courseNavigationMessage = '暂时无法打开课程，请重试';
     });
   }
 
@@ -477,9 +509,23 @@ export struct HomeContent {
             .fontWeight(FontWeight.Medium)
             .fontColor(Constants.COLOR_MAP_CORE)
           Blank()
-          Text(this.nextActionProgressText)
-            .fontSize(12)
-            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+          if (this.nextActionKind === 'task' && this.todayTasks().length > 0) {
+            Row({ space: 4 }) {
+              Text('查看计划')
+                .fontSize(12)
+                .fontColor(Constants.COLOR_MAP_CORE)
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(12)
+                .fontColor([Constants.COLOR_MAP_CORE])
+            }
+            .height(48)
+            .accessibilityText('查看完整学习计划')
+            .onClick((): void => { this.openPlan(); })
+          } else {
+            Text(this.nextActionProgressText)
+              .fontSize(12)
+              .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
+          }
         }
         .width('100%')
 
@@ -567,7 +613,8 @@ export struct HomeContent {
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Text(task.date + ' · ' + task.estimatedMin.toString() + ' 分钟')
+        Text((task.courseId === 'cs102' ? '操作系统' : task.courseId === 'cs103' ?
+          '计算机网络' : '数据结构') + ' · ' + task.estimatedMin.toString() + ' 分钟')
           .fontSize(12)
           .fontColor(Constants.COLOR_TEXT_SECONDARY)
           .margin({ top: 3 })
@@ -698,9 +745,9 @@ export struct HomeContent {
           .width('100%')
           .padding({ top: 18, bottom: 18 })
         } else {
-          ForEach(this.todayTasks().slice(0, 3), (task: PlanTask, index: number) => {
+          ForEach(this.otherTodayTasks().slice(0, 3), (task: PlanTask, index: number) => {
             this.TaskRow(task, index)
-            if (index < Math.min(this.todayTasks().length, 3) - 1) {
+            if (index < Math.min(this.otherTodayTasks().length, 3) - 1) {
               Divider()
                 .color(Constants.COLOR_BORDER)
                 .margin({ left: 46 })
@@ -720,6 +767,78 @@ export struct HomeContent {
           .fontColor(this.taskUpdateFailed ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
           .margin({ top: 8 })
           .accessibilityText(this.taskUpdateMessage)
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  CourseJump(courseId: string) {
+    Button({ type: ButtonType.Normal }) {
+      Column({ space: 8 }) {
+        Row() {
+          Stack({ alignContent: Alignment.Center }) {
+            Column()
+              .width(34)
+              .height(34)
+              .backgroundColor(Constants.COLOR_BG_CARD)
+              .borderRadius(11)
+            SymbolGlyph($r('sys.symbol.book_open_fill'))
+              .fontSize(17)
+              .fontColor([Constants.courseInk(courseId)])
+          }
+          Blank()
+          SymbolGlyph($r('sys.symbol.arrow_up_right'))
+            .fontSize(16)
+            .fontColor([Constants.courseInk(courseId)])
+        }
+        .width('100%')
+        Text(this.courseTitle(courseId))
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(LearningContentRepository.getTopics(courseId).length.toString() + ' 个主题')
+          .fontSize(12)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+    }
+    .layoutWeight(1)
+    .constraintSize({ minHeight: 118 })
+    .padding(14)
+    .backgroundColor(Constants.courseTint(courseId))
+    .borderRadius(Constants.RADIUS_LG)
+    .accessibilityText('进入' + this.courseTitle(courseId) + '课程')
+    .onClick((): void => { this.openCourse(courseId); })
+  }
+
+  @Builder
+  CourseShortcuts() {
+    Column({ space: 10 }) {
+      Row() {
+        Text('课程')
+          .fontSize(Constants.PAGE_SECTION_SIZE)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Blank()
+        Text('全部课程 ›')
+          .fontSize(13)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+          .constraintSize({ minHeight: 48 })
+          .onClick((): void => { this.selectedTab = 1; })
+      }
+      .width('100%')
+      Row({ space: 10 }) {
+        ForEach(this.alternativeCourseIds(), (courseId: string): void => {
+          this.CourseJump(courseId)
+        }, (courseId: string): string => courseId)
+      }
+      .width('100%')
+      if (this.courseNavigationMessage.length > 0) {
+        Text(this.courseNavigationMessage)
+          .fontSize(12)
+          .fontColor(Constants.COLOR_ERROR)
       }
     }
     .width('100%')
@@ -786,7 +905,11 @@ export struct HomeContent {
       Column({ space: 18 }) {
         this.Header()
         this.ContinueCard()
-        this.TodayPlan()
+        if (this.planLoading || this.planError || this.planTasks.length === 0 ||
+          this.todayTasks().length === 0 || this.otherTodayTasks().length > 0) {
+          this.TodayPlan()
+        }
+        this.CourseShortcuts()
         this.QuickAsk()
       }
       .width('100%')

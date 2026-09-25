@@ -133,7 +133,7 @@ export struct CourseContent {
       Text('接着学')
         .fontSize(12)
         .fontWeight(FontWeight.Medium)
-        .fontColor(Constants.COLOR_BRAND_TEXT)
+        .fontColor(Constants.courseInk(course.id))
       Row() {
         Text(course.title)
           .layoutWeight(1)
@@ -194,11 +194,11 @@ export struct CourseContent {
             Column()
               .width(44)
               .height(44)
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+              .backgroundColor(Constants.courseTint(course.id))
               .borderRadius(Constants.RADIUS_MD)
             SymbolGlyph($r('sys.symbol.book_open_fill'))
               .fontSize(21)
-              .fontColor([Constants.COLOR_BRAND])
+              .fontColor([Constants.courseInk(course.id)])
           }
           Column({ space: 4 }) {
             Text(course.title)

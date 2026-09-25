@@ -8117,3 +8117,19 @@ Python 3.12 `unittest discover` 215/215；HarmonyOS API 12 增量 `assembleHap` 
 ### 涉及文件
 
 `apps/harmonyos/entry/src/main/ets/pages/ResourceLibrary.ets`、`docs/RESOURCE-CURATION-20260925.md`、`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`DEVLOG.md`。保留其他任务已有未提交文件。
+
+---
+
+## [2026-09-25T13:12:00Z] [2026-09-25 21:12:00 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+用户要求跳出九张参考图，主动搜集优秀设计作品与开源设计稿。核对华为官方移动资源、开源学习 App 与对话客户端、Dribbble 和 Figma 作品，逐项记录页面结构、采用决定和许可边界于 `docs/DESIGN-REFERENCE-20260925.md`。D1 批据此调整首页与计划：当前任务只出现一次，两门其他课程有独立识别色与真实主题数量；计划按日期显示待办与分钟，今天突出、其他日期可展开，任务保留“学习／完成”两种真实操作。课程目录同步课程色。没有导入第三方代码、插画、品牌或课程内容。
+
+### 验证与边界
+
+Python 3.12 `unittest discover` 215/215；三份 Node 契约 67/67；HarmonyOS API 12 增量 `assembleHap` exit 0，未签名 HAP 已安装至 Pura X View。1320×2232 竖屏截图 `.runtime/design-audit-20260925/23-home-final-d1.jpeg` 与 `22-plan-verified-d1.jpeg`。UI 树抽样确认首页课程快捷卡进入操作系统课程、首页进入计划、计划“学习”进入哈希表 Lesson；首页下滑仍能看到学伴提问。未验证大字号、横屏、真机及新在线回答；既有 `TextInputController` syscap 提示和未签名构建提示仍在。保留其他任务已有未提交文件。
+
+### 涉及文件
+
+`Constants.ets`、`Course.ets`、`HomeContent.ets`、`Plan.ets`、一份过期任务标题契约、设计参考记录、实施交接及本日志。
