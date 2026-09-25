@@ -7920,3 +7920,18 @@ ohpm包源验证 + Lottie JSON格式验证 + 资源可靠性/可用性/创新性
 提交 `8021d6c` 推送后，GitHub API 显示 author/committer 均为 `Gavin8233841`；对应 Vercel Preview deployment `6654188982` 状态 `success`。旧 `DostiAziz` 作者关联问题不再阻断构建。Preview `/api/health` 的未认证请求被重定向至 `vercel.com/login`，响应是 HTML 登录页，不能当新接口通过；需项目账号访问后联调。
 
 本批继续删去主页演示路径中的“依据/闭环/校验”等内部话术，精简 Chat、Lesson、Plan、Practice、Quiz 的标题、等待态和反馈。Chat 消息把回答与行动放在过程卡前，旧对话在 Pura X View 模拟器的实时 UI 树和截图 `.runtime/semifinal-copy-chat-answer-first-20260925b.png` 中已显示回答先于过程；这不代表新模型回答的语气已校准。HAP 增量构建 exit 0，未签名产物 SHA-256 `9f5240e035a4f9f895000fb67302f2ca426349bf1cf8d3111c6e97ebb652eb18`。其他既有未提交脚本、审计文档和截图未改动。
+
+---
+
+## 2026-09-25 [MAIN] 本机 DevEco 运行与 BFS 首屏互动
+
+背景：复赛演示的图遍历课程进入后，原先长说明和两行选项把互动推到首屏以下。现有 DevEco Studio 当时停在欢迎页，需实际载入工程和模拟器运行配置。
+
+改动：仅调整 `Lesson.ets` 的 BFS 版式。BFS 图、队列、已访问序列与五个预测按钮进入首屏；五个按钮维持至少 48vp。错答和正确反馈放在问题旁；步骤解释默认收起，可按需展开，不改变推演状态。课程说明移到 BFS 互动之后。非 BFS 的课程说明顺序、DFS 状态判断及练习逻辑未修改。
+
+验证：
+- DevEco Studio 26.0.0.821 已打开 `/Users/Admin/Desktop/Hormony/hormony/apps/harmonyos`，`entry` 运行配置选中 Pura X View 7.0.0(26.0.0)。IDE 的 `Run 'entry'` 控制台显示 Build task 完成、HAP 安装成功、`com.c4ai.hormony successfully launched`；截屏在忽略目录 `.runtime/deveco-run-result.png`。
+- Studio 内置 Hvigor `assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon`：exit 0，33 tasks，API 12 工程未改 SDK 版本；产物未签名。`node scripts/test-graph-lesson-contract.mjs`：exit 0，3/3。
+- Pura X View 1320×2232：HDC `127.0.0.1:5555` 安装和启动成功。首屏 UI 树中五个选项 bounds 均为 144px 高（48vp），完全位于固定底栏上方；截图 `.runtime/bfs-final.png`。选 `0` 后队列 `1 → 2`，误选 `2` 后仍为 `1 → 2` 且出现“看看队首，再试一次。”，再选 `1` 后队列 `2 → 3`；对应 UI 树在 `.runtime/layout-hx-after0.json`、`.runtime/layout-hx-wrong2.json`、`.runtime/layout-hx-after1.json`。展开/收起解释不改变队列；推演至队列为空后“重新推演”回到队列 `0`。
+
+未验证：真机、横屏及系统放大字号；签名/发布 HAP 和复赛门户提交。现有 `Chat`/`Plan` 的 `TextInputController` 设备能力警告仍由构建器报告，未在本批改动。保留原有未提交脚本和文档，不纳入本次提交。

@@ -79,6 +79,7 @@ struct LessonPage {
   @State conceptStepIndex: number = 0;
   @State bfsGraphStepIndex: number = 0;
   @State bfsPredictionMessage: string = '';
+  @State bfsStepExpanded: boolean = false;
   @State dfsGraphStepIndex: number = 0;
   @State graphPromptExpanded: boolean = false;
   @State codeRunStepIndex: number = -1;
@@ -107,6 +108,7 @@ struct LessonPage {
     this.conceptStepIndex = 0;
     this.bfsGraphStepIndex = 0;
     this.bfsPredictionMessage = '';
+    this.bfsStepExpanded = false;
     this.dfsGraphStepIndex = 0;
     this.graphPromptExpanded = false;
     this.chunks = content;
@@ -690,7 +692,7 @@ struct LessonPage {
   private predictBfsNext(id: number): void {
     if (this.bfsGraphStepIndex >= BFS_NEXT.length) return;
     if (id !== BFS_NEXT[this.bfsGraphStepIndex]) {
-      this.bfsPredictionMessage = '看看队首：它最先进入队列。';
+      this.bfsPredictionMessage = '看看队首，再试一次。';
       return;
     }
     this.bfsGraphStepIndex += 1;
@@ -700,7 +702,7 @@ struct LessonPage {
 
   @Builder
   private GraphBoard(dfs: boolean) {
-    Column({ space: 10 }) {
+    Column({ space: dfs ? 10 : 6 }) {
       Row() {
         Text(dfs ? 'DFS 练习图 · 无向' : 'BFS 示例图 · 无向')
           .fontSize(12)
@@ -747,14 +749,14 @@ struct LessonPage {
         '广度优先搜索概念示例图，边为 0-1、0-2、1-3、2-4')
     }
     .width('100%')
-    .padding(16)
+    .padding(dfs ? 16 : 12)
     .backgroundColor(Constants.COLOR_MAP_SURFACE)
     .borderRadius(Constants.RADIUS_LG)
   }
 
   @Builder
   private BfsGraphExperience() {
-    Column({ space: 12 }) {
+    Column({ space: 6 }) {
       Row() {
         Text('广度优先搜索')
           .fontSize(17)
@@ -776,34 +778,24 @@ struct LessonPage {
         .width('100%')
         .fontSize(13)
         .fontColor(Constants.COLOR_TEXT_SECONDARY)
-      Text(this.experience!.workedExampleSteps[this.bfsGraphStepIndex])
-        .width('100%')
-        .fontSize(13)
-        .lineHeight(21)
-        .fontColor(Constants.COLOR_TEXT_TERTIARY)
-
       if (this.bfsGraphStepIndex < BFS_NEXT.length) {
-        Text('下一个出队的是谁？')
-          .width('100%')
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
-        Row({ space: 8 }) {
-          ForEach(GRAPH_NODES.slice(0, 3), (node: LessonGraphNode): void => {
-            Button(node.id.toString())
+        Row({ space: 6 }) {
+          Text('下一个出队的是谁？')
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          if (this.bfsPredictionMessage.length > 0) {
+            Text(this.bfsPredictionMessage)
               .layoutWeight(1)
-              .constraintSize({ minHeight: 48 })
-              .fontSize(13)
+              .fontSize(11)
+              .maxLines(1)
+              .textAlign(TextAlign.End)
               .fontColor(Constants.COLOR_BRAND_TEXT)
-              .backgroundColor(Constants.COLOR_BRAND_LIGHT)
-              .borderRadius(Constants.RADIUS_SM)
-              .accessibilityText('预测顶点 ' + node.id.toString() + ' 下一个出队')
-              .onClick((): void => { this.predictBfsNext(node.id); })
-          })
+          }
         }
         .width('100%')
         Row({ space: 8 }) {
-          ForEach(GRAPH_NODES.slice(3), (node: LessonGraphNode): void => {
+          ForEach(GRAPH_NODES, (node: LessonGraphNode): void => {
             Button(node.id.toString())
               .layoutWeight(1)
               .constraintSize({ minHeight: 48 })
@@ -828,15 +820,30 @@ struct LessonPage {
             this.bfsPredictionMessage = '';
           })
       }
-      if (this.bfsPredictionMessage.length > 0) {
+      if (this.bfsGraphStepIndex >= BFS_NEXT.length && this.bfsPredictionMessage.length > 0) {
         Text(this.bfsPredictionMessage)
           .width('100%')
           .fontSize(12)
           .fontColor(Constants.COLOR_BRAND_TEXT)
       }
+      Button(this.bfsStepExpanded ? '收起解释' : '查看这一步')
+        .width('100%')
+        .constraintSize({ minHeight: 48 })
+        .fontSize(12)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        .backgroundColor(Constants.COLOR_BG_TAG)
+        .borderRadius(Constants.RADIUS_MD)
+        .onClick((): void => { this.bfsStepExpanded = !this.bfsStepExpanded; })
+      if (this.bfsStepExpanded) {
+        Text(this.experience!.workedExampleSteps[this.bfsGraphStepIndex])
+          .width('100%')
+          .fontSize(13)
+          .lineHeight(21)
+          .fontColor(Constants.COLOR_TEXT_TERTIARY)
+      }
     }
     .width('100%')
-    .padding(16)
+    .padding(12)
     .backgroundColor(Constants.COLOR_BG_CARD)
     .borderRadius(Constants.RADIUS_LG)
   }
@@ -1123,24 +1130,24 @@ struct LessonPage {
   private IntroExperience() {
     if (this.experience !== null) {
       Column({ space: 14 }) {
-        Row() {
-          Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.book_open_fill'))
-              .fontSize(18)
-              .fontColor([Constants.COLOR_BRAND])
-            Text('概念推演')
-              .fontSize(17)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        if (!this.hasBfsGraphSource()) {
+          Row() {
+            Row({ space: 8 }) {
+              SymbolGlyph($r('sys.symbol.book_open_fill'))
+                .fontSize(18)
+                .fontColor([Constants.COLOR_BRAND])
+              Text('概念推演')
+                .fontSize(17)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            }
+            Text((this.conceptStepIndex + 1).toString() + ' / ' + this.conceptStepCount().toString())
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
           }
-          Text(this.hasBfsGraphSource() ?
-            (this.bfsGraphStepIndex + 1).toString() + ' / ' + BFS_QUEUES.length.toString() :
-            (this.conceptStepIndex + 1).toString() + ' / ' + this.conceptStepCount().toString())
-            .fontSize(11)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
         }
-        .width('100%')
-        .justifyContent(FlexAlign.SpaceBetween)
         if (this.hasBfsGraphSource()) {
           this.BfsGraphExperience()
         } else {
@@ -1565,6 +1572,33 @@ struct LessonPage {
     .width('100%')
   }
 
+  @Builder
+  private LessonOpening() {
+    Column({ space: 12 }) {
+      Row({ space: 8 }) {
+        SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
+          .fontSize(18)
+          .fontColor([Constants.COLOR_BRAND])
+        Text('这节讲什么')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+      }
+      .width('100%')
+
+      Text(this.contentBeats()[0] ?? this.activeChunk.text)
+        .width('100%')
+        .fontSize(16)
+        .fontWeight(FontWeight.Regular)
+        .lineHeight(26)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+    .backgroundColor(Constants.COLOR_SURFACE_TINT)
+    .borderRadius(Constants.RADIUS_LG)
+  }
+
   build() {
     Column() {
       TitleBar(this.topic.length > 0 ? this.topic : '课程内容', this.courseTitle,
@@ -1615,31 +1649,13 @@ struct LessonPage {
 
         Scroll(this.contentScroller) {
           Column({ space: 24 }) {
-            Column({ space: 12 }) {
-              Row({ space: 8 }) {
-                SymbolGlyph($r('sys.symbol.lightbulb_max_fill'))
-                  .fontSize(18)
-                  .fontColor([Constants.COLOR_BRAND])
-                Text('这节讲什么')
-                  .fontSize(13)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(Constants.COLOR_BRAND_TEXT)
-              }
-              .width('100%')
-
-              Text(this.contentBeats()[0] ?? this.activeChunk.text)
-                .width('100%')
-                .fontSize(16)
-                .fontWeight(FontWeight.Regular)
-                .lineHeight(26)
-                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            if (this.hasBfsGraphSource() && this.showIntroExperience()) {
+              this.IntroExperience()
             }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 16, bottom: 16 })
-            .backgroundColor(Constants.COLOR_SURFACE_TINT)
-            .borderRadius(Constants.RADIUS_LG)
 
-            if (this.showIntroExperience()) {
+            this.LessonOpening()
+
+            if (this.showIntroExperience() && !this.hasBfsGraphSource()) {
               this.IntroExperience()
             }
 
