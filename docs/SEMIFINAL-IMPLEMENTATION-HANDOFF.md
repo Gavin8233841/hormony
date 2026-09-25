@@ -251,3 +251,11 @@ Codex 保存项目现已由用户改到 `/Users/Admin/Desktop/Hormony`，但 `li
 Preview 地址 `https://hormony-jymx3ippv-gwyy8233841.vercel.app` 当前受 Vercel 登录保护；未认证请求访问 `/api/health` 最终收到 `vercel.com/login` 的 HTML，不能将 HTTP 200 登录页认作 API 通过。需要项目账号的受限访问方式后再测新 Chat/Evaluator/action SSE，且不应为了测试公开整个项目。
 
 主演示路径的静态文案已做第二批精简：Chat 让回答和行动先于技术过程显示；首页主卡压缩；Lesson、Plan、Practice、Quiz 删除开发/验收式措辞。Pura X View 模拟器的 Chat UI 树显示回答正文先于过程卡，截图 `.runtime/semifinal-copy-chat-answer-first-20260925b.png`。此项仍须在真实新回答、五屏截图及学生短任务中复核，不能仅凭旧会话宣布全部完成；模型输出本身也需要减少报告式长文，待可访问新版 API 后校准提示与案例。
+
+## 17. 9/25 可验证 Preview 与真实回答（14:16 CST）
+
+本节更新第 16 节的 Preview 待验证项。提交 `cc96e41d17f59c77d20699d176dd364f1d9ca7bf` 的 GitHub 作者/提交者均为 `Gavin8233841`；Vercel Preview deployment `6654907669` 为 `success`，地址 `https://hormony-c5owmzq5m-gwyy8233841.vercel.app`。已登录 Vercel CLI 通过部署保护访问该地址，`GET /api/health` 为 HTTP 200、`status=ready`、`model.configured=true`、无状态部署。Preview 仍受 Vercel 登录保护，不公开部署或密钥。
+
+合成图遍历题的真实接口回执：未提交时 Chat 进入 Tutor，只提示按邻接点编号排序，不透露下一顶点；提交错误序列 `0 2 1 3 4` 后进入 Evaluator，指出 `1` 应先于 `2`，给出一题可立即完成的小练习，并发出课程练习 `action` 与三条资料引用。此前同一题返回冗长“学习诊断报告”；`cc96e41` 已改为回答学生具体问题、最多三句，不再把正确率报告和空泛分类塞进聊天正文。`POST /api/plan` 返回三天各 30 分钟的阅读、练习、测验任务；`POST /api/quiz` 返回两道图遍历题且题目与评分条目逐项对应。Web lint、typecheck、482/482 测试、build 均通过；新增端侧短文案的 HAP 增量构建通过。以上是 Preview API 与本机构建证据，不是当前 HAP 经新 Preview 的端云联调。
+
+现有 `MODEL_API_KEY` 是 Vercel 的 Production 敏感变量；本次部署时仅临时扩展到 Preview，部署就绪后已恢复 Production-only，未读取或写出密钥值。这个部署保留其创建时的模型配置，但**后续新 Preview 部署不会自动继承密钥**。下一批推送前应配独立、限额且仅适用于目标分支的测试密钥，或按这次方式短时配置并部署后收回。当前 HAP 的 `Constants.BASE_URL` 仍指向旧 Production 地址 `https://hormony-ruddy.vercel.app`；端侧接入新服务及同一版本完整模拟器路径仍列在复赛集成待办，不能用本节接口回执代替。
