@@ -56,6 +56,7 @@ const BFS_VISITED_COUNT: number[] = [1, 3, 4, 5, 5, 5];
 @Entry
 @Component
 struct LessonPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   private contentScroller: Scroller = new Scroller();
   private activityOffset: number = 0;
   @State courseId: string = 'cs101';

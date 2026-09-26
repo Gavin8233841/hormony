@@ -11,6 +11,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct CourseContent {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @Prop @Watch('refreshLearningView') learningViewVersion: number = 0;
   @State courses: Course[] = [];
   @State lessonProgress: LessonProgress[] = [];
@@ -141,15 +142,15 @@ export struct CourseContent {
           Text('接着学')
             .fontSize(12)
             .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.courseInk(course.id))
+            .fontColor(Constants.COLOR_HERO_ACCENT)
           Text(course.title)
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .fontColor(Constants.COLOR_MAP_CORE)
           Text(this.courseProgressLabel(course))
             .width('100%')
             .fontSize(13)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
             .maxLines(2)
         }
         .layoutWeight(1)
@@ -166,11 +167,11 @@ export struct CourseContent {
           Progress({ value: course.progress * 100, total: 100, type: ProgressType.Linear })
             .layoutWeight(1)
             .height(4)
-            .color(Constants.COLOR_BRAND)
-            .backgroundColor(Constants.COLOR_BG_PROGRESS_TRACK)
+            .color(Constants.COLOR_HERO_ACCENT)
+            .backgroundColor(Constants.COLOR_HERO_BADGE)
           Text(Math.round(course.progress * 100).toString() + '%')
             .fontSize(12)
-            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
         }
         .layoutWeight(1)
         Button(this.courseActionLabel(course))
@@ -178,29 +179,33 @@ export struct CourseContent {
           .padding({ left: 20, right: 20 })
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-          .backgroundColor(Constants.COLOR_BRAND)
+          .fontColor(Constants.COLOR_HERO_SURFACE)
+          .backgroundColor(Constants.COLOR_HERO_ACCENT)
           .borderRadius(Constants.RADIUS_MD)
           .accessibilityText(this.courseActionLabel(course) + '：' + course.title)
           .onClick((): void => { this.openCourse(course); })
       }
       .width('100%')
-      .padding({ left: 12, right: 8, top: 7, bottom: 7 })
-      .backgroundColor(Constants.COLOR_HERO_INSET)
-      .borderRadius(15)
+      .padding({ left: 0, right: 0, top: 4, bottom: 0 })
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding(18)
-    .backgroundColor(Constants.courseTint(course.id))
-    .borderRadius(Constants.RADIUS_XL)
-    .margin({ bottom: 20 })
+    .backgroundColor(Constants.COLOR_HERO_SURFACE)
+    .linearGradient({ angle: 115, colors: [[Constants.COLOR_HERO_SURFACE, 0], ['#314b7e', 1]] })
+    .borderRadius(24)
+    .margin({ bottom: 16 })
   }
 
   @Builder
   CourseDirectoryRow(course: Course) {
     Button({ type: ButtonType.Normal }) {
-      Row({ space: 8 }) {
+      Row({ space: 12 }) {
+        Column()
+          .width(4)
+          .height(64)
+          .backgroundColor(Constants.courseInk(course.id))
+          .borderRadius(2)
         Column({ space: 5 }) {
           Text(course.title)
             .fontSize(18)
@@ -211,32 +216,27 @@ export struct CourseContent {
             .fontColor(Constants.COLOR_TEXT_SECONDARY)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Row({ space: 4 }) {
-            Text(this.courseIsStarted(course) ? '继续学习' : '进入课程')
-              .fontSize(11)
-              .fontColor(Constants.courseInk(course.id))
-            SymbolGlyph($r('sys.symbol.arrow_up_right'))
-              .fontSize(11)
-              .fontColor([Constants.courseInk(course.id)])
-          }
-          .margin({ top: 4 })
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         Image(this.courseArtwork(course.id))
-          .width(74)
-          .height(74)
+          .width(68)
+          .height(68)
           .objectFit(ImageFit.Contain)
           .accessibilityText('')
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(14)
+          .fontColor([Constants.COLOR_TEXT_SECONDARY])
       }
       .width('100%')
     }
     .width('100%')
-    .height(108)
-    .padding({ left: 16, right: 12 })
-    .backgroundColor(Constants.courseTint(course.id))
-    .borderRadius(Constants.RADIUS_XL)
-    .margin({ bottom: 10 })
+    .height(96)
+    .padding({ left: 14, right: 14 })
+    .backgroundColor(Constants.COLOR_BG_CARD)
+    .border({ width: 1, color: Constants.COLOR_BORDER })
+    .borderRadius(Constants.RADIUS_LG)
+    .margin({ bottom: 8 })
     .accessibilityText(this.courseActionLabel(course) + '：' + course.title)
     .onClick((): void => { this.openCourse(course); })
   }

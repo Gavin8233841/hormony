@@ -12,6 +12,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Component
 export struct ProfileContent {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State profile: UserProfile | null = null;
   @State courses: Course[] = [];
   @State topicMastery: TopicMastery[] = [];
@@ -275,12 +276,38 @@ export struct ProfileContent {
               .layoutWeight(1)
             }
             .width('100%')
-            .padding(16)
+            .padding({ left: 4, right: 4, top: 6, bottom: 6 })
+            .accessibilityGroup(true)
+            .accessibilityText(this.profile.name + '，' + this.profile.stage)
+
+            Column({ space: 10 }) {
+              Row() {
+                this.Metric(Math.round(this.profile.stats.accuracy * 100).toString() + '%', '正确率',
+                  Constants.COLOR_TEXT_PRIMARY)
+                Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
+                this.Metric(this.profile.stats.totalQuestions.toString(), '累计答题', Constants.COLOR_TEXT_PRIMARY)
+                Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
+                this.Metric(this.profile.stats.streakDays.toString(), '连续天数', Constants.COLOR_BRAND)
+              }
+              .width('100%')
+              Text('已学习 ' + this.profile.stats.studyDays.toString() + ' 天')
+                .width('100%')
+                .fontSize(11)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                .textAlign(TextAlign.Center)
+                .lineHeight(18)
+            }
+            .width('100%')
+            .padding({ top: 14, bottom: 14 })
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
             .border({ width: 1, color: Constants.COLOR_BORDER })
             .accessibilityGroup(true)
-            .accessibilityText(this.profile.name + '，' + this.profile.stage)
+            .accessibilityText('学习统计，正确率' + Math.round(this.profile.stats.accuracy * 100).toString() +
+              '%，累计答题' + this.profile.stats.totalQuestions.toString() + '题，连续学习' +
+              this.profile.stats.streakDays.toString() + '天，已学习' +
+              this.profile.stats.studyDays.toString() + '天')
+            .accessibilityDescription('根据已保存的学习记录统计')
 
             if (this.featuredMastery() !== null) {
               ForEach(this.topicMastery.slice(0, 1), (item: TopicMastery): void => {
@@ -288,7 +315,7 @@ export struct ProfileContent {
                   Text('接着练')
                     .fontSize(12)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor(Constants.COLOR_BRAND)
+                    .fontColor(Constants.COLOR_BRAND_TEXT)
                   Text(item.topic)
                     .fontSize(20)
                     .fontWeight(FontWeight.Bold)
@@ -309,9 +336,8 @@ export struct ProfileContent {
                 .width('100%')
                 .padding(16)
                 .alignItems(HorizontalAlign.Start)
-                .backgroundColor(Constants.COLOR_BG_CARD)
+                .backgroundColor(Constants.COLOR_BRAND_LIGHT)
                 .borderRadius(Constants.RADIUS_LG)
-                .border({ width: 1, color: Constants.COLOR_BORDER })
               })
             }
 
@@ -363,39 +389,12 @@ export struct ProfileContent {
             .constraintSize({ minHeight: 96 })
             .padding(18)
             .backgroundColor(Constants.COLOR_MAP_SURFACE)
+            .linearGradient({ angle: 115, colors: [[Constants.COLOR_MAP_SURFACE, 0], ['#314b7e', 1]] })
             .borderRadius(Constants.RADIUS_LG)
             .onClick((): void => { this.openLearningMap(); })
             .accessibilityGroup(true)
             .accessibilityText('打开学习星图')
             .accessibilityDescription('查看知识之间的联系与掌握状态')
-
-            Column({ space: 10 }) {
-              Row() {
-                this.Metric(Math.round(this.profile.stats.accuracy * 100).toString() + '%', '正确率', Constants.COLOR_SUCCESS)
-                Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
-                this.Metric(this.profile.stats.totalQuestions.toString(), '累计答题', Constants.COLOR_TEXT_PRIMARY)
-                Column().width(1).height(36).backgroundColor(Constants.COLOR_BORDER)
-                this.Metric(this.profile.stats.streakDays.toString(), '连续天数', Constants.COLOR_BRAND)
-              }
-              .width('100%')
-              Text('已学习 ' + this.profile.stats.studyDays.toString() + ' 天')
-                .width('100%')
-                .fontSize(11)
-                .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                .textAlign(TextAlign.Center)
-                .lineHeight(18)
-            }
-            .width('100%')
-            .padding({ top: 16, bottom: 16 })
-            .backgroundColor(Constants.COLOR_BG_CARD)
-            .borderRadius(Constants.RADIUS_LG)
-            .border({ width: 1, color: Constants.COLOR_BORDER })
-            .accessibilityGroup(true)
-            .accessibilityText('学习统计，正确率' + Math.round(this.profile.stats.accuracy * 100).toString() +
-              '%，累计答题' + this.profile.stats.totalQuestions.toString() + '题，连续学习' +
-              this.profile.stats.streakDays.toString() + '天，已学习' +
-              this.profile.stats.studyDays.toString() + '天')
-            .accessibilityDescription('根据已保存的学习记录统计')
 
             Column({ space: 12 }) {
               Text('知识点')

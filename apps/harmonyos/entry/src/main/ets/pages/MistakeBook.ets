@@ -9,6 +9,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 @Entry
 @Component
 struct MistakeBookPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State items: ReviewItem[] = [];
   @State reviewSummary: string = '待复习 0 道 · 今天 0 道';
   @State expandedId: string = '';

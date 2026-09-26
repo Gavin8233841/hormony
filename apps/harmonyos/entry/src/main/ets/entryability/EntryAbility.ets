@@ -2,8 +2,9 @@
  * EntryAbility — 应用入口 Ability
  */
 
-import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { display, window } from '@kit.ArkUI';
+import { resourceManager } from '@kit.LocalizationKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { Constants } from '../common/Constants';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
@@ -24,7 +25,14 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.queueProactiveWant(want);
+    AppStorage.setOrCreate<boolean>('darkMode',
+      this.context.resourceManager.getConfigurationSync().colorMode === resourceManager.ColorMode.DARK);
     console.info('EntryAbility onCreate');
+  }
+
+  onConfigurationUpdate(newConfig: Configuration): void {
+    AppStorage.setOrCreate<boolean>('darkMode',
+      newConfig.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -64,6 +72,11 @@ export default class EntryAbility extends UIAbility {
       return;
     }
     try {
+      // 普通窗口已经由系统避让状态栏和手势区，只有沉浸式布局才需页面再加内边距。
+      if (!this.mainWindow.getWindowProperties().isLayoutFullScreen) {
+        SafeAreaInsets.setVp(0, 0);
+        return;
+      }
       const systemArea = this.mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const cutoutArea = this.mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_CUTOUT);
       const gestureArea = this.mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM_GESTURE);

@@ -31,6 +31,7 @@ interface PlanValidationResult {
 @Entry
 @Component
 struct PlanPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   private goalInputController: TextInputController = new TextInputController();
   @State goal: string = '';
   @State days: number = 14;
@@ -519,13 +520,15 @@ struct PlanPage {
   }
 
   private toggleDay(day: string): void {
-    if (this.isDayExpanded(day)) {
-      this.expandedFutureDays = this.expandedFutureDays.filter((value: string): boolean => value !== day);
-      this.collapsedDays = [...this.collapsedDays, day];
-    } else {
-      this.collapsedDays = this.collapsedDays.filter((value: string): boolean => value !== day);
-      this.expandedFutureDays = [...this.expandedFutureDays, day];
-    }
+    this.getUIContext().animateTo({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut }, (): void => {
+      if (this.isDayExpanded(day)) {
+        this.expandedFutureDays = this.expandedFutureDays.filter((value: string): boolean => value !== day);
+        this.collapsedDays = [...this.collapsedDays, day];
+      } else {
+        this.collapsedDays = this.collapsedDays.filter((value: string): boolean => value !== day);
+        this.expandedFutureDays = [...this.expandedFutureDays, day];
+      }
+    });
   }
 
   private dayLabel(day: string): string {
@@ -1071,11 +1074,10 @@ struct PlanPage {
           }
           .width('94%')
           .alignItems(VerticalAlign.Center)
-          .padding(16)
-          .backgroundColor(Constants.COLOR_SURFACE_TINT)
-          .border({ width: 1, color: Constants.COLOR_BORDER })
-          .borderRadius(Constants.RADIUS_LG)
-          .margin({ bottom: 8 })
+          .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+          .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+          .borderRadius(Constants.RADIUS_MD)
+          .margin({ bottom: 6 })
           .constraintSize({ maxWidth: 760 })
         }
       }
@@ -1205,32 +1207,43 @@ struct PlanPage {
         .layoutWeight(1)
         .scrollBar(BarState.Off)
       } else if (this.tasks.length > 0) {
-        List({ space: 8 }) {
+        List({ space: 4 }) {
           ForEach(this.taskDays(), (day: string): void => {
             ListItem() {
-              Column({ space: 8 }) {
+              Column({ space: 3 }) {
                 Row({ space: 12 }) {
-                  Column({ space: 4 }) {
+                  if (day === this.localDateKey()) {
+                    Column({ space: 2 }) {
+                      Text(this.dayLabel(day))
+                        .fontSize(17)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor(Constants.COLOR_BRAND_TEXT)
+                      Text(this.daySummary(day))
+                        .fontSize(11)
+                        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                    }
+                    .alignItems(HorizontalAlign.Start)
+                    .layoutWeight(1)
+                  } else {
                     Text(this.dayLabel(day))
-                      .fontSize(day === this.localDateKey() ? 18 : 16)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(day === this.localDateKey() ? Constants.COLOR_MAP_CORE : Constants.COLOR_TEXT_PRIMARY)
+                      .fontSize(14)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                    Blank()
                     Text(this.daySummary(day))
-                      .fontSize(12)
-                      .fontColor(day === this.localDateKey() ? Constants.COLOR_MAP_TEXT_MUTED : Constants.COLOR_TEXT_SECONDARY)
+                      .fontSize(11)
+                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
                   }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
                   SymbolGlyph($r(this.isDayExpanded(day) ? 'sys.symbol.chevron_up' : 'sys.symbol.chevron_down'))
-                    .fontSize(16)
-                    .fontColor([day === this.localDateKey() ? Constants.COLOR_MAP_CORE : Constants.COLOR_BRAND])
+                    .fontSize(14)
+                    .fontColor([Constants.COLOR_BRAND])
                 }
                 .width('100%')
-                .constraintSize({ minHeight: 56 })
-                .padding({ left: day === this.localDateKey() ? 16 : 4,
-                  right: day === this.localDateKey() ? 16 : 4, top: 8, bottom: 8 })
-                .backgroundColor(day === this.localDateKey() ? Constants.COLOR_MAP_SURFACE : Constants.COLOR_BG_PAGE)
-                .borderRadius(day === this.localDateKey() ? Constants.RADIUS_MD : 0)
+                .height(day === this.localDateKey() ? 60 : 46)
+                .padding({ left: 14, right: 14, top: 5, bottom: 5 })
+                .backgroundColor(day === this.localDateKey() ? Constants.COLOR_BRAND_LIGHT :
+                  Constants.COLOR_SURFACE_TINT)
+                .borderRadius(Constants.RADIUS_MD)
                 .focusable(true)
                 .accessibilityText(this.dayLabel(day) + '，' + this.daySummary(day) + '，' +
                   (this.isDayExpanded(day) ? '已展开' : '已折叠'))
@@ -1296,7 +1309,7 @@ struct PlanPage {
                     .accessibilityDescription('打开任务对应的课程或练习')
                     .onClick(() => { this.openTask(t); })
                   Button(this.updatingTaskId === t.id ? '保存中' : (t.done ? '恢复' : '完成'))
-                    .layoutWeight(1)
+                    .width(88)
                     .constraintSize({ minWidth: 64, minHeight: 48 })
                     .padding({ left: 12, right: 12, top: 10, bottom: 10 })
                     .fontSize(13)
@@ -1316,6 +1329,7 @@ struct PlanPage {
               .padding(14)
               .backgroundColor(Constants.COLOR_BG_CARD)
               .borderRadius(Constants.RADIUS_MD)
+              .margin({ left: 12 })
                   }, (task: PlanTask): string => task.id)
                 }
               }

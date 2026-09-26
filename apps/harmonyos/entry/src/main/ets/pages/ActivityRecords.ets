@@ -16,6 +16,7 @@ interface ActivityDay {
 @Entry
 @Component
 struct ActivityRecordsPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State events: StudyEvent[] = [];
   @State visibleEvents: StudyEvent[] = [];
   @State courses: Course[] = [];

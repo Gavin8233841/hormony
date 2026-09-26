@@ -24,6 +24,7 @@ interface KnowledgeEvidence {
 @Entry
 @Component
 struct KnowledgePage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State query: string = '';
   @State resultQuery: string = '';
   @State results: KnowledgeChunk[] = [];

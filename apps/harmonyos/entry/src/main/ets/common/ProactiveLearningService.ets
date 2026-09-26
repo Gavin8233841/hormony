@@ -213,9 +213,9 @@ export class ProactiveLearningService {
     const stem = item.stem.length > 34 ? item.stem.slice(0, 34) + '…' : item.stem;
     return {
       kind: 'review',
-      badge: '到期复习',
-      title: dueCount.toString() + ' 道错题今天到期',
-      subtitle: title + ' · ' + item.topic,
+      badge: '今日任务',
+      title: '错题复习',
+      subtitle: title + ' · ' + dueCount.toString() + ' 道待复习',
       cta: '开始复习',
       courseId: item.courseId,
       courseTitle: title,
@@ -224,7 +224,7 @@ export class ProactiveLearningService {
       taskAction: 'review',
       targetPage: 'pages/MistakeBook',
       evidence: '上次错题：' + stem,
-      progressText: dueCount.toString() + ' 道今日到期'
+      progressText: item.topic
     };
   }
 

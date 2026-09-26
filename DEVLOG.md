@@ -5,6 +5,7 @@
 
 ---
 
+
 ## [2026-06-25T04:20:47Z] [2026-06-25 12:20:47 CST] 模型: Claude (WorkBuddy)
 
 ### 操作
@@ -8255,3 +8256,23 @@ Python 3.12 `unittest discover` 215/215、Node 三份相关契约 46/46、Harmon
 ### 涉及文件
 
 `docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`docs/SEMIFINAL-ATTACHMENT-START-20260927.md`、`DEVLOG.md`。
+
+## [2026-09-26T18:41:00Z] [2026-09-27 02:41:00 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+按复赛演示优先级完成一轮原生界面与学习引导升级。首页复习卡删去三处重复的到期数量，改为一次明确的“8 道待复习”；折叠计划行显示实际任务名。新增可一次点击的每日签到卡，独立持久化本地日期，展示近七日与可展开的 28 日记录；重复签到不重复计数，保存成功才播放小鸿与星点动效，失败可重试。签到连续天数不改变实际学习事件计算的连续学习天数。
+
+以系统外观配置驱动 API 12 原生浅色／深色语义色，分别调整页面、卡片、导航、聊天气泡、行动区和计划日期行。课程列表与首页缩减空白，学伴回复内加入“再给提示”“换个例子”的追问按钮，服务端提示词要求按追问类型逐步讲解。设计取舍、来源和截图索引见 `docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`。外部设计仓库只作研究，没有复制素材或新增依赖。
+
+### 验证与边界
+
+Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均 exit 0。HarmonyOS `DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli build` exit 0，API 12 `CompileArkTS`、`PackageHap`、`PackingCheck` 通过；`devecocli run --skip-build --device 127.0.0.1:5555` exit 0 并在 Pura X View 安装启动。最终未签名 HAP SHA-256 `b7bb143ad240d294ddb144b719fa7c18b11156442e464bbd85178e64c30d9a53`。模拟器 UI 点击确认签到、已签到状态、历史展开和重装后保留；系统深浅外观切换后无重装可见首页及课程／聊天／我的分层。图片在忽略的 `.runtime/design-*-20260927.png`。
+
+未验证实体设备、横屏、大字号、动画逐帧性能、签到存储失败注入、正式签名和复赛门户提交。Web 新提示词在本批提交前只通过本地检查，线上发布须另记部署证据。其他任务的未提交脚本与文档不纳入本批。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/common/Constants.ets`、`LocalLearningRepository.ets`、`ProactiveLearningService.ets`、`EntryAbility.ets`、原生页面、`apps/web/src/lib/agents/tutor-agent.ts`、`docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`、本日志。
+
+---

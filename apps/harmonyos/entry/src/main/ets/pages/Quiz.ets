@@ -53,6 +53,7 @@ interface QuizTagSummary {
 @Entry
 @Component
 struct QuizPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '';

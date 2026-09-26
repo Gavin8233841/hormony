@@ -43,6 +43,7 @@ const LEVEL_GAP: number = 82;
 @Entry
 @Component
 struct LearningMapPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State courses: Course[] = [];
   @State selectedCourseId: string = 'cs101';
   @State selectedCourseTitle: string = '数据结构';

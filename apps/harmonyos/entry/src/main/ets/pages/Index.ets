@@ -14,6 +14,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 @Entry
 @Component
 struct Index {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State currentIndex: number = 0;
   @State quickQuestion: string = '';
   @State contentOpacity: number = 1;
@@ -43,11 +44,11 @@ struct Index {
   }
 
   private contentBottomPadding(): number {
-    return Constants.NAV_HEIGHT + 18 + this.safeAreaBottomVp();
+    return Constants.NAV_HEIGHT + 12 + this.safeAreaBottomVp();
   }
 
   private navigationBottomPadding(): number {
-    return 10 + this.safeAreaBottomVp();
+    return 8 + this.safeAreaBottomVp();
   }
 
   private consumeProactiveLaunch(): void {
@@ -176,8 +177,9 @@ struct Index {
         .width('100%')
         .height(48)
         .justifyContent(FlexAlign.Center)
-        .backgroundColor(Constants.COLOR_HERO_SURFACE)
-        .borderRadius(17)
+        .backgroundColor(Constants.COLOR_BRAND)
+        .linearGradient({ angle: 110, colors: [[Constants.COLOR_BRAND, 0], ['#5878ea', 1]] })
+        .borderRadius(16)
       } else {
         Column({ space: 2 }) {
           SymbolGlyph(icon)
@@ -209,13 +211,14 @@ struct Index {
       this.TabItem('学伴', $r('sys.symbol.rays'), $r('sys.symbol.rays'), 2)
       this.TabItem('我的', $r('sys.symbol.person'), $r('sys.symbol.person_2_fill'), 3)
     }
-    .width('92%')
+    .width('90%')
     .constraintSize({ maxWidth: 520 })
     .height(Constants.NAV_HEIGHT)
-    .backgroundColor(Constants.COLOR_NAV_SURFACE)
+    .backgroundColor(this.darkMode ? '#ed222e40' : '#eaf7f9fd')
+    .backgroundBlurStyle(BlurStyle.Thin)
     .border({ width: 1, color: Constants.COLOR_BORDER })
-    .borderRadius(24)
-    .shadow({ radius: 18, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 5 })
+    .borderRadius(22)
+    .shadow({ radius: 14, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
     .zIndex(2)
   }
 

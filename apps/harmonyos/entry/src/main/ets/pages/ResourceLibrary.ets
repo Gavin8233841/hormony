@@ -7,6 +7,7 @@ import { ExternalLearningResource } from '../model/DataModels';
 @Entry
 @Component
 struct ResourceLibraryPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State courseId: string = 'cs101';
   @State courseTitle: string = '数据结构';
   @State topic: string = '';

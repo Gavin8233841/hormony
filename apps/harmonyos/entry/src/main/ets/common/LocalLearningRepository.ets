@@ -41,6 +41,7 @@ const KEY_TOPIC_MASTERY: string = 'topic_mastery';
 const KEY_QUIZ_STATS: string = 'quiz_stats';
 const KEY_QUIZ_LEARNING_STATE: string = 'quiz_learning_state';
 const KEY_FORM_IDS: string = 'form_ids';
+const KEY_CHECKIN_DATES: string = 'checkin_dates';
 
 interface LegacyQuizStatsAggregate {
   totalQuestions: number;
@@ -76,6 +77,7 @@ export class LocalLearningRepository {
   private static quizStateQueue: Promise<void> = Promise.resolve();
   private static lessonProgressQueue: Promise<void> = Promise.resolve();
   private static planQueue: Promise<void> = Promise.resolve();
+  private static checkInQueue: Promise<void> = Promise.resolve();
 
   static async initialize(context: common.Context): Promise<void> {
     if (LocalLearningRepository.initializationTask !== null) {
@@ -1002,6 +1004,33 @@ export class LocalLearningRepository {
     const running: Promise<T> = LocalLearningRepository.planQueue.then((): Promise<T> => task());
     LocalLearningRepository.planQueue = running.then((): void => {}, (): void => {});
     return running;
+  }
+
+  private static runCheckInTask<T>(task: () => Promise<T>): Promise<T> {
+    const running: Promise<T> = LocalLearningRepository.checkInQueue.then((): Promise<T> => task());
+    LocalLearningRepository.checkInQueue = running.then((): void => {}, (): void => {});
+    return running;
+  }
+
+  static async getCheckInDates(): Promise<string[]> {
+    const stored = await LocalLearningRepository.getValue<string[]>(KEY_CHECKIN_DATES);
+    if (stored === null) return [];
+    if (!Array.isArray(stored) || stored.some((value: string): boolean =>
+      typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))) {
+      throw new Error('签到记录无法读取');
+    }
+    return Array.from(new Set(stored)).sort();
+  }
+
+  static async checkInToday(now: Date = new Date()): Promise<boolean> {
+    return LocalLearningRepository.runCheckInTask(async (): Promise<boolean> => {
+      const today = LocalLearningRepository.localDateKey(now);
+      const dates = await LocalLearningRepository.getCheckInDates();
+      if (dates.includes(today)) return false;
+      dates.push(today);
+      await LocalLearningRepository.putValue<string[]>(KEY_CHECKIN_DATES, dates.sort());
+      return true;
+    });
   }
 
   private static isExactCourseTopic(courseId: string, topic: string): boolean {

@@ -37,6 +37,7 @@ interface MarkdownBlock {
 
 @Component
 export struct ChatContent {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @Prop quickQuestion: string = '';
   @State messages: DisplayMessage[] = [];
   @State inputText: string = '';
@@ -158,6 +159,15 @@ export struct ChatContent {
     if (kind === 'quiz') return '开始测验';
     if (kind === 'review') return '复习错题';
     return '去练习';
+  }
+
+  private continueTutoring(kind: string): void {
+    if (this.loading || !this.cloudAgentReady || this.historyLoading || this.historySaving || this.historyLoadFailed) return;
+    if (kind === 'hint') {
+      this.sendMessage('再提示我一下？');
+    } else {
+      this.sendMessage('能换个例子吗？');
+    }
   }
 
   private async openAction(action: ChatAction): Promise<void> {
@@ -736,11 +746,11 @@ export struct ChatContent {
           .fontColor(Constants.COLOR_TEXT_PRIMARY)
       }
       .width('100%')
-      .constraintSize({ minHeight: 56 })
+      .height(50)
       .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER })
 
       if (this.contextSummary.length > 0) {
-        Column({ space: 5 }) {
+        Column({ space: 2 }) {
           Row({ space: 8 }) {
             SymbolGlyph($r('sys.symbol.book_open_fill'))
               .fontSize(16)
@@ -755,7 +765,7 @@ export struct ChatContent {
               .fontColor([Constants.COLOR_TEXT_SECONDARY])
           }
           .width('100%')
-          .constraintSize({ minHeight: 48 })
+          .constraintSize({ minHeight: 44 })
           .onClick((): void => { this.contextExpanded = !this.contextExpanded; })
 
           if (this.contextExpanded && this.contextQuestion.length > 0) {
@@ -781,7 +791,7 @@ export struct ChatContent {
           }
         }
         .width('100%')
-        .padding({ left: 12, right: 12, top: 4, bottom: 10 })
+        .padding({ left: 12, right: 12, top: 1, bottom: 1 })
         .backgroundColor(Constants.COLOR_BRAND_LIGHT)
         .borderRadius(Constants.RADIUS_MD)
         .margin({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 8 })
@@ -973,7 +983,7 @@ export struct ChatContent {
             })
         }
         .width('100%')
-        .padding({ left: 4, right: 4, top: 4, bottom: 4 })
+        .padding({ left: 3, right: 3, top: 3, bottom: 3 })
         .backgroundColor(Constants.COLOR_BG_CARD)
         .border({ width: 1, color: Constants.COLOR_BORDER })
         .borderRadius(Constants.RADIUS_LG)
@@ -1006,7 +1016,7 @@ export struct ChatContent {
         }
       }
       .width('100%')
-      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 12, top: 8 })
+      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, bottom: 7, top: 5 })
       .constraintSize({ maxWidth: 760 })
     }
     .width('100%')
@@ -1316,8 +1326,8 @@ export struct ChatContent {
               .lineHeight(23)
               .fontColor(Constants.COLOR_TEXT_PRIMARY)
               .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-              .backgroundColor(Constants.COLOR_BG_TAG)
-              .borderRadius(Constants.RADIUS_LG)
+              .backgroundColor(Constants.COLOR_CHAT_USER)
+              .borderRadius(20)
           }
           .alignItems(HorizontalAlign.End)
           .constraintSize({ maxWidth: '84%' })
@@ -1353,6 +1363,33 @@ export struct ChatContent {
             if (msg.action !== null && !msg.streaming && !msg.failed && !msg.cancelled &&
               msg.content.length > 0) {
               this.ActionCard(msg.action)
+            }
+
+            if (!msg.streaming && !msg.failed && !msg.cancelled && msg.content.length > 0 &&
+              this.messages.indexOf(msg) === this.messages.length - 1) {
+              Row({ space: 8 }) {
+                Button('再给提示')
+                  .height(44)
+                  .padding({ left: 12, right: 12 })
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_BRAND_TEXT)
+                  .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                  .borderRadius(12)
+                  .enabled(!this.loading && this.cloudAgentReady && !this.historySaving)
+                  .onClick((): void => { this.continueTutoring('hint'); })
+                Button('换个例子')
+                  .height(44)
+                  .padding({ left: 12, right: 12 })
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                  .backgroundColor(Constants.COLOR_BG_CARD)
+                  .border({ width: 1, color: Constants.COLOR_BORDER })
+                  .borderRadius(12)
+                  .enabled(!this.loading && this.cloudAgentReady && !this.historySaving)
+                  .onClick((): void => { this.continueTutoring('example'); })
+              }
+              .width('100%')
+              .margin({ top: 9 })
             }
 
             if (msg.failed || msg.cancelled) {
@@ -1423,6 +1460,10 @@ export struct ChatContent {
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start)
+          .padding({ left: 15, right: 15, top: 14, bottom: 13 })
+          .backgroundColor(Constants.COLOR_BG_CARD)
+          .border({ width: 1, color: Constants.COLOR_BORDER })
+          .borderRadius(20)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -1434,26 +1475,27 @@ export struct ChatContent {
 
   @Builder
   ActionCard(action: ChatAction) {
-    Column({ space: 8 }) {
-      Row({ space: 6 }) {
+    Column({ space: 6 }) {
+      Row({ space: 10 }) {
         SymbolGlyph($r(action.kind === 'lesson' ? 'sys.symbol.book_open_fill' :
           'sys.symbol.checkmark_circle_fill'))
-          .fontSize(14)
-          .fontColor([Constants.COLOR_BRAND_TEXT])
-        Text(action.kind === 'lesson' ? '接着学' : action.kind === 'quiz' ? '测一测' : '接着练')
-          .fontSize(12)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_BRAND_TEXT)
-      }
-      Row({ space: 12 }) {
-        Text(action.title)
-          .layoutWeight(1)
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .fontSize(18)
+          .fontColor([Constants.COLOR_BRAND])
+        Column({ space: 2 }) {
+          Text(action.kind === 'lesson' ? '接着学' : action.kind === 'quiz' ? '测一测' : '接着练')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+          Text(action.title)
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .maxLines(2)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
         Button(this.actionButtonLabel(action.kind))
           .height(48)
-          .padding({ left: 18, right: 18 })
+          .padding({ left: 12, right: 12 })
           .borderRadius(Constants.RADIUS_MD)
           .enabled(!this.actionOpening)
           .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
@@ -1469,10 +1511,10 @@ export struct ChatContent {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .padding(16)
-    .backgroundColor(action.kind === 'quiz' ? Constants.COLOR_COURSE_OS_LIGHT : Constants.COLOR_HERO_INSET)
+    .padding({ left: 12, right: 8, top: 9, bottom: 9 })
+    .backgroundColor(Constants.COLOR_BRAND_LIGHT)
     .borderRadius(Constants.RADIUS_LG)
-    .margin({ top: 12, bottom: 4 })
+    .margin({ top: 9, bottom: 3 })
   }
 
   @Builder

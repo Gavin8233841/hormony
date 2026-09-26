@@ -14,6 +14,7 @@ interface AchievementActionTarget {
 @Entry
 @Component
 struct AchievementsPage {
+  @StorageProp('darkMode') darkMode: boolean = false;
   @State achievements: AchievementProgress[] = [];
   @State courses: Course[] = [];
   @State studyEvents: StudyEvent[] = [];
