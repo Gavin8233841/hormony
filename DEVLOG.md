@@ -8237,3 +8237,21 @@ Python 3.12 `unittest discover` 215/215、Node 三份相关契约 46/46、Harmon
 ### 涉及文件
 
 `scripts/validate-release-evidence.py`、`scripts/test_validate_release_evidence.py`、`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`DEVLOG.md`。
+
+---
+
+## [2026-09-26T17:45:00Z] [2026-09-27 01:45:00 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+按用户授权，仅接受 Pura X View 小艺输入法的基本模式，完成原生端云复赛主路径。新输入 BFS 问题得到真实云端回复；一周 TCP 计划生成后显示“计划已保存”，点击任务进入对应课程；数据结构固定练习现场作答 4/5，错题“问学伴”携带实际作答上下文，云端指出多算的元素并给出练习动作；操作系统 AI 测验生成五题、现场作答 4/5，结果写回本机累计答题与错题。截图保存在忽略的 `.runtime/native-*-20260926.png`，复赛附件制作底稿已列镜头和表述边界。
+
+初次 Chat Health 探测失败时，本机模拟器网关未启动；普通 Node `fetch` 在此 macOS 代理环境无法连接线上服务。改用 `NODE_USE_ENV_PROXY=1 node scripts/simulator-api-gateway.mjs`，本机 Health 200，原生重试恢复并取得真实新回复。网关只为模拟器网络适配，不证明实体设备。已将启动依赖和未签名 HAP、尚未上传材料的边界写入交接文档。
+
+### 验证与边界
+
+原生 UI 树逐步确认 Chat、Plan、Lesson、Practice、Quiz 的可见字段和点击状态；当前 HAP SHA-256 `29c0a30ad2429eedf56d019f8ed54416f736bf8b52fe86087c068991abc50a5c` 与前一批一致。先前公开域名 HAR 四接口和 16 项业务检查仍是线上 API 证据，本批新增的是模拟器交互证据。未做实体设备、大字号或无网模式全回归；未形成正式 PDF/MP4/ZIP、签名材料或门户回执。应用源码未改动；其他任务未提交文件保持原状。
+
+### 涉及文件
+
+`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`docs/SEMIFINAL-ATTACHMENT-START-20260927.md`、`DEVLOG.md`。
