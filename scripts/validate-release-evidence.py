@@ -752,7 +752,7 @@ def _chat_business_checks(
         if event is not None:
             events.append(event)
 
-    allowed_types = {"thinking", "delta", "citation", "trace", "error", "done"}
+    allowed_types = {"thinking", "delta", "citation", "trace", "action", "error", "done"}
     event_types: list[str] = []
     body_characters = 0
     citations = 0
@@ -775,6 +775,22 @@ def _chat_business_checks(
                 errors.append(f"{event_label}.source 必须为对象")
             else:
                 citations += 1
+        elif event_type == "action":
+            action = event.get("action")
+            if not isinstance(action, dict):
+                errors.append(f"{event_label}.action 必须为对象")
+            else:
+                if action.get("kind") not in {"lesson", "practice", "quiz", "review"}:
+                    errors.append(f"{event_label}.action.kind 不是受控学习动作")
+                if action.get("courseId") not in {"cs101", "cs102", "cs103"}:
+                    errors.append(f"{event_label}.action.courseId 不是现有课程")
+                for field in ("topic", "title", "reason"):
+                    _, field_errors = _nonempty_text(
+                        action.get(field),
+                        f"{event_label}.action.{field}",
+                        MAX_SHORT_TEXT_CHARACTERS,
+                    )
+                    errors.extend(field_errors)
         elif event_type == "done":
             session_id, session_errors = _nonempty_text(
                 event.get("sessionId"),

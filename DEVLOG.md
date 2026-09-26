@@ -8221,3 +8221,19 @@ Python 3.12 `unittest discover` 215/215、Node 三份相关契约 46/46、Harmon
 ### 涉及文件
 
 `.gitignore`、`.vercelignore`、`apps/web/src/lib/agents/model.ts`、`DEVLOG.md`。
+
+---
+
+## [2026-09-26T02:40:00Z] [2026-09-26 10:40:00 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+带安全状态日志的 Production 暂存部署 `dpl_HUkLXGtZwRRWx5tCvPyeefoXDPm9` 使用 `--skip-domain`，在受保护地址依次通过 Tutor Chat、已提交错题 Evaluator Chat、Plan 和 Quiz。随后将它提升为公开域名部署，并从 `https://hormony-ruddy.vercel.app` 对合成错题做四接口 HAR 采集。Chat 包含合法 `action`；原发布证据解析器的旧事件白名单会误拒此新协议，因此增加 `action` 的类型、课程和非空主题/标题/理由检查，并用合法与跨课程目标用例约束，未放宽 HTTP/业务通过门槛。
+
+### 验证与边界
+
+公开域名 HAR `.runtime/production-api-20260926.har` 恰好四接口 HTTP 200，`parse_online_capture` 零错误并推出 16 项业务检查。Python 全套 216/216、内容、Topic 关系、发布依赖三门禁均 exit 0。HarmonyOS API12 增量构建 exit 0，未签名 HAP SHA-256 `29c0a30ad2429eedf56d019f8ed54416f736bf8b52fe86087c068991abc50a5c`，已安装并启动 Pura X View。原生旧会话可见；首次输入遇到独立小艺输入法协议，尚未接受，故原生新 Chat/Plan/Quiz 与状态回写的完整路径仍未验证。首次新部署的 MODEL_UNAVAILABLE 根因也未查明。
+
+### 涉及文件
+
+`scripts/validate-release-evidence.py`、`scripts/test_validate_release_evidence.py`、`docs/SEMIFINAL-IMPLEMENTATION-HANDOFF.md`、`DEVLOG.md`。

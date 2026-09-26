@@ -639,6 +639,32 @@ class ReleaseEvidenceGateTests(unittest.TestCase):
         self.assertIsNone(capture)
         self.assertTrue(any("HAR 1.2" in error for error in errors))
 
+    def test_chat_capture_accepts_valid_learning_action_and_rejects_invalid_target(self) -> None:
+        action = {
+            "type": "action",
+            "action": {
+                "kind": "practice", "courseId": "cs101", "topic": "图的表示与遍历",
+                "title": "练习图的表示与遍历", "reason": "再做一组题检查错因",
+            },
+        }
+        response = online_response_bodies()[0]["chat"]
+        before_done = response.replace(
+            'data: {"type":"done","sessionId":"fixed-session"}\n\n',
+            "data: " + json.dumps(action, ensure_ascii=False) + "\n\n"
+            + 'data: {"type":"done","sessionId":"fixed-session"}\n\n',
+        )
+        checks, errors = MODULE._chat_business_checks(before_done, "chat")
+        self.assertEqual([], errors)
+        self.assertEqual(19, checks["chat.body"])
+
+        action["action"]["courseId"] = "unknown"
+        invalid = before_done.replace(
+            'data: ' + json.dumps({**action, "action": {**action["action"], "courseId": "cs101"}}, ensure_ascii=False),
+            'data: ' + json.dumps(action, ensure_ascii=False),
+        )
+        _, invalid_errors = MODULE._chat_business_checks(invalid, "chat")
+        self.assertTrue(any("action.courseId" in error for error in invalid_errors))
+
     def test_timestamp_lists_duplicate_keys_and_size_limits_are_rejected(self) -> None:
         document = valid_document()
         records = document["records"]
