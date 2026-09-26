@@ -3053,11 +3053,11 @@ describe("Quiz 与 Practice 结果页下一步动作", () => {
 
     const resultSource = pageMethod(practicePageSource, "ResultView").source;
     const wrongConditionIndex = resultSource.indexOf("if (this.correctCount < this.questions.length)");
-    const mistakeActionIndex = resultSource.indexOf(`this.${mistakeRoute.name}();`, wrongConditionIndex);
-    const quizActionIndex = resultSource.indexOf(`else this.${quizRoute.name}();`, mistakeActionIndex);
+    const quizActionIndex = resultSource.indexOf(`this.${quizRoute.name}();`, wrongConditionIndex);
+    const mistakeActionIndex = resultSource.indexOf(`this.${mistakeRoute.name}();`, quizActionIndex);
     expect(wrongConditionIndex).toBeGreaterThan(-1);
-    expect(mistakeActionIndex).toBeGreaterThan(wrongConditionIndex);
-    expect(quizActionIndex).toBeGreaterThan(mistakeActionIndex);
+    expect(quizActionIndex).toBeGreaterThan(wrongConditionIndex);
+    expect(mistakeActionIndex).toBeGreaterThan(quizActionIndex);
   });
 
   it("Practice 的 AI 测验导航失败也显示明确消息", () => {

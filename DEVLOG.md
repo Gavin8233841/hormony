@@ -8187,3 +8187,19 @@ Python 3.12 `unittest discover` 215/215、Node 三份相关契约 46/46、Harmon
 ### 涉及文件
 
 `Chat.ets`、`Practice.ets`、`docs/DESIGN-REFERENCE-20260925.md`、`docs/VISUAL-IDENTITY-XIAOHONG-20260926.md`、本日志。其他任务的未提交文件保留。
+
+---
+
+## [2026-09-26T01:51:30Z] [2026-09-26 09:51:30 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+复赛端云验收前运行 Web 全套检查，发现 6 条 HarmonyOS 页面源码契约仍要求旧文案或旧按钮顺序。核对当前 `MistakeBook` 与 `Practice` 后，更新测试以覆盖现行行为：未到期错题可进入同主题练习，但不作为到期原题传入复习 ID；已到期且选项完整时才显示原题重练；结果页全对去主题测验、有错题可进学伴与错题本。没有为通过测试改动学习行为或验收阈值。
+
+### 验证与边界
+
+`pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均 exit 0。仅证明当前工作树的 Web 与源码契约检查通过；线上接口、原生安装和签名交付仍需分别验证。其他任务的未提交文件保持原状。
+
+### 涉及文件
+
+`apps/web/src/lib/data/mistake-review-flow.test.ts`、`apps/web/src/lib/data/quiz-learning-state.test.ts`、`DEVLOG.md`。

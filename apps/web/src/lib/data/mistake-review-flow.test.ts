@@ -63,7 +63,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(mistakeBookSource).toContain(
       "new Date(left.nextReviewAt).getTime() - new Date(right.nextReviewAt).getTime()"
     );
-    expect(mistakeBookSource).toContain("'现在复习'");
+    expect(mistakeBookSource).toContain("'今天复习'");
     expect(mistakeBookSource).toContain("'重新读取'");
   });
 
@@ -293,7 +293,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(practiceLoadSource).not.toContain("getReviewItems(");
   });
 
-  it("未到期项应继续显示但不能写入复习 ID 或进入练习", () => {
+  it("未到期项可练同主题题目，但不能作为到期错题重练", () => {
     expect(mistakeBookSource).toContain(
       "activeItems.filter((item: ReviewItem): boolean => !dueIds.includes(item.id))"
     );
@@ -306,21 +306,14 @@ describe("HarmonyOS 错题复习入口契约", () => {
     );
     const buildStart = mistakeBookSource.indexOf("\n  build()", retryStart);
     const retrySource = mistakeBookSource.slice(retryStart, buildStart);
-    const dueGuard = retrySource.indexOf("if (!this.isDue(item))");
     const topicGuard = retrySource.indexOf(
       "if (!LearningContentRepository.getTopics(item.courseId).includes(item.topic))"
     );
-    const reviewWrite = retrySource.indexOf("'selectedReviewItemId', item.id");
-    const notDueBranch = retrySource.slice(dueGuard, topicGuard);
-
-    expect(dueGuard).toBeGreaterThan(-1);
-    expect(topicGuard).toBeGreaterThan(dueGuard);
+    const reviewWrite = retrySource.indexOf("'selectedReviewItemId', this.isDue(item) ? item.id : ''");
+    expect(topicGuard).toBeGreaterThan(-1);
     expect(reviewWrite).toBeGreaterThan(topicGuard);
-    expect(notDueBranch).toContain("'这道题尚未到复习时间，请按计划巩固'");
-    expect(notDueBranch).toContain("return;");
-    expect(notDueBranch).not.toContain("selectedReviewItemId");
 
-    const buttonStart = mistakeBookSource.indexOf("Button(this.isDue(item) ?");
+    const buttonStart = mistakeBookSource.indexOf("Button(this.isDue(item) && this.hasOriginalQuestion(item) ?");
     const buttonEnd = mistakeBookSource.indexOf(
       ".onClick((): void => { this.retry(item); })",
       buttonStart
@@ -329,8 +322,8 @@ describe("HarmonyOS 错题复习入口契约", () => {
 
     expect(buttonStart).toBeGreaterThan(-1);
     expect(buttonEnd).toBeGreaterThan(buttonStart);
-    expect(buttonSource).toContain(": '等待到期'");
-    expect(buttonSource).toContain(".enabled(this.isDue(item))");
+    expect(buttonSource).toContain("'重练这道题' : '练同主题题目'");
+    expect(buttonSource).not.toContain(".enabled(this.isDue(item))");
   });
 
   it("错题入口应校验精确 Topic 并完整传递课程、Topic 与复习项 ID", () => {
@@ -346,7 +339,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
 
     const courseWrite = retrySource.indexOf("'selectedCourseId', item.courseId");
     const topicWrite = retrySource.indexOf("'selectedPracticeTopic', item.topic");
-    const reviewWrite = retrySource.indexOf("'selectedReviewItemId', item.id");
+    const reviewWrite = retrySource.indexOf("'selectedReviewItemId', this.isDue(item) ? item.id : ''");
     const practiceNavigation = retrySource.indexOf("url: 'pages/Practice'");
 
     expect(courseWrite).toBeGreaterThan(-1);
@@ -372,10 +365,10 @@ describe("HarmonyOS 错题复习入口契约", () => {
     expect(mistakeBookSource).toContain(
       "option.trim().toUpperCase().startsWith(labels[index] + '.')"
     );
-    expect(mistakeBookSource).toContain("'重练原题'");
-    expect(mistakeBookSource).toContain("'练同主题精选题'");
+    expect(mistakeBookSource).toContain("'重练这道题'");
+    expect(mistakeBookSource).toContain("'练同主题题目'");
     expect(mistakeBookSource).toContain(
-      "'此记录未保留完整选项，将使用同主题精选题巩固'"
+      "'这道题暂无完整选项，可练习同主题题目'"
     );
     expect(practiceSource).toContain("let options = review.options ?? []");
     expect(practiceSource).toContain("if (!this.validReviewOptions(options))");
@@ -508,7 +501,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
       "await this.loadQuestions(this.selectedReviewItemId)"
     );
     expect(reloadSource).toContain(
-      "this.message = '本地练习加载失败，请重试'"
+      "this.message = '练习暂时打不开，请重试'"
     );
     expect(reloadSource).toContain("this.loadRetryAvailable = true");
     expect(reloadSource).not.toContain("请重新进入");
@@ -523,7 +516,7 @@ describe("HarmonyOS 错题复习入口契约", () => {
     const retryButtonSource = practiceSource.slice(retryButtonStart, retryButtonEnd);
     expect(retryButtonSource).toContain(".height(48)");
     expect(retryButtonSource).toContain(
-      ".accessibilityText('重新加载本地练习')"
+      ".accessibilityText('重新加载练习')"
     );
     expect(retryButtonSource).toContain(
       ".accessibilityDescription('再次读取原错题与同主题精选题')"
