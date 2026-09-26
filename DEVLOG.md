@@ -8276,3 +8276,17 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 `apps/harmonyos/entry/src/main/ets/common/Constants.ets`、`LocalLearningRepository.ets`、`ProactiveLearningService.ets`、`EntryAbility.ets`、原生页面、`apps/web/src/lib/agents/tutor-agent.ts`、`docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`、本日志。
 
 ---
+
+## [2026-09-26T18:50:49Z] [2026-09-27 02:50:49 CST] 模型: Codex (GPT-6)
+
+### 发布与验证
+
+将提交 `9935fbd` 通过仓库根目录的 Vercel CLI 部署为 Production 候选 `dpl_AZnTiXbBgtamSxnJ9B3cs9uHaqq1`（`--skip-domain`）。候选地址的 Health HTTP 200、`status=ready`、`deploymentMode=stateless`；Chat 合成请求 HTTP 200，12 个 SSE 事件包含正文、3 条引用与 `done`，无 `error`；Plan HTTP 200、7 个任务；Quiz HTTP 200、2 道展示题与 2 条独立评分记录，展示题没有答案或解析字段。首次测试请求因合成 userId 含连字符而收到预期 400 `INVALID_USER_ID`，改为符合接口约束的下划线 ID 后通过。请求和响应保存在忽略的 `.runtime/candidate-*-20260927.*`，未提交。
+
+验证候选后执行 `vercel promote dpl_AZnTiXbBgtamSxnJ9B3cs9uHaqq1 --yes` exit 0。`vercel inspect hormony-ruddy.vercel.app` 确认公开域名解析到同一部署 ID、Production `Ready`；公开域名 Health 再次返回 HTTP 200、`ready`。这证明本批学伴追问提示词已进入当前公开部署；没有把接口通过解释为教学效果评价或原生端新提示词逐句验收。未执行复赛门户上传、实体设备与签名包验证。
+
+### 涉及文件
+
+`DEVLOG.md`；部署使用已推送的提交 `9935fbd`，没有修改应用源码或新增环境变量。
+
+---
