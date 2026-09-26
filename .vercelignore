@@ -1,0 +1,17 @@
+# Vercel project root is apps/web; keep local build and evidence out of CLI uploads.
+/apps/harmonyos
+/docs
+/scripts
+/assets
+/screenshots
+/.runtime
+/.trae
+/.agents
+/.hvigor
+/.vercel
+/.env*
+**/node_modules
+**/.next
+**/.runtime
+**/.vercel
+**/.env*

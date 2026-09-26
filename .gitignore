@@ -62,3 +62,4 @@ coverage/
 
 # Screenshots (UI verification evidence, kept locally but not tracked)
 screenshots/
+.vercel/

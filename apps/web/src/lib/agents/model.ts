@@ -166,6 +166,15 @@ function getModelClient(config: ModelConfig): OpenAI | null {
   return cachedClient;
 }
 
+function logModelRequestFailure(error: unknown): void {
+  const status = typeof error === "object" && error !== null && "status" in error &&
+    typeof error.status === "number" ? error.status : null;
+  console.error("[model] upstream request failed", {
+    kind: error instanceof Error ? error.name : "unknown",
+    status,
+  });
+}
+
 async function createChatCompletion(
   client: OpenAI,
   request: ArkChatCompletionRequest,
@@ -358,6 +367,7 @@ export async function callModel(
     if (error instanceof ModelTimeoutError || isTimeoutLikeError(error)) {
       throw new ModelTimeoutError();
     }
+    logModelRequestFailure(error);
     throw new ModelUnavailableError();
   }
 }
@@ -411,6 +421,7 @@ export async function callModelWithHistory(
     if (error instanceof ModelTimeoutError || isTimeoutLikeError(error)) {
       throw new ModelTimeoutError();
     }
+    logModelRequestFailure(error);
     throw new ModelUnavailableError();
   }
 }

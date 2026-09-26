@@ -8203,3 +8203,21 @@ Python 3.12 `unittest discover` 215/215、Node 三份相关契约 46/46、Harmon
 ### 涉及文件
 
 `apps/web/src/lib/data/mistake-review-flow.test.ts`、`apps/web/src/lib/data/quiz-learning-state.test.ts`、`DEVLOG.md`。
+
+---
+
+## [2026-09-26T02:18:00Z] [2026-09-26 10:18:00 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+为完成复赛端云同版本验收，确认 Vercel 项目 Root Directory 为 `apps/web`。从子目录执行 CLI 部署时上传 21,547 项并因服务端找不到 `apps/web` 失败；改由仓库根目录关联原有 `gwyy8233841/hormony` 项目，新增 `.vercelignore` 排除本地构建、HarmonyOS 工程与证据，下一次上传降至 3.1 MB，Production 构建通过。CLI 生成的根目录 `.vercel/` 和 `.env.local` 仅在本机，已忽略，不纳入源码。
+
+新部署 `dpl_BuvfQVxzDu58MV3MdtQZardeG8TK` 的 Health 为 200/ready，但真实 Chat 返回 `MODEL_UNAVAILABLE` 事件、Plan 返回 503；健康检查只证明密钥变量非空。旧部署 `dpl_6rHKDj8CzwuSpNKLhV7WtYaaDtoo` 的受保护 Chat 在同一时段正常返回正文与行动，故已立即把公开别名恢复到旧部署。为定位上游失败，在模型统一入口增加只记错误类别与 HTTP 状态的服务端日志，不输出请求内容或密钥；下一步用不切换域名的 Production 构建复测。
+
+### 验证与边界
+
+模型日志变更后 Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均 exit 0。线上失败回执在忽略目录 `.runtime/production-api-20260926.har`；旧部署 Chat 回执在 `.runtime/old-chat-response.txt`。当前公开域名对应旧部署，不能宣称已完成当前提交的线上或原生端云验收。其他任务的未提交文件保持原状。
+
+### 涉及文件
+
+`.gitignore`、`.vercelignore`、`apps/web/src/lib/agents/model.ts`、`DEVLOG.md`。
