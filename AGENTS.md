@@ -24,6 +24,7 @@
    - `docs/MODEL-ROLLOUT-STRATEGY.md`
    - `docs/FRONTEND-RESOURCE-ADOPTION.md`
    - `DEVLOG.md` 末尾相关记录
+   - 涉及鸿蒙 AI、小艺或竞赛评分时，先读 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`，再按其中的官方链接核对当前版本与适用设备；本地知识卡不是功能验收证据。
 5. 文档与当前源码冲突时，以当前 `HEAD`、构建配置、源码和可执行测试为准，并修正文档，不得为迁就旧文档回滚有效实现。
 6. 查找文件或文本优先使用 `rg --files` 和 `rg`。无法从仓库取得精确信息时，停止相关改动并向用户询问。
 7. 不得猜测标识符的大小写、格式或层级，不得用 `candidate` 等含糊词代替核验结论。

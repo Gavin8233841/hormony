@@ -8365,3 +8365,19 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 `apps/web/src/lib/agents/orchestrator.ts`、`orchestrator.test.ts`、`tutor-agent.ts`、`cloud-a2a-tutor.ts`、`cloud-a2a-tutor.test.ts`、`docs/SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md`、`DEVLOG.md`。其他任务未提交脚本与文档不纳入本批。
 
 ---
+
+## [2026-09-27T09:06:00Z] [2026-09-27 17:06:00 CST] 模型: Codex (GPT-6)
+
+### 官方技术知识卡与接入顺序复核
+
+将 2026 年鸿蒙高校创新赛规程第 3、5、6 页的 Agent 方向、复赛交付和评分与华为小艺端/云 A2A、AgentCard、Intents Kit、Agent Framework Kit、Core Speech Kit、Data Augmentation Kit 的适用条件整理为 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`。资料以链接和可执行约束记录，明确每项的当前实现与证据级别，不复制官方原文全文。新核对 DevEco API 26 SDK 与官方端 A2A 接入文档后，将端侧 AgentExtensionAbility 的最小实验前置；已写好的云 A2A 适配继续保留，但公网接入仍需共享会话、鉴权、取消和成本控制。AGENTS.md 增加本地知识入口。复赛说明/PDF仍未开始修改。
+
+### 验证与边界
+
+本批只改工作知识和计划，不改 App、服务端或平台设置；只执行 Markdown/差异检查，无需重复 Web/HAP 构建。小艺项目关联、真实小艺问答、系统意图、语音 Kit 和真机均为**未验证**；新增技术路线是实施优先级，不是功能完成证明。其他任务的未提交脚本与文档保留原状。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`docs/SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md`、`AGENTS.md`、`DEVLOG.md`。
+
+---
