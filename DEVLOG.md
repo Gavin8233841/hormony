@@ -8791,3 +8791,17 @@ Pura X View 1320×2232 模拟器已安装本批未签名 HAP（SHA-256 `74e5e17d
 `apps/web/src/lib/agents/tutor-agent.ts`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T19:17:27Z] [2026-09-28 03:17:27 CST] 模型: Codex (GPT-6)
+
+### 小艺讲解候选回归未通过后的提示收紧
+
+提交 `ec91a3e` 的 Vercel Production 候选 `dpl_BLXTis3fJkqpPgnxxapPG7bWRMPw` 构建为 `READY`；候选 Health 为 `ready`。对同一合成进程／线程问题的候选 SSE 回答仍把真实商业软件的三项操作映射为三个线程。旧提示仅要求举例为假设情境，未阻止这个未经资料证实的推断；**未把该候选切换到公开的 `hormony-ruddy.vercel.app`**。候选响应保存在忽略目录 `.runtime/xiaoyi-os-candidate-response-20260928.sse`。
+
+已将小艺概念讲解的举例约束收紧为仅使用明确标注假设的无品牌程序，不断言真实产品内部的进程或线程映射。修改后 `apps/web` 的 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0，37 个测试文件、493 项测试通过。仍需新候选线上抽样，不能把提示词改动视作确定性的事实校验器。
+
+### 涉及文件
+
+`apps/web/src/lib/agents/tutor-agent.ts`、`DEVLOG.md`。
+
+---
