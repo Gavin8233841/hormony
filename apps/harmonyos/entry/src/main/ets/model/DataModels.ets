@@ -76,6 +76,7 @@ export interface ChatAction {
   topic: string;
   title: string;
   reason: string;
+  reviewItemId?: string;
 }
 
 export interface Citation {
@@ -348,6 +349,7 @@ export interface ChatContext {
   correctAnswer?: string;
   submitted?: boolean;
   sessionId?: string;
+  reviewItemId?: string;
 }
 
 export interface HealthResponse {

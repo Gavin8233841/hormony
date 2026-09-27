@@ -7,7 +7,7 @@ import http from '@ohos.net.http';
 import { HttpClient, HttpRequestCancellation, HttpStreamError } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { Citation, StreamEvent, ChatRequest, ChatMessage, ChatContext, ChatAction, Course,
-  HealthResponse } from '../model/DataModels';
+  HealthResponse, ReviewItem } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { ProactiveLearningAction, ProactiveLearningLaunch, ProactiveLearningService } from '../common/ProactiveLearningService';
 import { InsightIntentPage } from '@kit.AbilityKit';
@@ -158,7 +158,9 @@ export struct ChatContent {
       action.courseId.length > 0 && action.courseId.length <= 128 &&
       action.topic.length > 0 && action.topic.length <= 128 &&
       action.title.length > 0 && action.title.length <= 120 &&
-      action.reason.length > 0 && action.reason.length <= 200;
+      action.reason.length > 0 && action.reason.length <= 200 &&
+      (action.reviewItemId === undefined || (typeof action.reviewItemId === 'string' &&
+        action.reviewItemId.length > 0 && action.reviewItemId.length <= 256));
   }
 
   private actionTarget(kind: string): string {
@@ -167,10 +169,11 @@ export struct ChatContent {
     return 'pages/Practice';
   }
 
-  private actionButtonLabel(kind: string): string {
-    if (kind === 'lesson') return '看课程';
-    if (kind === 'quiz') return '开始测验';
-    if (kind === 'review') return '复习错题';
+  private actionButtonLabel(action: ChatAction): string {
+    if (action.kind === 'lesson') return '看课程';
+    if (action.kind === 'quiz') return '开始测验';
+    if (action.kind === 'review') return '复习错题';
+    if (action.reviewItemId !== undefined) return '重练这道题';
     return '去练习';
   }
 
@@ -196,6 +199,18 @@ export struct ChatContent {
         this.actionMessage = '当前课程或主题已变化，请重新提问';
         return;
       }
+      let reviewItemId = '';
+      if (action.kind === 'practice' && action.reviewItemId !== undefined) {
+        const queue = await LocalLearningRepository.getReviewQueue();
+        const review = queue.dueItems.find((item: ReviewItem): boolean =>
+          item.id === action.reviewItemId && item.courseId === launch.courseId &&
+          item.topic === launch.topic);
+        if (review === undefined) {
+          this.actionMessage = '这道错题已更新，请从错题本重新进入';
+          return;
+        }
+        reviewItemId = review.id;
+      }
       const selection: ProactiveLearningAction = {
         kind: action.kind, badge: '学伴建议', title: action.title,
         subtitle: launch.courseTitle + ' · ' + launch.topic,
@@ -204,8 +219,10 @@ export struct ChatContent {
         evidence: '本次回答建议', progressText: ''
       };
       ProactiveLearningService.applySelection(selection);
+      AppStorage.setOrCreate<string>('selectedReviewItemId', reviewItemId);
       await this.getUIContext().getRouter().pushUrl({ url: targetPage });
     } catch (_) {
+      AppStorage.setOrCreate<string>('selectedReviewItemId', '');
       this.actionMessage = '暂时打不开，请重试';
     } finally {
       this.actionOpening = false;
@@ -1222,11 +1239,12 @@ export struct ChatContent {
         submitted: this.activeChatContext?.submitted
       }
     };
+    const reviewItemId = this.activeChatContext?.reviewItemId;
     LocalLearningRepository.getProfile().then((profile): void => {
       if (profile !== null) req.profile = profile;
-      this.startSseRequest(req, requestId, cancellation);
+      this.startSseRequest(req, requestId, cancellation, reviewItemId);
     }).catch((): void => {
-      this.startSseRequest(req, requestId, cancellation);
+      this.startSseRequest(req, requestId, cancellation, reviewItemId);
     });
   }
 
@@ -1234,7 +1252,8 @@ export struct ChatContent {
     return requestId === this.activeRequestId && !this.isCancelled;
   }
 
-  private startSseRequest(req: ChatRequest, requestId: number, cancellation: HttpRequestCancellation): void {
+  private startSseRequest(req: ChatRequest, requestId: number, cancellation: HttpRequestCancellation,
+    reviewItemId?: string): void {
     if (!this.isActiveRequest(requestId) || !this.loading) return;
     HttpClient.postSSE(Constants.API_CHAT, JSON.stringify(req),
       (evt: StreamEvent) => {
@@ -1257,7 +1276,13 @@ export struct ChatContent {
         } else if (evt.type === 'citation' && evt.source) {
           last.citations.push(evt.source);
         } else if (evt.type === 'action' && evt.action && this.validAction(evt.action)) {
-          last.action = evt.action;
+          const action: ChatAction = evt.action;
+          last.action = action.kind === 'practice' && reviewItemId !== undefined &&
+            reviewItemId.length > 0 && action.courseId === req.context?.courseId &&
+            action.topic === req.context?.topic ? {
+              kind: action.kind, courseId: action.courseId, topic: action.topic,
+              title: action.title, reason: action.reason, reviewItemId: reviewItemId
+            } : action;
         } else if (evt.type === 'error') {
           last.streaming = false;
           last.failed = true;
@@ -1626,7 +1651,7 @@ export struct ChatContent {
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
-        Button(this.actionButtonLabel(action.kind))
+        Button(this.actionButtonLabel(action))
           .height(48)
           .padding({ left: 12, right: 12 })
           .borderRadius(Constants.RADIUS_MD)

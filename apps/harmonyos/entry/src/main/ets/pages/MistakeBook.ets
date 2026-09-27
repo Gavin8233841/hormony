@@ -108,7 +108,8 @@ struct MistakeBookPage {
       question: item.stem,
       userAnswer: item.userAnswer,
       correctAnswer: item.correctAnswer,
-      submitted: true
+      submitted: true,
+      reviewItemId: this.isDue(item) && this.hasOriginalQuestion(item) ? item.id : ''
     }));
     this.getUIContext().getRouter().pushUrl({ url: 'pages/Chat' }).catch((): void => {
       this.message = '无法打开学伴，请重试';

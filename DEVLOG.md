@@ -8611,3 +8611,19 @@ DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=defa
 `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`apps/harmonyos/entry/src/main/ets/pages/Index.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T16:12:36Z] [2026-09-28 00:12:36 CST] 模型: Codex (GPT-6)
+
+### 错题问学伴后回到同一道题
+
+发现从 Dijkstra 负权边错题问学伴后，“去练习”只按主题选题，首题变成邻接表 DFS。`MistakeBook.ets` 将当前待复习且选项完整的本地错题 ID 放入待打开的学伴上下文；`Chat.ets` 将其只附在同课程、同主题的练习动作上并随对话存入 ArkData，点击时再次核对待复习队列，随后由现有 `Practice.ets` 选择该题为首题。失效 ID 阻止误导性跳转并提示重新进入错题本。云端 Chat 请求仍显式构造原有字段，不携带此本地 ID。
+
+### 验证与边界
+
+直接 DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=default -p buildMode=debug --parallel --incremental --no-daemon` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，仅有既有 `TextInputController` 系统能力告警。未签名 HAP SHA-256 `13a1fa6707a38b0eb1027d7d40c6b57c0d04a6499244df6c14c7adbdb1b5d33f`，签名 HAP SHA-256 `297f114ae5f02e80f5d90c85417066f749ce4e54bc472880a38b4c44fd1d19db`。Pura X View 1320×2232 模拟器 `127.0.0.1:5555` 覆盖安装、启动 exit 0；从错题本第二题进入学伴，获得针对 Dijkstra 负权边的回答，点“重练这道题”后练习 UI 树显示 `1 / 5` 且首题就是 Dijkstra 负权边题。退回首页普通学伴标签后，保存的动作仍在，再次点击也进入相同首题。UI 树和截图在 `.runtime/chat-review-exact-20260928.json`、`.runtime/chat-review-exact-20260928.jpeg`、`.runtime/chat-review-card-20260928.jpeg`，均不入库。未测试失效 ID 的模拟器提示、签名包安装、小艺端 A2A 实际对话或真机。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/model/DataModels.ets`、`apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`、`apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
