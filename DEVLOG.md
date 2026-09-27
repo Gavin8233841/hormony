@@ -8805,3 +8805,17 @@ Pura X View 1320×2232 模拟器已安装本批未签名 HAP（SHA-256 `74e5e17d
 `apps/web/src/lib/agents/tutor-agent.ts`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T19:22:49Z] [2026-09-28 03:22:49 CST] 模型: Codex (GPT-6)
+
+### 验证并提升小艺概念讲解的生产部署
+
+提交 `9115a15` 部署为 Vercel Production 候选 `dpl_4cMyTpzA3gwJSQiprnBYSa9Xw32J`，构建 `READY`。用 `vercel curl` 对受保护候选发送合成进程／线程问题，SSE 包含 `delta`、3 条 `citation`、`done` 且无 `error`；正文改用“假设”的无品牌文档编辑程序说明共享资源与每线程私有状态。计算机网络代表题也返回完整 SSE，无错误。两份候选响应分别保存在 `.runtime/xiaoyi-os-candidate-v2-response-20260928.sse`、`.runtime/xiaoyi-network-candidate-v2-response-20260928.sse`。
+
+`vercel promote dpl_4cMyTpzA3gwJSQiprnBYSa9Xw32J --yes` exit 0；`vercel inspect hormony-ruddy.vercel.app` 显示同一部署、Production `Ready`。公开 Health HTTP 200／`ready`／模型已配置；公开 `/api/xiaoyi/tutor` 同题 HTTP 200、`text/event-stream`，有非空讲解、3 条引用和 `done`，无 `error`，响应存于 `.runtime/xiaoyi-os-public-response-20260928.sse`。这只是一组生成内容抽样，提示词不是确定性事实校验器；HAP 本轮没有变化，平台 Card 重新导入和小艺真实对话仍未完成。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
