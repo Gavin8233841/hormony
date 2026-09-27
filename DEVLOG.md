@@ -8919,3 +8919,13 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 提交 `d2945fe` 已推送至 `origin/codex/semifinal-macos-20260920`。Vercel CLI 60.1.3 从仓库根部署 Production 候选 `dpl_8jiitXWSn51hQVyxGjBD9k5hvKpP`（`--skip-domain`），构建 `READY`；候选 Health 为 200／`ready`，合成二叉搜索树讲解为 200／SSE，Profile trace 明确为无画像，包含非空回答、3 条引用及 `done`，无 `error` 或默认年级、学习风格。经 `vercel promote` exit 0，`vercel inspect hormony-ruddy.vercel.app` 指向同一部署且 Production `Ready`。公开域名复测 Health 200／`ready`、Tutor 200／SSE，164 字正文、3 条引用、`done`，无错误或旧默认画像字样。合成回执保存在忽略目录 `.runtime/xiaoyi-anon-candidate-20260928.sse`、`.runtime/xiaoyi-anon-public-20260928.sse`。
 
 追加文档 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`。平台 Safari 会话因 Mac 锁屏无法复核新版 AgentCard，已请求用户解锁并重新登录。HAP 本批未改；小艺 App 到 Extension 的真实对话及真机均未验证，当前阶段继续使用模拟器。
+
+---
+
+## [2026-09-27T23:39:27Z] Pura X View 桌面卡片实点与底部布局修整
+
+在当前 Pura X View 1320×2232 模拟器，通过启动器长按「鸿学伴」→「卡片」→「添加至桌面」真正添加 Form Kit 卡片。旧版截图 `.runtime/hbx-card-desktop-20260928.jpeg` 显示 Topic 在按钮左侧被挤成残句；点击卡片「开始复习」进入错题本，UI 树 `.runtime/hbx-card-clicked-20260928.json` 显示「待复习 13 道 · 今天 10 道」。将 `LearningPlanCard.ets` 的 Topic 改为独立全宽一行，行动按钮独立全宽居中，避免同排竞争空间。
+
+API 26 直接 Hvigor 增量 `assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `5e429e57aa07959eda26d9715588441ad47c44ff5e47926a24cdcd1c655457e1`，签名 HAP SHA-256 `bbc43563fb0353efcebcc66d1a96f6826555f48c356a3385360651852bd9dc29`。Pura X View `127.0.0.1:5555` 覆盖安装同版未签名包 exit 0，桌面截图 `.runtime/hbx-card-fixed-20260928.jpeg` 的 Topic 完整、按钮不重叠；实点新版按钮后 `.runtime/hbx-card-fixed-clicked-20260928.json` 再次显示错题本及上述待复习数。卡片与跳转为模拟器通过；小艺真实连接、签名包真机使用未验证。
+
+本批只改 `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md` 和 `DEVLOG.md`；保留工作区已有的其他未提交文件。小艺平台当前 Mac 锁屏，尚不能重新导入新版 Card。

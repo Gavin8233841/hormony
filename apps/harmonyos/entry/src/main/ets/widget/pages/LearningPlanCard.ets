@@ -76,14 +76,15 @@ struct LearningPlanCard {
         .width('100%')
         .alignItems(HorizontalAlign.Start)
 
-        Row() {
+        Column({ space: 6 }) {
           Text(this.progressText)
-            .fontSize(12)
+            .fontSize(11)
             .fontColor('#176BFF')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .layoutWeight(1)
+            .width('100%')
           Row({ space: 2 }) {
+            Blank()
             Text(this.cta)
               .fontSize(12)
               .fontWeight(FontWeight.Medium)
@@ -92,14 +93,16 @@ struct LearningPlanCard {
             SymbolGlyph($r('sys.symbol.chevron_right'))
               .fontSize(13)
               .fontColor(['#FFFFFF'])
+            Blank()
           }
           .height(32)
-          .padding({ left: 12, right: 9 })
+          .width('100%')
           .backgroundColor('#176BFF')
           .borderRadius(16)
         }
         .width('100%')
-        .margin({ top: 10 })
+        .alignItems(HorizontalAlign.Start)
+        .margin({ top: 8 })
       }
       .width('100%')
       .height('100%')
