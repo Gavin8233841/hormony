@@ -8337,3 +8337,31 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`、`DEVLOG.md`。评估计划保存在忽略目录 `.runtime/semifinal-attachments/`，不入库；其他任务的未提交脚本和文档保持原状。
 
 ---
+
+## [2026-09-27T08:18:35Z] [2026-09-27 16:18:35 CST] 模型: Codex (GPT-6)
+
+### 鸿蒙 AI 计划入库
+
+将华为官方文档和小艺开发模式的评估、Astra 复审意见、协议门槛与分阶段验收整理为 `docs/SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md`。明确云 A2A 仅为有条件可行，当前未实现共享对话状态、平台鉴权或真机联调；产品叙事需等同版本的运行证据。此批只新增文档，无应用或服务端代码改动，因此未重复构建。`git diff --check` 通过。
+
+### 涉及文件
+
+`docs/SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md`、`DEVLOG.md`。其余任务未提交文件保持原状。
+
+---
+
+## [2026-09-27T08:45:00Z] [2026-09-27 16:45:00 CST] 模型: Codex (GPT-6)
+
+### 小艺云 A2A 只读讲解本地适配
+
+依据华为《发起会话》的 `message/stream` 文本请求及 `artifact-update` 响应格式，新增受限消息解析、输入安全检查、只读 Tutor 编排和终态 SSE 编码。Tutor 的路由由服务端强制指定，计划、测验、评估关键词不再把该入口引向其他 Agent；不接收端侧画像或答题记录。Astra 审查中指出的原生跳转问题已在上一批修复。本批未创建公网 A2A 路由，未配置凭据或平台项目。
+
+### 验证与边界
+
+`apps/web` 下 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0；测试为 37 个文件、486 项。协议单测覆盖文本请求、终态回答、拒绝不支持的 part、过长或含个人信息的输入、非法会话历史和安全审核失败。源码与本地测试不能证明平台兼容或真实小艺交互；跨请求共享会话、`tasks/cancel`、`clearContext`、平台鉴权、全局成本控制、部署及真机白名单仍未完成。上一批 HAP 后续使用 `devecocli run --skip-build --device 127.0.0.1:5555` 安装启动 exit 0，仍未完成卡片／提醒目标动作交互测试。
+
+### 涉及文件
+
+`apps/web/src/lib/agents/orchestrator.ts`、`orchestrator.test.ts`、`tutor-agent.ts`、`cloud-a2a-tutor.ts`、`cloud-a2a-tutor.test.ts`、`docs/SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md`、`DEVLOG.md`。其他任务未提交脚本与文档不纳入本批。
+
+---

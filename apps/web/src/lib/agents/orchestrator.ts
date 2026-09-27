@@ -44,12 +44,12 @@ export interface OrchestrationResult {
 // ========== 公共编排逻辑（orchestrate / orchestrateStream 共享） ==========
 
 // 准备编排上下文：意图识别 + 会话 ID + 加载对话历史
-function prepareContext(req: ChatRequest): {
+function prepareContext(req: ChatRequest, forcedIntent?: Intent): {
   intent: Intent;
   sessionId: string;
   history: ChatMessage[];
 } {
-  const intent = detectIntent(req.message, req.context);
+  const intent = forcedIntent ?? detectIntent(req.message, req.context);
   const sessionId = req.context?.sessionId ?? generateId("session");
   const history: ChatMessage[] = req.history ?? [];
   return { intent, sessionId, history };
@@ -123,7 +123,8 @@ async function routeMainAgent(
   retrievalResult: AgentResult,
   history: ChatMessage[],
   emit?: (event: StreamEvent) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tutorOnly: boolean = false
 ): Promise<AgentResult> {
   // 是否为流式模式（由是否传入 emit 决定）：影响 plan/quiz 的内容格式化方式
   const isStream = !!emit;
@@ -199,7 +200,8 @@ async function routeMainAgent(
           retrievalResult.citations ?? [],
           history,
           req.profile,
-          signal
+          signal,
+          tutorOnly ? "concept" : "general"
         );
       break;
   }
@@ -249,8 +251,8 @@ function nextAction(req: ChatRequest, intent: Intent): ChatAction | undefined {
 // ========== 入口函数 ==========
 
 // 非流式编排：用于一次性返回（如 plan/quiz 接口）
-export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult> {
-  const { intent, sessionId, history } = prepareContext(req);
+async function orchestrateWithIntent(req: ChatRequest, forcedIntent?: Intent): Promise<OrchestrationResult> {
+  const { intent, sessionId, history } = prepareContext(req, forcedIntent);
   const agentResults: AgentResult[] = [];
 
   // 1. 前置 Agent：Profile + Retrieval
@@ -261,7 +263,8 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
   }
 
   // 2. 按意图路由到主 Agent
-  const mainResult = await routeMainAgent(intent, req, retrievalResult, history);
+  const mainResult = await routeMainAgent(
+    intent, req, retrievalResult, history, undefined, undefined, forcedIntent === "tutor");
   agentResults.push(mainResult);
 
   // 3. 安全审核
@@ -285,6 +288,37 @@ export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult
     safetySuggestion: safety.suggestion,
     action: safety.passed ? nextAction(req, intent) : undefined,
   };
+}
+
+export async function orchestrate(req: ChatRequest): Promise<OrchestrationResult> {
+  return orchestrateWithIntent(req);
+}
+
+// 小艺等外部入口只能调用课程讲解。不接收端侧画像、答题记录或可触发
+// Evaluator 的题目上下文；网络入口仍须独立校验消息和历史。
+export interface TutorOnlyRequest {
+  userId: string;
+  message: string;
+  startDate: string;
+  courseId?: string;
+  topic?: string;
+  sessionId?: string;
+  history?: ChatMessage[];
+}
+
+export async function orchestrateTutorOnly(input: TutorOnlyRequest): Promise<OrchestrationResult> {
+  const req: ChatRequest = {
+    userId: input.userId,
+    message: input.message,
+    startDate: input.startDate,
+    context: {
+      courseId: input.courseId,
+      topic: input.topic,
+      sessionId: input.sessionId,
+    },
+    history: input.history,
+  };
+  return orchestrateWithIntent(req, "tutor");
 }
 
 // 流式编排：通过回调推送 SSE 事件

@@ -17,7 +17,7 @@ const ragMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/rag", () => ragMock);
 
-import { orchestrate, orchestrateStream } from "./orchestrator";
+import { orchestrate, orchestrateStream, orchestrateTutorOnly } from "./orchestrator";
 import type { StreamEvent } from "@/lib/types";
 
 afterEach(() => {
@@ -27,6 +27,25 @@ afterEach(() => {
 });
 
 describe("orchestrator 前置检索调度", () => {
+  it("外部讲解入口即使遇到计划、出题和成绩关键词也只调用 Tutor", async () => {
+    process.env.TEST_MODEL_RESPONSE = "线性表按逻辑顺序组织元素，数组是常见的顺序存储方式。";
+
+    const result = await orchestrateTutorOnly({
+      userId: "external_guest",
+      message: "解释数组与线性表的计划、出题和成绩评估分别是什么意思",
+      startDate: "2026-09-27",
+      courseId: "cs101",
+      topic: "数组与线性表",
+    });
+
+    expect(result.intent).toBe("tutor");
+    expect(result.agentResults.map((item) => item.agent)).toEqual([
+      "Profile", "Retrieval", "Tutor", "Safety",
+    ]);
+    expect(result.safetyPassed).toBe(true);
+    expect(result.action).toMatchObject({ kind: "lesson", courseId: "cs101", topic: "数组与线性表" });
+  });
+
   it("已提交的具体作答优先进入 Evaluator，并给出可执行练习", async () => {
     process.env.TEST_MODEL_RESPONSE = "学生混淆了遍历访问顺序，应先演练队列变化。";
     const events: StreamEvent[] = [];
