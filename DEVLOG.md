@@ -8861,3 +8861,19 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 `scripts/test-proactive-delivery-contracts.mjs`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T20:15:43Z] [2026-09-28 04:15:43 CST] 模型: Codex (GPT-6)
+
+### 对齐小艺端 A2A 流式成功与失败报文
+
+核对华为《端 A2A 对话交互》《异常与任务取消》后，保留先发 `TASK_STATE_SUBMITTED` 的可取消首帧，将成功正文从第二个完整 `result.task` 改为 `result.artifactUpdate`（首块 `append: false`、末块 `lastChunk: true`），再发 `result.statusUpdate` 的 `TASK_STATE_COMPLETED`；错误及缺少服务端 `done` 则以 `TASK_STATE_FAILED` 结束。明确这是完整正文一次交付的多帧协议，不是逐 token 传输。为新增响应结构使用显式 ArkTS 接口，修复首次构建的匿名对象类型编译错误。
+
+### 验证与边界
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs` exit 0，11/11 通过，覆盖成功帧顺序、请求 ID、取消、模型错误后迟到回调、网络错误与上下文隔离。首次直接 Hvigor `assembleHap --no-daemon` exit 255，因 ArkTS 不允许匿名对象类型；改为显式接口后同一命令 exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，仅有既有 `TextInputController` syscap 告警。未签名 HAP SHA-256 `a4ac5ad5fa306ab738619232dc3a65773cd3a4867b0f893bc6c1d98631e93292`，签名 HAP SHA-256 `1582fc51cb8d79a44592f77512dda4d5d7177b94d61260daf3d1c42d8eb35eeb`。Pura X View `127.0.0.1:5555` 覆盖安装此未签名包、启动 exit 0，`bm dump` 含 `XiaoyiAgentAbility` 与 `ohos.extension.agent`。当前小艺平台登录超时，未验证真实 Agent 连接、对话或取消回执；本阶段按用户要求只使用模拟器。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

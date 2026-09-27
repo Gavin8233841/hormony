@@ -85,12 +85,17 @@ test('valid text request returns an Agent-assigned task and context before compl
   calls[0].onEvent({ type: 'delta', content: '一种有序二叉树。' });
   calls[0].onEvent({ type: 'done' });
   calls[0].onComplete();
-  assert.equal(client.responses.length, 2);
+  assert.equal(client.responses.length, 3);
   assert.equal(client.responses[1].id, 'request-1');
-  assert.equal(client.responses[1].result.task.id, 'task-uuid-1');
-  assert.equal(client.responses[1].result.task.contextId, 'ctx-uuid-2');
-  assert.equal(client.responses[1].result.task.status.state, 'TASK_STATE_COMPLETED');
-  assert.equal(client.responses[1].result.task.artifacts[0].parts[0].text, '一种有序二叉树。');
+  assert.equal(client.responses[1].result.artifactUpdate.taskId, 'task-uuid-1');
+  assert.equal(client.responses[1].result.artifactUpdate.contextId, 'ctx-uuid-2');
+  assert.equal(client.responses[1].result.artifactUpdate.artifact.parts[0].text, '一种有序二叉树。');
+  assert.equal(client.responses[1].result.artifactUpdate.append, false);
+  assert.equal(client.responses[1].result.artifactUpdate.lastChunk, true);
+  assert.equal(client.responses[2].id, 'request-1');
+  assert.equal(client.responses[2].result.statusUpdate.taskId, 'task-uuid-1');
+  assert.equal(client.responses[2].result.statusUpdate.contextId, 'ctx-uuid-2');
+  assert.equal(client.responses[2].result.statusUpdate.status.state, 'TASK_STATE_COMPLETED');
 });
 
 test('malformed JSON, invalid part and unsupported method return one protocol error', () => {
@@ -130,10 +135,28 @@ test('missing terminal event and stream error cannot produce a completed answer'
   agent.onData(first, message('request-1', 'task-1'));
   calls[0].onEvent({ type: 'delta', content: 'partial' });
   calls[0].onComplete();
-  assert.equal(first.responses[1].result.task.status.state, 'TASK_STATE_FAILED');
+  assert.equal(first.responses[1].result.statusUpdate.status.state, 'TASK_STATE_FAILED');
+  assert.equal(first.responses[1].result.statusUpdate.status.message.parts[0].text,
+    '暂时无法生成课程讲解');
   agent.onData(first, message('request-2', 'task-2'));
   calls[1].onError({ code: 'MODEL_TIMEOUT' });
-  assert.equal(first.responses[3].result.task.status.state, 'TASK_STATE_FAILED');
+  assert.equal(first.responses[3].result.statusUpdate.status.state, 'TASK_STATE_FAILED');
+});
+
+test('model error emits a failed status update and suppresses later callbacks', () => {
+  const { agent, calls } = harness();
+  const client = proxy();
+  agent.onData(client, message('request-1', 'message-1'));
+  calls[0].onEvent({ type: 'delta', content: 'partial' });
+  calls[0].onEvent({ type: 'error', code: 'MODEL_UNAVAILABLE' });
+  assert.equal(calls[0].cancellation.cancelled, true);
+  assert.equal(client.responses.length, 2);
+  assert.equal(client.responses[1].id, 'request-1');
+  assert.equal(client.responses[1].result.statusUpdate.status.state, 'TASK_STATE_FAILED');
+  assert.equal(client.responses[1].result.statusUpdate.status.message.role, 'ROLE_AGENT');
+  calls[0].onEvent({ type: 'done' });
+  calls[0].onComplete();
+  assert.equal(client.responses.length, 2);
 });
 
 test('same incoming message ID on separate connections gets distinct Agent task IDs', () => {
@@ -152,7 +175,7 @@ test('same incoming message ID on separate connections gets distinct Agent task 
   calls[1].onEvent({ type: 'delta', content: '第二个回答' });
   calls[1].onEvent({ type: 'done' });
   calls[1].onComplete();
-  assert.equal(second.responses[1].result.task.status.state, 'TASK_STATE_COMPLETED');
+  assert.equal(second.responses[2].result.statusUpdate.status.state, 'TASK_STATE_COMPLETED');
 });
 
 test('unknown context and unsupported task continuation fail before network access', () => {
@@ -223,7 +246,7 @@ test('follow-up history is limited to the original connection and context', () =
   calls[0].onEvent({ type: 'delta', content: '进程是资源分配单位。' });
   calls[0].onEvent({ type: 'done' });
   calls[0].onComplete();
-  const contextId = first.responses[1].result.task.contextId;
+  const contextId = first.responses[0].result.task.contextId;
   const followUp = JSON.parse(message('request-2', 'task-2', '线程呢？'));
   followUp.params.message.contextId = contextId;
   agent.onData(first, JSON.stringify(followUp));

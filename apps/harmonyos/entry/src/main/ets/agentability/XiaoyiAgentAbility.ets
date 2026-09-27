@@ -49,6 +49,13 @@ interface DeviceErrorResponse {
 interface DeviceStatus {
   state: string;
   timestamp: string;
+  message?: DeviceAgentMessage;
+}
+
+interface DeviceAgentMessage {
+  role: string;
+  messageId: string;
+  parts: DevicePart[];
 }
 
 interface DeviceArtifact {
@@ -71,6 +78,40 @@ interface DeviceTaskResponse {
   jsonrpc: string;
   id: string;
   result: DeviceTaskResult;
+}
+
+interface DeviceArtifactUpdate {
+  taskId: string;
+  contextId: string;
+  artifact: DeviceArtifact;
+  append: boolean;
+  lastChunk: boolean;
+}
+
+interface DeviceArtifactResult {
+  artifactUpdate: DeviceArtifactUpdate;
+}
+
+interface DeviceArtifactResponse {
+  jsonrpc: string;
+  id: string;
+  result: DeviceArtifactResult;
+}
+
+interface DeviceStatusUpdate {
+  taskId: string;
+  contextId: string;
+  status: DeviceStatus;
+}
+
+interface DeviceStatusResult {
+  statusUpdate: DeviceStatusUpdate;
+}
+
+interface DeviceStatusResponse {
+  jsonrpc: string;
+  id: string;
+  result: DeviceStatusResult;
 }
 
 interface DeviceCancelResult {
@@ -199,7 +240,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     const history = connectionHistories.get(contextId) ?? [];
     const body: TutorRequest = { mode: 'xiaoyi_tutor', message: question, history };
     // 首帧公布 Agent 分配的任务标识，小艺才能在生成过程中发出 TasksCancel。
-    if (!this.sendTask(proxy, request.id, taskId, contextId, 'TASK_STATE_SUBMITTED', '')) {
+    if (!this.sendSubmittedTask(proxy, request.id, taskId, contextId)) {
       active.completed = true;
       this.removeActiveTask(proxy, taskId);
       return;
@@ -210,8 +251,9 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
         if (active.completed || active.failed) return;
         if (event.type === 'error') {
           active.failed = true;
+          active.cancellation.cancel();
           this.removeActiveTask(proxy, taskId);
-          this.sendTask(proxy, active.requestId, taskId, contextId,
+          this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
             'TASK_STATE_FAILED', '课程讲解暂时不可用，请稍后重试');
         } else if (event.type === 'done') {
           active.terminalSeen = true;
@@ -221,7 +263,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
             active.failed = true;
             active.cancellation.cancel();
             this.removeActiveTask(proxy, taskId);
-            this.sendTask(proxy, active.requestId, taskId, contextId,
+            this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
               'TASK_STATE_FAILED', '回答过长，请缩小问题范围');
           }
         }
@@ -231,10 +273,12 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
         active.completed = true;
         this.removeActiveTask(proxy, taskId);
         if (!active.terminalSeen || active.answer.trim().length === 0) {
-          this.sendTask(proxy, active.requestId, taskId, contextId,
+          this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
             'TASK_STATE_FAILED', '暂时无法生成课程讲解');
           return;
         }
+        if (!this.sendArtifactUpdate(proxy, active.requestId, taskId, contextId, active.answer)) return;
+        if (!this.sendStatusUpdate(proxy, active.requestId, taskId, contextId, 'TASK_STATE_COMPLETED')) return;
         const nextHistory: ChatMessage[] = [...history,
           { role: 'user', content: question.slice(0, 1000) },
           { role: 'assistant', content: active.answer.slice(0, 1000) }];
@@ -250,13 +294,12 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
             break;
           }
         }
-        this.sendTask(proxy, active.requestId, taskId, contextId, 'TASK_STATE_COMPLETED', active.answer);
       },
       (_error: HttpStreamError): void => {
         if (active.completed || active.failed) return;
         active.failed = true;
         this.removeActiveTask(proxy, taskId);
-        this.sendTask(proxy, active.requestId, taskId, contextId,
+        this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
           'TASK_STATE_FAILED', '网络暂时不可用，请稍后重试');
       }, undefined, cancellation);
   }
@@ -301,15 +344,10 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     }
   }
 
-  private sendTask(proxy: common.AgentHostProxy, requestId: string, taskId: string,
-    contextId: string, state: string, content: string): boolean {
-    const status: DeviceStatus = { state, timestamp: new Date().toISOString() };
+  private sendSubmittedTask(proxy: common.AgentHostProxy, requestId: string, taskId: string,
+    contextId: string): boolean {
+    const status: DeviceStatus = { state: 'TASK_STATE_SUBMITTED', timestamp: new Date().toISOString() };
     const task: DeviceTask = { id: taskId, contextId, status };
-    if (content.length > 0) {
-      const part: DevicePart = { text: content, mediaType: 'text/plain' };
-      const artifact: DeviceArtifact = { artifactId: taskId + '-text', parts: [part] };
-      task.artifacts = [artifact];
-    }
     const result: DeviceTaskResult = { task };
     const response: DeviceTaskResponse = { jsonrpc: '2.0', id: requestId, result };
     try {
@@ -317,6 +355,41 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       return true;
     } catch (_) {
       // 连接已结束；请求已经取消或无法再交付。
+      return false;
+    }
+  }
+
+  private sendArtifactUpdate(proxy: common.AgentHostProxy, requestId: string, taskId: string,
+    contextId: string, content: string): boolean {
+    const part: DevicePart = { text: content, mediaType: 'text/plain' };
+    const artifact: DeviceArtifact = { artifactId: taskId + '-text', parts: [part] };
+    const artifactUpdate: DeviceArtifactUpdate = {
+      taskId, contextId, artifact, append: false, lastChunk: true
+    };
+    const result: DeviceArtifactResult = { artifactUpdate };
+    const response: DeviceArtifactResponse = { jsonrpc: '2.0', id: requestId, result };
+    try {
+      proxy.sendData(JSON.stringify(response));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  private sendStatusUpdate(proxy: common.AgentHostProxy, requestId: string, taskId: string,
+    contextId: string, state: string, content?: string): boolean {
+    const status: DeviceStatus = { state, timestamp: new Date().toISOString() };
+    if (content && content.length > 0) {
+      const part: DevicePart = { text: content, mediaType: 'text/plain' };
+      status.message = { role: 'ROLE_AGENT', messageId: 'msg-' + util.generateRandomUUID(), parts: [part] };
+    }
+    const statusUpdate: DeviceStatusUpdate = { taskId, contextId, status };
+    const result: DeviceStatusResult = { statusUpdate };
+    const response: DeviceStatusResponse = { jsonrpc: '2.0', id: requestId, result };
+    try {
+      proxy.sendData(JSON.stringify(response));
+      return true;
+    } catch (_) {
       return false;
     }
   }
