@@ -13,6 +13,8 @@ const sourcePath = resolve(repo, 'apps/harmonyos/entry/src/main/ets/agentability
 const require = createRequire(import.meta.url);
 const ts = require(require.resolve('typescript', { paths: [resolve(repo, 'apps/web')] }));
 const source = readFileSync(sourcePath, 'utf8');
+const agentCard = JSON.parse(readFileSync(resolve(repo,
+  'apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json'), 'utf8')).agentCards[0];
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
@@ -65,6 +67,8 @@ function cancel(id, taskId) {
 }
 
 test('valid text request returns an Agent-assigned task and context before completion', () => {
+  assert.equal(agentCard.capabilities.streaming, true,
+    'AgentCard must declare the multi-frame task response supported by the Extension');
   const { agent, calls } = harness();
   const client = proxy();
   agent.onData(client, message('request-1', 'task-1'));

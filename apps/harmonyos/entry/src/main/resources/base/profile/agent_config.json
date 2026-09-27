@@ -10,7 +10,7 @@
       "defaultInputModes": ["text/plain"],
       "defaultOutputModes": ["text/plain"],
       "capabilities": {
-        "streaming": false,
+        "streaming": true,
         "pushNotifications": false
       },
       "skills": [

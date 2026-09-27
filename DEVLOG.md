@@ -8725,3 +8725,19 @@ Vercel CLI 60.1.3 从仓库根部署 Production 候选 `dpl_9pu9dmP5MkPQagcgusSP
 `apps/web/public/xiaohong-agent-opaque.png`、`apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`docs/VISUAL-IDENTITY-XIAOHONG-20260926.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T18:37:00Z] [2026-09-28 02:37:00 CST] 模型: Codex (GPT-6)
+
+### 对齐小艺 AgentCard 多帧能力声明
+
+本机 API 26 `application/AgentCard.d.ts` 说明 `capabilities.streaming` 表示 Agent 是否支持流式响应。现有 `XiaoyiAgentAbility` 的 `MessageStream` 已先回 `TASK_STATE_SUBMITTED`，再回完成/失败终态，但导入过平台的 Card 仍写 `streaming:false`。将工程 Card 改为 `true`，保留 `pushNotifications:false`；这声明多帧任务响应，不声称逐 token 输出。协议夹具新增 Card 与首帧/终帧一致性断言。平台草稿此前导入旧 Card；本机当前锁屏，未重新导入或修改平台配置，白名单测试态版本也未复核。
+
+### 验证与边界
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs` exit 0，10/10 通过。API 26 直接 Hvigor `assembleHap` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成；仅有此前 `TextInputController` 系统能力告警。未签名 HAP SHA-256 `74e5e17d0ad5523c3079323656aa9869c16785f5120de410a05d54b395c1f743`，签名 HAP SHA-256 `f280323026087b9ccceac813da5cfead0593887334a476c6841e55deb66c49ee`。解包确认 `streaming:true` 与新头像 URL。Pura X View `127.0.0.1:5555` 对该未签名包 `hdc install -r` exit 0、`aa start` exit 0，`bm dump` 仍列出 `XiaoyiAgentAbility` 和 `ohos.extension.agent`。这些验证不包含小艺真实调用、逐 token 传输或平台新 Card 导入。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
