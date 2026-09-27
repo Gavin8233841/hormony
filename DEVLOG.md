@@ -8714,9 +8714,11 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0；37 
 
 ### 验证与发布边界
 
-Web `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0，37 个测试文件、493 项测试通过。直接 Hvigor `assembleHap` 使用 DevEco SDK 和 JBR 环境后 exit 0，`PackageHap`、`PackingCheck`、`SignHap` 完成；未签名 HAP 内解包可见新 `iconUrl`，SHA-256 `7033f2cc8ee378c4d5b004b88e1a03a0a71b5a3cde545f51ba0a3af89fb6afdb`，签名 HAP SHA-256 `6100d5539f26ff237c57f256219bf174c3ae8a0a3c2dc844285d4793c26f1c3c`。本批未重新安装模拟器 HAP。
+Web `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0，37 个测试文件、493 项测试通过。直接 Hvigor `assembleHap` 使用 DevEco SDK 和 JBR 环境后 exit 0，`PackageHap`、`PackingCheck`、`SignHap` 完成；未签名 HAP 内解包可见新 `iconUrl`，SHA-256 `7033f2cc8ee378c4d5b004b88e1a03a0a71b5a3cde545f51ba0a3af89fb6afdb`，签名 HAP SHA-256 `6100d5539f26ff237c57f256219bf174c3ae8a0a3c2dc844285d4793c26f1c3c`。Pura X View 模拟器 `127.0.0.1:5555` 对同一未签名 HAP 执行 `hdc install -r` exit 0，未卸载也未清除数据；`aa start` exit 0，`bm dump` 有 `XiaoyiAgentAbility` 与 `ohos.extension.agent`，`uitest dumpLayout` 的页面树含「鸿学伴」「学伴」。这只证明包的安装、启动和注册，未触发小艺调用。
 
 Vercel CLI 60.1.3 从仓库根部署 Production 候选 `dpl_9pu9dmP5MkPQagcgusSPm7uFpDXi`，状态 `Ready`；保护绕过测试新 PNG 200／`image/png`／1,195,363 字节，Health 200／`ready`。`vercel promote` 成功后，`vercel inspect hormony-ruddy.vercel.app` 指向同一部署；公开 PNG 再验 200／`image/png`／1,195,363 字节，公开 Health 为 `ready`。本批未重测 `/api/xiaoyi/tutor`，没有小艺到端侧 Extension 的真实连接、对话或取消回执；用户决定本阶段仅用模拟器，真机讨论留待决赛后。平台正式「上架」仍有内容合规主体确认门槛。
+
+平台头像保存后尝试复核白名单测试态是否需重新发布，但本机当时已锁屏，Safari 无法经计算机控制读取；未执行重新发布。既有白名单测试态的发布回执属于更新头像前的版本，不把新头像已显示于白名单小艺端作为已验证事实。
 
 ### 涉及文件
 
