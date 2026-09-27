@@ -622,10 +622,8 @@ test('EntryAbility 连续合法 Want 以单调序号保证 latest-wins', () => {
     /await\s+LocalLearningRepository\.getCourses\s*\(\s*\)/,
     /if\s*\(\s*sequence\s*!==\s*this\.pendingProactiveWantSequence\s*\)\s*return\s*;/,
     /ProactiveLearningService\.validateLaunch\s*\(/,
-    /await\s+ProactiveLearningService\.resolve\s*\(\s*\)/,
-    /if\s*\(\s*sequence\s*!==\s*this\.pendingProactiveWantSequence\s*\)\s*return\s*;/,
     /this\.clearPendingProactiveWant\s*\(\s*sequence\s*\)\s*;/,
-    /ProactiveLearningService\.requestAction\s*\(\s*currentAction\s*\)\s*;/
+    /ProactiveLearningService\.requestLaunch\s*\(\s*launch\s*\)\s*;/
   ], 'only the latest Want may survive repository reads and publish an action');
   assert.doesNotMatch(consumeMethod, /this\.pendingProactiveWant\s*=\s*null\s*;/,
     'async consumers must not clear a newer Want directly');
@@ -635,7 +633,7 @@ test('EntryAbility 连续合法 Want 以单调序号保证 latest-wins', () => {
   ], 'pending Want clear must be sequence guarded');
 });
 
-test('EntryAbility 校验通知外壳后重新解析当前行动', () => {
+test('EntryAbility 校验外部目标后使用本地目录标题直达', () => {
   const source = sourceFile(entryAbilityPath);
   const consumeMethod = methodBlock(source, 'consumeProactiveWant');
 
@@ -644,11 +642,11 @@ test('EntryAbility 校验通知外壳后重新解析当前行动', () => {
   assertOrdered(consumeMethod, [
     /const\s+launch\s*=\s*ProactiveLearningService\.validateLaunch\s*\(/,
     /if\s*\(\s*launch\s*===\s*undefined\s*\)/,
-    /const\s+currentAction\s*=\s*await\s+ProactiveLearningService\.resolve\s*\(\s*\)\s*;/,
-    /ProactiveLearningService\.requestAction\s*\(\s*currentAction\s*\)\s*;/
-  ], 'notification click must validate its envelope and then resolve live learning state');
-  assert.doesNotMatch(consumeMethod, /ProactiveLearningService\.requestLaunch\s*\(\s*launch\s*\)/,
-    'validated notification parameters must not execute a stale fixed action');
+    /ProactiveLearningService\.requestLaunch\s*\(\s*launch\s*\)\s*;/,
+    /this\.navigateProactiveWant\s*\(\s*launch\.targetPage\s*\)\s*;/
+  ], 'validated launch must use the local catalog and route warm child pages');
+  assert.doesNotMatch(consumeMethod, /ProactiveLearningService\.requestAction\s*\(/,
+    'external Want must not replace a requested task with a different current action');
 });
 
 test('Index 热启动按当前路径返回根页或切换子页', () => {

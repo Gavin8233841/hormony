@@ -8819,3 +8819,19 @@ Pura X View 1320×2232 模拟器已安装本批未签名 HAP（SHA-256 `74e5e17d
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T19:44:26Z] [2026-09-28 03:44:26 CST] 模型: Codex (GPT-6)
+
+### 修复服务卡片与学习提醒热启动后停留子页面
+
+Pura X View 模拟器上，`aa start` 携带与 `FormLink`／通知 `WantAgent` 相同的参数，冷启动计划页和课节页均可达；应用已在计划页时再次投递课节 Want，旧包仍留在计划页。`EntryAbility` 的 `onNewWant` 已消费并校验参数，但 Index 的页面监听在子页期间没有完成导航。现于主页面加载完成后，若当前为子页，则使用本机 API 26 SDK 中声明的 `Window.getUIContext().getRouter()` 直接替换至目标页；返回课程根页时替换到 Index，由其选择课程 Tab。外部参数继续经课程目录校验，非法动作／页面配对仍被拒绝。同步更新两条过时的静态契约断言，使其核对当前“已验证的指定目标直达”语义。
+
+### 验证与边界
+
+`node --test scripts/test-proactive-learning-service.mjs` exit 0，24/24。直接 Hvigor API 26 `assembleHap` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成；只有此前已有的 `TextInputController` 系统能力警告。最终未签名 HAP SHA-256 `85a42138d667fe0a0a5fe411051f850a62d6541ad70c5b776aa7f6e431dd43bf`，签名 HAP SHA-256 `b4c2420e13647267d7818a0dc78aa5c43dc0a3fc7d19274d29a4fa7ff68aebf0`。Pura X View 1320×2232、HDC `127.0.0.1:5555` 无卸载覆盖安装同版未签名包 exit 0；课程根页、学习计划、数组与线性表课节的最终 UI 树分别为 `.runtime/hbx-proactive-final-index.json`、`.runtime/hbx-proactive-final-plan.json`、`.runtime/hbx-proactive-final-lesson.json`，无效动作／页面组合后仍停留课节的 UI 树为 `.runtime/hbx-proactive-final-invalid.json`，课节截图 `.runtime/hbx-proactive-final-lesson.jpeg`。这些是外部 Want 注入验证，未实际点击桌面卡片或通知；未验证小艺调用和真机。另一个旧文件 `scripts/test-proactive-delivery-contracts.mjs` 在本批修改前已因导入字符串与现有 Ability 源码不符而启动失败，本批未把它计为通过。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`、`scripts/test-proactive-learning-service.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

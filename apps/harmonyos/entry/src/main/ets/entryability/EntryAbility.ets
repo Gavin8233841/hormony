@@ -22,6 +22,7 @@ export default class EntryAbility extends UIAbility {
   private pendingProactiveWantSequence: number = 0;
   private proactiveWantSequence: number = 0;
   private repositoriesReady: boolean = false;
+  private mainPageReady: boolean = false;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.queueProactiveWant(want);
@@ -38,6 +39,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    hilog.info(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'EntryAbility onNewWant received');
     this.queueProactiveWant(want);
   }
 
@@ -184,6 +186,33 @@ export default class EntryAbility extends UIAbility {
     }
     this.clearPendingProactiveWant(sequence);
     ProactiveLearningService.requestLaunch(launch);
+    if (this.mainPageReady && this.mainWindow !== null) {
+      this.navigateProactiveWant(launch.targetPage);
+    }
+  }
+
+  private navigateProactiveWant(targetPage: string): void {
+    const mainWindow = this.mainWindow;
+    if (mainWindow === null) return;
+    try {
+      const appRouter = mainWindow.getUIContext().getRouter();
+      if (appRouter.getState().path === 'pages/Index') return;
+      const launchVersion = AppStorage.get<number>('proactiveLaunchVersion') ?? 0;
+      appRouter.replaceUrl({ url: targetPage }).then((): void => {
+        if (targetPage !== 'pages/Index' &&
+          launchVersion === AppStorage.get<number>('proactiveLaunchVersion') &&
+          targetPage === AppStorage.get<string>('proactiveTargetPage')) {
+          AppStorage.setOrCreate<string>('proactiveTargetPage', '');
+        }
+      }).catch((error: Error): void => {
+        hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+          'Proactive Want navigation failed: %{public}s', error.message);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'Proactive Want navigation unavailable: %{public}s', message);
+    }
   }
 
   private clearPendingProactiveWant(sequence: number): void {
@@ -222,6 +251,7 @@ export default class EntryAbility extends UIAbility {
         hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'EntryAbility loadContent failed: %{public}s', JSON.stringify(err));
         return;
       }
+      this.mainPageReady = true;
       try {
         ThemePreference.apply(this.context, themeMode);
       } catch (error) {
