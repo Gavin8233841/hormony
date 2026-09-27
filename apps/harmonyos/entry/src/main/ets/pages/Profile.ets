@@ -354,6 +354,29 @@ export struct ProfileContent {
             .backgroundColor(Constants.COLOR_BG_CARD)
             .borderRadius(Constants.RADIUS_LG)
 
+            Row({ space: 12 }) {
+              Text('设置')
+                .fontSize(15)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                .layoutWeight(1)
+              Text('外观与显示')
+                .fontSize(12)
+                .fontColor(Constants.COLOR_TEXT_SECONDARY)
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(17)
+                .fontColor([Constants.COLOR_TEXT_PLACEHOLDER])
+            }
+            .width('100%')
+            .constraintSize({ minHeight: 64 })
+            .padding({ left: 16, right: 16 })
+            .backgroundColor(Constants.COLOR_BG_CARD)
+            .borderRadius(Constants.RADIUS_LG)
+            .onClick((): void => { this.openPage('pages/Settings'); })
+            .accessibilityGroup(true)
+            .accessibilityText('设置')
+            .accessibilityDescription('外观与显示')
+
             Row({ space: 14 }) {
               Stack({ alignContent: Alignment.Center }) {
                 Column()

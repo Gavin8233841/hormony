@@ -8305,3 +8305,19 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 `AGENTS.md`、`apps/harmonyos/README.md`、`apps/harmonyos/build-profile.json5`、原生根页与首页、`entry/src/main/resources/rawfile/nav-icons/`、`docs/FRONTEND-RESOURCE-ADOPTION.md`、`docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`、`docs/SEMIFINAL-ATTACHMENT-START-20260927.md`、`docs/SEMIFINAL-API26-HANDOFF-20260927.md`、本日志。
 
 ---
+
+## [2026-09-27T07:07:47Z] [2026-09-27 15:07:47 CST] 模型: Codex (GPT-6)
+
+### 背景与变化
+
+为复赛原生端增加应用内外观选择。在“我的学习”增加设置入口和独立设置页，提供“跟随系统／浅色／深色”三档。选择保存在 ArkData Preferences，启动时恢复；系统配置变化时仅在“跟随系统”模式下更新界面语义色，手动模式保持选定外观。保存失败显示重试提示。路由注册与设计验收记录同步更新。
+
+### 验证与边界
+
+`DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli build` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 成功；`devecocli run --skip-build --device 127.0.0.1:5555` exit 0。Pura X View 竖屏 1320×2232 的设置页实际点击验证三档即时切换；手动深色在重装启动后保留，跟随系统在系统浅色→深色→浅色切换后显示对应外观。未签名 HAP SHA-256 `2173fcb2c9728dd862dc29ceee2b8e9142578056db6fc08d9d9963d37e56ffe0`。截图在本机忽略目录 `.runtime/semifinal-attachments/`，未验证实体设备、横屏/展开态、大字号或正式签名。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/common/ThemePreference.ets`、`entryability/EntryAbility.ets`、`pages/Profile.ets`、`pages/Settings.ets`、`resources/base/profile/main_pages.json`、`docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`、`docs/SEMIFINAL-ATTACHMENT-START-20260927.md`、本日志。其他任务的未提交脚本与文档保持原状，不纳入本批。
+
+---

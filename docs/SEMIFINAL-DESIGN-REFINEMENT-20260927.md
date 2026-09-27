@@ -35,3 +35,9 @@
 - 浮动底栏会覆盖页面下缘，因此首页、课程、我的的滚动内容留出底部空间，学伴输入区置于底栏上方。课程快捷卡左下角的斜箭头另用居中容器修正视觉偏移。
 - Pura X View 模拟器竖屏 1320×2232：浅色首页 `.runtime/api26-arrow-centered.jpeg`、深色首页 `.runtime/api26-final-dark.jpeg`；系统“显示和亮度”的 UI 树 `.runtime/api26-settings-dark-layout.json` 确认深色选中。此前 `.runtime/api26-chat-fixed.jpeg` 确认学伴输入区未被底栏遮挡；键盘截图 `.runtime/api26-keyboard.jpeg` 显示输入时系统底栏自动隐藏。截图与 UI 树均在忽略目录，仅作为本机验证证据。
 - API 26 增量构建的 `CompileArkTS`、`PackageHap`、`PackingCheck` 均通过并在模拟器安装启动；最后一次 `devecocli build` exit 0。此前 CLI 曾在显示 `BUILD SUCCESSFUL` 后报 `Lock is already released` 导致 exit 1。当前 HAP 未配置正式签名，也没有 API 12 向下兼容性承诺。
+
+## 应用内外观设置增量
+
+- “我的学习 → 设置”新增三档外观选择：跟随系统、浅色、深色。设置使用 ArkData Preferences 保存；启动时先读取选择，再将 HarmonyOS 应用色彩模式和现有语义色状态同步。保存失败时提示重试，不把失败选择展示为已生效。
+- Pura X View 模拟器竖屏 1320×2232：设置页可见三档且位置靠近页首；手动浅色、深色可立即切换，选定深色后重装启动仍保持深色；改为跟随系统后，系统外观从浅色切到深色、再恢复浅色，应用首页相应变化。本机截图见 `.runtime/semifinal-attachments/api26-theme-persisted-dark-home-20260927.png`、`api26-system-follow-dark-home-20260927.png`、`api26-system-follow-light-home-20260927.png`。
+- 最终增量构建 `devecocli build` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 通过；`devecocli run --skip-build --device 127.0.0.1:5555` exit 0。未签名 HAP SHA-256 为 `2173fcb2c9728dd862dc29ceee2b8e9142578056db6fc08d9d9963d37e56ffe0`。未验证真机及横屏/展开态。

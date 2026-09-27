@@ -13,6 +13,7 @@ import { Course, HealthResponse } from '../model/DataModels';
 import { LearningContentRepository } from '../common/LearningContentRepository';
 import { SafeAreaInsets } from '../common/SafeArea';
 import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
+import { ThemeMode, ThemePreference } from '../common/ThemePreference';
 
 export default class EntryAbility extends UIAbility {
   private mainWindow: window.Window | null = null;
@@ -25,14 +26,16 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.queueProactiveWant(want);
+    AppStorage.setOrCreate<string>('themeMode', ThemeMode.SYSTEM);
     AppStorage.setOrCreate<boolean>('darkMode',
       this.context.resourceManager.getConfigurationSync().colorMode === resourceManager.ColorMode.DARK);
     console.info('EntryAbility onCreate');
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
-    AppStorage.setOrCreate<boolean>('darkMode',
-      newConfig.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
+    const mode = AppStorage.get<string>('themeMode') ?? ThemeMode.SYSTEM;
+    AppStorage.setOrCreate<boolean>('darkMode', mode === ThemeMode.DARK ||
+      (mode === ThemeMode.SYSTEM && newConfig.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK));
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -117,6 +120,17 @@ export default class EntryAbility extends UIAbility {
   }
 
   private async startMainPage(windowStage: window.WindowStage): Promise<void> {
+    let themeMode: ThemeMode = ThemeMode.SYSTEM;
+    try {
+      themeMode = await ThemePreference.load(this.context);
+      AppStorage.setOrCreate<string>('themeMode', themeMode);
+      if (themeMode !== ThemeMode.SYSTEM) {
+        AppStorage.setOrCreate<boolean>('darkMode', themeMode === ThemeMode.DARK);
+      }
+    } catch (error) {
+      hilog.warn(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'Appearance preference could not be read');
+    }
     try {
       await this.initializeRepositories();
       this.repositoriesReady = true;
@@ -126,7 +140,7 @@ export default class EntryAbility extends UIAbility {
       hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
         'Local repository initialization failed: %{public}s', message);
     }
-    this.loadMainPage(windowStage);
+    this.loadMainPage(windowStage, themeMode);
     this.probeCloudAgent();
   }
 
@@ -223,11 +237,17 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  private loadMainPage(windowStage: window.WindowStage): void {
+  private loadMainPage(windowStage: window.WindowStage, themeMode: ThemeMode): void {
     windowStage.loadContent('pages/Index', (err): void => {
       if (err.code) {
         hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG, 'EntryAbility loadContent failed: %{public}s', JSON.stringify(err));
         return;
+      }
+      try {
+        ThemePreference.apply(this.context, themeMode);
+      } catch (error) {
+        hilog.warn(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+          'Appearance preference could not be applied');
       }
       console.info('Loaded content successfully.');
     });

@@ -12,6 +12,7 @@
     "pages/ResourceLibrary",
     "pages/ActivityRecords",
     "pages/MistakeBook",
-    "pages/Achievements"
+    "pages/Achievements",
+    "pages/Settings"
   ]
 }
