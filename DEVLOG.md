@@ -8835,3 +8835,17 @@ Pura X View 模拟器上，`aa start` 携带与 `FormLink`／通知 `WantAgent` 
 `apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`、`scripts/test-proactive-learning-service.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T20:00:57Z] [2026-09-28 04:00:57 CST] 模型: Codex (GPT-6)
+
+### 统一应用名称并验证系统通知实际点击
+
+AppScope 的应用名称与 EntryAbility 的标签、说明统一为“鸿学伴”。直接 Hvigor API 26 增量构建 exit 0，沿用已有的 `TextInputController` 系统能力警告；最终未签名 HAP SHA-256 `481715c608a7000346f3e29e1571a6fe90b799d44f7c010f4b33db4cd5283040`，签名 HAP SHA-256 `372e04d53f6ca4143f59d5218b42dfce7769029b05a21875945fd3f66d2ef631`。
+
+Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标标为“鸿学伴”。在“今日”页面点击提醒按钮后，应用显示“系统提醒已创建：错题复习”；通知栏显示“鸿学伴 · 今日任务／错题复习”；实际点击通知，系统打开 `com.c4ai.hormony` 的 `pages/MistakeBook`，页面显示“错题本”和“待复习 13 道 · 今天 10 道”。本地忽略证据为 `.runtime/hbx-brand-reminder-created.json`、`.runtime/hbx-brand-reminder-shade.json`、`.runtime/hbx-brand-reminder-clicked.json` 和 `.runtime/hbx-brand-reminder-clicked.jpeg`。启动器里另一个“学习助理”图标来自旧测试包 `com.c4ai.hormony.visualqa`，未删除。模拟器通知链已实点；桌面卡片实点、小艺对 Extension 的真实连接和真机仍未验证。
+
+### 涉及文件
+
+`apps/harmonyos/AppScope/resources/base/element/string.json`、`apps/harmonyos/entry/src/main/resources/base/element/string.json`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
