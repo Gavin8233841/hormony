@@ -26,7 +26,7 @@
 
 [AgentCard 规范](https://developer.huawei.com/consumer/cn/doc/service/agentcard-0000002678424557)（2026-07-27）列 `name`、`description`、`agentId`、`version`、`iconUrl`、默认输入/输出 MIME、`skills` 和 `appInfo` 等字段；规范表说明平台导入/导出不支持 `agentId` 与 `appInfo`，它们分别有平台内部与应用关联语义。IDE 简化模板与平台字段不完全一致，**按平台实际导入校验结果确认**，不猜平台生成的 ID。`agentId` 在同包名内唯一。平台上传控件明确要求 APP 工程中的 `agent_config.json`；本项目用 `entry/src/main/resources/base/profile/agent_config.json`。不要在 Card 填未上线 URL、虚构设备支持或未实现的 Skill。
 
-项目现状：`entry/src/main/module.json5` 已注册导出的 `XiaoyiAgentAbility`，其配置位于 `entry/src/main/resources/base/profile/agent_config.json`；API 26 Debug HAP 的 ArkTS 编译、打包检查通过。Extension 只接收短文本课程问题，经 `HttpClient.postSSE` 调用独立的 `/api/xiaoyi/tutor`，复用服务端 Tutor 编排和 Safety；提供按连接隔离的取消、断连、并发及进程内历史上限。**这是端侧协议适配加云端模型调用，不是端侧模型推理**。当前没有小艺实际连接证据，`iconUrl` 在 Web 部署前也不可作为线上可访问资源。
+项目现状：`entry/src/main/module.json5` 已注册导出的 `XiaoyiAgentAbility`，其配置位于 `entry/src/main/resources/base/profile/agent_config.json`；API 26 Debug HAP 的 ArkTS 编译、打包检查通过。Extension 只接收短文本课程问题，经 `HttpClient.postSSE` 调用独立的 `/api/xiaoyi/tutor`，复用服务端 Tutor 编排和 Safety；提供按连接隔离的取消、断连、并发及进程内历史上限。**这是端侧协议适配加云端模型调用，不是端侧模型推理**。Web 部署 `dpl_6LQpd9gP8pwQWfpSdApnQaDdLGeV` 已提升到 `hormony-ruddy.vercel.app`，线上图标 URL 返回 PNG 200，小艺专用接口的合成课程问题返回 200、正文和 `done`；仍没有小艺实际连接证据。
 
 2026-09-27 平台实查：初次进入“端A2A模式”时应用选择器显示“暂无数据”；用户随后在 AppGallery Connect 完成“鸿学伴”应用创建，项目名 `Hormony`，小艺表单现已显示关联应用“鸿学伴”。平台在同页提示最低 HarmonyOS API 24、小艺 App 11.6.6.300；当前 App 目标 API 26 满足代码侧版本条件。平台“应用服务名称”按 `module.json5` 中 `type: "agent"` 的 `name` 填 `XiaoyiAgentAbility`。已在 Safari 填入该值，尝试上传 `agent_config.json` 时平台返回“会话超时”并跳转华为账号登录；**尚无 Card 导入成功或 Agent 创建证据**。登录恢复后重新核对关联应用、上传结果和确认创建状态。真机版本与真实小艺对话也未验证。[官方创建应用指南](https://developer.huawei.com/consumer/cn/doc/app/agc-help-createharmonyapp-0000001945392297)与[端 A2A 创建流程](https://developer.huawei.com/consumer/cn/doc/service/device-a2a-0000002640106106)用于复核后续步骤。若页面提出法律协议或资质验证，由账户主体完成。
 
@@ -51,10 +51,17 @@
 4. 证据按 **源码确认→静态诊断→构建→模拟器→真机→平台/线上** 分级。登记提交哈希、HAP SHA-256、设备/系统、平台项目测试状态、一次成功与至少一次失败/取消路径。平台显示“创建完成”不等于小艺真实可问答；模拟器通过不等于真机通过。
 5. 只有能力已在 HAP 或平台按同版验证，才回写作品叙事和附件。优先完成端 A2A 文本课程讲解、课程动作入口、同版演示，再考虑语音/意图/自定义卡片；PDF 最后制作。
 
+### 签名与小艺真机测试的官方路径
+
+- [DevEco 自动签名](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/ide-signing-auto)区分关联与未关联注册应用。2026-09-27 在 DevEco 完成项目同步后，`Compatible SDK` 显示 `26.0.0`，并在 `File > Project Structure > Project > Signing Configs` 选择 **Associate with registered application**；团队与包名分别显示当前账号和 `com.c4ai.hormony`。首次打开签名页曾提示未验证用户须签协议，项目同步后该提示未再出现，关联及签名构建成功；不能据首次提示推断当前仍缺协议。API 26 支持先在 AGC 注册设备再签名。DevEco 将包含本机签名口令和路径的配置写入**已跟踪的** `apps/harmonyos/build-profile.json5`，该文件只保留为本地未提交修改，绝不得暂存、提交或输出内容；`.p12`、`.csr`、`.cer`、`.p7b` 也不得入库。
+- [小艺真机测试](https://developer.huawei.com/consumer/cn/doc/doccenter-celia/list-of-user-groups-for-real-machine-testing-0000002471264273)先在 Agent 调试与预览设置白名单用户组，再发布真机测试；官方说明测试态有效期 15 天，重新启动小艺后约 3–5 分钟可见“开发中”Agent。测试账号必须是有小艺开放平台权限的团队成员；主账号可按平台实际资格测试。只有同一签名包在支持版本真机中完成成功对话及失败/取消路径，才写入复赛演示叙事。
+
 ## 4. 当前状态与下一批
 
 - **源码确认**：ArkUI、ArkData、服务卡片、通知、云端多 Agent、只读 Tutor，以及本批新增的端 A2A Extension 和独立 Tutor 接口；包名 `com.c4ai.hormony`、模块 `entry`、API 26。具体范围见[交接](SEMIFINAL-IMPLEMENTATION-HANDOFF.md)和[接入计划](SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md)。
-- **本地检查**：Web lint、typecheck、492 项测试及构建通过；Hvigor API 26 增量构建 exit 0，产物仍为未签名 HAP。尚无平台 AgentCard 导入校验。
+- **本地检查**：Web lint、typecheck、492 项测试及构建通过；原 API 26 未签名 HAP 已构建。关联 AGC“鸿学伴”的本机签名配置之后，`devecocli build` exit 0，含 `SignHap`；`entry-default-signed.hap` 为 4,071,833 字节、SHA-256 `62f741b2782da864f0d2929988aba3ec4b2a84b2e1ae1c6a8578e53b28a1b061`。本地 SDK `hap-sign-tool.jar verify-app` exit 0，提取证书链和 Profile 到忽略目录 `.runtime/`。这证明包签名可验证，不证明指定真机的 Profile 包含设备，也不证明平台 AgentCard 导入。
+- **模拟器通过（有限范围）**：Pura X View 模拟器 `127.0.0.1:5555` 上 `devecocli run --skip-build` 安装、启动 exit 0；`bm dump -n com.c4ai.hormony` 包含 `XiaoyiAgentAbility` 与 `ohos.extension.agent` 元数据。仅证实扩展能力已随包注册，不证明小艺能连接、请求与取消协议能运行。
+- **线上通过**：部署 `dpl_6LQpd9gP8pwQWfpSdApnQaDdLGeV` 已提升为公开域名目标；公开域名 `GET /api/health` 为 200 且 `status=ready`，头像 PNG 为 200，`POST /api/xiaoyi/tutor` 的合成课程问题为 200 SSE，含非空 `delta` 与 `done`、无 `error`；空问题为 400 `MISSING_FIELD`。这只证明云端接口，不证明端侧 Extension 或小艺平台连接。
 - **平台确认**：AppGallery Connect 中“鸿学伴”应用已由用户创建，小艺端 A2A 表单已显示关联成功；应用服务名称已填写 `XiaoyiAgentAbility`。AgentCard 上传遇到会话超时，未完成导入与创建。
-- **未验证**：Extension 运行和真实小艺对话、系统意图、语音 Kit、真机与已签名 HAP。
-- **下一批顺序**：部署并校验 Web 独立接口与头像 URL → 账户重新登录后平台端 A2A 导入与测试态 → 真机问答/取消 → 明确补充 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。
+- **未验证**：Extension 运行和真实小艺对话、系统意图、语音 Kit、签名 HAP 的真机安装与使用。HDC 当前只列出 `127.0.0.1:5555` 模拟器。
+- **下一批顺序**：账户重新登录后平台端 A2A 导入与测试态 → 同版 HAP 安装和真机问答/取消 → 明确补充 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。

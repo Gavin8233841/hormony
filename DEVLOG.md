@@ -8399,3 +8399,43 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 `apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`apps/harmonyos/entry/src/main/ets/common/Constants.ets`、`apps/harmonyos/entry/src/main/module.json5`、`apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`、`apps/web/src/app/api/chat/route.ts`、`apps/web/src/app/api/xiaoyi/tutor/route.ts`、`apps/web/src/app/api/request-validation.test.ts`、`apps/web/src/app/api/stateless-agent.test.ts`、`apps/web/src/lib/agents/orchestrator.ts`、`apps/web/src/lib/agents/orchestrator.test.ts`、`apps/web/src/middleware.ts`、`apps/web/src/middleware.test.ts`、`apps/web/vercel.json`、`apps/web/public/xiaohong-agent.png`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。其他任务的未提交文件保持原状。
 
 ---
+
+## [2026-09-27T11:52:20Z] [2026-09-27 19:52:20 CST] 模型: Codex (GPT-6)
+
+### 小艺 Tutor 公网依赖上线
+
+将 `a665944` 构建为 Vercel Production 候选 `dpl_6LQpd9gP8pwQWfpSdApnQaDdLGeV`（`--skip-domain`），候选的 Health、头像 PNG、小艺 Tutor 正常 SSE 与空问题 400 均通过。随后执行 `vercel promote ... --yes`，`vercel inspect hormony-ruddy.vercel.app` 确认公开域名目标为同一部署且状态 `Ready`。公开域名复测：Health 200/`ready`；`/xiaohong-agent.png` 200、`image/png`、59144 字节；`/api/xiaoyi/tutor` 合成课程问题 200、12 个 SSE 事件含非空 `delta`、3 条引用与 `done`、无 `error`；空问题 400 `MISSING_FIELD`。未输出或传输真实学生资料。
+
+公网服务和 AgentCard 图标已可访问，但华为账号会话超时后尚未重新登录，小艺平台仍未完成 Card 导入、Agent 创建与真机连接。上线验证不能替代端侧签名和真机测试。其他任务未提交文件保持原状。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
+
+## [2026-09-27T11:53:44Z] [2026-09-27 19:53:44 CST] 模型: Codex (GPT-6)
+
+### 端 A2A 扩展的模拟器安装核验
+
+Pura X View 模拟器 `127.0.0.1:5555` 处于 Connected。`DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli run --skip-build --device 127.0.0.1:5555` exit 0，输出 `App installed successfully`、`EntryAbility` 启动成功、`Smoke: PASS`；安装包仍是 SHA-256 `7446fd47aa0ac2fbd3eb1888254ab93a98d0e41fee24a4b37ccd3dfb095c7e7c` 的未签名 HAP。设备 `bm dump -n com.c4ai.hormony` 明确列出 `XiaoyiAgentAbility` 与 `ohos.extension.agent` 配置。此证据只证明模拟器安装与扩展注册，不证明小艺 App 调起、消息协议成功或真机验收。用户的华为账号登录恢复后继续平台导入。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
+
+## [2026-09-27T12:02:48Z] [2026-09-27 20:02:48 CST] 模型: Codex (GPT-6)
+
+### 鸿学伴关联注册应用的调试签名
+
+DevEco Studio 项目同步完成后，Project Structure 的 Compatible SDK 从旧缓存的 `5.0.0(12)` 更新为 `26.0.0`。Signing Configs 关联已注册应用，团队和 Bundle name 与当前“鸿学伴”应用一致。首次打开签名页曾提示协议签署状态查询失败；同步后重进未再显示错误，签名配置可应用。`DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli build` exit 0，`SignHap` 成功；签名 HAP 为 `apps/harmonyos/entry/build/default/outputs/default/entry-default-signed.hap`，4,071,833 字节，SHA-256 `62f741b2782da864f0d2929988aba3ec4b2a84b2e1ae1c6a8578e53b28a1b061`。用 DevEco 自带 `hap-sign-tool.jar verify-app` 校验 exit 0，提取产物留在忽略目录 `.runtime/`，未输出密钥材料。
+
+DevEco 在已跟踪的 `apps/harmonyos/build-profile.json5` 写入本机签名路径与口令。该文件保持本地未提交，提交与推送必须排除；密钥及 Profile 不入库。当前 HDC 只有 Pura X View 模拟器，没有已连接实体设备；签名包尚未安装真机，小艺平台仍在华为账号登录页，AgentCard 导入和真实对话未验证。
+
+### 涉及文件
+
+`apps/harmonyos/build-profile.json5`（本地秘密，禁止提交）、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
