@@ -8519,3 +8519,19 @@ Mac 解锁后在小艺开放平台「小鸿」编排页打开「真机测试」�
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T14:35:30Z] [2026-09-27 22:35:30 CST] 模型: Codex (GPT-6)
+
+### 学习计划页接入系统意图
+
+按照华为 `@InsightIntentPage` 官方接口，在 `Plan.ets` 现有 `@Entry` 页面声明自定义 `ViewStudyPlan`，垂域 `EducationDomain`，绑定 `EntryAbility` 与学习计划页，不传递学生数据。意图编译器首次报 `Failed to generate standard OHMUrl`；按华为工程配置文档在当前 HarmonyOS 产品的 `buildOption.strictMode` 增加 `useNormalizedOHMUrl=true` 后成功编译。保留本地 `build-profile.json5` 中已有签名配置，不输出敏感字段。
+
+### 验证与边界
+
+`devecocli build` 的内层 Hvigor 完成 `CompileArkTS`、`PackageHap`、`PackingCheck` 和 `SignHap` 并显示 `BUILD SUCCESSFUL in 6 s 867 ms`，但 CLI 外层返回码为 1；随后直接执行同参数 Hvigor 增量构建 exit 0、`BUILD SUCCESSFUL in 116 ms`。编译生成的 `insight_intent.json` 含 `ViewStudyPlan`、`EducationDomain`、`EntryAbility` 和标准化页面路径；签名 HAP 中确有该文件，`module.json` 为 `hasInsightIntent=true`。签名 HAP SHA-256 `3643a4e8151ab0477e630f51b1ec8df825b2d8e3a61dc36b61d1455844759322`。仍有 `TextInputController` 系统能力告警。用户目前没有 HarmonyOS 真机，因此未验证小艺唤起、页面运行、端 A2A 对话与取消；旧模拟器结果不对应此包。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/pages/Plan.ets`、`apps/harmonyos/build-profile.json5`（仅提交标准化 OHMUrl 一项，保留本地签名字段未提交）、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

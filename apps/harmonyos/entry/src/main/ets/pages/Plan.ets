@@ -13,6 +13,7 @@ import { LearningStudyEvent as StudyEvent } from '../model/LearningMetadataModel
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { LearningFormUpdater } from '../common/LearningFormUpdater';
 import { ProactiveLearningService } from '../common/ProactiveLearningService';
+import { InsightIntentPage } from '@kit.AbilityKit';
 
 interface AgentPlanTask extends PlanTask {
   reason?: string;
@@ -30,6 +31,17 @@ interface PlanValidationResult {
 
 @Entry
 @Component
+@InsightIntentPage({
+  intentName: 'ViewStudyPlan',
+  domain: 'EducationDomain',
+  intentVersion: '1.0.1',
+  displayName: '查看学习计划',
+  displayDescription: '打开鸿学伴的学习计划和任务',
+  llmDescription: '打开鸿学伴学习计划页，查看已保存的学习任务并继续课程或练习。',
+  keywords: ['学习计划', '今日学习任务', '复习任务', '鸿学伴'],
+  uiAbility: 'EntryAbility',
+  pagePath: './ets/pages/Plan'
+})
 struct PlanPage {
   @StorageProp('darkMode') darkMode: boolean = false;
   private goalInputController: TextInputController = new TextInputController();
