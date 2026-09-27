@@ -32,6 +32,10 @@
 
 2026-09-27 登录恢复后复查：刷新小艺“新建项目”并选择端 A2A，当前关联步骤显示“暂无HarmonyOS应用”；Agent 列表显示共 0 条，之前表单的“鸿学伴”关联没有留下已创建项目。AGC 的 **APP ID** 列表确有一条“鸿学伴”／`com.c4ai.hormony`（APP ID `6917617536495682419`）；但 **APP 与元服务** 的 HarmonyOS 列表显示“暂无数据”。进入 AGC“开发与服务”项目管理时弹出《AppGallery Connect协议包》，其中预选了多项服务条款，包含付费服务协议；关闭弹窗后回到 AGC 首页，未读取到项目列表。不能由 APP ID 存在推断已完成 AGC 应用/项目配置，也不能确定小艺列表为空仅由该协议造成。账户主体需审阅并处理协议后，再分别复核 AGC 项目、应用列表和小艺选择器；代理不代签法律协议。此时仍无 Card 导入、Agent 创建或小艺对话证据。
 
+2026-09-27 约 21:53–22:03 CST 平台续查：用户完成账户协议/登录后，AGC「APP 与元服务」创建了鸿学伴的 HarmonyOS 应用记录，列表显示「准备提交」、详情显示「未提交」；此前 APP ID `6917617536495682419` 仍对应 `com.c4ai.hormony`。小艺端 A2A 选择器随后可关联鸿学伴。上传工程 `agent_config.json` 后平台成功解析名称、版本、文本输入输出与「讲解课程概念」Skill，并创建 **小鸿 Agent 草稿**，平台 Agent ID `agent1e478cf9ea75464495020ca66bc39fb0`，应用内 ID `xiaohong_learning_tutor`，服务名称 `XiaoyiAgentAbility`，分类「教育 / 学习」。编排中保存了「解释二叉搜索树」文本快捷指令。测试白名单组「鸿学伴小鸿真机测试」已创建，当前账户在组中，开关在页面显示 `on`。Card 的线上 PNG URL 由本机请求返回 200，但平台提示「iconUrl解析失败，已替换成默认图标」；现有草稿仍为平台默认头像，不能写成品牌头像已接入。
+
+点击平台「上架（1项未完成）」得到唯一未完成项「内容合规未填写」。该表单要求判断是否包含人工智能生成的文件、是否接入非小艺平台三方大模型；选三方模型「是」后新增必填「生成式人工智能服务上线备案号」和「算法备案号」，并有对法规审视及申报真实性承担责任的确认框。**未填写备案号、未勾选确认、未上架或发布真机测试**。仓库 `apps/web/src/lib/agents/model.ts` 默认使用火山方舟兼容接口；当时公开 `/api/health` 只读结果显示模型已配置且名称 `doubao-seed-2-1-pro-260628`，因此不能如实选择「未接入三方大模型」。火山引擎[客户资质材料说明](https://www.volcengine.com/docs/82379/1326340?lang=zh)指向按账户、已开通商品取得对应合同及备案说明；其他产品的公开备案号不能未经核对直接填作本 Agent 的申报。另在当前 Web 源码中未找到可直接用于该 Agent 的隐私政策页面；平台「隐私协议服务」默认隐私托管但政策选择为空。正式发布前需由账户主体核定备案/登记材料、模型使用关系、AI 标识和隐私政策，并审阅平台声明。草稿和白名单均不证明小艺真机可问答。
+
 ### B. 小艺云 A2A（保留现有适配，按门槛再开放）
 
 [云 A2A 模式](https://developer.huawei.com/consumer/cn/doc/service/cloud-a2a-0000002640266052)适配已有自有云 Agent。[协议技术规范](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-comments-0000002500412353)、[消息定义](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-define-0000002467293060)、[发起会话](https://developer.huawei.com/consumer/cn/doc/service/message-stream-0000002505761434)、[终止会话](https://developer.huawei.com/consumer/cn/doc/service/tasks-cancel-0000002537561193)是实现依据。云版使用单 POST Endpoint / Streamable HTTP / JSON-RPC，可返回 SSE；`message/stream` 有 `params.id` 与 `sessionId`，终态可用 `artifact-update`、`final: true` 与 `lastChunk: true`。有会话模式要处理 `initialize` 和 `agent-session-id`；无会话模式每次携带鉴权。当前 `apps/web/src/lib/agents/cloud-a2a-tutor.ts` **只有本地解析/只读讲解/终态格式化与单测**，无公网路由。无共享会话、鉴权、幂等、跨实例取消和全局成本限额之前不公开接入点；Vercel 进程内 Map 不满足跨实例语义。
@@ -65,6 +69,6 @@
 - **模拟器通过（有限范围）**：Pura X View 模拟器 `127.0.0.1:5555` 上 `devecocli run --skip-build` 安装、启动 exit 0；`bm dump -n com.c4ai.hormony` 包含 `XiaoyiAgentAbility` 与 `ohos.extension.agent` 元数据。仅证实扩展能力已随包注册，不证明小艺能连接、请求与取消协议能运行。
 - **签名包安装尝试**：对同一模拟器执行 HDC `install -r entry-default-signed.hap`，安装器返回 `code:9568332 error: install sign info inconsistent`。设备原有安装为未签名调试包（`appSignType: none`），尝试后仍保留原包。因此这是覆盖安装时签名身份不一致的失败证据，不能据此判定签名 HAP 本身无效；也没有签名包安装成功的证据。没有卸载原包或清除数据。
 - **线上通过**：部署 `dpl_6LQpd9gP8pwQWfpSdApnQaDdLGeV` 已提升为公开域名目标；公开域名 `GET /api/health` 为 200 且 `status=ready`，头像 PNG 为 200，`POST /api/xiaoyi/tutor` 的合成课程问题为 200 SSE，含非空 `delta` 与 `done`、无 `error`；空问题为 400 `MISSING_FIELD`。这只证明云端接口，不证明端侧 Extension 或小艺平台连接。
-- **平台确认**：AGC 的 APP ID 列表有“鸿学伴”／`com.c4ai.hormony`；“APP 与元服务”列表为空，项目管理弹出待处理协议包。小艺重新登录并刷新后的端 A2A 选择器显示“暂无HarmonyOS应用”，Agent 列表 0 条。先前表单曾显示“鸿学伴”并填过 `XiaoyiAgentAbility`，但会话超时后没有导入或创建成功证据。
+- **平台确认**：AGC 已有 APP ID 与单独的「APP 与元服务」鸿学伴记录，后者为「准备提交／未提交」。小艺平台已创建「小鸿」端 A2A **草稿**，导入 Card、分类、快捷指令、含当前账户且已开启的真机测试组均在页面确认；默认头像替代了未解析的 `iconUrl`。「内容合规」仍缺备案字段及主体确认，未上架、未发布真机测试，也未取得真实小艺对话。
 - **未验证**：Extension 运行和真实小艺对话、系统意图、语音 Kit、签名 HAP 的真机安装与使用。HDC 当前只列出 `127.0.0.1:5555` 模拟器。
-- **下一批顺序**：账户主体处理 AGC 协议后复核项目及应用列表 → 小艺端 A2A 重新关联、导入与测试态 → 同版 HAP 安装和真机问答/取消 → 明确补充 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。
+- **下一批顺序**：核定三方模型对应的合规材料、AI 标识和隐私政策 → 账户主体审阅并完成小艺内容合规声明 → 发布真机测试 → 在身份匹配的鸿蒙真机安装同版签名 HAP 并验证小艺问答/取消 → 再决定 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。
