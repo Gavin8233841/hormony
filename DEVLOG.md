@@ -8777,3 +8777,17 @@ Pura X View 1320×2232 模拟器已安装本批未签名 HAP（SHA-256 `74e5e17d
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T19:11:28Z] [2026-09-28 03:11:28 CST] 模型: Codex (GPT-6)
+
+### 避免小艺概念讲解编造具体软件内部线程映射
+
+生产 `/api/xiaoyi/tutor` 对操作系统和计算机网络各发送一个合成课程问题，均返回 HTTP 200、`text/event-stream`、非空 `delta` 和 `done`，无 `error`；原始结果保存在忽略目录 `.runtime/xiaoyi-course-matrix-20260928.json`。操作系统样本把某商业应用的三个界面操作直接断言为三个线程，但课程资料只证明进程和线程的一般资源关系，不能据此推断该产品内部实现。课程概念入口的 Tutor 提示现要求日常软件例子使用假设情境，不把操作一一映射为真实线程，也不猜具体产品内部实现；范围仅限小艺只读概念讲解。
+
+`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 在 `apps/web` 均 exit 0，37 个测试文件、493 项测试通过。本批尚未部署或取得修改后的线上回答，不能声称已修复生产样本；HAP 源码和构建未变，小艺平台 Card 同步仍受 Safari 登录会话影响。
+
+### 涉及文件
+
+`apps/web/src/lib/agents/tutor-agent.ts`、`DEVLOG.md`。
+
+---
