@@ -8741,3 +8741,15 @@ Vercel CLI 60.1.3 从仓库根部署 Production 候选 `dpl_9pu9dmP5MkPQagcgusSP
 `apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T18:42:35Z] [2026-09-28 02:42:35 CST] 模型: Codex (GPT-6)
+
+### 复核生产小艺讲解入口
+
+在当前生产域名对 `/api/xiaoyi/tutor` 发送合成二叉搜索树课程问题与空历史，HTTP 200／`text/event-stream`；事件顺序包含 `thinking`、`trace`、`delta`、`citation`、`done`，正文 `delta` 合计 183 字符，未收到 `error`。同一路径未传 `mode` 返回 HTTP 400／`INVALID_MODE`。这确认当前线上入口的一次成功样本和专用模式约束，不证明小艺 App 的端 A2A 对话、完整教学质量或平台最新版 AgentCard。Mac 仍锁屏，平台 Card 同步待恢复账户页面后核对。本阶段按用户要求只用模拟器。
+
+### 验证与文件
+
+只读线上请求脚本 exit 0；本批仅更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md` 与 `DEVLOG.md`，未改代码或 HAP，故未重跑构建。平台白名单版本与小艺真实会话仍未验证。
+
+---

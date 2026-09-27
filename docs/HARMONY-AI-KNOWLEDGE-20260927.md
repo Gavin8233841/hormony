@@ -44,6 +44,8 @@
 
 2026-09-28 Card 能力声明复核：本机 API 26 `application/AgentCard.d.ts` 将 `capabilities.streaming` 说明为是否支持流式响应；[华为 Ability Kit API 差异](https://developer.huawei.com/consumer/en/doc/harmonyos-releases/js-apidiff-abilitykit-6111)也列出此字段。当前 Extension 的 `MessageStream` 先发 `TASK_STATE_SUBMITTED`，云端完成后再发终态，是多帧任务响应；原 Card 仍为 `streaming:false`，与当前实现不符。现改为 `true`，协议测试同时断言 Card 与首帧/终帧行为一致，10/10 通过。未实现逐 token 内容推送，也不声明推送通知。更新后的 Card 已进入模拟器 HAP，但**平台先前导入的是旧 Card**，需在平台可访问时核对是否支持覆盖导入或手动更新，并重新核对测试态版本；不能仅凭本地 Card 宣称平台元数据已更新。
 
+2026-09-28 02:41 CST 线上小艺讲解入口复核：对生产域名 `https://hormony-ruddy.vercel.app/api/xiaoyi/tutor` 发合成课程问题「请用一个三节点例子解释二叉搜索树如何查找数字 7。」与空历史，HTTP 200、`text/event-stream`，收到 `thinking`、`trace`、`delta`、`citation`、`done`，`delta` 正文合计 183 字符，无 `error` 事件；未带 `mode` 的请求返回 HTTP 400／`INVALID_MODE`。因此只能标记为**线上专用 Tutor 接口的一次可用性样本**，不代表小艺 App 已连接端 A2A Extension、回答质量全面合格或平台已同步新版 Card。本阶段按用户决定仅使用模拟器，真机联调留待决赛后。
+
 ### B. 小艺云 A2A（保留现有适配，按门槛再开放）
 
 [云 A2A 模式](https://developer.huawei.com/consumer/cn/doc/service/cloud-a2a-0000002640266052)适配已有自有云 Agent。[协议技术规范](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-comments-0000002500412353)、[消息定义](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-define-0000002467293060)、[发起会话](https://developer.huawei.com/consumer/cn/doc/service/message-stream-0000002505761434)、[终止会话](https://developer.huawei.com/consumer/cn/doc/service/tasks-cancel-0000002537561193)是实现依据。云版使用单 POST Endpoint / Streamable HTTP / JSON-RPC，可返回 SSE；`message/stream` 有 `params.id` 与 `sessionId`，终态可用 `artifact-update`、`final: true` 与 `lastChunk: true`。有会话模式要处理 `initialize` 和 `agent-session-id`；无会话模式每次携带鉴权。当前 `apps/web/src/lib/agents/cloud-a2a-tutor.ts` **只有本地解析/只读讲解/终态格式化与单测**，无公网路由。无共享会话、鉴权、幂等、跨实例取消和全局成本限额之前不公开接入点；Vercel 进程内 Map 不满足跨实例语义。
