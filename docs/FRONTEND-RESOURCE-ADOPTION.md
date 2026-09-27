@@ -208,7 +208,11 @@ ohpm install @ohos/lottie
 2. **Lottie JSON 验证流程**：OHPM 安装 → API 12 构建 → 真机帧率与生命周期验证 → rawfile 部署。验证前不得放入产品资源目录。
 3. **Web 专用库隔离**：Zustand、Comlink、BlurHash、SpinKit CSS、canvas-confetti 仅服务于 `apps/web`（Next.js）端，不得以任何形式（源码复制、ArkWeb 加载、类型引用）进入 `apps/harmonyos`。
 4. **ArkWeb 边界**：ArkWeb 不得承载原生页面或庆祝动画。庆祝动画统一走 @ohos/lottie 原生方向。
-5. **图标统一**：应用内功能图标使用 HarmonyOS 系统 Symbol，不混入 Tabler/Phosphor SVG。SVG 图标仅作设计参考。
+5. **图标统一**：一般功能图标继续使用 HarmonyOS 系统 Symbol；API 26 底部原生 Tabs 依用户批准统一使用一套 Phosphor 常规／双色 SVG，见下文增量决定。
+
+### 2026-09-27 导航图标增量决定
+
+原批次的 6 个教育主题 Phosphor 图标仍只作参考。底部导航另采用 4 组常规／双色图标，共 8 个 SVG，全部来自 [Phosphor Icons Core](https://github.com/phosphor-icons/core) 固定提交 `2b75f3ad12b420c9504ef05df8d2564a28f8500e`，许可证 MIT 已随资源放在 `apps/harmonyos/entry/src/main/resources/rawfile/nav-icons/LICENSE`。选择一套线宽和光学尺寸相同的图标，避免系统 Symbol 在底栏出现不同基线和视觉重量；其余页面不因此混入第二套功能图标。API 26 模拟器构建、渲染与四入口点击已验证，来源和许可证已核对。
 6. **依赖不替代原生能力**：不得用第三方库替代 ArkData 本地状态、HarmonyOS 系统能力或真实 Agent。
 7. **OHPM 源不可用时保持原生实现**，不依据 README 猜写组件 API。
 

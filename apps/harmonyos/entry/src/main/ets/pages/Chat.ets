@@ -39,6 +39,7 @@ interface MarkdownBlock {
 export struct ChatContent {
   @StorageProp('darkMode') darkMode: boolean = false;
   @Prop quickQuestion: string = '';
+  @Prop bottomInset: number = 0;
   @State messages: DisplayMessage[] = [];
   @State inputText: string = '';
   @State loading: boolean = false;
@@ -1022,6 +1023,7 @@ export struct ChatContent {
     .width('100%')
     .height('100%')
     .backgroundColor(Constants.COLOR_BG_PAGE)
+    .padding({ bottom: this.bottomInset })
   }
 
   private localDateKey(date: Date = new Date()): string {

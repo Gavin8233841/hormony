@@ -15,6 +15,7 @@ export struct HomeContent {
   @Link selectedTab: number;
   @Link quickQuestion: string;
   @Prop @Watch('refreshLearningView') learningViewVersion: number = 0;
+  @Prop bottomInset: number = 0;
 
   @State quickAsk: string = '';
   @State notificationOpen: boolean = false;
@@ -500,12 +501,12 @@ export struct HomeContent {
   }
 
   @Builder
-  CheckInDay(date: string, compact: boolean) {
+  CheckInDay(date: string) {
     Column({ space: 3 }) {
       Text(this.checkInDates.includes(date) ? '✓' : date === this.todayDate() ? '今' : '·')
-        .width(compact ? 23 : 27)
-        .height(compact ? 23 : 27)
-        .fontSize(compact ? 12 : 13)
+        .width(23)
+        .height(23)
+        .fontSize(12)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.checkInDates.includes(date) ? Constants.COLOR_TEXT_ON_GRADIENT :
           Constants.COLOR_BRAND_TEXT)
@@ -513,7 +514,7 @@ export struct HomeContent {
         .backgroundColor(this.checkInDates.includes(date) ? Constants.COLOR_BRAND :
           this.darkMode ? '#7053687f' : '#99ffffff')
         .borderRadius(14)
-      Text(compact ? date.slice(5) : date.slice(8))
+      Text(date.slice(5))
         .fontSize(10)
         .fontColor(Constants.COLOR_TEXT_SECONDARY)
     }
@@ -525,105 +526,73 @@ export struct HomeContent {
   @Builder
   CheckInCard() {
     Stack({ alignContent: Alignment.TopEnd }) {
-      Column({ space: 8 }) {
-      Row() {
-        Column({ space: 3 }) {
-          Text('每日签到')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Constants.COLOR_TEXT_PRIMARY)
-          Text(this.checkInDates.includes(this.todayDate()) ?
-            '连续签到 ' + this.checkInStreak().toString() + ' 天' : '为今天做个标记')
-            .fontSize(11)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        if (this.checkInDates.includes(this.todayDate())) {
-          Text('已签到')
-            .height(40)
-            .padding({ left: 15, right: 15 })
-            .fontSize(12)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_BRAND_TEXT)
-            .backgroundColor(this.darkMode ? Constants.COLOR_BG_TAG : '#b8ffffff')
-            .borderRadius(14)
-            .textAlign(TextAlign.Center)
-        } else {
-          Button(this.checkInBusy ? '签到中' : '签到')
-            .height(40)
-            .padding({ left: 15, right: 15 })
-            .fontSize(12)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
-            .backgroundColor(Constants.COLOR_BRAND)
-            .borderRadius(14)
-            .enabled(!this.checkInBusy)
-            .onClick((): void => { this.checkIn(); })
-        }
-      }
-      .width('100%')
-      .padding({ right: 76 })
-
-      Row() {
-        ForEach(this.recentCheckInDates(7), (date: string): void => {
-          this.CheckInDay(date, false)
-        }, (date: string): string => date)
-      }
-      .width('100%')
-      .padding({ right: 78 })
-      .scale({ x: this.checkInCelebrating ? 1.025 : 1, y: this.checkInCelebrating ? 1.025 : 1 })
-      .animation({ duration: 400, curve: Curve.EaseOut })
-
-      Row() {
-        Text(this.checkInError.length > 0 ? this.checkInError :
-          this.checkInHistoryOpen ? '收起记录' : '近 28 天记录')
+      Column({ space: 3 }) {
+        Text('签到')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Text(this.checkInStreak().toString() + ' 天')
+          .fontSize(27)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_BRAND_TEXT)
+        Text(this.checkInError.length > 0 ? this.checkInError : '连续学习')
           .fontSize(11)
-          .fontColor(this.checkInError.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_BRAND_TEXT)
-        SymbolGlyph($r('sys.symbol.chevron_right'))
-          .fontSize(10)
-          .fontColor([Constants.COLOR_BRAND_TEXT])
-          .rotate({ angle: this.checkInHistoryOpen ? 90 : 0 })
-      }
-      .height(28)
-      .onClick((): void => {
-        if (this.checkInError.length > 0) this.loadCheckIn();
-        else this.checkInHistoryOpen = !this.checkInHistoryOpen;
-      })
-
-      if (this.checkInHistoryOpen) {
-        Column({ space: 8 }) {
-          ForEach([0, 1, 2, 3], (rowIndex: number): void => {
-            Row() {
-              ForEach(this.recentCheckInDates(28).slice(rowIndex * 7, rowIndex * 7 + 7),
-                (date: string): void => { this.CheckInDay(date, true) }, (date: string): string => date)
-            }
-            .width('100%')
-          })
+          .fontColor(this.checkInError.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_TEXT_SECONDARY)
+          .maxLines(1)
+        Blank()
+        Row({ space: 5 }) {
+          if (this.checkInDates.includes(this.todayDate())) {
+            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+              .fontSize(13)
+              .fontColor([Constants.COLOR_SUCCESS])
+            Text('已签到')
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          } else {
+            Button(this.checkInBusy ? '签到中' : '签到')
+              .height(40)
+              .padding({ left: 12, right: 12 })
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_ON_GRADIENT)
+              .backgroundColor(Constants.COLOR_BRAND)
+              .borderRadius(13)
+              .enabled(!this.checkInBusy)
+              .onClick((): void => { this.checkIn(); })
+          }
+          Blank()
+          Text('记录 ›')
+            .fontSize(10)
+            .fontColor(Constants.COLOR_BRAND_TEXT)
+            .height(40)
+            .onClick((): void => {
+              this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, (): void => {
+                this.checkInHistoryOpen = !this.checkInHistoryOpen;
+              });
+            })
         }
         .width('100%')
-        .padding({ top: 8 })
-      }
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 14, bottom: 8 })
+      .height(134)
+      .padding({ left: 14, right: 10, top: 13, bottom: 7 })
+      .alignItems(HorizontalAlign.Start)
       Image($r('app.media.mascot_xiaohong_welcome'))
-        .width(104).height(104).objectFit(ImageFit.Contain)
-        .margin({ right: 7, top: 5 })
+        .width(60).height(65).objectFit(ImageFit.Contain)
+        .margin({ right: 2, top: 9 })
         .scale({ x: this.checkInCelebrating ? 1.1 : 1, y: this.checkInCelebrating ? 1.1 : 1 })
         .rotate({ angle: this.checkInCelebrating ? -7 : 0 })
         .animation({ duration: 420, curve: Curve.EaseOut })
       SymbolGlyph($r('sys.symbol.star_fill'))
         .fontSize(17)
         .fontColor(['#eac77d'])
-        .margin({ right: 91, top: 12 })
+        .margin({ right: 58, top: 9 })
         .opacity(this.checkInCelebrating ? 1 : 0)
         .translate({ x: this.checkInCelebrating ? -8 : 0, y: this.checkInCelebrating ? -10 : 6 })
         .animation({ duration: 420, curve: Curve.EaseOut })
       SymbolGlyph($r('sys.symbol.star_fill'))
         .fontSize(12)
         .fontColor([Constants.COLOR_HERO_ACCENT])
-        .margin({ right: 12, top: 58 })
+        .margin({ right: 5, top: 60 })
         .opacity(this.checkInCelebrating ? 1 : 0)
         .translate({ y: this.checkInCelebrating ? -10 : 5 })
         .animation({ duration: 520, curve: Curve.EaseOut })
@@ -633,6 +602,106 @@ export struct HomeContent {
     .linearGradient({ angle: 105, colors: [[this.darkMode ? '#253556' : '#e8edff', 0],
       [this.darkMode ? '#1c3f43' : '#e4f5f1', 1]] })
     .borderRadius(22)
+  }
+
+  @Builder
+  TodaySummaryCard() {
+    Column({ space: 5 }) {
+      Row() {
+        Text('今日计划')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Blank()
+        SymbolGlyph($r('sys.symbol.arrow_up_right'))
+          .fontSize(13)
+          .fontColor([Constants.COLOR_BRAND_TEXT])
+      }
+      .width('100%')
+      if (this.planLoading) {
+        Text('正在读取计划')
+          .fontSize(14)
+          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+      } else if (this.planError) {
+        Text('暂时无法读取')
+          .fontSize(14)
+          .fontColor(Constants.COLOR_ERROR)
+      } else if (this.planTasks.length === 0) {
+        Text('安排今天的学习')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      } else if (this.todayTasks().length === 0) {
+        Text('今天没有安排')
+          .fontSize(14)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+      } else {
+        Text(this.otherTodayTasks().length > 0 ?
+          ProactiveLearningService.planTaskTitle(this.otherTodayTasks()[0]) :
+          this.todayTasks().filter((task: PlanTask): boolean => !task.done).length.toString() + ' 项待办')
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .maxLines(2)
+        if (this.otherTodayTasks().length > 0) {
+          Text('约 ' + this.otherTodayTasks()[0].estimatedMin.toString() + ' 分钟')
+            .fontSize(11)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        }
+      }
+      Blank()
+      Text(this.planError ? '轻触重试' : this.planTasks.length === 0 ? '制定计划  ›' : '查看安排  ›')
+        .fontSize(11)
+        .fontColor(Constants.COLOR_BRAND_TEXT)
+        .height(26)
+    }
+    .width('100%')
+    .height(134)
+    .padding({ left: 14, right: 14, top: 13, bottom: 7 })
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor(this.darkMode ? '#273349' : '#fffaf1')
+    .border({ width: 1, color: this.darkMode ? '#344158' : '#f1e9da' })
+    .borderRadius(22)
+    .accessibilityText('今日计划，' + (this.planError ? '读取失败，轻触重试' : '查看学习安排'))
+    .onClick((): void => {
+      if (this.planError) this.loadPlan();
+      else this.openPlan();
+    })
+  }
+
+  @Builder
+  CheckInHistory() {
+    Column({ space: 8 }) {
+      Row() {
+        Text('近 28 天')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        Blank()
+        Text(this.checkInError.length > 0 ? '重试' : '收起')
+          .fontSize(12)
+          .fontColor(this.checkInError.length > 0 ? Constants.COLOR_ERROR : Constants.COLOR_BRAND_TEXT)
+          .height(40)
+          .onClick((): void => {
+            if (this.checkInError.length > 0) this.loadCheckIn();
+            else this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, (): void => {
+              this.checkInHistoryOpen = false;
+            });
+          })
+      }
+      .width('100%')
+      ForEach([0, 1, 2, 3], (rowIndex: number): void => {
+        Row() {
+          ForEach(this.recentCheckInDates(28).slice(rowIndex * 7, rowIndex * 7 + 7),
+            (date: string): void => { this.CheckInDay(date) }, (date: string): string => date)
+        }
+        .width('100%')
+      })
+    }
+    .width('100%')
+    .padding({ left: 14, right: 14, top: 8, bottom: 4 })
+    .backgroundColor(this.darkMode ? '#1b2839' : '#eef2f8')
+    .borderRadius(20)
   }
 
   @Builder
@@ -702,32 +771,14 @@ export struct HomeContent {
             .padding({ left: 9, right: 9, top: 5, bottom: 5 })
             .backgroundColor(Constants.COLOR_HERO_BADGE)
             .borderRadius(9)
-          Blank()
-          if (this.nextActionKind === 'task' && this.todayTasks().length > 0) {
-            Row({ space: 4 }) {
-              Text('查看计划')
-                .fontSize(12)
-                .fontColor(Constants.COLOR_MAP_CORE)
-              SymbolGlyph($r('sys.symbol.chevron_right'))
-                .fontSize(12)
-                .fontColor([Constants.COLOR_MAP_CORE])
-            }
-            .height(48)
-            .accessibilityText('查看完整学习计划')
-            .onClick((): void => { this.openPlan(); })
-          } else {
-            Text(this.nextActionProgressText)
-              .fontSize(12)
-              .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
-          }
         }
         .width('100%')
 
         Row({ space: 10 }) {
-          Column({ space: 7 }) {
+          Column({ space: 6 }) {
             Text(this.nextActionTitle)
               .width('100%')
-              .fontSize(22)
+              .fontSize(20)
               .fontWeight(FontWeight.Bold)
               .fontColor(Constants.COLOR_MAP_CORE)
               .maxLines(2)
@@ -737,12 +788,38 @@ export struct HomeContent {
               .lineHeight(19)
               .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
               .maxLines(2)
+            Button() {
+              Row({ space: 4 }) {
+                Text(this.nextActionCta)
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(Constants.COLOR_HERO_SURFACE)
+                SymbolGlyph($r('sys.symbol.chevron_right'))
+                  .fontSize(12)
+                  .fontColor([Constants.COLOR_HERO_SURFACE])
+              }
+            }
+            .height(40)
+            .padding({ left: 13, right: 11 })
+            .backgroundColor(Constants.COLOR_HERO_ACCENT)
+            .borderRadius(12)
+            .scale({ x: this.pressedPrimary ? 0.98 : 1, y: this.pressedPrimary ? 0.98 : 1 })
+            .animation({ duration: this.pressedPrimary ? 120 : 180, curve: Curve.EaseOut })
+            .accessibilityText(this.nextActionCta + '，' + this.nextActionTitle)
+            .onTouch((event?: TouchEvent): void => {
+              if (event) this.pressedPrimary = event.type === TouchType.Down;
+            })
+            .onClick((): void => {
+              this.nextActionNavigationMessage = '';
+              this.openNextAction();
+            })
+            .margin({ top: 2 })
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
           Image($r('app.media.hero_learning_steps'))
-            .width(96)
-            .height(88)
+            .width(78)
+            .height(82)
             .objectFit(ImageFit.Contain)
             .opacity(this.artworkRevealed ? 1 : 0)
             .translate({ y: this.artworkRevealed ? 0 : 8 })
@@ -752,40 +829,6 @@ export struct HomeContent {
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
-
-        Row({ space: 8 }) {
-          Blank()
-          Button() {
-            Row({ space: 4 }) {
-              Text(this.nextActionCta)
-                .fontSize(13)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(Constants.COLOR_HERO_SURFACE)
-              SymbolGlyph($r('sys.symbol.chevron_right'))
-                .fontSize(13)
-                .fontColor([Constants.COLOR_HERO_SURFACE])
-            }
-          }
-          .height(48)
-          .padding({ left: 14, right: 12 })
-          .backgroundColor(Constants.COLOR_HERO_ACCENT)
-          .borderRadius(12)
-          .scale({ x: this.pressedPrimary ? 0.98 : 1, y: this.pressedPrimary ? 0.98 : 1 })
-          .animation({ duration: this.pressedPrimary ? 120 : 180, curve: Curve.EaseOut })
-          .accessibilityText(this.nextActionCta + '，' + this.nextActionTitle)
-          .onTouch((event?: TouchEvent): void => {
-            if (event) {
-              this.pressedPrimary = event.type === TouchType.Down;
-            }
-          })
-          .onClick(() => {
-            this.nextActionNavigationMessage = '';
-            this.openNextAction();
-          })
-        }
-        .width('100%')
-        .height(52)
-        .padding({ left: 0, right: 0 })
 
         if (this.nextActionNavigationMessage.length > 0) {
           Text(this.nextActionNavigationMessage)
@@ -1039,13 +1082,15 @@ export struct HomeContent {
           .maxLines(1)
         Row({ space: 2 }) {
           Column() {
-          Text(LearningContentRepository.getTopics(courseId).length.toString() + ' 个主题')
-            .fontSize(11)
-            .fontColor(Constants.COLOR_TEXT_SECONDARY)
-          Blank()
-          SymbolGlyph($r('sys.symbol.arrow_up_right'))
-            .fontSize(13)
-            .fontColor([Constants.courseInk(courseId)])
+            Text(LearningContentRepository.getTopics(courseId).length.toString() + ' 个主题')
+              .fontSize(11)
+              .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            Blank()
+            Stack({ alignContent: Alignment.Center }) {
+              SymbolGlyph($r('sys.symbol.arrow_up_right'))
+                .fontSize(15)
+                .fontColor([Constants.courseInk(courseId)])
+            }
             .width(28)
             .height(28)
             .backgroundColor(Constants.COLOR_BG_CARD)
@@ -1176,16 +1221,24 @@ export struct HomeContent {
       Column({ space: 14 }) {
         this.Header()
         this.ContinueCard()
-        this.CheckInCard()
-        if (this.planLoading || this.planError || this.planTasks.length === 0 ||
-          this.todayTasks().length === 0 || this.otherTodayTasks().length > 0) {
-          this.TodayPlan()
+        Row({ space: 10 }) {
+          Column() {
+            this.TodaySummaryCard()
+          }
+          .layoutWeight(11)
+          Column() {
+            this.CheckInCard()
+          }
+          .layoutWeight(9)
         }
+        .width('100%')
+        if (this.checkInHistoryOpen) this.CheckInHistory()
         this.CourseShortcuts()
         this.QuickAsk()
       }
       .width('100%')
-      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER, top: 16, bottom: 16 })
+      .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER,
+        top: 16, bottom: 16 + this.bottomInset })
     }
     .width('100%')
     .height('100%')

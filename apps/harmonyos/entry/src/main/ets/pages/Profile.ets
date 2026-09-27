@@ -13,6 +13,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 @Component
 export struct ProfileContent {
   @StorageProp('darkMode') darkMode: boolean = false;
+  @Prop bottomInset: number = 0;
   @State profile: UserProfile | null = null;
   @State courses: Course[] = [];
   @State topicMastery: TopicMastery[] = [];
@@ -423,7 +424,7 @@ export struct ProfileContent {
             .border({ width: 1, color: Constants.COLOR_BORDER })
           }
           .width('100%')
-          .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() })
+          .padding({ left: 16, right: 16, bottom: 12 + SafeAreaInsets.bottomVp() + this.bottomInset })
         }
         .width('100%')
         .layoutWeight(1)

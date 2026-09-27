@@ -10,6 +10,7 @@ import { HomeContent } from './HomeContent';
 import { ProfileContent } from './Profile';
 import { ProactiveLearningService } from '../common/ProactiveLearningService';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import uiMaterial from '@ohos.arkui.uiMaterial';
 
 @Entry
 @Component
@@ -17,8 +18,6 @@ struct Index {
   @StorageProp('darkMode') darkMode: boolean = false;
   @State currentIndex: number = 0;
   @State quickQuestion: string = '';
-  @State contentOpacity: number = 1;
-  @State contentOffset: number = 0;
   @State learningViewVersion: number = 0;
   @StorageProp('safeAreaTopVp') safeAreaTopVpValue: number = 0;
   @StorageProp('safeAreaBottomVp') safeAreaBottomVpValue: number = 0;
@@ -41,10 +40,6 @@ struct Index {
 
   private safeAreaBottomVp(): number {
     return Math.max(0, this.safeAreaBottomVpValue);
-  }
-
-  private contentBottomPadding(): number {
-    return Constants.NAV_HEIGHT + 12 + this.safeAreaBottomVp();
   }
 
   private navigationBottomPadding(): number {
@@ -153,130 +148,107 @@ struct Index {
     }
     this.currentIndex = index;
     this.learningViewVersion += 1;
-    this.contentOpacity = 0.86;
-    this.contentOffset = 6;
-    this.getUIContext().animateTo({ duration: Constants.ANIM_NORMAL, curve: Curve.EaseOut }, (): void => {
-      this.contentOpacity = 1;
-      this.contentOffset = 0;
-    });
   }
 
   @Builder
-  TabItem(title: string, icon: Resource, selectedIcon: Resource, index: number) {
-    Column() {
-      if (this.currentIndex === index) {
-        Row({ space: 5 }) {
-          SymbolGlyph(selectedIcon)
-            .fontSize(19)
-            .fontColor([Constants.COLOR_MAP_CORE])
-          Text(title)
-            .fontSize(11)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Constants.COLOR_MAP_CORE)
-        }
-        .width('100%')
-        .height(48)
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor(Constants.COLOR_BRAND)
-        .linearGradient({ angle: 110, colors: [[Constants.COLOR_BRAND, 0], ['#5878ea', 1]] })
-        .borderRadius(16)
-      } else {
-        Column({ space: 2 }) {
-          SymbolGlyph(icon)
-            .fontSize(20)
-            .fontColor([Constants.COLOR_NAV_INACTIVE])
-          Text(title)
-            .fontSize(10)
-            .fontColor(Constants.COLOR_NAV_INACTIVE)
-        }
-        .width('100%')
-        .height(48)
-        .justifyContent(FlexAlign.Center)
+  NativeTabItem(title: string, icon: Resource, selectedIcon: Resource, index: number) {
+    Column({ space: 2 }) {
+      Stack({ alignContent: Alignment.Center }) {
+        Column()
+          .width(42)
+          .height(32)
+          .backgroundColor(this.currentIndex === index ? Constants.COLOR_BRAND_LIGHT : Color.Transparent)
+          .borderRadius(16)
+        Image(this.currentIndex === index ? selectedIcon : icon)
+          .width(23)
+          .height(23)
+          .objectFit(ImageFit.Contain)
+          .fillColor(this.currentIndex === index ? Constants.COLOR_BRAND_TEXT : Constants.COLOR_NAV_INACTIVE)
+          .scale({ x: this.currentIndex === index ? 1.08 : 1, y: this.currentIndex === index ? 1.08 : 1 })
+          .animation({ duration: 180, curve: Curve.EaseOut })
       }
+      .width(46)
+      .height(32)
+      .animation({ duration: 180, curve: Curve.EaseOut })
+      Text(title)
+        .fontSize(11)
+        .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Regular)
+        .fontColor(this.currentIndex === index ? Constants.COLOR_BRAND_TEXT : Constants.COLOR_NAV_INACTIVE)
+        .height(17)
+        .textAlign(TextAlign.Center)
+        .maxLines(1)
+        .animation({ duration: 180, curve: Curve.EaseOut })
     }
-    .width('25%')
-    .height('100%')
-    .padding(5)
     .justifyContent(FlexAlign.Center)
-    .onClick(() => {
-      this.selectTab(index);
-    })
+    .alignItems(HorizontalAlign.Center)
+    .width('100%')
+    .height('100%')
+    .accessibilityText(title + (this.currentIndex === index ? '，当前页面' : ''))
   }
 
   @Builder
-  BottomNavigation() {
-    Row() {
-      this.TabItem('今日', $r('sys.symbol.calendar'), $r('sys.symbol.calendar_fill'), 0)
-      this.TabItem('课程', $r('sys.symbol.book_open_fill'), $r('sys.symbol.book_open_fill'), 1)
-      this.TabItem('学伴', $r('sys.symbol.rays'), $r('sys.symbol.rays'), 2)
-      this.TabItem('我的', $r('sys.symbol.person'), $r('sys.symbol.person_2_fill'), 3)
-    }
-    .width('90%')
-    .constraintSize({ maxWidth: 520 })
-    .height(Constants.NAV_HEIGHT)
-    .backgroundColor(this.darkMode ? '#ed222e40' : '#eaf7f9fd')
-    .backgroundBlurStyle(BlurStyle.Thin)
-    .border({ width: 1, color: Constants.COLOR_BORDER })
-    .borderRadius(22)
-    .shadow({ radius: 14, color: Constants.SHADOW_CARD_LG, offsetX: 0, offsetY: 4 })
-    .zIndex(2)
-  }
-
   build() {
-    Stack({ alignContent: Alignment.Center }) {
-      Column() {
-        if (this.currentIndex === 0) {
-          Column() {
-            HomeContent({
-              selectedTab: $currentIndex,
-              quickQuestion: $quickQuestion,
-              learningViewVersion: this.learningViewVersion,
-            })
-          }
-          .width('100%')
-          .height('100%')
-          .padding({ bottom: this.contentBottomPadding() })
-        } else if (this.currentIndex === 1) {
-          Column() {
-            CourseContent({ learningViewVersion: this.learningViewVersion })
-          }
-          .width('100%')
-          .height('100%')
-          .padding({ bottom: this.contentBottomPadding() })
-        } else if (this.currentIndex === 2) {
-          Column() {
-            ChatContent({ quickQuestion: this.quickQuestion })
-          }
-          .width('100%')
-          .height('100%')
-          .padding({ bottom: this.contentBottomPadding() })
-        } else {
-          Column() {
-            ProfileContent()
-          }
-          .width('100%')
-          .height('100%')
-          .padding({ bottom: this.contentBottomPadding() })
-        }
+    Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
+      TabContent() {
+        HomeContent({
+          selectedTab: $currentIndex,
+          quickQuestion: $quickQuestion,
+          learningViewVersion: this.learningViewVersion,
+          bottomInset: Constants.NAV_HEIGHT + 20 + this.safeAreaBottomVp(),
+        })
+          .padding({ top: this.safeAreaTopVp() })
       }
-      .width('100%')
-      .height('100%')
-      .padding({ top: this.safeAreaTopVp() })
-      .opacity(this.contentOpacity)
-      .translate({ y: this.contentOffset })
+      .tabBar(this.NativeTabItem('今日', $rawfile('nav-icons/calendar-check.svg'),
+        $rawfile('nav-icons/calendar-check-duotone.svg'), 0))
 
-      Column() {
-        Blank()
-        this.BottomNavigation()
+      TabContent() {
+        CourseContent({
+          learningViewVersion: this.learningViewVersion,
+          bottomInset: Constants.NAV_HEIGHT + 20 + this.safeAreaBottomVp(),
+        })
+          .padding({ top: this.safeAreaTopVp() })
       }
-      .width('100%')
-      .height('100%')
-      .padding({ bottom: this.navigationBottomPadding() })
-      .hitTestBehavior(HitTestMode.Transparent)
-      .zIndex(2)
+      .tabBar(this.NativeTabItem('课程', $rawfile('nav-icons/books.svg'),
+        $rawfile('nav-icons/books-duotone.svg'), 1))
+
+      TabContent() {
+        ChatContent({
+          quickQuestion: this.quickQuestion,
+          bottomInset: Constants.NAV_HEIGHT + 20 + this.safeAreaBottomVp(),
+        })
+          .padding({ top: this.safeAreaTopVp() })
+      }
+      .tabBar(this.NativeTabItem('学伴', $rawfile('nav-icons/chat-circle-dots.svg'),
+        $rawfile('nav-icons/chat-circle-dots-duotone.svg'), 2))
+
+      TabContent() {
+        ProfileContent({ bottomInset: Constants.NAV_HEIGHT + 20 + this.safeAreaBottomVp() })
+          .padding({ top: this.safeAreaTopVp() })
+      }
+      .tabBar(this.NativeTabItem('我的', $rawfile('nav-icons/user-circle.svg'),
+        $rawfile('nav-icons/user-circle-duotone.svg'), 3))
     }
     .width('100%')
     .height('100%')
+    .barHeight(Constants.NAV_HEIGHT)
+    .barMode(BarMode.Fixed)
+    .scrollable(false)
+    .barOverlap(true)
+    .barFloatingStyle({
+      barSideMargin: 20,
+      barBottomMargin: this.navigationBottomPadding(),
+      maskHeight: 100,
+      maskColor: this.darkMode ? '#14202e40' : '#d7f7f9fd',
+      systemMaterial: new uiMaterial.ImmersiveMaterial({
+        style: uiMaterial.ImmersiveStyle.THIN,
+        materialColor: this.darkMode ? '#442b3d55' : '#64f5f8fc',
+        applyShadow: true,
+        interactive: true,
+      }),
+    })
+    .onChange((index: number): void => {
+      this.selectTab(index);
+    })
     .backgroundColor(Constants.COLOR_BG_PAGE)
   }
 }

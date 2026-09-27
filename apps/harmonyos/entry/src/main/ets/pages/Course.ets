@@ -13,6 +13,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 export struct CourseContent {
   @StorageProp('darkMode') darkMode: boolean = false;
   @Prop @Watch('refreshLearningView') learningViewVersion: number = 0;
+  @Prop bottomInset: number = 0;
   @State courses: Course[] = [];
   @State lessonProgress: LessonProgress[] = [];
   @State loading: boolean = false;
@@ -315,7 +316,8 @@ export struct CourseContent {
         .layoutWeight(1)
         .cachedCount(3)
         .scrollBar(BarState.Off)
-        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER })
+        .padding({ left: Constants.PAGE_GUTTER, right: Constants.PAGE_GUTTER,
+          bottom: this.bottomInset })
       } else {
         Column({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.book_open_fill'))

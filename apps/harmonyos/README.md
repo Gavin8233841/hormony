@@ -1,11 +1,11 @@
 # HarmonyOS 客户端（ArkTS / Stage 模型）
 
-> 本目录为鸿蒙端工程骨架。DevEco Studio 未安装时，以下文件已就绪，安装后可直接打开补全。
+> 鸿学伴原生端。当前 `compatibleSdkVersion` 与 `targetSdkVersion` 均为 HarmonyOS API 26；旧版系统不在当前安装范围内。
 
 ## 前置条件
 
 1. 安装 DevEco Studio（https://developer.huawei.com/consumer/cn/download/）
-2. 通过 DevEco Studio SDK Manager 安装 HarmonyOS SDK（API 12+）
+2. 通过 DevEco Studio SDK Manager 安装 HarmonyOS SDK（API 26）
 3. 配置 ohpm / hvigor / hdc 到 PATH
 
 ## 使用方式

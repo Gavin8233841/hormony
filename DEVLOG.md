@@ -5,7 +5,6 @@
 
 ---
 
-
 ## [2026-06-25T04:20:47Z] [2026-06-25 12:20:47 CST] 模型: Claude (WorkBuddy)
 
 ### 操作
@@ -8288,5 +8287,21 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 ### 涉及文件
 
 `DEVLOG.md`；部署使用已推送的提交 `9935fbd`，没有修改应用源码或新增环境变量。
+
+---
+
+## [2026-09-27T06:21:34Z] [2026-09-27 14:21:34 CST] 模型: Codex (GPT-6)
+
+### API 26 原生导航与视觉收口
+
+按用户批准将 HarmonyOS 最低与目标版本升至 API 26。首页改为单套原生 `Tabs`，底栏使用沉浸薄材质，四个入口统一使用 MIT 许可的 Phosphor 常规／双色 SVG；选中态有图标、色彩、底色与 180ms 动效变化。修正底栏图文基线与首页课程卡圆形按钮的斜箭头偏位。根页底部留出滚动与输入空间；首页签到和课程卡收紧。来源与画面索引见 `docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`。
+
+最终 `devecocli build` exit 0，`devecocli run --skip-build --device 127.0.0.1:5555` exit 0；未签名 HAP SHA-256 `d06511381c902897046e6584dc99686707394343b839275ee3bd06aca42bacd1`。Pura X View 1320×2232 浅色与系统深色首页截图分别为 `.runtime/api26-arrow-centered.jpeg`、`.runtime/api26-final-dark.jpeg`。学伴输入区与键盘截图表明底栏未遮挡输入；首页到课程再到学伴已实际点击。最后一次“我的”点击时 HDC 断连，故不计为本轮新验收。实体设备、横屏、大字号、正式签名与门户提交仍待处理。
+
+工作区另有其他任务未提交的脚本和文档，本批不纳入、不覆盖；接力边界见 `docs/SEMIFINAL-API26-HANDOFF-20260927.md`。
+
+### 涉及文件
+
+`AGENTS.md`、`apps/harmonyos/README.md`、`apps/harmonyos/build-profile.json5`、原生根页与首页、`entry/src/main/resources/rawfile/nav-icons/`、`docs/FRONTEND-RESOURCE-ADOPTION.md`、`docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`、`docs/SEMIFINAL-ATTACHMENT-START-20260927.md`、`docs/SEMIFINAL-API26-HANDOFF-20260927.md`、本日志。
 
 ---
