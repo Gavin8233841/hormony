@@ -37,6 +37,11 @@ describe("orchestrator 前置检索调度", () => {
     expect(events).toContainEqual({ type: "thinking", agent: "Tutor" });
     expect(events.some((event) => event.type === "thinking" &&
       (event.agent === "Planner" || event.agent === "Quiz"))).toBe(false);
+    expect(events).toContainEqual({
+      type: "trace", agent: "Profile",
+      content: "未提供学习画像；仅依据问题、对话历史和课程资料讲解。",
+    });
+    expect(JSON.stringify(events)).not.toContain("本科二年级");
     expect(events).toContainEqual({ type: "delta", content: "数组通过连续存储位置保存元素。" });
   });
 
@@ -55,6 +60,9 @@ describe("orchestrator 前置检索调度", () => {
     expect(result.agentResults.map((item) => item.agent)).toEqual([
       "Profile", "Retrieval", "Tutor", "Safety",
     ]);
+    expect(result.agentResults[0].content).toBe(
+      "未提供学习画像；仅依据问题、对话历史和课程资料讲解。"
+    );
     expect(result.safetyPassed).toBe(true);
     expect(result.action).toMatchObject({ kind: "lesson", courseId: "cs101", topic: "数组与线性表" });
   });

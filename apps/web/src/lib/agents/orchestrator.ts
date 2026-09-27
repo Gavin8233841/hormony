@@ -63,7 +63,8 @@ function prepareContext(req: ChatRequest, forcedIntent?: Intent): {
 async function runPreAgents(
   intent: Intent,
   req: ChatRequest,
-  emit?: (event: StreamEvent) => void
+  emit?: (event: StreamEvent) => void,
+  tutorOnly: boolean = false
 ): Promise<{
   profileResult: AgentResult;
   retrievalResult: AgentResult;
@@ -73,13 +74,21 @@ async function runPreAgents(
   emit?.({ type: "thinking", agent: "Profile" });
   if (shouldRetrieve) emit?.({ type: "thinking", agent: "Retrieval" });
 
+  // 小艺等外部课程讲解入口没有学生画像，不把演示默认画像说成用户事实。
+  const anonymousProfileResult: AgentResult = {
+    agent: "Profile",
+    content: "未提供学习画像；仅依据问题、对话历史和课程资料讲解。",
+  };
+  const profilePromise = tutorOnly
+    ? Promise.resolve(anonymousProfileResult)
+    : runProfileAgent(req.profile);
   const [profileResult, retrievalResult] = shouldRetrieve
     ? await Promise.all([
-        runProfileAgent(req.profile),
+        profilePromise,
         runRetrievalAgent(req.context?.question ?
           `${req.context.topic ?? ""} ${req.context.question}` : req.message, req.context?.courseId),
       ])
-    : [await runProfileAgent(req.profile), skippedRetrievalResult(intent)];
+    : [await profilePromise, skippedRetrievalResult(intent)];
 
   const retrievalSafety: SafetyResult = shouldRetrieve
     ? await runSafetyAgent(
@@ -256,7 +265,8 @@ async function orchestrateWithIntent(req: ChatRequest, forcedIntent?: Intent): P
   const agentResults: AgentResult[] = [];
 
   // 1. 前置 Agent：Profile + Retrieval
-  const { profileResult, retrievalResult, retrievalSafety } = await runPreAgents(intent, req);
+  const { profileResult, retrievalResult, retrievalSafety } =
+    await runPreAgents(intent, req, undefined, forcedIntent === "tutor");
   agentResults.push(profileResult, retrievalResult);
   if (!retrievalSafety.passed) {
     throw new SafetyBlockedError("检索结果未通过安全审核");
@@ -331,7 +341,8 @@ export async function orchestrateStream(
   const { intent, sessionId, history } = prepareContext(req, forcedIntent);
 
   // 1. 前置 Agent：Profile + Retrieval（流式推送 trace）
-  const { retrievalResult, retrievalSafety } = await runPreAgents(intent, req, emit);
+  const { retrievalResult, retrievalSafety } =
+    await runPreAgents(intent, req, emit, forcedIntent === "tutor");
   if (!retrievalSafety.passed) {
     emit({
       type: "error",

@@ -8903,3 +8903,11 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 本批仅更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md` 与 `DEVLOG.md`；HAP 源码和产物未改，因此不重复构建。小艺平台 Safari 标签仍显示“会话超时”，已请求用户恢复登录；本阶段继续仅使用模拟器。
 
 ---
+
+---
+
+## [2026-09-27T22:42:28Z] 小艺匿名讲解移除演示画像
+
+公开接口的合成问题回执显示 Profile trace 使用了未提供的默认「本科二年级、结构化学习」画像；小艺专用路由本身禁止上传画像。现于 Tutor 专用编排中给出中性的无画像 trace，并在概念讲解提示词中省去默认及显式画像；普通原生讲解仍沿用现有画像路径。修改 `apps/web/src/lib/agents/orchestrator.ts`、`tutor-agent.ts` 与对应测试，更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`。
+
+本地 Web 门禁：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，38 文件 495 项；`pnpm build` exit 0。新增概念提示词测试后再执行定向测试与类型检查。公开部署在本条记录时仍是旧逻辑，候选部署与生产回执待核对。HAP 未修改；小艺平台 Card 更新、真实 Agent 对话和真机均未验证，本阶段仅用模拟器。
