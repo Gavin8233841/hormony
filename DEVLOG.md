@@ -8535,3 +8535,15 @@ Mac 解锁后在小艺开放平台「小鸿」编排页打开「真机测试」�
 `apps/harmonyos/entry/src/main/ets/pages/Plan.ets`、`apps/harmonyos/build-profile.json5`（仅提交标准化 OHMUrl 一项，保留本地签名字段未提交）、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T14:43:23Z] [2026-09-27 22:43:23 CST] 模型: Codex (GPT-6)
+
+### 最新 HAP 模拟器页面验证与阶段边界
+
+用户明确本阶段全部使用模拟器，决赛后再讨论真机。Pura X View 模拟器 `127.0.0.1:5555` 对最新未签名 HAP 执行 `hdc install -r` exit 0（无卸载、保留原数据），`aa start -a EntryAbility -b com.c4ai.hormony` exit 0；从首页「查看安排」进入学习计划页，`uitest dumpLayout` 含「学习计划」「今天 · 9月27日」和当前课程任务，截图位于忽略目录 `.runtime/hongxueban-plan-20260927.png`。该未签名 HAP SHA-256 `59f535d8ea4bea993a47c7e01e8eae01e90f43bfc2e20bba1280ae3eb4f39c2a`。这是普通页面入口运行证据，不是小艺系统意图触发证据；平台「小鸿」仍只有开发测试态发布回执。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`；截图保留在未跟踪的忽略目录，不入库。
+
+---
