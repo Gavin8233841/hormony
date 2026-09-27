@@ -8487,3 +8487,19 @@ DevEco 在已跟踪的 `apps/harmonyos/build-profile.json5` 写入本机签名�
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T14:10:25Z] [2026-09-27 22:10:25 CST] 模型: Codex (GPT-6)
+
+### 端 A2A 异常报文保护与签名重建
+
+审阅 `XiaoyiAgentAbility.onData` 发现 `parts[0].text` 来自外部 JSON：若为数字或其他非字符串，原来的可选链仍会调用 `.trim()`，在返回协议错误前抛异常。改为仅对字符串调用 `.trim()`；其他类型落入现有「仅支持文本课程问题」错误路径，不改变正常短文本行为。
+
+### 验证与边界
+
+`DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli build` exit 0，包含 `CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap`；签名 HAP SHA-256 `dfa95e2e4b34f95afd200788302b476dec8a8baa60b95a330d41d71138d4c4c0`。DevEco SDK 的 `hap-sign-tool.jar verify-app` exit 0，证书链与 Profile 仅写入忽略的 `.runtime/`。保留既有 `TextInputController` 系统能力警告。未在小艺真机触发异常报文或正常问答；只有 Pura X View 模拟器在线，Mac 锁定使小艺网站无法继续操作。旧版模拟器运行结果不可作为本次新包验证。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

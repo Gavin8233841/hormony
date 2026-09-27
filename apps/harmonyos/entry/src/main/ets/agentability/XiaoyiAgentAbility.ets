@@ -133,7 +133,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     }
     const message = request.params?.message;
     const part = message?.parts?.[0];
-    const question = part?.text?.trim() ?? '';
+    const question = typeof part?.text === 'string' ? part.text.trim() : '';
     if (!message || message.role !== 'ROLE_USER' || typeof message.messageId !== 'string' ||
       message.messageId.length === 0 || message.messageId.length > 128 ||
       !Array.isArray(message.parts) || message.parts.length !== 1 || !part ||
