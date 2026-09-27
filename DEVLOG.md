@@ -8877,3 +8877,19 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 `apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T20:22:58Z] [2026-09-28 04:22:58 CST] 模型: Codex (GPT-6)
+
+### 补齐小艺端 A2A 已终止任务的取消回执
+
+华为《异常处理与任务取消》明确已终止任务的取消结果按实际情况返回 `TASK_STATE_COMPLETED`、`TASK_STATE_CANCELED` 或含 `99911200` 的 `TASK_STATE_FAILED`。原扩展仅查活动任务，对刚完成的任务返回未知任务错误。现在按连接保留最近 16 个任务的终态与上下文，重试取消返回该终态；真正未知任务仍返回 `-32001`。断连及连接缓存淘汰会清理终态记录，不跨连接共享。平台 Safari 标签本批确认出现“会话超时”，已请求用户恢复登录，尚未核对更新 Card 的平台状态。
+
+### 验证与边界
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs` exit 0，12/12 通过；`git diff --check` exit 0。API 26 直接 Hvigor 增量 `assembleHap --no-daemon` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，仅有既有 `TextInputController` syscap 告警。未签名 HAP SHA-256 `a34405815c0d576431fa630e8e2f2d90f48633871f033ba9b4fd9c2f5ed4d4f8`，签名 HAP SHA-256 `e4d7ea8ff866d9a2439edb92fe0f7e1e416363e3c7a82141f6c35bb247991026`。Pura X View 模拟器 `127.0.0.1:5555` 覆盖安装同版未签名 HAP、启动 exit 0，`bm dump` 含 `XiaoyiAgentAbility` 与 `ohos.extension.agent`。本地协议测试和安装注册均不证明小艺真实发送取消请求；未使用真机。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

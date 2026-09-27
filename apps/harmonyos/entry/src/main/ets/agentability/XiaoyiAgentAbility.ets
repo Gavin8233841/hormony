@@ -7,6 +7,16 @@ import { ChatMessage, StreamEvent } from '../model/DataModels';
 interface DevicePart {
   text?: string;
   mediaType?: string;
+  data?: DeviceErrorData;
+}
+
+interface DeviceErrorData {
+  error: DeviceProtocolError;
+}
+
+interface DeviceProtocolError {
+  code: string;
+  message: string;
 }
 
 interface DeviceMessage {
@@ -136,16 +146,23 @@ interface ActiveTask {
   terminalSeen: boolean;
 }
 
+interface FinishedTask {
+  contextId: string;
+  state: string;
+}
+
 // 小艺端 A2A 仅提供短文本课程讲解。进程内历史只辅助本次连接，
 // 不表示跨设备持久会话；学习画像和答题记录不传到此入口。
 export default class XiaoyiAgentAbility extends AgentExtensionAbility {
   private activeTasks: Map<common.AgentHostProxy, Map<string, ActiveTask>> = new Map();
   private activeTaskCount: number = 0;
   private histories: Map<common.AgentHostProxy, Map<string, ChatMessage[]>> = new Map();
+  private finishedTasks: Map<common.AgentHostProxy, Map<string, FinishedTask>> = new Map();
 
   private readonly maxActiveTasks: number = 2;
   private readonly maxHistories: number = 16;
   private readonly maxConnections: number = 8;
+  private readonly maxFinishedTasks: number = 16;
   private readonly maxRequestChars: number = 16384;
 
   onCreate(_want: Want): void {}
@@ -232,6 +249,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       if (this.histories.size >= this.maxConnections) {
         for (const oldestProxy of this.histories.keys()) {
           this.histories.delete(oldestProxy);
+          this.finishedTasks.delete(oldestProxy);
           break;
         }
       }
@@ -253,6 +271,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
           active.failed = true;
           active.cancellation.cancel();
           this.removeActiveTask(proxy, taskId);
+          this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_FAILED');
           this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
             'TASK_STATE_FAILED', '课程讲解暂时不可用，请稍后重试');
         } else if (event.type === 'done') {
@@ -263,6 +282,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
             active.failed = true;
             active.cancellation.cancel();
             this.removeActiveTask(proxy, taskId);
+            this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_FAILED');
             this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
               'TASK_STATE_FAILED', '回答过长，请缩小问题范围');
           }
@@ -273,10 +293,12 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
         active.completed = true;
         this.removeActiveTask(proxy, taskId);
         if (!active.terminalSeen || active.answer.trim().length === 0) {
+          this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_FAILED');
           this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
             'TASK_STATE_FAILED', '暂时无法生成课程讲解');
           return;
         }
+        this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_COMPLETED');
         if (!this.sendArtifactUpdate(proxy, active.requestId, taskId, contextId, active.answer)) return;
         if (!this.sendStatusUpdate(proxy, active.requestId, taskId, contextId, 'TASK_STATE_COMPLETED')) return;
         const nextHistory: ChatMessage[] = [...history,
@@ -299,6 +321,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
         if (active.completed || active.failed) return;
         active.failed = true;
         this.removeActiveTask(proxy, taskId);
+        this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_FAILED');
         this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
           'TASK_STATE_FAILED', '网络暂时不可用，请稍后重试');
       }, undefined, cancellation);
@@ -312,13 +335,37 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     }
     const active = this.activeTasks.get(proxy)?.get(taskId);
     if (!active) {
+      const finished = this.finishedTasks.get(proxy)?.get(taskId);
+      if (finished) {
+        this.sendFinishedCancel(proxy, request.id ?? '', taskId, finished);
+        return;
+      }
       this.sendError(proxy, request.id ?? '', -32001, '任务不存在或已经结束');
       return;
     }
     active.completed = true;
     active.cancellation.cancel();
     this.removeActiveTask(proxy, taskId);
+    this.rememberFinishedTask(proxy, taskId, active.contextId, 'TASK_STATE_CANCELED');
     this.sendCanceled(proxy, request.id ?? '', taskId, active.contextId);
+  }
+
+  private sendFinishedCancel(proxy: common.AgentHostProxy, requestId: string,
+    taskId: string, finished: FinishedTask): void {
+    const status: DeviceStatus = { state: finished.state, timestamp: new Date().toISOString() };
+    if (finished.state === 'TASK_STATE_FAILED') {
+      const protocolError: DeviceProtocolError = { code: '99911200', message: '任务已结束' };
+      const data: DeviceErrorData = { error: protocolError };
+      const part: DevicePart = { data };
+      status.message = { role: 'ROLE_AGENT', messageId: 'msg-' + util.generateRandomUUID(), parts: [part] };
+    }
+    const result: DeviceCancelResult = { id: taskId, contextId: finished.contextId, status };
+    const response: DeviceCancelResponse = { jsonrpc: '2.0', id: requestId, result };
+    try {
+      proxy.sendData(JSON.stringify(response));
+    } catch (_) {
+      // 连接已结束；不记录用户问题或协议载荷。
+    }
   }
 
   private sendCanceled(proxy: common.AgentHostProxy, requestId: string,
@@ -401,6 +448,22 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     if (connectionTasks.size === 0) this.activeTasks.delete(proxy);
   }
 
+  private rememberFinishedTask(proxy: common.AgentHostProxy, taskId: string,
+    contextId: string, state: string): void {
+    let tasks = this.finishedTasks.get(proxy);
+    if (!tasks) {
+      tasks = new Map<string, FinishedTask>();
+      this.finishedTasks.set(proxy, tasks);
+    }
+    tasks.set(taskId, { contextId, state });
+    if (tasks.size > this.maxFinishedTasks) {
+      for (const oldestTaskId of tasks.keys()) {
+        tasks.delete(oldestTaskId);
+        break;
+      }
+    }
+  }
+
   onDisconnect(_want: Want, proxy: common.AgentHostProxy): void {
     const connectionTasks = this.activeTasks.get(proxy);
     if (connectionTasks) {
@@ -412,6 +475,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       this.activeTasks.delete(proxy);
     }
     this.histories.delete(proxy);
+    this.finishedTasks.delete(proxy);
   }
 
   onDestroy(): void {
@@ -424,5 +488,6 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     this.activeTasks.clear();
     this.activeTaskCount = 0;
     this.histories.clear();
+    this.finishedTasks.clear();
   }
 }

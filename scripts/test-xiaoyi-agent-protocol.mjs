@@ -127,6 +127,34 @@ test('cancel only affects the originating connection and suppresses late complet
   calls[0].onEvent({ type: 'delta', content: 'late' });
   calls[0].onComplete();
   assert.equal(first.responses.length, 2);
+  agent.onData(first, cancel('cancel-again', taskId));
+  assert.equal(first.responses[2].id, 'cancel-again');
+  assert.equal(first.responses[2].result.status.state, 'TASK_STATE_CANCELED');
+});
+
+test('cancel after a terminal task returns its actual terminal state', () => {
+  const { agent, calls } = harness();
+  const client = proxy();
+  agent.onData(client, message('request-1', 'message-1'));
+  const completedId = client.responses[0].result.task.id;
+  const completedContext = client.responses[0].result.task.contextId;
+  calls[0].onEvent({ type: 'delta', content: '回答。' });
+  calls[0].onEvent({ type: 'done' });
+  calls[0].onComplete();
+  agent.onData(client, cancel('cancel-completed', completedId));
+  assert.equal(client.responses[3].id, 'cancel-completed');
+  assert.equal(client.responses[3].result.contextId, completedContext);
+  assert.equal(client.responses[3].result.status.state, 'TASK_STATE_COMPLETED');
+
+  agent.onData(client, message('request-2', 'message-2'));
+  const failedId = client.responses[4].result.task.id;
+  calls[1].onError({ code: 'MODEL_TIMEOUT' });
+  agent.onData(client, cancel('cancel-failed', failedId));
+  assert.equal(client.responses[6].id, 'cancel-failed');
+  assert.equal(client.responses[6].result.status.state, 'TASK_STATE_FAILED');
+  assert.equal(client.responses[6].result.status.message.parts[0].data.error.code, '99911200');
+  agent.onData(client, cancel('cancel-unknown', 'task-never-issued'));
+  assert.equal(client.responses[7].error.code, -32001);
 });
 
 test('missing terminal event and stream error cannot produce a completed answer', () => {
