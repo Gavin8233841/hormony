@@ -8893,3 +8893,13 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 `apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T20:27:06Z] [2026-09-28 04:27:06 CST] 模型: Codex (GPT-6)
+
+### 复核当前公开小艺 Tutor 接口
+
+核对 HAP `Constants.BASE_URL` 后，向同一公开域名的 `/api/xiaoyi/tutor` 发送合成二叉搜索树问题（`mode: xiaoyi_tutor`、空历史），收到 HTTP 200／`text/event-stream`，事件含 `thinking`、`trace`、187 字非空 `delta`、3 条 `citation`、`done`，没有 `error`。空问题收到 HTTP 400／`MISSING_FIELD`。原始回执留在忽略目录 `.runtime/xiaoyi-current-live-20260928.sse`、`.runtime/xiaoyi-current-invalid-20260928.json`。这只证明当前公开接口的两项样本，不证明小艺 App 到端侧 Extension 的连接、平台 Card 同步或所有题目的质量。
+
+本批仅更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md` 与 `DEVLOG.md`；HAP 源码和产物未改，因此不重复构建。小艺平台 Safari 标签仍显示“会话超时”，已请求用户恢复登录；本阶段继续仅使用模拟器。
+
+---
