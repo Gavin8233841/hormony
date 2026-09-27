@@ -10,6 +10,7 @@ import { Citation, StreamEvent, ChatRequest, ChatMessage, ChatContext, ChatActio
   HealthResponse } from '../model/DataModels';
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { ProactiveLearningAction, ProactiveLearningLaunch, ProactiveLearningService } from '../common/ProactiveLearningService';
+import { InsightIntentPage } from '@kit.AbilityKit';
 
 interface DisplayMessage {
   role: string;
@@ -1777,6 +1778,17 @@ export struct ChatContent {
 
 @Entry
 @Component
+@InsightIntentPage({
+  intentName: 'AskLearningCompanion',
+  domain: 'EducationDomain',
+  intentVersion: '1.0.1',
+  displayName: '询问学伴',
+  displayDescription: '打开鸿学伴的 AI 学习辅导对话',
+  llmDescription: '打开鸿学伴的学伴对话页，让用户询问课程概念、学习方法和复习问题。',
+  keywords: ['问学伴', '学习辅导', '课程答疑', '鸿学伴'],
+  uiAbility: 'EntryAbility',
+  pagePath: './ets/pages/Chat'
+})
 struct ChatPage {
   build() {
     Column() {

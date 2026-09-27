@@ -8547,3 +8547,19 @@ Mac 解锁后在小艺开放平台「小鸿」编排页打开「真机测试」�
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`；截图保留在未跟踪的忽略目录，不入库。
 
 ---
+
+## [2026-09-27T14:52:50Z] [2026-09-27 22:52:50 CST] 模型: Codex (GPT-6)
+
+### 学伴对话页接入第二个系统意图
+
+将 `Chat.ets` 现有独立 `@Entry` 页面声明为自定义 `AskLearningCompanion`（`EducationDomain`，绑定 `EntryAbility`，不携带个人数据），与学习计划 `ViewStudyPlan` 形成两个教育场景入口。根据 API 26 本地 SDK 核对 `AgentController.isAgentSupport` 与 `FunctionComponent`，因模拟器上尚无平台 Agent 可用性回执，本批不增加无法验证的 HMAF 弹窗按钮。
+
+### 验证与边界
+
+直接运行 DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=default -p buildMode=debug --parallel --incremental` exit 0、`BUILD SUCCESSFUL in 2 s 962 ms`；`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，有既有 `TextInputController` 系统能力告警。签名包 SHA-256 `9626cb9dd6af214f72501b62cfa5f1729b7a441409bb3217a54ce881de50cedb`，未签名包 SHA-256 `62bbe68d00965828c76b337adc09a297c5816abb25832fd78b3f67463a6f65dc`；两包中 `insight_intent.json` 含两项意图，`module.json` 为 `hasInsightIntent=true`。模拟器 `127.0.0.1:5555` 无卸载覆盖安装当前未签名包 exit 0，`aa start` exit 0；点击学伴标签后 UI 树出现对话页、已有回答和参考资料。未从小艺系统入口唤起任一意图，也未验证当前包的实时 AI 回复；签名包未安装。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
