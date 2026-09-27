@@ -1,4 +1,5 @@
 import { AgentExtensionAbility, common, Want } from '@kit.AbilityKit';
+import { util } from '@kit.ArkTS';
 import { HttpClient, HttpRequestCancellation, HttpStreamError } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
 import { ChatMessage, StreamEvent } from '../model/DataModels';
@@ -59,7 +60,7 @@ interface DeviceTask {
   id: string;
   contextId: string;
   status: DeviceStatus;
-  artifacts: DeviceArtifact[];
+  artifacts?: DeviceArtifact[];
 }
 
 interface DeviceTaskResult {
@@ -143,18 +144,31 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       !Array.isArray(message.parts) || message.parts.length !== 1 || !part ||
       part.mediaType !== 'text/plain' || question.length === 0 || question.length > 2000 ||
       (message.contextId !== undefined &&
-        (typeof message.contextId !== 'string' || message.contextId.length > 128))) {
+        (typeof message.contextId !== 'string' || message.contextId.length === 0 ||
+          message.contextId.length > 128))) {
       this.sendError(proxy, request.id, -32602, '仅支持 2000 字以内的文本课程问题');
       return;
     }
-    const taskId = message.taskId ?? message.messageId;
-    const contextId = message.contextId && message.contextId.length > 0 ?
-      message.contextId : message.messageId;
-    let connectionTasks = this.activeTasks.get(proxy);
-    if (typeof taskId !== 'string' || taskId.length === 0 || taskId.length > 128 ||
-      connectionTasks?.has(taskId)) {
-      this.sendError(proxy, request.id, -32602, '任务标识不可用');
+    if (message.taskId !== undefined) {
+      this.sendError(proxy, request.id, -32602, '暂不支持继续待澄清任务');
       return;
+    }
+    const existingHistories = this.histories.get(proxy);
+    if (message.contextId && !existingHistories?.has(message.contextId)) {
+      this.sendError(proxy, request.id, 99911222, '会话已失效，请重新提问');
+      return;
+    }
+    // 按端 A2A 规范由 Agent 分配标识；用户消息 ID 不能充当 Task 或 Context ID。
+    const taskId = 'task-' + util.generateRandomUUID();
+    const contextId = message.contextId ?? 'ctx-' + util.generateRandomUUID();
+    let connectionTasks = this.activeTasks.get(proxy);
+    if (connectionTasks) {
+      for (const active of connectionTasks.values()) {
+        if (active.contextId === contextId) {
+          this.sendError(proxy, request.id, -32002, '当前会话正在处理其他问题，请稍后重试');
+          return;
+        }
+      }
     }
     if (this.activeTaskCount >= this.maxActiveTasks) {
       this.sendError(proxy, request.id, -32002, '当前正在处理其他问题，请稍后重试');
@@ -184,6 +198,13 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     }
     const history = connectionHistories.get(contextId) ?? [];
     const body: TutorRequest = { mode: 'xiaoyi_tutor', message: question, history };
+    // 首帧公布 Agent 分配的任务标识，小艺才能在生成过程中发出 TasksCancel。
+    if (!this.sendTask(proxy, request.id, taskId, contextId, 'TASK_STATE_SUBMITTED', '')) {
+      active.completed = true;
+      this.removeActiveTask(proxy, taskId);
+      return;
+    }
+    if (active.completed) return;
     HttpClient.postSSE(Constants.API_XIAOYI_TUTOR, JSON.stringify(body),
       (event: StreamEvent): void => {
         if (active.completed || active.failed) return;
@@ -281,21 +302,22 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
   }
 
   private sendTask(proxy: common.AgentHostProxy, requestId: string, taskId: string,
-    contextId: string, state: string, content: string): void {
+    contextId: string, state: string, content: string): boolean {
     const status: DeviceStatus = { state, timestamp: new Date().toISOString() };
-    const artifacts: DeviceArtifact[] = [];
+    const task: DeviceTask = { id: taskId, contextId, status };
     if (content.length > 0) {
       const part: DevicePart = { text: content, mediaType: 'text/plain' };
       const artifact: DeviceArtifact = { artifactId: taskId + '-text', parts: [part] };
-      artifacts.push(artifact);
+      task.artifacts = [artifact];
     }
-    const task: DeviceTask = { id: taskId, contextId, status, artifacts };
     const result: DeviceTaskResult = { task };
     const response: DeviceTaskResponse = { jsonrpc: '2.0', id: requestId, result };
     try {
       proxy.sendData(JSON.stringify(response));
+      return true;
     } catch (_) {
       // 连接已结束；请求已经取消或无法再交付。
+      return false;
     }
   }
 

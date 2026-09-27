@@ -8673,3 +8673,19 @@ DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=defa
 `apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T16:56:17Z] [2026-09-28 00:56:17 CST] 模型: Codex (GPT-6)
+
+### 端 A2A Agent 分配任务与会话标识
+
+在 Safari 重读华为端 A2A 技术规范 V0.6、对话交互和异常取消说明后，发现原 Extension 把用户 `messageId` 当成 `taskId` 和首次 `contextId`，且云端完成前不回包，使小艺无法取得生成中任务的取消标识。按文档改为 Agent 生成任务与会话 ID、先回 `TASK_STATE_SUBMITTED`，再回完成或失败；后续轮次只接受本连接已完成的上下文，未知上下文返回官方失效码 `99911222`。不支持的澄清续答 `taskId` 明确拒绝。官方单轮示例包含首轮 `contextId`，与概念段的首次不携带说明有差异，需保留平台真实调用验证门槛。
+
+### 验证与边界
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs` exit 0，10/10 通过，包括首帧返回、Agent ID 分配、后续轮次、跨连接隔离、旧上下文拒绝、取消与首帧同步取消竞态及首帧发送失败时不发起云端请求。API 26 直接 Hvigor 增量构建 exit 0，完成 `CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap`；仅见已有 `TextInputController` 系统能力告警。未签名 HAP SHA-256 `6dd3b308f421f0f01e465cd2986f7afb7bf0a6954ddf8efae712ade52080f309`，签名 HAP SHA-256 `0ccd7b997bbf55153e5f2fcdbd401e18fa980ca126f489c5d2fa75da4e1e519c`。Pura X View 模拟器覆盖安装、启动 exit 0，`bm dump` 含 `XiaoyiAgentAbility` 与 `ohos.extension.agent`，首页 UI 树包含“鸿学伴”和“学伴”，忽略目录证据 `.runtime/xiaoyi-agent-id-ui-20260928.json`。平台“小鸿”仍为草稿、已发布白名单测试态，页面明确端 Agent 不支持云侧调试。本阶段无小艺真实连接、对话及取消回执。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
