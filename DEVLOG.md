@@ -8563,3 +8563,19 @@ Mac 解锁后在小艺开放平台「小鸿」编排页打开「真机测试」�
 `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T15:12:14Z] [2026-09-27 23:12:14 CST] 模型: Codex (GPT-6)
+
+### 学伴回答接入模拟器可运行的原生朗读
+
+核对华为 Core Speech Kit 官方简介与文本转语音指南：HarmonyOS 6.0.0(20) 起支持模拟器；离线引擎 `online: 1`，文本上限 10000 字符，`onComplete` 的 `type=0/1` 分别表示合成/播放完成。在 `Chat.ets` 最后一条完整回答提供「朗读回答／停止朗读」，只读出回答正文；页面退出停止并释放引擎，超长与引擎错误显示简短提示。第一次模拟器测试发现按首次 `onComplete` 停播，随后改为只在 `type=1` 完成时收尾。
+
+### 验证与边界
+
+DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=default -p buildMode=debug --parallel --incremental` exit 0，完成 ArkTS 编译、打包检查和签名；仅有既有 `TextInputController` 系统能力告警。补充新问题发送时停播后最后一次构建 `BUILD SUCCESSFUL in 2 s 360 ms`；签名 HAP SHA-256 `66414dc32268043e166223bbf6ad6f9dd173883eaaf8d40f9cbbac76c10310a5`，未签名 HAP SHA-256 `a884203a85f908d22783da6a681f3f434dfd06dabc82d39ffd42df7d90af9608`。Pura X View 1320×2232 模拟器 `127.0.0.1:5555` 对最后版未签名包 `hdc install -r` exit 0、启动成功；学伴历史回答上点击朗读后 UI 树显示「停止朗读」，日志含 `speak`、`onStart`、`onComplete 0`，随后有 `onComplete 1`；点击停止后按钮恢复「朗读回答」。播放中截图 `.runtime/hongxueban-tts-active-20260927.jpeg` 属于上一版朗读包、不入库；最后版的 UI 与回调单独复测通过。未进行人工听感、真机或小艺连接测试；本批未发起新的线上 AI 回答。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

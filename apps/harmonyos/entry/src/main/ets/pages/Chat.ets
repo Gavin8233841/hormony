@@ -11,6 +11,7 @@ import { Citation, StreamEvent, ChatRequest, ChatMessage, ChatContext, ChatActio
 import { LocalLearningRepository } from '../common/LocalLearningRepository';
 import { ProactiveLearningAction, ProactiveLearningLaunch, ProactiveLearningService } from '../common/ProactiveLearningService';
 import { InsightIntentPage } from '@kit.AbilityKit';
+import { textToSpeech } from '@kit.CoreSpeechKit';
 
 interface DisplayMessage {
   role: string;
@@ -59,6 +60,9 @@ export struct ChatContent {
   @State actionOpening: boolean = false;
   @State welcomeOpacity: number = 0;
   @State welcomeOffset: number = 8;
+  @State speechMessageIndex: number = -1;
+  @State speechStarting: boolean = false;
+  @State speechError: string = '';
   private activeChatContext: ChatContext | null = null;
   private scroller: Scroller = new Scroller();
   private inputController: TextInputController = new TextInputController();
@@ -72,6 +76,9 @@ export struct ChatContent {
   private historySaveQueued: boolean = false;
   private lifecycleRunId: number = 0;
   private pageActive: boolean = false;
+  private speechEngine: textToSpeech.TextToSpeechEngine | null = null;
+  private speechRequestId: string = '';
+  private speechSequence: number = 0;
 
   // 推荐问题
   private suggestions: string[] = [
@@ -205,6 +212,86 @@ export struct ChatContent {
     this.pageActive = false;
     this.lifecycleRunId += 1;
     this.cancelCurrentRequest(false);
+    this.stopSpeech();
+    this.speechEngine?.shutdown();
+    this.speechEngine = null;
+  }
+
+  private stopSpeech(): void {
+    this.speechSequence += 1;
+    this.speechStarting = false;
+    this.speechRequestId = '';
+    this.speechMessageIndex = -1;
+    try {
+      this.speechEngine?.stop();
+    } catch (_) {
+      // A stopped or unavailable engine must not interrupt the chat page.
+    }
+  }
+
+  private finishSpeech(): void {
+    this.speechStarting = false;
+    this.speechRequestId = '';
+    this.speechMessageIndex = -1;
+  }
+
+  private async readAnswer(message: DisplayMessage): Promise<void> {
+    const messageIndex = this.messages.indexOf(message);
+    if (messageIndex < 0 || message.streaming || message.failed || message.cancelled) return;
+    if (this.speechMessageIndex === messageIndex) {
+      this.stopSpeech();
+      return;
+    }
+    const spokenText = this.readableMarkdown(message.content).trim();
+    if (spokenText.length === 0) return;
+    if (spokenText.length > 10000) {
+      this.speechError = '这段回答太长，暂时无法朗读';
+      return;
+    }
+    this.stopSpeech();
+    this.speechError = '';
+    this.speechStarting = true;
+    const sequence = this.speechSequence;
+    try {
+      let engine = this.speechEngine;
+      if (engine === null) {
+        engine = await textToSpeech.createEngine({ language: 'zh-CN', person: 0, online: 1 });
+        if (!this.pageActive || sequence !== this.speechSequence) {
+          engine.shutdown();
+          return;
+        }
+        this.speechEngine = engine;
+      }
+      engine.setListener({
+        onStart: (requestId: string): void => {
+          console.info('HongxuebanTTS onStart');
+          if (requestId === this.speechRequestId) this.speechStarting = false;
+        },
+        onComplete: (requestId: string, response: textToSpeech.CompleteResponse): void => {
+          console.info('HongxuebanTTS onComplete ' + response.type.toString());
+          if (requestId === this.speechRequestId && response.type === 1) this.finishSpeech();
+        },
+        onStop: (requestId: string): void => {
+          console.info('HongxuebanTTS onStop');
+          if (requestId === this.speechRequestId) this.finishSpeech();
+        },
+        onError: (requestId: string, errorCode: number): void => {
+          console.error('HongxuebanTTS onError ' + errorCode.toString());
+          if (requestId !== this.speechRequestId) return;
+          this.stopSpeech();
+          this.speechError = '朗读暂时不可用，请稍后重试';
+        }
+      });
+      this.speechRequestId = 'answer' + Date.now().toString() + sequence.toString();
+      this.speechMessageIndex = messageIndex;
+      console.info('HongxuebanTTS speak');
+      engine.speak(spokenText, { requestId: this.speechRequestId, extraParams: { 'playType': 1 } });
+    } catch (_) {
+      console.error('HongxuebanTTS unavailable');
+      if (sequence !== this.speechSequence) return;
+      this.stopSpeech();
+      this.speechError = '朗读暂时不可用，请稍后重试';
+    }
   }
 
   private isActiveLifecycle(lifecycleRunId: number): boolean {
@@ -1039,6 +1126,8 @@ export struct ChatContent {
       this.historyLoadFailed || !this.cloudAgentReady) {
       return;
     }
+    this.stopSpeech();
+    this.speechError = '';
     this.inputController.stopEditing();
     this.historyMessage = '';
 
@@ -1370,6 +1459,26 @@ export struct ChatContent {
 
             if (!msg.streaming && !msg.failed && !msg.cancelled && msg.content.length > 0 &&
               this.messages.indexOf(msg) === this.messages.length - 1) {
+              Row() {
+                Button(this.speechMessageIndex === this.messages.indexOf(msg) ? '停止朗读' :
+                  (this.speechStarting ? '准备朗读' : '朗读回答'))
+                  .height(44)
+                  .padding({ left: 12, right: 12 })
+                  .fontSize(12)
+                  .fontColor(Constants.COLOR_BRAND_TEXT)
+                  .backgroundColor(Constants.COLOR_BRAND_LIGHT)
+                  .borderRadius(12)
+                  .enabled(!this.speechStarting)
+                  .onClick((): void => { void this.readAnswer(msg); })
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.End)
+              .margin({ top: 8 })
+              if (this.speechError.length > 0) {
+                Text(this.speechError)
+                  .fontSize(11)
+                  .fontColor(Constants.COLOR_ERROR)
+              }
               Row({ space: 8 }) {
                 Button('再给提示')
                   .height(44)
