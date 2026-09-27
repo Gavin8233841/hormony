@@ -42,6 +42,8 @@ export struct ChatContent {
   @StorageProp('darkMode') darkMode: boolean = false;
   @Prop quickQuestion: string = '';
   @Prop bottomInset: number = 0;
+  @Prop @Watch('refreshSharedHistory') learningViewVersion: number = 0;
+  @StorageLink('chatHistoryVersion') @Watch('refreshSharedHistory') chatHistoryVersion: number = 0;
   @State messages: DisplayMessage[] = [];
   @State inputText: string = '';
   @State loading: boolean = false;
@@ -64,6 +66,7 @@ export struct ChatContent {
   @State speechStarting: boolean = false;
   @State speechError: string = '';
   private activeChatContext: ChatContext | null = null;
+  private contextStartIndex: number = 0;
   private scroller: Scroller = new Scroller();
   private inputController: TextInputController = new TextInputController();
   private currentRequest: http.HttpRequest | null = null;
@@ -98,6 +101,7 @@ export struct ChatContent {
     this.currentCancellation = null;
     this.receivedDone = false;
     this.activeRequestId = 0;
+    this.contextStartIndex = 0;
     this.welcomeOpacity = 0;
     this.welcomeOffset = 8;
     setTimeout((): void => {
@@ -701,6 +705,9 @@ export struct ChatContent {
         };
         restored.push(message);
       }
+      // A question opened from a lesson or mistake begins a focused exchange.
+      // Keep earlier turns on disk, but do not show or send them as context for this question.
+      this.contextStartIndex = this.activeChatContext === null ? 0 : restored.length;
       this.messages = restored;
       this.historyLoadFailed = false;
       this.historySaveFailed = false;
@@ -723,6 +730,13 @@ export struct ChatContent {
     this.historyLoading = true;
     this.historyLoadFailed = false;
     this.historyMessage = '正在打开对话';
+    this.loadLocalHistory(this.lifecycleRunId);
+  }
+
+  private refreshSharedHistory(): void {
+    if (!this.pageActive || this.activeChatContext !== null || this.loading ||
+      this.historyLoading || this.historySaving) return;
+    this.historyLoading = true;
     this.loadLocalHistory(this.lifecycleRunId);
   }
 
@@ -814,8 +828,9 @@ export struct ChatContent {
     const lifecycleRunId = this.lifecycleRunId;
     setTimeout(() => {
       this.scrollScheduled = false;
-      if (this.isActiveLifecycle(lifecycleRunId) && this.messages.length > 0) {
-        this.scroller.scrollToIndex(this.messages.length - 1, true, ScrollAlign.END);
+      if (this.isActiveLifecycle(lifecycleRunId) && this.messages.length > this.contextStartIndex) {
+        this.scroller.scrollToIndex(this.messages.length - this.contextStartIndex - 1,
+          true, ScrollAlign.END);
       }
     }, 50);
   }
@@ -887,17 +902,17 @@ export struct ChatContent {
       }
 
       // 消息列表 / 欢迎页
-      if (this.messages.length === 0) {
+      if (this.messages.length === this.contextStartIndex) {
         // 欢迎引导：角色只在空状态完整出现，不挤占回答区域。
         Scroll() {
           Column() {
             Row() {
               Column({ space: 8 }) {
-                Text('小鸿在这儿')
+                Text(this.activeChatContext === null ? '小鸿在这儿' : '问问这道题')
                   .fontSize(24)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(Constants.COLOR_MAP_CORE)
-                Text('课程、错题，都可以问。')
+                Text(this.activeChatContext === null ? '课程、错题，都可以问。' : '把你的疑问发给小鸿。')
                   .fontSize(13)
                   .lineHeight(19)
                   .fontColor(Constants.COLOR_MAP_TEXT_MUTED)
@@ -919,27 +934,28 @@ export struct ChatContent {
             .opacity(this.welcomeOpacity)
             .translate({ y: this.welcomeOffset })
 
-            Text('试试这样问')
-              .width('100%')
-              .fontSize(17)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(Constants.COLOR_TEXT_PRIMARY)
-              .margin({ top: 24, bottom: 12 })
+            if (this.activeChatContext === null) {
+              Text('试试这样问')
+                .width('100%')
+                .fontSize(17)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                .margin({ top: 24, bottom: 12 })
 
-            Column({ space: 8 }) {
-              ForEach(this.suggestions, (s: string, index: number) => {
-                Button({ type: ButtonType.Normal }) {
-                  Row() {
-                    Text(s)
-                      .layoutWeight(1)
-                      .fontSize(14)
-                      .fontColor(Constants.COLOR_TEXT_PRIMARY)
-                    SymbolGlyph($r('sys.symbol.chevron_right'))
-                      .fontSize(13)
-                      .fontColor([Constants.COLOR_TEXT_SECONDARY])
+              Column({ space: 8 }) {
+                ForEach(this.suggestions, (s: string, index: number) => {
+                  Button({ type: ButtonType.Normal }) {
+                    Row() {
+                      Text(s)
+                        .layoutWeight(1)
+                        .fontSize(14)
+                        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                      SymbolGlyph($r('sys.symbol.chevron_right'))
+                        .fontSize(13)
+                        .fontColor([Constants.COLOR_TEXT_SECONDARY])
+                    }
+                    .width('100%')
                   }
-                  .width('100%')
-                }
                   .width('100%')
                   .constraintSize({ minHeight: 56 })
                   .padding({ left: 16, right: 16 })
@@ -954,9 +970,10 @@ export struct ChatContent {
                     this.inputText = s;
                     this.sendMessage();
                   })
-              })
+                })
+              }
+              .width('100%')
             }
-            .width('100%')
           }
           .width('100%')
           .justifyContent(FlexAlign.Start)
@@ -970,7 +987,7 @@ export struct ChatContent {
       } else {
         // 消息列表
         List({ scroller: this.scroller }) {
-          ForEach(this.messages, (msg: DisplayMessage) => {
+          ForEach(this.messages.slice(this.contextStartIndex), (msg: DisplayMessage) => {
             ListItem() {
               this.MessageBubble(msg)
             }
@@ -1181,7 +1198,8 @@ export struct ChatContent {
     this.currentCancellation = cancellation;
     this.scrollToBottom();
 
-    const requestHistory = this.completeChatHistory(this.messages.slice(0, this.messages.length - 2), false)
+    const requestHistory = this.completeChatHistory(
+      this.messages.slice(this.contextStartIndex, this.messages.length - 2), false)
       .slice(-12)
       .map((item: ChatMessage): ChatMessage => {
         return {
@@ -1385,8 +1403,10 @@ export struct ChatContent {
     }
     const history = this.completeChatHistory(this.messages, true);
     this.historySaving = true;
+    let saved = false;
     try {
       await LocalLearningRepository.saveChatHistory(history);
+      saved = true;
       this.historySaveFailed = false;
       this.historyMessage = '回答已保存';
     } catch (_) {
@@ -1394,6 +1414,7 @@ export struct ChatContent {
       this.historyMessage = '回答已完成，保存失败';
     } finally {
       this.historySaving = false;
+      if (saved) this.chatHistoryVersion += 1;
       if (this.historySaveQueued) {
         this.historySaveQueued = false;
         this.saveLocalHistory();

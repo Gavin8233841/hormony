@@ -8595,3 +8595,19 @@ DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=defa
 `apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T15:43:17Z] [2026-09-27 23:43:17 CST] 模型: Codex (GPT-6)
+
+### 错题进入学伴时隔离旧话题
+
+模拟器从错题本“图的表示与遍历”点击“问学伴”后，旧实现仍显示数组删除的上一轮回答，新题请求也会携带该历史，容易造成讲解串题。`Chat.ets` 在带题目上下文的新入口从现有历史末尾开始聚焦显示，并仅把本次入口之后的轮次加入请求历史；原有 ArkData 对话保留。空题会话使用当前题目的欢迎提示，不展示无关的通用问题。复测发现首页学伴 Tab 被缓存，单独题目会话保存后该 Tab 仍显示上一轮；保存成功后递增 `chatHistoryVersion`，其他会话实例重读，`Index` 返回时也传入刷新版本。
+
+### 验证与边界
+
+直接 Hvigor `assembleHap --mode module -p module=entry@default -p product=default -p buildMode=debug --parallel --incremental --no-daemon` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成；仅有既有 `TextInputController` 系统能力告警。最终未签名 HAP SHA-256 `7858ed2b27697a57886ad365f177587d03f95ea46c00a418f55cf455e6ae4a78`，签名 HAP SHA-256 `55ba6e34c1109ab9121ea38e95dbb88de817d94ae35ff101a39f5e06e2380e91`。Pura X View 1320×2232 模拟器 `127.0.0.1:5555` 覆盖安装、启动 exit 0；从首页进入错题本第二题再问学伴，UI 树只有本题上下文和新会话提示，没有旧答案。同版发送已预填问题后出现针对 Dijkstra 负权边错因的回答和“去练习”动作；返回首页普通学伴标签显示这条最新回答。本地截图 `.runtime/chat-history-refreshed-20260927.png` 与 UI 树 `.runtime/chat-history-refreshed-20260927.json` 不入库。此前一版的空会话与邻接表 DFS 回答截图只作开发过程记录，不作为最终包证据。没有抓取本次请求体；请求历史隔离以源码和模拟器界面为证，没有小艺对话或真机证据。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`apps/harmonyos/entry/src/main/ets/pages/Index.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

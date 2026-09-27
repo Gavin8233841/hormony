@@ -214,6 +214,7 @@ struct Index {
       TabContent() {
         ChatContent({
           quickQuestion: this.quickQuestion,
+          learningViewVersion: this.learningViewVersion,
           bottomInset: Constants.NAV_HEIGHT + 20 + this.safeAreaBottomVp(),
         })
           .padding({ top: this.safeAreaTopVp() })
