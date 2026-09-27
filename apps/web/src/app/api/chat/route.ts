@@ -51,6 +51,21 @@ export async function POST(req: NextRequest) {
   const parsed = await readJsonObject<Record<string, unknown>>(req);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
+  const xiaoyiEndpoint = new URL(req.url).pathname === "/api/xiaoyi/tutor";
+
+  if (body.mode !== undefined && body.mode !== "xiaoyi_tutor") {
+    return Response.json({ error: "不支持的对话模式", code: "INVALID_MODE" }, { status: 400 });
+  }
+  const xiaoyiTutor = body.mode === "xiaoyi_tutor";
+  if (xiaoyiEndpoint && !xiaoyiTutor) {
+    return Response.json({ error: "此入口仅支持小艺课程讲解", code: "INVALID_MODE" },
+      { status: 400 });
+  }
+  if (xiaoyiTutor && (body.userId !== undefined || body.profile !== undefined ||
+      body.context !== undefined || body.startDate !== undefined)) {
+    return Response.json({ error: "小艺讲解只接收问题和对话历史", code: "INVALID_TUTOR_REQUEST" },
+      { status: 400 });
+  }
 
   if (body.message === undefined) {
     return Response.json({ error: "缺少 message 字段", code: "MISSING_FIELD" }, { status: 400 });
@@ -128,7 +143,7 @@ export async function POST(req: NextRequest) {
   }
 
   const chatRequest: ChatRequest = {
-    userId: userId.value,
+    userId: xiaoyiTutor ? "xiaoyi_guest" : userId.value,
     message,
     startDate: startDate.value,
     profile: profile.value,
@@ -220,7 +235,7 @@ export async function POST(req: NextRequest) {
   const orchestratePromise = (async () => {
     try {
       await withModelRequestBudget(
-        (signal) => orchestrateStream(chatRequest, emit, signal),
+        (signal) => orchestrateStream(chatRequest, emit, signal, xiaoyiTutor ? "tutor" : undefined),
         {
           timeoutMs: CHAT_REQUEST_BUDGET_MS,
           signal: req.signal,

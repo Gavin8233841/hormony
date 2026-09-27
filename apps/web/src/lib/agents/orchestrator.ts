@@ -325,9 +325,10 @@ export async function orchestrateTutorOnly(input: TutorOnlyRequest): Promise<Orc
 export async function orchestrateStream(
   req: ChatRequest,
   emit: (event: StreamEvent) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  forcedIntent?: "tutor"
 ): Promise<void> {
-  const { intent, sessionId, history } = prepareContext(req);
+  const { intent, sessionId, history } = prepareContext(req, forcedIntent);
 
   // 1. 前置 Agent：Profile + Retrieval（流式推送 trace）
   const { retrievalResult, retrievalSafety } = await runPreAgents(intent, req, emit);
@@ -342,7 +343,8 @@ export async function orchestrateStream(
   }
 
   // 2. 按意图路由到主 Agent
-  const mainResult = await routeMainAgent(intent, req, retrievalResult, history, emit, signal);
+  const mainResult = await routeMainAgent(
+    intent, req, retrievalResult, history, emit, signal, forcedIntent === "tutor");
 
   // 3. 安全审核必须先于任何正文输出。
   const { safety } = await runSafetyCheck(

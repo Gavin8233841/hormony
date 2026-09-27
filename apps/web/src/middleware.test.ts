@@ -22,6 +22,7 @@ const STATEFUL_API_PREFIXES = [
 const STATELESS_API_ENDPOINTS = [
   ["GET", "/api/health"],
   ["POST", "/api/chat"],
+  ["POST", "/api/xiaoyi/tutor"],
   ["POST", "/api/plan"],
   ["POST", "/api/quiz"],
   ["POST", "/api/knowledge/search"],
@@ -227,6 +228,17 @@ describe("middleware API gateway", () => {
       error: "请求过于频繁，请稍后重试",
       code: "RATE_LIMITED",
     });
+  });
+
+  it("shares one model request bucket between Chat and Xiaoyi Tutor", async () => {
+    const options = { method: "POST", runtimeIp: "203.0.113.151" };
+    for (let index = 0; index < 20; index++) {
+      expect(middleware(apiRequest("/api/chat", options)).status).toBe(200);
+    }
+    for (let index = 0; index < 10; index++) {
+      expect(middleware(apiRequest("/api/xiaoyi/tutor", options)).status).toBe(200);
+    }
+    expect(middleware(apiRequest("/api/xiaoyi/tutor", options)).status).toBe(429);
   });
 
   it("uses a shared limited bucket when only untrusted forwarded IPs are available", async () => {

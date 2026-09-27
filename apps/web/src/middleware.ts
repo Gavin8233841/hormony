@@ -114,7 +114,9 @@ export function middleware(req: NextRequest) {
     // 直接采用 X-Forwarded-For 会让客户端轮换伪造值绕过限流并撑大 Map。
     const clientIp = req.ip?.trim() || "unknown";
     const now = Date.now();
-    const key = `${clientIp}:${pathname}`;
+    // 小艺入口与普通 Chat 共用额度，避免同一客户端绕路加倍模型调用。
+    const budgetPath = pathname === "/api/xiaoyi/tutor" ? "/api/chat" : pathname;
+    const key = `${clientIp}:${budgetPath}`;
     const record = rateLimitMap.get(key);
 
     // 最早窗口尚未到期时不扫描，避免容量攻击让每次请求都遍历整个 Map。

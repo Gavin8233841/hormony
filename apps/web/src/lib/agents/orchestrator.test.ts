@@ -27,6 +27,19 @@ afterEach(() => {
 });
 
 describe("orchestrator 前置检索调度", () => {
+  it("小艺流式讲解固定进入 Tutor，不由计划和测验关键词改道", async () => {
+    process.env.TEST_MODEL_RESPONSE = "数组通过连续存储位置保存元素。";
+    const events: StreamEvent[] = [];
+    await orchestrateStream({
+      userId: "xiaoyi_guest", message: "解释数组并给我出题和学习计划", startDate: "2026-09-27",
+    }, (event) => events.push(event), undefined, "tutor");
+
+    expect(events).toContainEqual({ type: "thinking", agent: "Tutor" });
+    expect(events.some((event) => event.type === "thinking" &&
+      (event.agent === "Planner" || event.agent === "Quiz"))).toBe(false);
+    expect(events).toContainEqual({ type: "delta", content: "数组通过连续存储位置保存元素。" });
+  });
+
   it("外部讲解入口即使遇到计划、出题和成绩关键词也只调用 Tutor", async () => {
     process.env.TEST_MODEL_RESPONSE = "线性表按逻辑顺序组织元素，数组是常见的顺序存储方式。";
 

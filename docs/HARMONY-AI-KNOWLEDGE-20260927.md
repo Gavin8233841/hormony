@@ -24,9 +24,11 @@
 
 [端 A2A 对话交互](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-chat-0000002660585429)（2026-07-27）使用 JSON-RPC `method: "MessageStream"`，`params.message.role: "ROLE_USER"`，`parts[].text`、`mediaType: "text/plain"`，有 `messageId`、后续轮次 `contextId`。简单回答可回 `result.task.id/contextId/status.state: "TASK_STATE_COMPLETED"`、`timestamp` 和 `artifacts[].parts[].text`。官方示例的一组请求/响应 `id` 不一致；实现必须回显收到的请求 `id`，再用平台调试检验。完整协议和取消分别看[端 A2A 技术规范](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-device-0000002624952279)、[异常与任务取消](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-exp-0000002660465491)。首版只做短文本、只读 Tutor，拒绝文件、界面操控和任意 App 动作；不暴露内部推理或学习画像。后续多轮 `contextId`、`TasksCancel`、并发与断连要按真实协议实现。
 
-[AgentCard 规范](https://developer.huawei.com/consumer/cn/doc/service/agentcard-0000002678424557)（2026-07-27）列 `name`、`description`、`agentId`、`version`、`iconUrl`、默认输入/输出 MIME、`skills` 和 `appInfo` 等字段；规范表与 IDE 简化模板对 `appInfo`、`iconUrl` 的要求不完全一致，**先按平台导入校验结果确认**，不猜平台生成的 ID。`agentId` 在同包名内唯一，平台内部 ID 另有语义。不要在 Card 填未上线 URL、虚构设备支持或未实现的 Skill。
+[AgentCard 规范](https://developer.huawei.com/consumer/cn/doc/service/agentcard-0000002678424557)（2026-07-27）列 `name`、`description`、`agentId`、`version`、`iconUrl`、默认输入/输出 MIME、`skills` 和 `appInfo` 等字段；规范表说明平台导入/导出不支持 `agentId` 与 `appInfo`，它们分别有平台内部与应用关联语义。IDE 简化模板与平台字段不完全一致，**按平台实际导入校验结果确认**，不猜平台生成的 ID。`agentId` 在同包名内唯一。平台上传控件明确要求 APP 工程中的 `agent_config.json`；本项目用 `entry/src/main/resources/base/profile/agent_config.json`。不要在 Card 填未上线 URL、虚构设备支持或未实现的 Skill。
 
-项目现状：`entry/src/main/module.json5` 只有 `EntryAbility` 与 `EntryFormAbility`，无 Agent Extension；API 26 已构建过，尚无小艺端侧连接证据。端侧 Agent 若调用现有云端 Tutor，要复用网络超时/取消和服务端 Safety；仅把云模型经端侧代理调用，**不能称端侧模型推理**。
+项目现状：`entry/src/main/module.json5` 已注册导出的 `XiaoyiAgentAbility`，其配置位于 `entry/src/main/resources/base/profile/agent_config.json`；API 26 Debug HAP 的 ArkTS 编译、打包检查通过。Extension 只接收短文本课程问题，经 `HttpClient.postSSE` 调用独立的 `/api/xiaoyi/tutor`，复用服务端 Tutor 编排和 Safety；提供按连接隔离的取消、断连、并发及进程内历史上限。**这是端侧协议适配加云端模型调用，不是端侧模型推理**。当前没有小艺实际连接证据，`iconUrl` 在 Web 部署前也不可作为线上可访问资源。
+
+2026-09-27 平台实查：初次进入“端A2A模式”时应用选择器显示“暂无数据”；用户随后在 AppGallery Connect 完成“鸿学伴”应用创建，项目名 `Hormony`，小艺表单现已显示关联应用“鸿学伴”。平台在同页提示最低 HarmonyOS API 24、小艺 App 11.6.6.300；当前 App 目标 API 26 满足代码侧版本条件。平台“应用服务名称”按 `module.json5` 中 `type: "agent"` 的 `name` 填 `XiaoyiAgentAbility`。已在 Safari 填入该值，尝试上传 `agent_config.json` 时平台返回“会话超时”并跳转华为账号登录；**尚无 Card 导入成功或 Agent 创建证据**。登录恢复后重新核对关联应用、上传结果和确认创建状态。真机版本与真实小艺对话也未验证。[官方创建应用指南](https://developer.huawei.com/consumer/cn/doc/app/agc-help-createharmonyapp-0000001945392297)与[端 A2A 创建流程](https://developer.huawei.com/consumer/cn/doc/service/device-a2a-0000002640106106)用于复核后续步骤。若页面提出法律协议或资质验证，由账户主体完成。
 
 ### B. 小艺云 A2A（保留现有适配，按门槛再开放）
 
@@ -51,6 +53,8 @@
 
 ## 4. 当前状态与下一批
 
-- **源码确认**：ArkUI、ArkData、服务卡片、通知、云端多 Agent 与只读 Tutor 适配；包名 `com.c4ai.hormony`、模块 `entry`、API 26。具体已验证范围见[交接](SEMIFINAL-IMPLEMENTATION-HANDOFF.md)和[接入计划](SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md)。
-- **未验证**：小艺项目关联、AgentCard 导入、AgentExtensionAbility 编译/运行、真实小艺对话、系统意图和语音 Kit。当前网页“新建项目”不是已接入状态。
-- **下一批顺序**：端侧最小对话协议与 Tutor 服务端受限入口 → HAP 构建和可观察测试 → 平台端 A2A 关联与测试态 → 真机问答/取消 → 明确补充 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。
+- **源码确认**：ArkUI、ArkData、服务卡片、通知、云端多 Agent、只读 Tutor，以及本批新增的端 A2A Extension 和独立 Tutor 接口；包名 `com.c4ai.hormony`、模块 `entry`、API 26。具体范围见[交接](SEMIFINAL-IMPLEMENTATION-HANDOFF.md)和[接入计划](SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md)。
+- **本地检查**：Web lint、typecheck、492 项测试及构建通过；Hvigor API 26 增量构建 exit 0，产物仍为未签名 HAP。尚无平台 AgentCard 导入校验。
+- **平台确认**：AppGallery Connect 中“鸿学伴”应用已由用户创建，小艺端 A2A 表单已显示关联成功；应用服务名称已填写 `XiaoyiAgentAbility`。AgentCard 上传遇到会话超时，未完成导入与创建。
+- **未验证**：Extension 运行和真实小艺对话、系统意图、语音 Kit、真机与已签名 HAP。
+- **下一批顺序**：部署并校验 Web 独立接口与头像 URL → 账户重新登录后平台端 A2A 导入与测试态 → 真机问答/取消 → 明确补充 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。

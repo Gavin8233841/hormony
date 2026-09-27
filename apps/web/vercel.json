@@ -3,6 +3,9 @@
     "src/app/api/chat/route.ts": {
       "maxDuration": 120
     },
+    "src/app/api/xiaoyi/tutor/route.ts": {
+      "maxDuration": 120
+    },
     "src/app/api/quiz/route.ts": {
       "maxDuration": 120
     },

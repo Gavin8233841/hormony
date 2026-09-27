@@ -16,6 +16,7 @@ export class Constants {
 
   // API 路径
   static readonly API_CHAT: string = '/api/chat';
+  static readonly API_XIAOYI_TUTOR: string = '/api/xiaoyi/tutor';
   static readonly API_PROFILE: string = '/api/profile';
   static readonly API_COURSES: string = '/api/courses';
   static readonly API_PLAN: string = '/api/plan';

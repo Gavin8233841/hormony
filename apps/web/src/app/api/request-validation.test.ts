@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
 import { POST as postChat } from "./chat/route";
+import { POST as postXiaoyiTutor } from "./xiaoyi/tutor/route";
 import { GET as getConversations } from "./conversations/route";
 import { GET as getCourses, POST as postCourse } from "./courses/route";
 import { POST as searchKnowledge } from "./knowledge/search/route";
@@ -630,6 +631,31 @@ describe("API request validation", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ code: "INVALID_HISTORY" });
+  });
+
+  it("rejects unknown chat mode and private fields in Xiaoyi Tutor mode", async () => {
+    for (const body of [
+      { mode: "other", message: "解释数组" },
+      { mode: "xiaoyi_tutor", message: "解释数组", profile: { weakTopics: [] } },
+      { mode: "xiaoyi_tutor", message: "解释数组", userId: "demo" },
+    ]) {
+      const response = await postChat(new NextRequest("http://localhost/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }));
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        code: body.mode === "other" ? "INVALID_MODE" : "INVALID_TUTOR_REQUEST",
+      });
+    }
+  });
+
+  it("dedicated Xiaoyi endpoint requires Tutor mode before any model call", async () => {
+    const response = await postXiaoyiTutor(new NextRequest("http://localhost/api/xiaoyi/tutor", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "帮我出题" }),
+    }));
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: "INVALID_MODE" });
   });
 
   it("rejects chat history content above the 1000-character limit", async () => {

@@ -8381,3 +8381,21 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`docs/SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md`、`AGENTS.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T11:46:22Z] [2026-09-27 19:46:22 CST] 模型: Codex (GPT-6)
+
+### 小艺端 A2A 最小讲解链路与平台关联
+
+按华为端 A2A 协议新增导出的 `XiaoyiAgentAbility` 与工程 AgentCard，限短文本课程讲解；端侧经独立 `/api/xiaoyi/tutor` 请求复用云端 Tutor 编排与 Safety，不接收个人画像、答题记录或任意应用动作。请求按连接隔离会话和取消，限制并发、历史和响应长度。Web 对小艺路径强制 Tutor、输入校验及 Chat 共享速率桶；上传头像作为 Card 的图标资源。`module.json5` 中的服务名称精确为 `XiaoyiAgentAbility`，包名仍为 `com.c4ai.hormony`。
+
+用户在 AppGallery Connect 创建“鸿学伴”应用，项目名 `Hormony`；小艺平台端 A2A 表单已显示关联应用成功。Safari 中已填写服务名称。按平台提示选择工程 `agent_config.json` 上传时返回“会话超时”并跳转华为账号登录；未取得导入成功、Agent 创建或小艺会话证据，等待账户重新登录后继续。
+
+### 验证与边界
+
+`apps/web` 的 `pnpm lint`、`pnpm typecheck`、`pnpm test`（37 文件、492 项）和 `pnpm build` 均 exit 0；Hvigor `assembleHap` 增量构建 exit 0，HAP SHA-256 为 `7446fd47aa0ac2fbd3eb1888254ab93a98d0e41fee24a4b37ccd3dfb095c7e7c`。该 HAP 位于 `apps/harmonyos/entry/build/default/outputs/default/entry-default-unsigned.hap`，尚未签名。官方文档和平台控件均要求 APP 工程中的 `agent_config.json`；平台导入结果、Web 线上路径与头像可访问性、Extension 运行、真机问答及取消仍未验证。既有 HarmonyOS TextInputController 构建警告仍在；不将其表述为本批新增错误。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`apps/harmonyos/entry/src/main/ets/common/Constants.ets`、`apps/harmonyos/entry/src/main/module.json5`、`apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`、`apps/web/src/app/api/chat/route.ts`、`apps/web/src/app/api/xiaoyi/tutor/route.ts`、`apps/web/src/app/api/request-validation.test.ts`、`apps/web/src/app/api/stateless-agent.test.ts`、`apps/web/src/lib/agents/orchestrator.ts`、`apps/web/src/lib/agents/orchestrator.test.ts`、`apps/web/src/middleware.ts`、`apps/web/src/middleware.test.ts`、`apps/web/vercel.json`、`apps/web/public/xiaohong-agent.png`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。其他任务的未提交文件保持原状。
+
+---

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { middleware } from "../../middleware";
 import { POST as chat } from "./chat/route";
+import { POST as xiaoyiTutor } from "./xiaoyi/tutor/route";
 import { GET as health } from "./health/route";
 import { POST as searchKnowledge } from "./knowledge/search/route";
 import { GET as getProfile } from "./profile/route";
@@ -31,6 +32,22 @@ async function getProfileThroughGateway(request: NextRequest): Promise<Response>
 }
 
 describe("无状态真实 Agent 边界", () => {
+  it("小艺独立入口用真实流式编排固定回答课程概念", async () => {
+    delete process.env.MODEL_API_KEY;
+    process.env.TEST_MODEL_RESPONSE = "二叉搜索树让左子树键值小于根，右子树键值大于根。";
+    const response = await xiaoyiTutor(new NextRequest("http://localhost/api/xiaoyi/tutor", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "xiaoyi_tutor", message: "解释二叉搜索树并给我出题和计划" }),
+    }));
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('"agent":"Tutor"');
+    expect(body).not.toContain('"agent":"Planner"');
+    expect(body).not.toContain('"agent":"Quiz"');
+    expect(body).toContain('"type":"delta"');
+    expect(body).toContain('"type":"done"');
+  });
+
   it("模型未配置时健康检查与聊天都应返回 503", async () => {
     delete process.env.MODEL_API_KEY;
     const healthResponse = await health();
