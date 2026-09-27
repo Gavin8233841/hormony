@@ -8439,3 +8439,19 @@ DevEco 在已跟踪的 `apps/harmonyos/build-profile.json5` 写入本机签名�
 `apps/harmonyos/build-profile.json5`（本地秘密，禁止提交）、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T13:21:55Z] [2026-09-27 21:21:55 CST] 模型: Codex (GPT-6)
+
+### 登录恢复后的 AGC 与小艺端 A2A 状态复核
+
+用户完成华为账号重新登录后，Safari 中刷新小艺新建 Agent 页面、重新选择端 A2A：应用选择器显示“暂无HarmonyOS应用”，Agent 列表为 0 条。AppGallery Connect 的 APP ID 列表确有“鸿学伴”／`com.c4ai.hormony`，但“APP 与元服务”HarmonyOS 列表为“暂无数据”。进入“开发与服务”项目管理时弹出《AppGallery Connect协议包》，其中预选多个服务条款（包括付费服务协议）；未勾选同意、未点击继续，关闭弹窗后回到首页。已请账户主体审阅并自行处理；该协议是否为小艺应用列表为空的唯一原因尚未证实。
+
+### 验证与边界
+
+本批仅用页面可见内容核对平台状态并更新知识卡、DEVLOG；未修改 App、服务端、签名配置或平台项目，未上传 Card 或创建 Agent。未重复 Web／HAP 构建，前批签名与模拟器证据保持其原有范围。平台端 A2A、真机对话和取消仍未验证。其他任务的未提交文件原样保留。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

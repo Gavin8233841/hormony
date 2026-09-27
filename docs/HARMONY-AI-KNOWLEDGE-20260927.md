@@ -28,7 +28,9 @@
 
 项目现状：`entry/src/main/module.json5` 已注册导出的 `XiaoyiAgentAbility`，其配置位于 `entry/src/main/resources/base/profile/agent_config.json`；API 26 Debug HAP 的 ArkTS 编译、打包检查通过。Extension 只接收短文本课程问题，经 `HttpClient.postSSE` 调用独立的 `/api/xiaoyi/tutor`，复用服务端 Tutor 编排和 Safety；提供按连接隔离的取消、断连、并发及进程内历史上限。**这是端侧协议适配加云端模型调用，不是端侧模型推理**。Web 部署 `dpl_6LQpd9gP8pwQWfpSdApnQaDdLGeV` 已提升到 `hormony-ruddy.vercel.app`，线上图标 URL 返回 PNG 200，小艺专用接口的合成课程问题返回 200、正文和 `done`；仍没有小艺实际连接证据。
 
-2026-09-27 平台实查：初次进入“端A2A模式”时应用选择器显示“暂无数据”；用户随后在 AppGallery Connect 完成“鸿学伴”应用创建，项目名 `Hormony`，小艺表单现已显示关联应用“鸿学伴”。平台在同页提示最低 HarmonyOS API 24、小艺 App 11.6.6.300；当前 App 目标 API 26 满足代码侧版本条件。平台“应用服务名称”按 `module.json5` 中 `type: "agent"` 的 `name` 填 `XiaoyiAgentAbility`。已在 Safari 填入该值，尝试上传 `agent_config.json` 时平台返回“会话超时”并跳转华为账号登录；**尚无 Card 导入成功或 Agent 创建证据**。登录恢复后重新核对关联应用、上传结果和确认创建状态。真机版本与真实小艺对话也未验证。[官方创建应用指南](https://developer.huawei.com/consumer/cn/doc/app/agc-help-createharmonyapp-0000001945392297)与[端 A2A 创建流程](https://developer.huawei.com/consumer/cn/doc/service/device-a2a-0000002640106106)用于复核后续步骤。若页面提出法律协议或资质验证，由账户主体完成。
+2026-09-27 初次平台实查：进入“端A2A模式”时应用选择器显示“暂无数据”；用户随后报告完成“鸿学伴”注册并给出项目名 `Hormony`，当时的小艺表单曾显示关联应用“鸿学伴”。平台在同页提示最低 HarmonyOS API 24、小艺 App 11.6.6.300；当前 App 目标 API 26 满足代码侧版本条件。平台“应用服务名称”按 `module.json5` 中 `type: "agent"` 的 `name` 填 `XiaoyiAgentAbility`。当时在 Safari 填入该值，尝试上传 `agent_config.json` 时平台返回“会话超时”并跳转华为账号登录；**尚无 Card 导入成功或 Agent 创建证据**。真机版本与真实小艺对话也未验证。[官方创建应用指南](https://developer.huawei.com/consumer/cn/doc/app/agc-help-createharmonyapp-0000001945392297)与[端 A2A 创建流程](https://developer.huawei.com/consumer/cn/doc/service/device-a2a-0000002640106106)用于复核后续步骤。若页面提出法律协议或资质验证，由账户主体完成。
+
+2026-09-27 登录恢复后复查：刷新小艺“新建项目”并选择端 A2A，当前关联步骤显示“暂无HarmonyOS应用”；Agent 列表显示共 0 条，之前表单的“鸿学伴”关联没有留下已创建项目。AGC 的 **APP ID** 列表确有一条“鸿学伴”／`com.c4ai.hormony`（APP ID `6917617536495682419`）；但 **APP 与元服务** 的 HarmonyOS 列表显示“暂无数据”。进入 AGC“开发与服务”项目管理时弹出《AppGallery Connect协议包》，其中预选了多项服务条款，包含付费服务协议；关闭弹窗后回到 AGC 首页，未读取到项目列表。不能由 APP ID 存在推断已完成 AGC 应用/项目配置，也不能确定小艺列表为空仅由该协议造成。账户主体需审阅并处理协议后，再分别复核 AGC 项目、应用列表和小艺选择器；代理不代签法律协议。此时仍无 Card 导入、Agent 创建或小艺对话证据。
 
 ### B. 小艺云 A2A（保留现有适配，按门槛再开放）
 
@@ -62,6 +64,6 @@
 - **本地检查**：Web lint、typecheck、492 项测试及构建通过；原 API 26 未签名 HAP 已构建。关联 AGC“鸿学伴”的本机签名配置之后，`devecocli build` exit 0，含 `SignHap`；`entry-default-signed.hap` 为 4,071,833 字节、SHA-256 `62f741b2782da864f0d2929988aba3ec4b2a84b2e1ae1c6a8578e53b28a1b061`。本地 SDK `hap-sign-tool.jar verify-app` exit 0，提取证书链和 Profile 到忽略目录 `.runtime/`。这证明包签名可验证，不证明指定真机的 Profile 包含设备，也不证明平台 AgentCard 导入。
 - **模拟器通过（有限范围）**：Pura X View 模拟器 `127.0.0.1:5555` 上 `devecocli run --skip-build` 安装、启动 exit 0；`bm dump -n com.c4ai.hormony` 包含 `XiaoyiAgentAbility` 与 `ohos.extension.agent` 元数据。仅证实扩展能力已随包注册，不证明小艺能连接、请求与取消协议能运行。
 - **线上通过**：部署 `dpl_6LQpd9gP8pwQWfpSdApnQaDdLGeV` 已提升为公开域名目标；公开域名 `GET /api/health` 为 200 且 `status=ready`，头像 PNG 为 200，`POST /api/xiaoyi/tutor` 的合成课程问题为 200 SSE，含非空 `delta` 与 `done`、无 `error`；空问题为 400 `MISSING_FIELD`。这只证明云端接口，不证明端侧 Extension 或小艺平台连接。
-- **平台确认**：AppGallery Connect 中“鸿学伴”应用已由用户创建，小艺端 A2A 表单已显示关联成功；应用服务名称已填写 `XiaoyiAgentAbility`。AgentCard 上传遇到会话超时，未完成导入与创建。
+- **平台确认**：AGC 的 APP ID 列表有“鸿学伴”／`com.c4ai.hormony`；“APP 与元服务”列表为空，项目管理弹出待处理协议包。小艺重新登录并刷新后的端 A2A 选择器显示“暂无HarmonyOS应用”，Agent 列表 0 条。先前表单曾显示“鸿学伴”并填过 `XiaoyiAgentAbility`，但会话超时后没有导入或创建成功证据。
 - **未验证**：Extension 运行和真实小艺对话、系统意图、语音 Kit、签名 HAP 的真机安装与使用。HDC 当前只列出 `127.0.0.1:5555` 模拟器。
-- **下一批顺序**：账户重新登录后平台端 A2A 导入与测试态 → 同版 HAP 安装和真机问答/取消 → 明确补充 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。
+- **下一批顺序**：账户主体处理 AGC 协议后复核项目及应用列表 → 小艺端 A2A 重新关联、导入与测试态 → 同版 HAP 安装和真机问答/取消 → 明确补充 Intents Kit 或朗读。每步不成功则保留上一层结果，并记下具体平台/设备阻塞。
