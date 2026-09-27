@@ -8,6 +8,7 @@ const MAX_REQUEST_ID_LENGTH = 128;
 const MAX_SESSION_ID_LENGTH = 128;
 const MAX_TASK_ID_LENGTH = 128;
 const MAX_MESSAGE_LENGTH = 2000;
+const MAX_HISTORY_ENTRY_LENGTH = 500;
 
 type JsonObject = Record<string, unknown>;
 
@@ -74,7 +75,7 @@ export async function executeCloudA2ATutorTurn(
 ): Promise<CloudA2ATutorTurn> {
   if (history.length > 12 || history.some((entry) =>
     (entry.role !== "user" && entry.role !== "assistant") ||
-    typeof entry.content !== "string" || entry.content.length > 500 ||
+    typeof entry.content !== "string" || entry.content.length > MAX_HISTORY_ENTRY_LENGTH ||
     validateUserInput(entry.content).length > 0
   )) {
     throw new Error("INVALID_SESSION_HISTORY");
@@ -91,8 +92,8 @@ export async function executeCloudA2ATutorTurn(
   }
   const appendedHistory: ChatMessage[] = [
       ...history,
-      { role: "user", content: message.text },
-      { role: "assistant", content: result.finalContent },
+      { role: "user", content: message.text.slice(0, MAX_HISTORY_ENTRY_LENGTH) },
+      { role: "assistant", content: result.finalContent.slice(0, MAX_HISTORY_ENTRY_LENGTH) },
     ];
   const nextHistory = appendedHistory.slice(-12);
   return { responseText: result.finalContent, nextHistory };

@@ -44,6 +44,8 @@
 
 [云 A2A 模式](https://developer.huawei.com/consumer/cn/doc/service/cloud-a2a-0000002640266052)适配已有自有云 Agent。[协议技术规范](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-comments-0000002500412353)、[消息定义](https://developer.huawei.com/consumer/cn/doc/service/agent2agent-define-0000002467293060)、[发起会话](https://developer.huawei.com/consumer/cn/doc/service/message-stream-0000002505761434)、[终止会话](https://developer.huawei.com/consumer/cn/doc/service/tasks-cancel-0000002537561193)是实现依据。云版使用单 POST Endpoint / Streamable HTTP / JSON-RPC，可返回 SSE；`message/stream` 有 `params.id` 与 `sessionId`，终态可用 `artifact-update`、`final: true` 与 `lastChunk: true`。有会话模式要处理 `initialize` 和 `agent-session-id`；无会话模式每次携带鉴权。当前 `apps/web/src/lib/agents/cloud-a2a-tutor.ts` **只有本地解析/只读讲解/终态格式化与单测**，无公网路由。无共享会话、鉴权、幂等、跨实例取消和全局成本限额之前不公开接入点；Vercel 进程内 Map 不满足跨实例语义。
 
+2026-09-28 补充：华为[2026 年 8 月开发者月刊](https://developer.huawei.com/consumer/cn/monthly/202608)对《小艺开放平台云 A2A 智能体开发实战》的介绍包含 Remote Agent 服务、AK/SK 鉴权、平台配置及**真机调试**。这不能证明云 A2A 的网页调试不可用，但也不能把云模式当作“仅用模拟器就能验收小艺对话”的捷径；须以当前账户的云模式创建与调试页实查。现有本地适配已修复长问题或长回答进入历史后下一轮被 500 字限制拒绝的边界，保留完整当轮回答，对历史单条截取 500 字；仍无公网路由和平台联调证据。
+
 端 A2A 与云 A2A **是两种协议**：方法名、报文结构和返回方式不同，不能把云适配层直接交给端侧 Extension。首轮以端侧 HAP + 平台测试态为主，云版作为服务分发备选；平台实测或签名条件若否定端侧路线，再转云版，并记录依据。
 
 ### C. 原生入口与自然交互

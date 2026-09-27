@@ -8689,3 +8689,19 @@ DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=defa
 `apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T17:07:21Z] [2026-09-28 01:07:21 CST] 模型: Codex (GPT-6)
+
+### 修复云 A2A 预备适配的多轮历史边界
+
+本地云 A2A 适配允许 2000 字输入，却将首轮完整输入与回答存为历史，并在下一轮拒绝任何超过 500 字的历史条目。将缓存历史单条限定为 500 字，保持当轮对小艺的回答完整；补充长输入、长输出再进入下一轮的回归。此适配仍无公网路由，未接入小艺云模式。华为官方 2026 年 8 月课程摘要列出云 A2A 的 AK/SK 鉴权、平台配置及真机调试；仅用模拟器的当前阶段不能凭云模式宣称平台对话通过，待登录页实查网页调试入口。
+
+### 验证与边界
+
+Web `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0；37 个测试文件、493 项测试通过。未部署，未进行小艺云平台联调；修复只覆盖本地会话历史格式。
+
+### 涉及文件
+
+`apps/web/src/lib/agents/cloud-a2a-tutor.ts`、`apps/web/src/lib/agents/cloud-a2a-tutor.test.ts`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

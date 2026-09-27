@@ -77,4 +77,19 @@ describe("cloud A2A Tutor adapter", () => {
     orchestrateTutorOnly.mockResolvedValueOnce({ finalContent: "blocked", safetyPassed: false });
     await expect(executeCloudA2ATutorTurn(parsed.value, [])).rejects.toThrow("TUTOR_OUTPUT_REJECTED");
   });
+
+  it("keeps a valid long turn inside the next request's history limit", async () => {
+    const longRequest = { ...request, params: {
+      ...request.params, message: { role: "user", parts: [{ kind: "text", text: "解释图的遍历".repeat(100) }] },
+    } };
+    const parsed = parseCloudA2ATutorMessage(longRequest);
+    if (!parsed.ok) throw new Error("test request invalid");
+    const longAnswer = "遍历时先记录访问顺序。".repeat(100);
+    orchestrateTutorOnly.mockResolvedValue({ finalContent: longAnswer, safetyPassed: true });
+    const first = await executeCloudA2ATutorTurn(parsed.value, []);
+    expect(first.responseText).toBe(longAnswer);
+    expect(first.nextHistory).toHaveLength(2);
+    expect(first.nextHistory.every((entry) => entry.content.length <= 500)).toBe(true);
+    await expect(executeCloudA2ATutorTurn(parsed.value, first.nextHistory)).resolves.toBeDefined();
+  });
 });
