@@ -8564,6 +8564,22 @@ Mac 解锁后在小艺开放平台「小鸿」编排页打开「真机测试」�
 
 ---
 
+## [2026-09-27T15:26:09Z] [2026-09-27 23:26:09 CST] 模型: Codex (GPT-6)
+
+### 小艺端 A2A 请求上限与新版 SDK 兼容性复核
+
+`XiaoyiAgentAbility.onData` 在 `JSON.parse` 前拒绝超过 16384 字符的原始报文，防止过大但有效的 JSON 在文本问题长度校验之前占用解析资源；原有 2000 字课程问题、只读 Tutor、取消和断连逻辑未变。更新鸿蒙 AI 本地知识卡及实施计划，纠正已创建小鸿平台 Agent、已发布白名单测试态、双意图声明和 Core Speech Kit 朗读的旧状态。
+
+### 验证与边界
+
+华为 [Agent Framework Kit 7.0.0.2 API 差异](https://developer.huawei.com/consumer/cn/doc/doccenter-release-notes/js-apidiff-agentframeworkkit-7002)列出 `createA2AServer`；本机 API 26 SDK 的 `@hms.ai.A2A.d.ts` 提供对应声明。但 Pura X View 模拟器 `bm dump -n com.huawei.hmsapp.hiai` 的 `moduleNames` 不含声明目标 `agentKitHsp`，本阶段不把已工作的 Extension 改成无法证明运行的新版 Server。直接 Hvigor `assembleHap --mode module -p module=entry@default -p product=default -p buildMode=debug --parallel --incremental` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成；仅有既有 `TextInputController` 系统能力告警。未签名 HAP SHA-256 `c49ee6a4982275f94e3d6c26ad6b95df44fac47d9fa1c6592c675beea5088e22`；签名 HAP SHA-256 `9c563628cdea970e410d3d53ceea16352755dda84a7f50a0fd1145c39bfb24bb`。模拟器 `127.0.0.1:5555` 对未签名包 `hdc install -r` exit 0，`aa start` exit 0，`bm dump` 仍列出 `XiaoyiAgentAbility` 和 `ohos.extension.agent`。**没有小艺真实调用或超长报文运行测试**；此包的模拟器结果只证明安装、启动和注册。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`docs/SEMIFINAL-HARMONY-AI-INTEGRATION-PLAN-20260927.md`、`DEVLOG.md`。
+
+---
+
 ## [2026-09-27T15:12:14Z] [2026-09-27 23:12:14 CST] 模型: Codex (GPT-6)
 
 ### 学伴回答接入模拟器可运行的原生朗读

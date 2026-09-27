@@ -105,11 +105,16 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
   private readonly maxActiveTasks: number = 2;
   private readonly maxHistories: number = 16;
   private readonly maxConnections: number = 8;
+  private readonly maxRequestChars: number = 16384;
 
   onCreate(_want: Want): void {}
   onConnect(_want: Want, _proxy: common.AgentHostProxy): void {}
 
   onData(proxy: common.AgentHostProxy, data: string): void {
+    if (typeof data !== 'string' || data.length > this.maxRequestChars) {
+      this.sendError(proxy, '', -32600, '请求过长或格式不正确');
+      return;
+    }
     let request: DeviceRequest;
     try {
       request = JSON.parse(data);
