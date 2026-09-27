@@ -8627,3 +8627,19 @@ DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=defa
 `apps/harmonyos/entry/src/main/ets/model/DataModels.ets`、`apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`、`apps/harmonyos/entry/src/main/ets/pages/Chat.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T16:19:53Z] [2026-09-28 00:19:53 CST] 模型: Codex (GPT-6)
+
+### 核对并修正错题讲解的 Dijkstra 数值反例
+
+模拟器回答中的 s→A=3、s→B=5、A→B=-3 会先确定 A、再把 B 松弛到 0，无法说明负权边导致 Dijkstra 失效。参照 CMU 15-210 最短路径讲义的有向图，`Evaluator` 仅在题目涉及 Dijkstra 负权边时提示已核对的 s→A=3、s→B=2、A→B=-2 反例：B 先以 2 确定，之后经 A 到 B 的权重为 1。另要求模型核对数值例的运算和确定顺序；课程知识片修正负权边的适用范围，但不把 CMU 反例归属到原教材。同步生成 HarmonyOS 端知识片。
+
+### 验证与边界
+
+`node scripts/generate-learning-content-json.mjs --check` exit 0，147 条知识片和 36 条外部资源与 Web 源一致。Web `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0，37 个测试文件、492 项测试通过。数学核对：初始 B 的候选距离 2 小于 A 的 3，因此先确定 B；之后 s→A→B 的权重 3+(-2)=1。上述检查不能证明模型以后不会再生成错误数值例；该 Web 修改尚未部署，模拟器本次实时回答仍来自旧服务。
+
+### 涉及文件
+
+`apps/web/src/lib/agents/evaluator-agent.ts`、`apps/web/src/lib/data/cs101-knowledge.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---

@@ -51,9 +51,15 @@ async function analyzeAnswers(
     }
   }
 
+  // CMU 15-210, Question 13.32: https://www.cs.cmu.edu/afs/cs/academic/class/15210-s14/www/lectures/shortest-path.pdf
+  const dijkstraExample = wrongAnswers.some((answer) =>
+    /Dijkstra/i.test(answer.question) && /负权/.test(answer.question))
+    ? "\n如需举数值反例，只用已核对的有向图：s→A=3、s→B=2、A→B=-2；B 会先以 2 被确定，但经 A 到 B 的路径权重为 1。先核对顶点确定顺序和每次松弛，再写进回答。"
+    : "";
+
   const systemPrompt = `你是大学课程学伴。根据实际作答，用自然、简短的中文回应学生。
 单题先回答学生的问题，指出答案中一个具体差异及原因，再给一个能立刻完成的练习。多题只归纳最重要的一个共性问题，举一道题说明，再给一个练习。全部正确时说明做对的关键点，并给一个进阶练习。
-只依据题目条件、作答和提供的资料判断；不要推测学生的学习能力或心理，也不要编造教材章节。最多三句话，不写标题、报告、分类、百分比或建议清单。`;
+只依据题目条件、作答和提供的资料判断；数值例子必须先核对运算与步骤，无法核对就解释概念，不编造例子。不要推测学生的学习能力或心理，也不要编造教材章节。最多三句话，不写标题、报告、分类、百分比或建议清单。${dijkstraExample}`;
 
   const userPrompt = `${studentQuestion ? `学生的问题：${studentQuestion}\n\n` : ""}本次答对 ${correct}/${answers.length} 题。
 答题记录：
