@@ -8911,3 +8911,11 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 公开接口的合成问题回执显示 Profile trace 使用了未提供的默认「本科二年级、结构化学习」画像；小艺专用路由本身禁止上传画像。现于 Tutor 专用编排中给出中性的无画像 trace，并在概念讲解提示词中省去默认及显式画像；普通原生讲解仍沿用现有画像路径。修改 `apps/web/src/lib/agents/orchestrator.ts`、`tutor-agent.ts` 与对应测试，更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`。
 
 本地 Web 门禁：`pnpm lint` exit 0；`pnpm typecheck` exit 0；`pnpm test` exit 0，38 文件 495 项；`pnpm build` exit 0。新增概念提示词测试后再执行定向测试与类型检查。公开部署在本条记录时仍是旧逻辑，候选部署与生产回执待核对。HAP 未修改；小艺平台 Card 更新、真实 Agent 对话和真机均未验证，本阶段仅用模拟器。
+
+---
+
+## [2026-09-27T22:57:42Z] 小艺匿名 Tutor 候选与公开部署复核
+
+提交 `d2945fe` 已推送至 `origin/codex/semifinal-macos-20260920`。Vercel CLI 60.1.3 从仓库根部署 Production 候选 `dpl_8jiitXWSn51hQVyxGjBD9k5hvKpP`（`--skip-domain`），构建 `READY`；候选 Health 为 200／`ready`，合成二叉搜索树讲解为 200／SSE，Profile trace 明确为无画像，包含非空回答、3 条引用及 `done`，无 `error` 或默认年级、学习风格。经 `vercel promote` exit 0，`vercel inspect hormony-ruddy.vercel.app` 指向同一部署且 Production `Ready`。公开域名复测 Health 200／`ready`、Tutor 200／SSE，164 字正文、3 条引用、`done`，无错误或旧默认画像字样。合成回执保存在忽略目录 `.runtime/xiaoyi-anon-candidate-20260928.sse`、`.runtime/xiaoyi-anon-public-20260928.sse`。
+
+追加文档 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`。平台 Safari 会话因 Mac 锁屏无法复核新版 AgentCard，已请求用户解锁并重新登录。HAP 本批未改；小艺 App 到 Extension 的真实对话及真机均未验证，当前阶段继续使用模拟器。
