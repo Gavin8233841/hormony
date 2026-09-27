@@ -8849,3 +8849,15 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 `apps/harmonyos/AppScope/resources/base/element/string.json`、`apps/harmonyos/entry/src/main/resources/base/element/string.json`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T20:05:34Z] [2026-09-28 04:05:34 CST] 模型: Codex (GPT-6)
+
+### 恢复主动学习交付契约检查
+
+旧契约测试加载器仍期待 EntryAbility 的旧导入，因此在运行用例前就断言失败；两条用例也继续期待旧的课程详情回流和热启动重复 Want 去重。按当前源码补齐配置、资源与主题的测试替身，将断言改为已校验目标 `pages/Quiz` 和每次有效热启动 Want 产生新版本。`node --test scripts/test-proactive-delivery-contracts.mjs` 26/26 通过，`node --test scripts/test-proactive-learning-service.mjs` 24/24 通过，`git diff --check` 无输出。本批仅修改测试与记录，未重建 HAP；模拟器通知实点证据仍绑定上一个 HAP 哈希。
+
+### 涉及文件
+
+`scripts/test-proactive-delivery-contracts.mjs`、`DEVLOG.md`。
+
+---

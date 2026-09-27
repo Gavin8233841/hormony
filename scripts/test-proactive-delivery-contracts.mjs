@@ -154,8 +154,9 @@ globalThis.__LearningContentRepository = LearningContentRepository;
 
 function compileEntryAbility() {
   const imports = [
-    "import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';",
+    "import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';",
     "import { display, window } from '@kit.ArkUI';",
+    "import { resourceManager } from '@kit.LocalizationKit';",
     "import { hilog } from '@kit.PerformanceAnalysisKit';",
     "import { Constants } from '../common/Constants';",
     "import { LocalLearningRepository } from '../common/LocalLearningRepository';",
@@ -163,7 +164,8 @@ function compileEntryAbility() {
     "import { Course, HealthResponse } from '../model/DataModels';",
     "import { LearningContentRepository } from '../common/LearningContentRepository';",
     "import { SafeAreaInsets } from '../common/SafeArea';",
-    "import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';"
+    "import { ProactiveLearningService } from '../common/ProactiveLearningService';",
+    "import { ThemeMode, ThemePreference } from '../common/ThemePreference';"
   ];
   let source = removeImports(readSource(entryAbilityPath), imports, entryAbilityPath);
   assert.equal(source.includes('export default class EntryAbility extends UIAbility'), true,
@@ -173,6 +175,7 @@ function compileEntryAbility() {
   source = `const UIAbility = globalThis.__UIAbility;
 const display = globalThis.__display;
 const window = globalThis.__window;
+const resourceManager = globalThis.__resourceManager;
 const hilog = globalThis.__hilog;
 const Constants = globalThis.__constants;
 const LocalLearningRepository = globalThis.__repository;
@@ -180,6 +183,8 @@ const HttpClient = globalThis.__httpClient;
 const LearningContentRepository = globalThis.__contentRepository;
 const SafeAreaInsets = globalThis.__safeAreaInsets;
 const ProactiveLearningService = globalThis.__service;
+const ThemeMode = globalThis.__themeMode;
+const ThemePreference = globalThis.__themePreference;
 ${source}
 globalThis.__EntryAbility = EntryAbility;
 `;
@@ -433,14 +438,15 @@ function createEntryHarness() {
   const service = loadService(repository, storage);
   class UIAbility {
     constructor() {
-      this.context = { resourceManager: {} };
+      this.context = { resourceManager: { getConfigurationSync: () => ({ colorMode: 1 }) } };
     }
   }
   const context = vm.createContext({
     __UIAbility: UIAbility,
     __display: { getDefaultDisplaySync: () => ({ densityPixels: 1 }) },
     __window: {},
-    __hilog: { error: () => {}, warn: () => {} },
+    __resourceManager: { ColorMode: { DARK: 2 } },
+    __hilog: { error: () => {}, warn: () => {}, info: () => {} },
     __constants: { API_HEALTH: '/api/health', HILOG_DOMAIN: 0, HILOG_TAG: 'test' },
     __repository: repository,
     __httpClient: { get: async () => ({ status: 'ready' }) },
@@ -451,6 +457,8 @@ function createEntryHarness() {
     },
     __safeAreaInsets: { setVp: () => {} },
     __service: service,
+    __themeMode: { SYSTEM: 'system', DARK: 'dark' },
+    __themePreference: { load: async () => 'system' },
     AppStorage: storage.api,
     console,
     setTimeout
@@ -935,7 +943,7 @@ test('Form Ability 更新失败后系统再次更新仍会委托刷新', async (
   assert.equal(refreshCalls, 2);
 });
 
-test('冷启动期间同一有效 Want 重复到达只写入一次跳转', async () => {
+test('冷启动期间重复 Want 只消费最后一份且直达已校验页面', async () => {
   const harness = createEntryHarness();
   const ability = new harness.EntryAbility();
 
@@ -944,11 +952,11 @@ test('冷启动期间同一有效 Want 重复到达只写入一次跳转', async
   await ability.startMainPage(harness.windowStage);
 
   assert.equal(harness.storage.get('proactiveLaunchVersion'), 1);
-  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/CourseDetail');
+  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/Quiz');
   assert.equal(harness.storage.get('selectedCourseTitle'), '数据结构');
 });
 
-test('热启动前台周期内同一有效 Want 顺序到达只写入一次跳转', async () => {
+test('热启动时每次有效 Want 均产生可观察的跳转版本', async () => {
   const harness = createEntryHarness();
   const ability = new harness.EntryAbility();
   ability.repositoriesReady = true;
@@ -958,8 +966,8 @@ test('热启动前台周期内同一有效 Want 顺序到达只写入一次跳�
   ability.onNewWant(validWant(), {});
   await settleAsyncWork();
 
-  assert.equal(harness.storage.get('proactiveLaunchVersion'), 1);
-  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/CourseDetail');
+  assert.equal(harness.storage.get('proactiveLaunchVersion'), 2);
+  assert.equal(harness.storage.get('proactiveTargetPage'), 'pages/Quiz');
 });
 
 test('同一 Want 在进入后台后可于新前台周期再次触发跳转', async () => {
