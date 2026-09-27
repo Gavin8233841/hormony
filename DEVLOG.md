@@ -8763,3 +8763,17 @@ Safari 中小鸿草稿仍关联「鸿学伴」／`com.c4ai.hormony` 和 `XiaoyiA
 DevEco SDK 自带 `hap-sign-tool.jar verify-app` 对当前 `entry-default-signed.hap` exit 0，日志含 `verify codesign success`、`Digest verify result: true`、`Verify success`；内嵌 Profile 类型为 debug。当前签名包 4,107,276 字节，SHA-256 `f280323026087b9ccceac813da5cfead0593887334a476c6841e55deb66c49ee`。提取的证书链与 Profile 仅在 `.runtime/xiaoyi-hap-verify-20260928/`。本批未更改源码、重新构建、正式上架或实现小艺真实会话；只更新技术知识卡与本日志。
 
 ---
+
+## [2026-09-27T19:03:03Z] [2026-09-28 03:03:03 CST] 模型: Codex (GPT-6)
+
+### 同批 HAP 模拟器复核错题讲解与精确重练
+
+Pura X View 1320×2232 模拟器已安装本批未签名 HAP（SHA-256 `74e5e17d0ad5523c3079323656aa9869c16785f5120de410a05d54b395c1f743`）；同批签名 HAP SHA-256 为 `f280323026087b9ccceac813da5cfead0593887334a476c6841e55deb66c49ee`。从首页「开始复习」进入 Dijkstra 负权边错题，点「问学伴」并发送已预填的问题。Chat 页面返回完整讲解，使用已校正的 `s→A=3、s→B=2、A→B=-2` 反例；点「重练这道题」后 Practice 首题为同一原题。未触碰模拟器小艺输入法授权弹窗。
+
+本地忽略证据 `.runtime/xiaoyi-same-hap-flow-20260928/` 含 Chat 与 Practice 页面树和截图；`chat-top.png` SHA-256 `1871f2e535612798eb56cef71c4ae26c9aacfae5f3c52bf5b6db4585c9abeb12`，`practice.png` SHA-256 `7bcc89eebe820fc7b5e70dd958b962fd58a18c89f508eeffcc2085955f1c289a`。这是应用内 Chat 在线回答和原题重练的同批模拟器证据，未观测小艺端 A2A 调用。平台 Card 重新导入因账户会话超时仍待恢复登录；本批仅更新知识卡与日志，未更改源码或重建 HAP。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
