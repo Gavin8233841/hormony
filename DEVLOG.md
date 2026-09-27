@@ -8753,3 +8753,13 @@ Vercel CLI 60.1.3 从仓库根部署 Production 候选 `dpl_9pu9dmP5MkPQagcgusSP
 只读线上请求脚本 exit 0；本批仅更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md` 与 `DEVLOG.md`，未改代码或 HAP，故未重跑构建。平台白名单版本与小艺真实会话仍未验证。
 
 ---
+
+## [2026-09-27T18:54:15Z] [2026-09-28 02:54:15 CST] 模型: Codex (GPT-6)
+
+### 复核小鸿平台 Card 与当前签名 HAP
+
+Safari 中小鸿草稿仍关联「鸿学伴」／`com.c4ai.hormony` 和 `XiaoyiAgentAbility`。选择工程新版 `agent_config.json` 执行「重新导入」时，平台返回「会话超时」并跳转华为账号登录；Card 没有更新。已请求用户在 Safari 恢复登录，之后须重新导入并核对测试态。
+
+DevEco SDK 自带 `hap-sign-tool.jar verify-app` 对当前 `entry-default-signed.hap` exit 0，日志含 `verify codesign success`、`Digest verify result: true`、`Verify success`；内嵌 Profile 类型为 debug。当前签名包 4,107,276 字节，SHA-256 `f280323026087b9ccceac813da5cfead0593887334a476c6841e55deb66c49ee`。提取的证书链与 Profile 仅在 `.runtime/xiaoyi-hap-verify-20260928/`。本批未更改源码、重新构建、正式上架或实现小艺真实会话；只更新技术知识卡与本日志。
+
+---
