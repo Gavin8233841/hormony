@@ -8643,3 +8643,17 @@ DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=defa
 `apps/web/src/lib/agents/evaluator-agent.ts`、`apps/web/src/lib/data/cs101-knowledge.ts`、`apps/harmonyos/entry/src/main/resources/rawfile/learning/knowledge-chunks.json`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T16:33:04Z] [2026-09-28 00:33:04 CST] 模型: Codex (GPT-6)
+
+### 更新生产讲解与模拟器 HAP
+
+提交 `c23cb14` 对应的 Vercel Preview `dpl_7A5iEgScfEu6XxsLxPhmz1Ze84ic` Ready。旧版 CLI 39 因平台要求至少 47.2.2 无法上传；从仓库根目录使用已登录的 CLI 60.1.3 成功部署 Production `dpl_9CHAakNHXznbGgWGZi93CwXrDp3z`，并自动关联现有 `https://hormony-ruddy.vercel.app`。公开 Health 返回 HTTP 200、`ready`、模型已配置。合成 Dijkstra 错题 Chat 返回 HTTP 200、SSE `done`、无 `error`；回答正确解释 B 先以 2 确定，s→A→B 路径为 1，并给出练习动作。这是一条在线样本，不保证全部生成内容正确。
+
+知识片生成检查 exit 0、147 条知识片和 36 条外部资源同步。Web lint、typecheck、37 文件 492 项测试、build 均 exit 0。HarmonyOS 直接 Hvigor 增量构建 exit 0；未签名 HAP SHA-256 `b05080d5e101f0abcc2dae9210e7601ef6b60bfe4ff6366de7427472ba12fa6a`，签名 HAP SHA-256 `c3cc90bab3860881924b2599b91d119a9731cabc203636cf28b26c5b509933df`。Pura X View 模拟器覆盖安装、启动成功；解包核对新知识片已进入未签名 HAP。尚未在这一包中重新截取完整讲解到练习 UI 路径，也没有小艺实际端 A2A 会话或真机证据。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
