@@ -85,11 +85,9 @@ interface DeviceCancelResponse {
 }
 
 interface ActiveTask {
-  proxy: common.AgentHostProxy;
   contextId: string;
   cancellation: HttpRequestCancellation;
   requestId: string;
-  question: string;
   answer: string;
   failed: boolean;
   completed: boolean;
@@ -99,7 +97,8 @@ interface ActiveTask {
 // 小艺端 A2A 仅提供短文本课程讲解。进程内历史只辅助本次连接，
 // 不表示跨设备持久会话；学习画像和答题记录不传到此入口。
 export default class XiaoyiAgentAbility extends AgentExtensionAbility {
-  private activeTasks: Map<string, ActiveTask> = new Map();
+  private activeTasks: Map<common.AgentHostProxy, Map<string, ActiveTask>> = new Map();
+  private activeTaskCount: number = 0;
   private histories: Map<common.AgentHostProxy, Map<string, ChatMessage[]>> = new Map();
 
   private readonly maxActiveTasks: number = 2;
@@ -151,21 +150,27 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     const taskId = message.taskId ?? message.messageId;
     const contextId = message.contextId && message.contextId.length > 0 ?
       message.contextId : message.messageId;
+    let connectionTasks = this.activeTasks.get(proxy);
     if (typeof taskId !== 'string' || taskId.length === 0 || taskId.length > 128 ||
-      this.activeTasks.has(taskId)) {
+      connectionTasks?.has(taskId)) {
       this.sendError(proxy, request.id, -32602, '任务标识不可用');
       return;
     }
-    if (this.activeTasks.size >= this.maxActiveTasks) {
+    if (this.activeTaskCount >= this.maxActiveTasks) {
       this.sendError(proxy, request.id, -32002, '当前正在处理其他问题，请稍后重试');
       return;
     }
     const cancellation = new HttpRequestCancellation();
     const active: ActiveTask = {
-      proxy, contextId, cancellation, requestId: request.id, question, answer: '',
+      contextId, cancellation, requestId: request.id, answer: '',
       failed: false, completed: false, terminalSeen: false,
     };
-    this.activeTasks.set(taskId, active);
+    if (!connectionTasks) {
+      connectionTasks = new Map<string, ActiveTask>();
+      this.activeTasks.set(proxy, connectionTasks);
+    }
+    connectionTasks.set(taskId, active);
+    this.activeTaskCount += 1;
     let connectionHistories = this.histories.get(proxy);
     if (!connectionHistories) {
       connectionHistories = new Map<string, ChatMessage[]>();
@@ -184,7 +189,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
         if (active.completed || active.failed) return;
         if (event.type === 'error') {
           active.failed = true;
-          this.activeTasks.delete(taskId);
+          this.removeActiveTask(proxy, taskId);
           this.sendTask(proxy, active.requestId, taskId, contextId,
             'TASK_STATE_FAILED', '课程讲解暂时不可用，请稍后重试');
         } else if (event.type === 'done') {
@@ -194,7 +199,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
           if (active.answer.length > 8000) {
             active.failed = true;
             active.cancellation.cancel();
-            this.activeTasks.delete(taskId);
+            this.removeActiveTask(proxy, taskId);
             this.sendTask(proxy, active.requestId, taskId, contextId,
               'TASK_STATE_FAILED', '回答过长，请缩小问题范围');
           }
@@ -203,7 +208,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       (): void => {
         if (active.completed || active.failed) return;
         active.completed = true;
-        this.activeTasks.delete(taskId);
+        this.removeActiveTask(proxy, taskId);
         if (!active.terminalSeen || active.answer.trim().length === 0) {
           this.sendTask(proxy, active.requestId, taskId, contextId,
             'TASK_STATE_FAILED', '暂时无法生成课程讲解');
@@ -229,7 +234,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       (_error: HttpStreamError): void => {
         if (active.completed || active.failed) return;
         active.failed = true;
-        this.activeTasks.delete(taskId);
+        this.removeActiveTask(proxy, taskId);
         this.sendTask(proxy, active.requestId, taskId, contextId,
           'TASK_STATE_FAILED', '网络暂时不可用，请稍后重试');
       }, undefined, cancellation);
@@ -241,14 +246,14 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       this.sendError(proxy, request.id ?? '', -32602, '缺少任务标识');
       return;
     }
-    const active = this.activeTasks.get(taskId);
-    if (!active || active.proxy !== proxy) {
+    const active = this.activeTasks.get(proxy)?.get(taskId);
+    if (!active) {
       this.sendError(proxy, request.id ?? '', -32001, '任务不存在或已经结束');
       return;
     }
     active.completed = true;
     active.cancellation.cancel();
-    this.activeTasks.delete(taskId);
+    this.removeActiveTask(proxy, taskId);
     this.sendCanceled(proxy, request.id ?? '', taskId, active.contextId);
   }
 
@@ -294,25 +299,35 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     }
   }
 
+  private removeActiveTask(proxy: common.AgentHostProxy, taskId: string): void {
+    const connectionTasks = this.activeTasks.get(proxy);
+    if (!connectionTasks?.delete(taskId)) return;
+    this.activeTaskCount -= 1;
+    if (connectionTasks.size === 0) this.activeTasks.delete(proxy);
+  }
+
   onDisconnect(_want: Want, proxy: common.AgentHostProxy): void {
-    for (const taskId of this.activeTasks.keys()) {
-      const task = this.activeTasks.get(taskId);
-      if (!task) continue;
-      if (task.proxy === proxy) {
+    const connectionTasks = this.activeTasks.get(proxy);
+    if (connectionTasks) {
+      for (const task of connectionTasks.values()) {
         task.completed = true;
         task.cancellation.cancel();
-        this.activeTasks.delete(taskId);
       }
+      this.activeTaskCount -= connectionTasks.size;
+      this.activeTasks.delete(proxy);
     }
     this.histories.delete(proxy);
   }
 
   onDestroy(): void {
-    for (const task of this.activeTasks.values()) {
-      task.completed = true;
-      task.cancellation.cancel();
+    for (const connectionTasks of this.activeTasks.values()) {
+      for (const task of connectionTasks.values()) {
+        task.completed = true;
+        task.cancellation.cancel();
+      }
     }
     this.activeTasks.clear();
+    this.activeTaskCount = 0;
     this.histories.clear();
   }
 }

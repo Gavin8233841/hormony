@@ -8657,3 +8657,19 @@ DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=defa
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T16:44:01Z] [2026-09-28 00:44:01 CST] 模型: Codex (GPT-6)
+
+### 小艺端 A2A 按连接隔离任务
+
+新增本地协议测试，直接编译并运行 `XiaoyiAgentAbility.ets`，仅模拟系统代理与网络边界。测试发现两个独立连接使用同一任务 ID 时，原有全局任务表拒绝第二个连接。将活动任务表改为以连接和任务 ID 为双层键，保留全局并发上限；取消、完成、失败、断连均通过同一计数释放逻辑，不影响其他连接。补齐成功回包、错误输入、取消、迟到回调、断连、会话历史的 7 个可重复用例。
+
+### 验证与边界
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs` exit 0，7/7 通过；其中同任务 ID 跨连接用例在修复前失败。DevEco Hvigor `assembleHap --mode module -p module=entry@default -p product=default -p buildMode=debug --parallel --incremental --no-daemon` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，仅有已有的 `TextInputController` 设备能力告警。未签名 HAP SHA-256 `b61f78d685dba21af15d3b1cf8091b2c4f0a5fd778edfca84c50975bb0031072`，签名 HAP SHA-256 `38e99b038088ad16dbd5950e36c6cd5ce35a0c793252cd6eef23ce4d1498b4f8`。Pura X View 模拟器覆盖安装并启动成功，`bm dump` 列出 Extension，首页 UI 树包含“鸿学伴”和“学伴”，本地忽略证据 `.runtime/xiaoyi-protocol-batch-ui-20260928.json`。没有小艺 App 到 Extension 的真实连接或真机证据；本阶段用户指定仅用模拟器。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
