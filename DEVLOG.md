@@ -8321,3 +8321,19 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`（482/482）、`pnpm build` 均
 `apps/harmonyos/entry/src/main/ets/common/ThemePreference.ets`、`entryability/EntryAbility.ets`、`pages/Profile.ets`、`pages/Settings.ets`、`resources/base/profile/main_pages.json`、`docs/SEMIFINAL-DESIGN-REFINEMENT-20260927.md`、`docs/SEMIFINAL-ATTACHMENT-START-20260927.md`、本日志。其他任务的未提交脚本与文档保持原状，不纳入本批。
 
 ---
+
+## [2026-09-27T08:18:35Z] [2026-09-27 16:18:35 CST] 模型: Codex (GPT-6)
+
+### Astra 审查后的首批原生修正
+
+复核小艺接入计划与现有路由时发现：`EntryAbility` 校验卡片／提醒传入的课程动作后，又重新计算当前推荐任务，可能打开与用户点击内容不同的主题。现改为直接执行已校验的动作；移除按动作内容去重的字段，使重复点击仍可触发导航。外部 Want 的来源字符串仍不是调用方身份凭据，未将小艺标识或未核实的接口写入应用。
+
+### 验证与边界
+
+`DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli build` 增量构建 exit 0，包含 ArkTS 编译、HAP 打包和打包检查；`git diff --check` exit 0。本批未安装新 HAP 或运行卡片／提醒冷启动、热启动及重复点击流程，因此仅为构建通过，原生运行未验证。`devecocli auth status` 显示未登录，不能将当前未签名产物作为实机或平台联调证据。小艺云 A2A 的协议适配、共享会话状态、鉴权和真机联调仍未实现。
+
+### 涉及文件
+
+`apps/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets`、`DEVLOG.md`。评估计划保存在忽略目录 `.runtime/semifinal-attachments/`，不入库；其他任务的未提交脚本和文档保持原状。
+
+---
