@@ -8455,3 +8455,17 @@ DevEco 在已跟踪的 `apps/harmonyos/build-profile.json5` 写入本机签名�
 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T13:29:40Z] [2026-09-27 21:29:40 CST] 模型: Codex (GPT-6)
+
+### 签名 HAP 覆盖安装边界
+
+对唯一在线的 Pura X View 模拟器 `127.0.0.1:5555` 执行 HDC `install -r`，输入为本批已通过本地签名校验的 `entry-default-signed.hap`。HDC 进程退出码为 0，但安装器明确返回 `code:9568332 error: install sign info inconsistent`，故按安装失败记录。设备原有 `com.c4ai.hormony` 是未签名调试包（`appSignType: none`）；失败后原包仍在。没有卸载、清除数据或声称签名包安装成功。签名包需在身份匹配的设备环境中另行验证，实体设备仍未连接。
+
+本批只修正知识卡与 DEVLOG 的证据边界；未改应用源码、Web 或本机签名配置，其他任务的未提交文件保持原状。
+
+### 涉及文件
+
+`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
+
+---
