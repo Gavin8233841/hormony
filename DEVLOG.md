@@ -8705,3 +8705,21 @@ Web `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0；37 
 `apps/web/src/lib/agents/cloud-a2a-tutor.ts`、`apps/web/src/lib/agents/cloud-a2a-tutor.test.ts`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。
 
 ---
+
+## [2026-09-27T17:53:35Z] [2026-09-28 01:53:35 CST] 模型: Codex (GPT-6)
+
+### 小艺草稿头像与 AgentCard 资源一致化
+
+小艺平台初次导入旧透明 PNG 时提示 `iconUrl` 解析失败并换成默认头像。2026-09-28 在当前「小鸿」草稿中看到图标上传建议为 1:1、非透明背景、直角且不超过 5 MB。基于原创纸羽小鹅新建不透明方形 `xiaohong-agent-opaque.png`（1254×1254 RGB、1,195,363 字节，SHA-256 `2374be282553fbe4e38861932fffc9336356c0bac1af596f88bc314ef05505ac`），平台手动上传、裁剪、保存成功，刷新页面仍显示小鸿图标。HAP 的 `agent_config.json` 改指向同一素材的公开 URL。未重新导入 AgentCard；平台保存不代表正式上架或小艺真实会话。
+
+### 验证与发布边界
+
+Web `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均 exit 0，37 个测试文件、493 项测试通过。直接 Hvigor `assembleHap` 使用 DevEco SDK 和 JBR 环境后 exit 0，`PackageHap`、`PackingCheck`、`SignHap` 完成；未签名 HAP 内解包可见新 `iconUrl`，SHA-256 `7033f2cc8ee378c4d5b004b88e1a03a0a71b5a3cde545f51ba0a3af89fb6afdb`，签名 HAP SHA-256 `6100d5539f26ff237c57f256219bf174c3ae8a0a3c2dc844285d4793c26f1c3c`。本批未重新安装模拟器 HAP。
+
+Vercel CLI 60.1.3 从仓库根部署 Production 候选 `dpl_9pu9dmP5MkPQagcgusSPm7uFpDXi`，状态 `Ready`；保护绕过测试新 PNG 200／`image/png`／1,195,363 字节，Health 200／`ready`。`vercel promote` 成功后，`vercel inspect hormony-ruddy.vercel.app` 指向同一部署；公开 PNG 再验 200／`image/png`／1,195,363 字节，公开 Health 为 `ready`。本批未重测 `/api/xiaoyi/tutor`，没有小艺到端侧 Extension 的真实连接、对话或取消回执；用户决定本阶段仅用模拟器，真机讨论留待决赛后。平台正式「上架」仍有内容合规主体确认门槛。
+
+### 涉及文件
+
+`apps/web/public/xiaohong-agent-opaque.png`、`apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`docs/VISUAL-IDENTITY-XIAOHONG-20260926.md`、`DEVLOG.md`。
+
+---

@@ -5,7 +5,7 @@
       "name": "小鸿",
       "description": "讲解数据结构、操作系统和计算机网络的课程概念，帮助学生理解疑难知识点。",
       "version": "1.0.0",
-      "iconUrl": "https://hormony-ruddy.vercel.app/xiaohong-agent.png",
+      "iconUrl": "https://hormony-ruddy.vercel.app/xiaohong-agent-opaque.png",
       "category": "education",
       "defaultInputModes": ["text/plain"],
       "defaultOutputModes": ["text/plain"],
