@@ -128,7 +128,12 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
   const usedStems = new Set<string>();
   while (questions.length < input.count) {
     const remaining = input.count - questions.length;
-    const batchSize = Math.min(remaining, MAX_QUESTIONS_PER_MODEL_BATCH);
+    // The default five-question quiz is more reliable as two small model
+    // responses. Keep the existing batch cap for larger explicit requests.
+    const batchSize = Math.min(
+      remaining,
+      input.count <= 5 ? 3 : MAX_QUESTIONS_PER_MODEL_BATCH
+    );
     const raw = await callModel(
       quizSystemPrompt(),
       quizUserPrompt(input, batchSize, questions),

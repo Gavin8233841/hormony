@@ -9067,3 +9067,9 @@ API 26 Hvigor 6.26.4 增量构建 exit 0，未签名 HAP SHA-256 仍为 `8507122
 `b1a1ee3` 已推送。第一次从 `apps/web` 部署因上传文件超过 15000 项被拒；归档重试后又因 Vercel 项目配置的根目录为 `apps/web` 而失败。改从仓库根目录归档上传后，受保护 Production 候选 `dpl_AC9RE4796bKG4rAeqWDomCv7ssZG` 构建为 `READY`，`--skip-domain` 保持应用公开域名指向上一版 `dpl_GrVQfooMMk5cHgFb6TZXsJz9YPEy`。候选 Health 为 200/ready；一组中等难度五题返回 502 `MODEL_INVALID_RESPONSE`，一组挑战难度五题返回 200，但第 5 题把 `O(n+e) 即 O(n²)` 与 `O(n²)`、`O(e) 即 O(n)` 与 `O(n)` 分列为不同答案，仍有多个等价选项。因此不提升该候选。
 
 继续在原 Quiz Agent 提示词要求复杂度选项代表不同的渐进类，并对跨选项出现的同一个 Big-O 表达式做结构拦截；拒绝后仍使用现有一次模型修复，无法修复则明确报错。新增基于候选实际题型的负例；Web 499/499、lint、typecheck、build 均 exit 0。该结构规则不能推断所有数学等价形式，需新受保护候选和人工抽检。HAP 未改，小艺 App 真实会话、真机、正式附件仍未验证。
+
+---
+
+## [2026-09-28T08:12:00Z] 默认五题改用 3＋2 模型批次
+
+提交 `11e1fdb` 已推送，其受保护候选 `dpl_AU2mLG73795x9MHPkAqvSU8FovFG` 为 `READY`，Health HTTP 200。真实图遍历中等难度五题返回 502 `MODEL_INVALID_RESPONSE`，挑战五题 HTTP 200 且样本选项未再出现相同 Big-O 表达式；同端点三题中等难度 HTTP 200。两次五题中等难度失败与三题成功表明默认单批五题的结构稳定性不足，但单次三题通过不能证明总体成功率。因此把总题量 1–5 的生成批次上限改为 3，默认五题按 3＋2 调用真实模型；显式 6–20 题保留原每批最多 5 题策略和 100 秒总预算。路由级测试同步验证五题分批、展示题与独立评分、服务端提交和 Chat Quiz 检索路径。Web 499/499、lint、typecheck、build 均 exit 0；还需新候选的五题真实请求与质量抽检。候选仍未提升公开域名。

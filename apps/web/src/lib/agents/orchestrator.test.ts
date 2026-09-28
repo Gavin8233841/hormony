@@ -22,6 +22,8 @@ import type { StreamEvent } from "@/lib/types";
 
 afterEach(() => {
   delete process.env.TEST_MODEL_RESPONSE;
+  delete process.env.TEST_MODEL_RESPONSE_SEQUENCE;
+  delete process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE;
   ragMock.retrieve.mockClear();
   ragMock.formatContext.mockClear();
 });
@@ -131,16 +133,19 @@ describe("orchestrator 前置检索调度", () => {
   });
 
   it("测验意图只应由 Quiz Agent 执行一次主题检索", async () => {
-    process.env.TEST_MODEL_RESPONSE = JSON.stringify(
-      Array.from({ length: 5 }, (_, index) => ({
+    const questions = Array.from({ length: 5 }, (_, index) => ({
         type: "choice",
         stem: `数组题目 ${index + 1}`,
         options: ["A. 正确选项", "B. 干扰项", "C. 干扰项", "D. 干扰项"],
         answer: "A",
         explanation: "依据课程资料可判断 A 正确。",
         tags: ["概念理解"],
-      }))
-    );
+      }));
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "本批数量：";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      questions.slice(0, 3),
+      questions.slice(3),
+    ]);
 
     const result = await orchestrate({
       userId: "demo",

@@ -20,6 +20,14 @@ function modelQuestion(index: number, tags: string[] = ["概念理解"]) {
   };
 }
 
+function setFiveQuestionSequence(questions: ReturnType<typeof modelQuestion>[]) {
+  process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "本批数量：";
+  process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+    questions.slice(0, 3),
+    questions.slice(3),
+  ]);
+}
+
 describe("题库与资源 API 闭环", () => {
   beforeEach(() => {
     delete process.env.MODEL_API_KEY;
@@ -49,7 +57,7 @@ describe("题库与资源 API 闭环", () => {
   });
 
   it("生成接口应分离展示题目与本地评分数据", async () => {
-    process.env.TEST_MODEL_RESPONSE = JSON.stringify(Array.from({ length: 5 }, (_, index) => ({
+    setFiveQuestionSequence(Array.from({ length: 5 }, (_, index) => ({
       ...modelQuestion(index + 1),
       explanation: "因此A正确；选项B错误；A[i][j] 表示矩阵元素。",
     })));
@@ -75,6 +83,7 @@ describe("题库与资源 API 闭环", () => {
     expect(quiz.questions[0].difficulty).toBe("medium");
     expect(quiz.questions[0].tags).toEqual(["概念理解"]);
     expect(quiz.grading).toHaveLength(5);
+    expect(JSON.parse(process.env.TEST_MODEL_RESPONSE_SEQUENCE ?? "null")).toEqual([]);
     expect(quiz.grading[0]).toMatchObject({ difficulty: "medium", tags: ["概念理解"] });
     expect(new Set(quiz.grading.slice(0, 4).map((item) => item.answer))).toEqual(new Set(["A", "B", "C", "D"]));
     quiz.questions.forEach((question, index) => {
@@ -89,6 +98,7 @@ describe("题库与资源 API 闭环", () => {
   });
 
   it("生成接口应把重点标签写入题目与评分标签", async () => {
+    setFiveQuestionSequence(JSON.parse(process.env.TEST_MODEL_RESPONSE ?? "[]"));
     const response = await generateQuiz(
       new Request("http://localhost/api/quiz", {
         method: "POST",
@@ -113,6 +123,7 @@ describe("题库与资源 API 闭环", () => {
   });
 
   it("Web 生成测验后应可立即提交服务端评分", async () => {
+    setFiveQuestionSequence(JSON.parse(process.env.TEST_MODEL_RESPONSE ?? "[]"));
     const generateResponse = await generateQuiz(
       new Request("http://localhost/api/quiz", {
         method: "POST",
