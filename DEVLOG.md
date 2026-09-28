@@ -8947,3 +8947,15 @@ API 26 直接 Hvigor 增量 `assembleHap --mode module -p product=default -p bui
 沿用未签名 HAP SHA-256 `5e429e57aa07959eda26d9715588441ad47c44ff5e47926a24cdcd1c655457e1`，Pura X View 1320×2232、HDC `127.0.0.1:5555`。`aa force-stop com.c4ai.hormony` 返回 `force stop process successfully.`，随后 `aa start -a EntryAbility -b com.c4ai.hormony` 返回 `start ability successfully.`。返回桌面后 `.runtime/hbx-card-restart-20260928.jpeg` 仍显示「操作系统 · 6 道待复习／进程与线程」；从卡片进入错题本后 `.runtime/hbx-card-restart-clicked-20260928.json` 仍显示「待复习 13 道 · 今天 6 道」和进程与线程错题。结合上一条同包学习路径，这验证一次练习后的推荐至少跨应用进程重启保持；未测试卸载、数据清除、跨设备或所有学习状态。
 
 本批只修改知识卡与 `DEVLOG.md`，不改源码、不重建 HAP。Mac 仍锁屏，Safari 小艺平台 Card 导入与测试态核对无法继续；小艺 App 实际触发端 A2A 与系统意图仍未验证，本阶段按用户决定仅使用模拟器。
+
+---
+
+## [2026-09-28T00:25:39Z] 小艺端 A2A 讲解附实际课程资料名
+
+检查同一公开 Tutor SSE 与端侧实现，发现鸿学伴原生 Chat 会显示 `citation.source.doc`，但小艺 Extension 的最终文本丢弃了引用。现在只在实际收到引用事件时附最多 3 条去重资料名；资料名规范空白并限制 80 字，最终文本仍不超过 8000 字，历史只保留讲解正文。未改 AgentCard 能力声明、云端路由或正式平台状态。新增协议测试验证真实引用、重复引用和最多三条；无引用路径由既有成功用例覆盖。
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs` 13/13；API 26 Hvigor 增量 `assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `704e1a0fb51033d2d76e4e334c25fcd6981ac317f17cd4703f2b9f30464d28e0`，签名 HAP SHA-256 `175b3ad7345b71dbf0d6b297df91ac800c2f9f95e1449a386f6f850e9365ae3b`。Pura X View 模拟器覆盖安装未签名包、`aa start` 成功；`bm dump` 列出 `XiaoyiAgentAbility` type 37、`EntryFormAbility` 和 `hasIntent: true`。
+
+新增可复跑的 `node scripts/probe-xiaoyi-agent-live.mjs`，以合成 BST 问题运行实际 Extension ArkTS 源码，测试适配层请求当前公开 `/api/xiaoyi/tutor`。先用 Node 直连超时，同一域名 `curl` Health 为 200；探针改为 curl 通道后成功：1 个请求、3 帧（`SUBMITTED`、带讲解及资料名的 artifact、`COMPLETED`）、160 字正文、1 条引用。这是源码与线上接口的集成检查，非 HarmonyOS Extension 真实网络运行；小艺平台仍因本机锁屏无法重新导入 Card，小艺 App 实际对话和真机均未验证。
+
+涉及 `apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`scripts/probe-xiaoyi-agent-live.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。其他任务未提交文件保留。

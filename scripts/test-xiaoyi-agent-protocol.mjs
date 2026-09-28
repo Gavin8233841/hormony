@@ -98,6 +98,24 @@ test('valid text request returns an Agent-assigned task and context before compl
   assert.equal(client.responses[2].result.statusUpdate.status.state, 'TASK_STATE_COMPLETED');
 });
 
+test('only received course sources are attached to the final text artifact', () => {
+  const { agent, calls } = harness();
+  const client = proxy();
+  agent.onData(client, message('request-1', 'message-1'));
+  calls[0].onEvent({ type: 'delta', content: '二叉搜索树按节点大小决定查找方向。' });
+  calls[0].onEvent({ type: 'citation', source: { doc: '数据结构与算法分析' } });
+  calls[0].onEvent({ type: 'citation', source: { doc: ' 数据结构与算法分析 ' } });
+  calls[0].onEvent({ type: 'citation', source: { doc: '课程讲义' } });
+  calls[0].onEvent({ type: 'citation', source: { doc: '实验手册' } });
+  calls[0].onEvent({ type: 'citation', source: { doc: '第四份资料' } });
+  calls[0].onEvent({ type: 'done' });
+  calls[0].onComplete();
+  assert.equal(client.responses[1].result.artifactUpdate.artifact.parts[0].text,
+    '二叉搜索树按节点大小决定查找方向。\n\n参考资料：\n' +
+    '[1] 数据结构与算法分析\n[2] 课程讲义\n[3] 实验手册');
+  assert.equal(client.responses[2].result.statusUpdate.status.state, 'TASK_STATE_COMPLETED');
+});
+
 test('malformed JSON, invalid part and unsupported method return one protocol error', () => {
   const { agent, calls } = harness();
   const client = proxy();

@@ -141,6 +141,7 @@ interface ActiveTask {
   cancellation: HttpRequestCancellation;
   requestId: string;
   answer: string;
+  citations: string[];
   failed: boolean;
   completed: boolean;
   terminalSeen: boolean;
@@ -234,7 +235,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
     }
     const cancellation = new HttpRequestCancellation();
     const active: ActiveTask = {
-      contextId, cancellation, requestId: request.id, answer: '',
+      contextId, cancellation, requestId: request.id, answer: '', citations: [],
       failed: false, completed: false, terminalSeen: false,
     };
     if (!connectionTasks) {
@@ -276,6 +277,12 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
             'TASK_STATE_FAILED', '课程讲解暂时不可用，请稍后重试');
         } else if (event.type === 'done') {
           active.terminalSeen = true;
+        } else if (event.type === 'citation' && typeof event.source?.doc === 'string') {
+          const sourceName = event.source.doc.trim().replace(/\s+/g, ' ').slice(0, 80);
+          if (sourceName.length > 0 && active.citations.length < 3 &&
+            !active.citations.includes(sourceName)) {
+            active.citations.push(sourceName);
+          }
         } else if (event.type === 'delta' && typeof event.content === 'string') {
           active.answer += event.content;
           if (active.answer.length > 8000) {
@@ -299,7 +306,12 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
           return;
         }
         this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_COMPLETED');
-        if (!this.sendArtifactUpdate(proxy, active.requestId, taskId, contextId, active.answer)) return;
+        const sourceLines = active.citations.map((name: string, index: number): string =>
+          '[' + (index + 1).toString() + '] ' + name);
+        const sourceText = sourceLines.length > 0 ? '\n\n参考资料：\n' + sourceLines.join('\n') : '';
+        const finalAnswer = active.answer.length + sourceText.length <= 8000 ?
+          active.answer + sourceText : active.answer;
+        if (!this.sendArtifactUpdate(proxy, active.requestId, taskId, contextId, finalAnswer)) return;
         if (!this.sendStatusUpdate(proxy, active.requestId, taskId, contextId, 'TASK_STATE_COMPLETED')) return;
         const nextHistory: ChatMessage[] = [...history,
           { role: 'user', content: question.slice(0, 1000) },
