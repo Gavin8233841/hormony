@@ -127,4 +127,14 @@ Pura X View 1320×2232 模拟器覆盖安装该批未签名 HAP 并启动。学�
 
 `node --test scripts/test-xiaoyi-agent-protocol.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs` exit 0，66/66；其中测试运行实际 Extension ArkTS 源码并模拟本机仓库边界，不等同 HarmonyOS 中小艺实际调用。API 26 Hvigor 增量构建 exit 0，完成 `CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap`，仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`；签名 HAP SHA-256 `c4b75e4471bda2be545cbab8a24adee4e5a244e5ec7d0f61a4ade0db73136f01`。解包确认 Card `1.1.0` 与两项技能；SDK `verify-app` exit 0，签名与摘要成功，提取物仅在忽略目录 `.runtime/xiaoyi-next-action-final-verify-20260928/`。
 
-Pura X View 1320×2232 模拟器覆盖安装该批未签名 HAP、启动 `EntryAbility` 均成功；同包首页 UI 树 `.runtime/xiaoyi-next-action-final-home-20260928.json` 显示已有的“错题复习／操作系统 · 6 道待复习／开始复习”决策。这个页面与新 Extension 调用同一 `ProactiveLearningService`，可核对当前本机行动，但**尚无 Extension 在模拟器被小艺调用的回执**；不能把源码测试或首页状态写成小艺实测。Mac 仍锁屏，平台 Card `1.1.0` 同步与测试态核对待解锁后继续；真机按用户决定延后至决赛后。
+Pura X View 1320×2232 模拟器覆盖安装该批未签名 HAP、启动 `EntryAbility` 均成功；同包首页 UI 树 `.runtime/xiaoyi-next-action-final-home-20260928.json` 显示已有的“错题复习／操作系统 · 6 道待复习／开始复习”决策。这个页面与新 Extension 调用同一 `ProactiveLearningService`，可核对当前本机行动，但**尚无 Extension 在模拟器被小艺调用的回执**；不能把源码测试或首页状态写成小艺实测。平台 Card 同步结果见下节；真机按用户决定延后至决赛后。
+
+### 2026-09-28 小艺平台同步 AgentCard 1.1.0
+
+Mac 解锁后，在[小艺开放平台“小鸿”项目](https://developer.huawei.com/consumer/cn/hag/abilityportal/#/agent/detail?agentId=agent1e478cf9ea75464495020ca66bc39fb0&agentUuid=40b2047163bf4b59b5e970f8fc9fc06d&isWorkflow=false&openAgreementDia=&type=DeviceA2A)的「配置 > 基础信息 > 重新导入」选择仓库 `apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`，平台下拉显示“小鸿 1.1.0”；点击「导入」后收到“保存成功”。刷新并再次进入配置页，仍显示应用“鸿学伴”／包名 `com.c4ai.hormony`、应用服务名称 `XiaoyiAgentAbility`、应用内 Agent ID `xiaohong_learning_tutor`、Card 版本 `1.1.0`，且两项技能为“讲解课程概念”和“推荐下一步学习”，分类为“教育／学习”。这是**平台已保存新版声明**的证据；先前记录的 1.0.0 状态至此被更新。
+
+导入时平台再次提示 `iconUrl解析失败，已替换成默认图标`，故随后在同页重新上传现有 `apps/web/public/xiaohong-agent-opaque.png` 并裁剪保存，得到“保存成功”。刷新后品牌小鸿头像、Card 1.1.0、两项技能仍可见；公网 URL 返回 200 不能替代这项平台内的手动头像设置。
+
+「测试白名单」复核显示“鸿学伴小鸿真机测试”组为开启、人数 1，当前账号在组中。在「编排 > 调试与预览」的手机测试菜单中可见「取消发布／重新发布」；点击「重新发布」后页面保存时间更新为 **2026-09-28 11:18:24 CST**，菜单仍为「取消发布／重新发布」。可据此记录**新版配置已执行白名单开发测试态重新发布，平台仍显示测试态发布菜单**；本次未截到独立的“发布成功”瞬时提示，不能据此声称手机已接收 1.1.0。项目仍是“草稿”，正式「上架（1项未完成）」的内容合规门槛未变。
+
+本阶段按用户决定仅用模拟器。当前证据为平台 Card 保存与白名单测试态操作、源码协议测试、HAP 构建和 Pura X View 首页学习决策；**没有小艺 App 实际调用 Extension 的回执**，也没有真机问答。正式上架仍需账户主体核定第三方模型备案／登记、AI 标识和隐私政策并审阅平台声明；复赛材料应分别呈现这些证据层级。

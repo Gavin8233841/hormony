@@ -8987,3 +8987,13 @@ Pura X View 1320×2232 模拟器覆盖安装未签名包、启动成功。展开
 `node --test scripts/test-xiaoyi-agent-protocol.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs` exit 0，66/66；JSON 解析及 `git diff --check` exit 0。API 26 Hvigor 增量 `assembleHap` exit 0，编译、打包检查、签名完成，仅既有 `TextInputController` syscap 告警。最终未签名 HAP SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`，签名 HAP SHA-256 `c4b75e4471bda2be545cbab8a24adee4e5a244e5ec7d0f61a4ade0db73136f01`；解包确认 Card `1.1.0`、两技能，SDK `verify-app` exit 0，签名和摘要有效。Pura X View 模拟器覆盖安装该批未签名包、启动成功；`.runtime/xiaoyi-next-action-final-home-20260928.json` 显示本机当前决策“错题复习／操作系统 · 6 道待复习／开始复习”。
 
 Extension 的平台真实调用、本机仓库在 Extension 运行时的访问与小艺端展示仍未验证；Mac 锁屏使新版 Card 暂不能同步到小艺平台，用户已被异步提醒解锁。真机留待决赛后。已有签名配置、脚本和其他未提交文档保持不动。
+
+---
+
+## [2026-09-28T03:21:41Z] 小艺平台导入小鸿 AgentCard 1.1.0
+
+用户解锁 Mac 后，在小艺开放平台既有“端 A2A”小鸿项目的「配置 > 基础信息 > 重新导入」选择本仓库 `apps/harmonyos/entry/src/main/resources/base/profile/agent_config.json`。页面解析“小鸿 1.1.0”并回执“保存成功”；刷新后仍显示 `com.c4ai.hormony`、`XiaoyiAgentAbility`、`xiaohong_learning_tutor`、版本 `1.1.0` 和“讲解课程概念／推荐下一步学习”两项技能。导入时平台提示 `iconUrl解析失败` 并改用默认头像，因此重新手动上传、裁剪现有 `apps/web/public/xiaohong-agent-opaque.png`，保存并刷新后品牌头像仍可见。
+
+白名单组“鸿学伴小鸿真机测试”在平台显示开启、人数 1，当前账号在组中；「编排 > 调试与预览」菜单仍有「取消发布／重新发布」。本次点击「重新发布」后保存时间更新为 2026-09-28 11:18:24 CST，菜单仍显示测试态发布选项；未截到本次“发布成功”的瞬时提示。项目仍为草稿，正式「上架（1项未完成）」的内容合规材料未提交。以上是平台 Card 和开发测试态的页面证据，**不是小艺 App 在模拟器或真机实际调用 Extension 的证明**。
+
+本批仅更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md` 与 `DEVLOG.md`，未改 HAP 源码，沿用上一批 66/66 源码协议与主动学习测试、API 26 构建及 Pura X View 模拟器启动结果。本阶段按用户要求只用模拟器；小艺真实端 A2A 会话留作未验证项，真机留待决赛后。
