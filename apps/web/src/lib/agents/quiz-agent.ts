@@ -9,6 +9,7 @@ import {
 } from "./model";
 import { generateId } from "@/lib/utils";
 import { formatContext, retrieve } from "@/lib/rag";
+import { store } from "@/lib/store/db";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 
 const MAX_QUESTIONS_PER_MODEL_BATCH = 5;
@@ -28,7 +29,12 @@ export async function runQuizAgent(
   focusTag?: string,
   signal?: AbortSignal
 ): Promise<Quiz> {
-  const courseContext = formatContext(retrieve(topic, courseId, 5));
+  // The dedicated Quiz API passes an exact topic; Chat may pass a free-form
+  // request. Scope exact topics to their own lesson and retain Chat retrieval.
+  const topicChunks = store.getKnowledge(courseId).filter((chunk) => chunk.topic === topic);
+  const courseContext = formatContext(
+    topicChunks.length > 0 ? topicChunks : retrieve(topic, courseId, 5)
+  );
   if (!courseContext) {
     throw new KnowledgeUnavailableError();
   }
@@ -159,6 +165,7 @@ function quizSystemPrompt(): string {
   const systemPrompt = `你是一位出题专家。根据指定主题生成选择题。
 输出 JSON 数组，每个元素：{"type":"choice","stem":"","options":["A. ","B. ","C. ","D. "],"answer":"A","explanation":"","tags":["概念理解","边界条件"]}
 题干、答案和解析必须与提供的课程资料一致，禁止引入资料外的事实。
+所有题目只考查指定主题；不要借用同一课程中其他主题的知识点。每题必须只有一个明确正确选项，写清影响答案的实现方式和前提条件。
 难度规则：
 - easy：考查定义、术语、直接性质或一步识别，适合刚学完概念的学生。
 - medium：给出简短场景或对比，需要应用概念完成一步推理。

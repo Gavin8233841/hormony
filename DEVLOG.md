@@ -9029,3 +9029,11 @@ Mac 解锁后经过两次失败探针（首条 180 秒录制在慢速人工操�
 同一 Pura X View API 26 HAP 从“我的→继续练习”生成“图的表示与遍历”五道 AI 题，作答与本机结果保存均在 UI 树中出现。故意五题全选 A 后为 5/5，提示答案位置可能偏斜；源码显示端侧按服务端 `grading.answer` 评分，生成服务端使用真实模型，提示示例固定答案 A。单次结果不能证明模型必然总输出 A。
 
 在 `apps/web/src/lib/agents/quiz-agent.ts` 对经过结构验证的四选题按四题一组轮换选项，组内 A–D 各一个，正确选项正文与评分键同步移动；不改题干、解析或课程内容。`quiz-flow.test.ts` 增加全 A 模型样本的 A–D 分布、正确正文与 Web 提交评分检查。Web `pnpm test` 495/495、`pnpm lint`、`pnpm typecheck`、`pnpm build` 均 exit 0。该 Web 修正尚未部署；现有模拟器 AI 测验与主链视频来自旧云端逻辑，待候选上线后复测。HAP 源码及字节未变，其他任务的签名配置和脚本脏文件未纳入本批。
+
+---
+
+## [2026-09-28T07:22:00Z] AI 测验候选教学核验与主题约束
+
+受保护 Production 候选 `dpl_2XaBqih64XYjTXx6EusWaECbQrp9` 的 Health 为 HTTP 200、`ready`、`stateless`，模型 `doubao-seed-2-1-pro-260628`。合成 Quiz 请求的非法数量和跨主题分别返回 HTTP 400 `INVALID_COUNT`、`INVALID_TOPIC`。图遍历候选样本两次成功生成五题、评分键分布非全 A；另一次输出安全审核返回 HTTP 502 `SAFETY_BLOCKED`，未伪装成成功。数组与线性表样本混入归并排序题，且其空间复杂度题意存在实现前提歧义，因此未将此候选提升到应用公开域名。响应仅保存在忽略的 `.runtime/semifinal-attachments/`。
+
+`apps/web/src/lib/agents/quiz-agent.ts` 现在对精确主题使用同课程且 `topic` 相等的知识片；聊天自然语言出题仍使用原有检索。提示词要求题目留在指定主题并明确影响答案的实现前提。初版严格主题查找使聊天出题路径 2 项测试失败，补回自由文本检索后 Web 测试 495/495、lint、typecheck、build 全部 exit 0。此批只改 Quiz Agent 与本日志；新源码尚需受保护候选及上线端云复核，模型语义正确性不能靠提示词或测试保证。
