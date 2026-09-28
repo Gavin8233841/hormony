@@ -8929,3 +8929,13 @@ Pura X View 模拟器覆盖安装并启动同版未签名包，启动器图标�
 API 26 直接 Hvigor 增量 `assembleHap --mode module -p product=default -p buildMode=debug --incremental --no-daemon` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 完成，仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `5e429e57aa07959eda26d9715588441ad47c44ff5e47926a24cdcd1c655457e1`，签名 HAP SHA-256 `bbc43563fb0353efcebcc66d1a96f6826555f48c356a3385360651852bd9dc29`。Pura X View `127.0.0.1:5555` 覆盖安装同版未签名包 exit 0，桌面截图 `.runtime/hbx-card-fixed-20260928.jpeg` 的 Topic 完整、按钮不重叠；实点新版按钮后 `.runtime/hbx-card-fixed-clicked-20260928.json` 再次显示错题本及上述待复习数。卡片与跳转为模拟器通过；小艺真实连接、签名包真机使用未验证。
 
 本批只改 `apps/harmonyos/entry/src/main/ets/widget/pages/LearningPlanCard.ets`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md` 和 `DEVLOG.md`；保留工作区已有的其他未提交文件。小艺平台当前 Mac 锁屏，尚不能重新导入新版 Card。
+
+---
+
+## [2026-09-28T00:01:22Z] 同包模拟器主动学习链实走
+
+沿用上一批未签名 HAP SHA-256 `5e429e57aa07959eda26d9715588441ad47c44ff5e47926a24cdcd1c655457e1`，Pura X View 1320×2232、HDC `127.0.0.1:5555`。从桌面卡片「开始复习」进入错题本，点首道图遍历错题「问学伴」，学伴页显示「已提交作答 · 图的表示与遍历」及预填的错题追问；实际发出后，UI 树 `.runtime/hbx-card-chat-response-20260928.json` 与截图 `.runtime/hbx-card-chat-answer-20260928.jpeg` 显示对邻接表 DFS `O(n+e)` 和误选 `O(e²)` 的讲解、3 条参考资料，以及「重练这道题」。此时宿主模拟器 API 网关进程在运行；本次没有单独取得请求链追踪，不把它写成 HAP 直连公网的证据。
+
+点击「重练这道题」进入 5 题图遍历练习，用 UI 树 bounds 选项、逐题前进并提交评分；结果 `.runtime/hbx-card-practice-result-20260928.json` 和截图 `.runtime/hbx-card-practice-result-20260928.jpeg` 显示 2/5 正确、错题解析、「已保存」及累计答题 45 题。返回桌面后，卡片截图 `.runtime/hbx-card-after-practice-20260928.jpeg` 从「数据结构 · 10 道待复习／图的表示与遍历」更新为「操作系统 · 6 道待复习／进程与线程」；再次实点卡片，`.runtime/hbx-card-next-review-20260928.json` 显示错题本「待复习 13 道 · 今天 6 道」和进程与线程错题。这是同包模拟器一次完整路径，不是对所有学习状态或长期持久性的验收。
+
+本批仅更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md` 和 `DEVLOG.md`；未修改源码或重建 HAP。平台 Card 重新导入仍待 Mac 解锁与账户会话恢复，小艺 App 真实会话及真机仍未验证。
