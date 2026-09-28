@@ -84,6 +84,45 @@ describe("Quiz Agent 模型输出边界", () => {
     ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
   });
 
+  it("拒绝同时给出多个 Big-O 上界却未要求最紧上界的复杂度题", async () => {
+    await expectInvalidModelResponse([modelQuestion({
+      stem: "用邻接表判断顶点 i 到 j 是否有边的最坏时间复杂度是？",
+      options: ["A. O(顶点 i 的出度)", "B. O(e)", "C. O(1)", "D. O(n)"],
+      answer: "A",
+    })]);
+  });
+
+  it("接受明确询问最紧渐进上界的复杂度题", async () => {
+    const stem = "用邻接表判断顶点 i 到 j 是否有边的最紧渐进上界复杂度是？";
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify([modelQuestion({
+      stem,
+      options: ["A. O(顶点 i 的出度)", "B. O(e)", "C. O(1)", "D. O(n)"],
+      answer: "A",
+    })]);
+
+    const quiz = await runQuizAgent("quiz_test", "cs101", "图的表示与遍历", 1, "medium");
+    expect(quiz.questions[0].stem).toBe(stem);
+  });
+
+  it("复杂度题缺少最紧限定时要求模型修复后才返回", async () => {
+    const preciseStem = "用邻接表判断顶点 i 到 j 是否有边的最紧渐进上界复杂度是？";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "主题：图的表示与遍历";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      [modelQuestion({
+        stem: "用邻接表判断顶点 i 到 j 是否有边的最坏时间复杂度是？",
+        options: ["A. O(顶点 i 的出度)", "B. O(e)", "C. O(1)", "D. O(n)"],
+      })],
+      [modelQuestion({
+        stem: preciseStem,
+        options: ["A. O(顶点 i 的出度)", "B. O(e)", "C. O(1)", "D. O(n)"],
+      })],
+    ]);
+
+    const quiz = await runQuizAgent("quiz_test", "cs101", "图的表示与遍历", 1, "medium");
+    expect(quiz.questions[0].stem).toBe(preciseStem);
+    expect(JSON.parse(process.env.TEST_MODEL_RESPONSE_SEQUENCE ?? "null")).toEqual([]);
+  });
+
   it.each([
     ["非 choice 题型", modelQuestion({ type: "short" })],
     ["缺失标签数组", modelQuestion({ tags: undefined })],

@@ -9053,3 +9053,9 @@ Mac 解锁后经过两次失败探针（首条 180 秒录制在慢速人工操�
 API 26 Hvigor 6.26.4 增量构建 exit 0，未签名 HAP SHA-256 仍为 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`。Pura X View 模拟器经现有宿主 API 网关生成图遍历挑战五题，逐题按 B/D/C/A/A 作答，UI 显示 5/5、结果已保存、累计答题 75→80；应用重启和一次模拟器冷启动恢复后，学习记录仍显示新结果。加载新题期间返回学习记录，等待 25 秒无新增结果。32 个 UI 树/截图及哈希索引见 `.runtime/semifinal-attachments/post-promote-simulator-20260928/run-evidence.json`。模拟器第 5 题的较松复杂度上界选项可能也成立，故人工教学正确性不能据 5/5 全部宣布通过；没有小艺 App 真实会话或真机证据。
 
 从 `7faabbf` Git tree 精确抽取 235 个清单文件，包内逐字节复核源码与 HAP，并生成七记录证据索引和预备 ZIP。包内证据索引用实际字节 resolver 验证 3 项有证据、4 项未验证、零结构错误。`validate-release-dependencies.py`、`validate-competition-content.py`、`validate-topic-relations.py` 均 exit 0；完整 `validate-release-bundle.py` exit 1，明确因 NOTICE、评分计划和发布结果中的 `CHECK-BEFORE-SUBMISSION` 人工标记而拒绝正式包。机器扫描本机 456 个已安装依赖，许可证全文草稿约 980 KB，26 个包未在包根找到许可文件；`pnpm licenses list` 因本地 store package index 缺失失败。所有候选、失败探针、旧 ZIP 与其他任务的未提交文件均保留。正式 PDF、视频、门户回执继续未验证。
+
+---
+
+## [2026-09-28T07:58:00Z] 复杂度生成题的多重上界歧义拦截
+
+上一批 Pura X View 真实生成的邻接表题只问“最坏时间复杂度”，同时把 `O(顶点 i 的出度)`、`O(e)` 和 `O(n)` 放在选项中；较松的上界也成立，不能用 5/5 UI 分数代替教学正确性。本批只改 `apps/web/src/lib/agents/quiz-agent.ts` 和对应测试：提示词要求有多个 Big-O 选项时明确询问最紧渐进上界并写清操作和数据结构；解析模型输出时拒绝仍缺该限定的复杂度题，走已有一次模型修复路径，修复失败按现有 `MODEL_INVALID_RESPONSE` 返回，不伪造题目。新增拒绝、接受及一次修复的实测响应测试。Web 498/498、lint、typecheck、build 均 exit 0。该规则只覆盖可识别的多个 Big-O 选项，不能证明模型生成题普遍无歧义；仍需受保护部署与公开线上/模拟器复核。

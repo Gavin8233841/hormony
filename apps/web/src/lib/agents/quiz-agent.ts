@@ -178,6 +178,7 @@ function quizSystemPrompt(): string {
 输出 JSON 数组，每个元素：{"type":"choice","stem":"","options":["A. ","B. ","C. ","D. "],"answer":"A","explanation":"","tags":["概念理解","边界条件"]}
 题干、答案和解析必须与提供的课程资料一致，禁止引入资料外的事实。
 所有题目只考查指定主题；不要借用同一课程中其他主题的知识点。每题必须只有一个明确正确选项，写清影响答案的实现方式和前提条件。解析请解释知识点，不引用选项字母。
+复杂度题若给出多个 Big-O 上界选项，题干必须明确询问“最紧渐进上界”，并写清数据结构及相关操作；仅问“最坏时间复杂度”会使较松上界也成立。
 难度规则：
 - easy：考查定义、术语、直接性质或一步识别，适合刚学完概念的学生。
 - medium：给出简短场景或对比，需要应用概念完成一步推理。
@@ -223,6 +224,7 @@ async function repairQuizJson(
 - 输出 ${batchSize} 道题；如果原输出中没有足够题目，也只能基于同一课程资料补齐。
 - 每题必须包含 stem、options、answer、explanation、tags。
 - options 必须是 A-D 四个选项，answer 只能是 A、B、C、D。
+- 复杂度题若有多个 Big-O 选项，题干必须明确询问“最紧渐进上界”，并写清数据结构及相关操作。
 - 如果有重点标签，每题 tags 必须包含重点标签。
 - 只输出 JSON，不要 Markdown，不要额外说明。
 
@@ -275,10 +277,14 @@ function parseQuestions(
           option.length <= MAX_QUESTION_OPTION_LENGTH &&
           option.toUpperCase().startsWith(`${String.fromCharCode(65 + index)}.`)
         );
+        const bigOBounds = options.filter((option) => /\bO\s*[（(]/i.test(option)).length;
+        const ambiguousComplexity =
+          /复杂度/.test(stem) && bigOBounds > 1 && !/最紧|紧确|精确|紧界|tight|Θ/i.test(stem);
         if (
           stem.length < 1 ||
           stem.length > MAX_QUESTION_STEM_LENGTH ||
           !validOptions ||
+          ambiguousComplexity ||
           !/^[A-D]$/i.test(answer) ||
           explanation.length < 1 ||
           explanation.length > MAX_QUESTION_EXPLANATION_LENGTH ||
