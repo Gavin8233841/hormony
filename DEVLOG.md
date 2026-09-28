@@ -9103,3 +9103,9 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 ## [2026-09-28T08:54:00Z] 恢复图 2 结构化证据状态
 
 前一文档提交 `928305e` 后按新 HEAD 重建预备 ZIP，源码 235 项与 HAP 字节核对通过，但完整发布门禁比既有 NOTICE 人工标记多报 `figure-2 必须且只能包含一个结构化证据状态`。原因是更新分项证据时删除了该行。本批为图 2 补回 `level=未验证` 的结构化状态，同时保留分项模拟器证据；直接调用 `figure_evidence_requirements` 检查两图状态均可解析、零错误。正式图 2 和视频尚未制作，不能提前升级状态；新提交后须重建 ZIP 再跑完整门禁。文档批次不重复 Web 构建或测试。
+
+---
+
+## [2026-09-28T09:10:00Z] 校正已提交错题的演示路由
+
+复核 `apps/web/src/lib/agents/orchestrator.ts` 发现，带题目上下文且 `submitted === true` 的 D04 问答被识别为 `evaluate`，执行 Profile、Evaluator 与 Safety；通用前置 Retrieval 在此意图下跳过。`apps/web/src/lib/agents/evaluator-agent.ts` 仅在错题分支内部按课程检索最多三段资料。评分计划先前写成 Profile + Retrieval + Tutor + Safety，会误导视频旁白，本批仅修正 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 对应行并追加本记录。`git diff --check` 退出码 0；纯文档修正不重复 Web 测试。v7 待签说明稿已按实际路由撰写；其正式 PDF 和同版视频仍待排版、人工核对与连续采集。
