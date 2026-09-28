@@ -9135,3 +9135,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 对照当前评分计划、`LearningReminder` 的即时通知流程、同版模拟器通知回流，以及已提交错题的 Profile → Evaluator → Safety 编排，修正 `scripts/validate-competition-evidence.py` 中 D02/D04 的过期固定锚点；D05 保留“展示题不泄露答案、提交后再评分”要求，并在 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 的对应镜头中明写。更新对应回归测试，仍检查七段 285 秒时间轴、同版身份、D02 精确口径与失实主动提醒拦截。此次是使文档门禁检查现有产品行为，不改变未验证的图、正式视频或人工权利门禁。
 
 `/Users/Admin/.local/bin/python3.12 -B scripts/validate-competition-evidence.py` exit 0；Python 3.12 的评分、发布包及最小依赖联合测试 58/58 通过；`validate-release-dependencies.py` exit 0；`validate-competition-content.py` exit 0，但报告 NOTICE 待人工处理和外部 URL 实时可达性未验证；`git diff --check` exit 0。系统默认 Python 3.9 运行联合测试时因现有测试使用 `| None` 类型语法而失败，改用已有 Python 3.12，未改测试语义。正式源码 ZIP 门禁、团队签署、素材与许可证复核、正式媒体和门户上传仍未完成。
+
+---
+
+## [2026-09-28T19:39:19+08:00] 校正提交源码中的复现说明
+
+检查发现 `README.md` 仍指示 `npm install`、旧页面和 API 数量及无条件 Agent 容错；`apps/harmonyos/README.md` 建议仅复制 ETS 到新工程，并将定时通知、元服务、跨设备同步写为现有能力；`docs/DEPLOYMENT-GUIDE.md` 的 SDK 与 API 地址示例也与当前 API 26、`Constants.ets` 不符。本批仅修改这三份文档，按当前源码说明 pnpm 11.9.0、完整 DevEco 工程、公开 API 与模拟器宿主网关、服务卡片、用户触发即时通知及小艺 App 会话的证据边界，不改应用或发布配置。
+
+`/Users/Admin/.local/bin/python3.12 -B scripts/validate-competition-evidence.py` exit 0；`validate-competition-content.py` exit 0，但保留外部 URL 实时可达性和 NOTICE 人工项未验证提示；`validate-release-dependencies.py` exit 0；`git diff --check` exit 0。纯文档批次未重复 Web/HAP 生产构建。提交后还须从新 HEAD 重建预备 ZIP 并检查解包复现；正式签名、团队权利、正式媒体与门户提交未完成。

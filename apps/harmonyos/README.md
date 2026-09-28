@@ -1,51 +1,27 @@
 # HarmonyOS 客户端（ArkTS / Stage 模型）
 
-> 鸿学伴原生端。当前 `compatibleSdkVersion` 与 `targetSdkVersion` 均为 HarmonyOS API 26；旧版系统不在当前安装范围内。
+当前 `compatibleSdkVersion` 与 `targetSdkVersion` 均为 HarmonyOS API 26。
 
-## 前置条件
+## 打开与构建
 
-1. 安装 DevEco Studio（https://developer.huawei.com/consumer/cn/download/）
-2. 通过 DevEco Studio SDK Manager 安装 HarmonyOS SDK（API 26）
-3. 配置 ohpm / hvigor / hdc 到 PATH
+1. 在 DevEco Studio 的 SDK Manager 安装 API 26 SDK。
+2. 用 DevEco Studio 打开**整个** `apps/harmonyos/` 工程，等待项目同步。
+3. 按本机调试签名配置运行在 API 26 模拟器；发布包需单独配置并验证正式签名。
 
-## 使用方式
+请保留工程中的 `build-profile.json5`、`entry/src/main/module.json5`、资源、服务卡片与 AgentExtension 配置。仅复制 `ets/` 源码到新建工程无法复现这些入口。
 
-### 方式一：在 DevEco Studio 中导入
+## 主要入口
 
-1. 打开 DevEco Studio → File → Open → 选择本目录
-2. 等待 hvigor 同步完成
-3. 如 SDK 版本不匹配，按提示在 SDK Manager 调整
-4. 连接模拟器或真机 → Run
+| 文件或目录 | 用途 |
+|------------|------|
+| `entry/src/main/ets/pages/` | 首页、课程、计划、对话、测验和错题等页面 |
+| `entry/src/main/ets/common/LocalLearningRepository.ets` | 端侧学习状态持久化 |
+| `entry/src/main/ets/common/HttpClient.ets` | 云端 API 请求和地址回退 |
+| `entry/src/main/ets/entryformability/EntryFormAbility.ets` | 桌面服务卡片 |
+| `entry/src/main/ets/agentability/XiaoyiAgentAbility.ets` | 小艺 AgentExtension 入口 |
 
-### 方式二：用 DevEco Studio 新建工程后替换 ets 源码
+## API 地址与证据边界
 
-1. DevEco Studio → New Project → Empty Ability → 命名后创建
-2. 将 `entry/src/main/ets/` 下的源文件替换为本目录对应文件
-3. 修改 `Constants.ets` 中的 `BASE_URL` 指向 Web 后端地址
+`entry/src/main/ets/common/Constants.ets` 当前将 `BASE_URL` 设为 `https://hormony-ruddy.vercel.app`，并将 `http://10.0.2.2:3001` 作为模拟器宿主网关回退地址。宿主网关脚本为仓库根目录的 `scripts/simulator-api-gateway.mjs`；`10.0.2.2` 是模拟器访问宿主机的地址，不能作为远程设备的 API 地址。
 
-## 页面结构
-
-| 页面 | 文件 | 说明 |
-|------|------|------|
-| 仪表盘 | `pages/Index.ets` | 首页，统计卡片 + 快捷入口 |
-| 对话 | `pages/Chat.ets` | AI 对话，SSE 流式接收 |
-| 课程 | `pages/Course.ets` | 课程列表与进度 |
-| 学习计划 | `pages/Plan.ets` | 任务列表 |
-| 知识库 | `pages/Knowledge.ets` | RAG 检索 |
-| 个人画像 | `pages/Profile.ets` | 学习画像 |
-
-## 后端对接
-
-- `Constants.ets` 中配置 `BASE_URL`（默认 `http://localhost:3000`，真机需改为局域网 IP）
-- 对话页通过 `HttpClient` 发送 POST 请求并解析 SSE 流
-- 模拟器访问宿主机用 `10.0.2.2`，真机用电脑局域网 IP
-
-## 鸿蒙系统体验亮点
-
-- 服务卡片：桌面展示今日学习任务
-- 通知：任务到期提醒
-- 元服务：免安装快速问答
-- 跨设备：手机学习 → 平板阅读 → 手表提醒
-- 分布式数据：学习进度多端同步
-
-> 注意：服务卡片/元服务/分布式能力需在 `module.json5` 中声明对应权限与 ExtensionAbility，开发阶段按需添加。
+已有模拟器演示证明通过宿主网关完成相应 API 流程，尚无 HAP 直连公网证据。服务卡片已在模拟器打开错题本；通知由用户点击后即时发布并可回流到错题本，尚无定时推送证据。小艺平台配置、端侧协议测试和合成云端 Tutor 请求均不证明小艺 App 到 AgentExtension 的真实调用。真机行为未验证。
