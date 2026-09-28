@@ -9127,3 +9127,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 忽略目录 `.runtime/semifinal-attachments/same-hap-preflight-evidence-4094e99.json` 记录 HAP、三段 MP4 和九项 UI 树的路径、字节数、SHA-256、证据范围与限制，索引自身 SHA-256 为 `1da1b0fc5473a48546d128ba8158ccdbabfa8df3ff8bde8eac390ea72a46e7ad`。更新 `docs/COMPETITION-SCORE-FIRST-PLAN.md`，把旧版分项与新 HAP 取证分开，纠正主录屏范围，以及操作系统错题问答与数据结构图遍历 AI 测验并非同一 Topic 的脚本表述。正式图、视频、同版待签 PDF、新 HEAD 源码 ZIP、NOTICE 权利确认、小艺 App 真实会话、真机和门户提交仍未验证。纯文档批次未重跑 Web/HAP 构建；相关应用代码自前一批构建后未改动。
 
 提交 `9874478` 已推送后，从该提交精确抽取 235 个清单源码文件并与本批 HAP 逐字节核对，生成预备 ZIP；最小依赖门禁和内容门禁 exit 0。完整 ZIP 门禁 exit 1，五项均来自 NOTICE/待人工标记与其导致的 Git manifest 快照级联失败。竞赛评分门禁首次 exit 1，报八项脚本锚点不符；其中 D05 的 `Topic 一致` 字样因本批改写遗漏，现补回且不更改实际主题边界，复测仍有七项失败。其余锚点涉及旧脚本与当前产品行为的差异，不能为求通过而虚构手动定时提醒或 Tutor 路由。该门禁与正式包继续按失败记录。
+
+---
+
+## [2026-09-28T19:11:00+08:00] 评分门禁口径与当前功能同步
+
+对照当前评分计划、`LearningReminder` 的即时通知流程、同版模拟器通知回流，以及已提交错题的 Profile → Evaluator → Safety 编排，修正 `scripts/validate-competition-evidence.py` 中 D02/D04 的过期固定锚点；D05 保留“展示题不泄露答案、提交后再评分”要求，并在 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 的对应镜头中明写。更新对应回归测试，仍检查七段 285 秒时间轴、同版身份、D02 精确口径与失实主动提醒拦截。此次是使文档门禁检查现有产品行为，不改变未验证的图、正式视频或人工权利门禁。
+
+`/Users/Admin/.local/bin/python3.12 -B scripts/validate-competition-evidence.py` exit 0；Python 3.12 的评分、发布包及最小依赖联合测试 58/58 通过；`validate-release-dependencies.py` exit 0；`validate-competition-content.py` exit 0，但报告 NOTICE 待人工处理和外部 URL 实时可达性未验证；`git diff --check` exit 0。系统默认 Python 3.9 运行联合测试时因现有测试使用 `| None` 类型语法而失败，改用已有 Python 3.12，未改测试语义。正式源码 ZIP 门禁、团队签署、素材与许可证复核、正式媒体和门户上传仍未完成。

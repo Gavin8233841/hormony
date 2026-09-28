@@ -150,8 +150,8 @@ class CompetitionEvidenceGateTests(unittest.TestCase):
                 "D04-live-chat",
                 "01:20-02:25",
                 "占位操作",
-                "真实等待态 SSE 正文 当次引用 "
-                "Profile + Retrieval + Tutor + Safety 实际出现的引用 "
+                "真实等待态 正文 当次引用 "
+                "Profile + Evaluator + Safety 检索课程资料 实际出现的引用 "
                 "POST /api/chat SSE done 实际返回校验",
                 "占位证据",
             ),
@@ -235,18 +235,19 @@ class CompetitionEvidenceGateTests(unittest.TestCase):
         _, gap_errors = MODULE.validate_plan(missing_gap)
         self.assertTrue(any("未验证状态必须列出缺口" in error for error in gap_errors))
 
-    def test_d02_requires_user_created_reminder_and_card_sync(self) -> None:
+    def test_d02_requires_user_triggered_immediate_reminder_and_separate_card_evidence(self) -> None:
         plan = current_plan()
         d02_line = next(
             line for line in plan.splitlines() if line.startswith("| D02-proactive-service |")
         )
-        self.assertIn("用户手动创建系统学习提醒", d02_line)
-        self.assertIn("同步服务卡片", d02_line)
+        self.assertIn("用户点首页铃铛即时创建系统学习提醒", d02_line)
+        self.assertIn("桌面服务卡片单独取证", d02_line)
+        self.assertIn("没有时间选择或定时投递", d02_line)
 
         false_claim = plan.replace(
             d02_line,
             d02_line.replace(
-                "用户手动创建系统学习提醒",
+                "用户点首页铃铛即时创建系统学习提醒",
                 "系统定时主动触达",
                 1,
             ),
@@ -257,8 +258,8 @@ class CompetitionEvidenceGateTests(unittest.TestCase):
         self.assertTrue(any("失实主动提醒口径" in error for error in errors))
 
         semantic_bypass = plan.replace(
-            "本地计划只按明确操作同步，不扩写为后台自主服务",
-            "本地计划只按明确操作同步，不扩写为后台自主服务；"
+            "本地计划只按明确操作同步",
+            "本地计划只按明确操作同步；"
             "系统无需用户操作自主安排新的学习任务",
             1,
         )
