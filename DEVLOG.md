@@ -9089,3 +9089,11 @@ API 26 Hvigor 6.26.4 增量构建 exit 0，未签名 HAP SHA-256 仍为 `8507122
 `f241a44` 已推送；受保护部署 `dpl_UCgySHkemsVFT4oKrBuDAyRVNH1C` 为 `READY`，真实图遍历中等五题三组及挑战五题一组均 HTTP 200。人工抽检挑战样本发现“等权带权图”最短路径题遗漏非负权前提，保留教学正确性限制。提升后 `vercel inspect hormony-ruddy.vercel.app` 确认公开域名指向同一部署 ID。按精确命令再次采集的合成 HAR `.runtime/semifinal-attachments/public-four-api-f241a44-final-20260928.har` SHA-256 `6b937313be6d855058ad4c2adf464027e7c048a6cdc9781bf3249f9196bc252e`；Health、Chat、Plan、Quiz HTTP 200，`parse_online_capture` 推导 16 项业务检查且零错误。请求不含私人答题记录。
 
 Pura X View HarmonyOS 7 / API 26 / 1320×2232 模拟器沿原未签名 HAP 与宿主网关启动图遍历进阶五题，真实题目按 D/A/B/C/C 手动作答，UI 显示 5/5、测验结果已保存、累计答题 80→85；进程重启后“我的”为 85，学习记录 23 次并显示 16:33 新测验。18 个 UI 树/截图的逐文件 SHA-256 索引在 `.runtime/semifinal-attachments/post-promotion-f241a44-simulator-20260928/run-evidence.json`，索引自身 SHA-256 `32d0917904bc59853ae3f356e88e3427e85b353c0ceb019540877d0d1a16030e`。网关在应用重启附近两次 Health 代理出现短时 502，此后本机 Health 复查 200；不能把网关链路说成 HAP 直连公网或真机网络验收。HAP 字节未变，SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`。本次文档提交后还需按新 HEAD 重建预备 ZIP；NOTICE 人工签署与许可、最终 PDF/视频、门户上传和小艺 App 真实会话继续未验证。
+
+---
+
+## [2026-09-28T08:51:44Z] 同版服务卡片与错题问答端侧验证
+
+Pura X View HarmonyOS 7 / API 26 / 1320×2232 模拟器仍运行未签名 HAP SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`。桌面显示鸿学伴 2×2 服务卡片“操作系统 · 5 道待复习”，点击“开始复习”打开对应错题本，首题为“关于进程和线程的区别”。该题“问学伴”自动填入已提交作答上下文，点击发送后 UI 先显示正在回答；宿主网关记录 `GET /api/health → 200` 与 `POST /api/chat → 200`，随后应用显示非空解释、重练动作及 3 条参考资料。公开域名在本轮开始经 `vercel inspect` 确认为部署 `dpl_UCgySHkemsVFT4oKrBuDAyRVNH1C`。21 个原始 UI 树/截图的字节数和 SHA-256 记录于忽略目录 `.runtime/semifinal-attachments/final-chat-card-simulator-20260928/run-evidence.json`。
+
+DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺输入法”首次隐私同意，已取消并退出输入法，未同意权限，也未送出自由输入问题。故本批只证明**预填上下文点击发送**的模拟器路径；自由打字、HAP 直连公网、服务卡片定时刷新、小艺 App→AgentExtension、真机与连续五分钟成片继续未验证。仅更新评分计划的分项证据和 D04 可操作路径，不改代码、HAP 或评审门禁；文档变更按 `git diff --check` 和精确暂存扫描核对，Web 构建与测试不因该文档批次重复执行。
