@@ -46,14 +46,53 @@ export async function runQuizAgent(
     throw new ModelInvalidResponseError("题目数量或结构不符合要求");
   }
 
+  const quizId = generateId("quiz");
   const quiz: Quiz = {
-    quizId: generateId("quiz"),
+    quizId,
     courseId,
     topic,
     focusTag: focusTag && focusTag.length > 0 ? focusTag : undefined,
-    questions,
+    questions: balanceGeneratedChoiceOptions(questions, quizId),
   };
   return quiz;
+}
+
+// Models can copy the answer position from the JSON example. Rotate complete
+// A-D option sets after validation, keeping the correct option body unchanged.
+function balanceGeneratedChoiceOptions(questions: QuizQuestion[], quizId: string): QuizQuestion[] {
+  return questions.map((question, index) => {
+    const correctIndex = question.answer.charCodeAt(0) - 65;
+    if (question.type !== "choice" || question.options?.length !== 4 ||
+        correctIndex < 0 || correctIndex > 3) return question;
+    const block = Math.floor(index / 4);
+    const position = index % 4;
+    const targets = shuffledPositions(`${quizId}:${block}`);
+    const targetIndex = targets[position];
+    const shift = (targetIndex - correctIndex + 4) % 4;
+    const bodies = question.options.map((option) => option.slice(3));
+    return {
+      ...question,
+      options: bodies.map((_, optionIndex) =>
+        `${String.fromCharCode(65 + optionIndex)}. ${bodies[(optionIndex - shift + 4) % 4].trimStart()}`
+      ),
+      answer: String.fromCharCode(65 + targetIndex),
+    };
+  });
+}
+
+function shuffledPositions(seed: string): number[] {
+  let hash = 2166136261;
+  for (const char of seed) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const positions = [0, 1, 2, 3];
+  for (let index = positions.length - 1; index > 0; index -= 1) {
+    hash = (Math.imul(hash, 1664525) + 1013904223) >>> 0;
+    const other = hash % (index + 1);
+    [positions[index], positions[other]] = [positions[other], positions[index]];
+  }
+  return positions;
 }
 
 interface GenerateQuizQuestionsInput {

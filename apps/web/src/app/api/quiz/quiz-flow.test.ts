@@ -71,7 +71,13 @@ describe("题库与资源 API 闭环", () => {
     expect(quiz.questions[0].difficulty).toBe("medium");
     expect(quiz.questions[0].tags).toEqual(["概念理解"]);
     expect(quiz.grading).toHaveLength(5);
-    expect(quiz.grading[0]).toMatchObject({ answer: "A", difficulty: "medium", tags: ["概念理解"] });
+    expect(quiz.grading[0]).toMatchObject({ difficulty: "medium", tags: ["概念理解"] });
+    expect(new Set(quiz.grading.slice(0, 4).map((item) => item.answer))).toEqual(new Set(["A", "B", "C", "D"]));
+    quiz.questions.forEach((question, index) => {
+      expect(question.options?.[quiz.grading[index].answer.charCodeAt(0) - 65]).toBe(
+        `${quiz.grading[index].answer}. 选项一`
+      );
+    });
   });
 
   it("生成接口应把重点标签写入题目与评分标签", async () => {
@@ -120,9 +126,9 @@ describe("题库与资源 API 闭环", () => {
         body: JSON.stringify({
           userId: "api_submit_user",
           quizId: quiz.quizId,
-          answers: quiz.questions.map((question) => ({
+          answers: quiz.questions.map((question, index) => ({
             questionId: question.id,
-            userAnswer: question.options?.[0] ?? "",
+            userAnswer: question.options?.[quiz.grading[index].answer.charCodeAt(0) - 65] ?? "",
           })),
         }),
       })
@@ -208,8 +214,8 @@ describe("题库与资源 API 闭环", () => {
     expect(response.status).toBe(200);
     expect(quiz.questions).toHaveLength(1);
     expect(quiz.questions[0]).not.toHaveProperty("answer");
-    expect(quiz.questions[0].options).toEqual(["A. 升序序列", "B. 随机序列", "C. 层序序列", "D. 逆拓扑序列"]);
-    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["BST性质"] });
+    expect(quiz.grading[0]).toMatchObject({ tags: ["BST性质"] });
+    expect(quiz.questions[0].options?.[quiz.grading[0].answer.charCodeAt(0) - 65]).toBe(`${quiz.grading[0].answer}. 升序序列`);
   });
 
   it("应跳过坏题并继续收集后续有效题", async () => {
@@ -247,7 +253,8 @@ describe("题库与资源 API 闭环", () => {
     expect(response.status).toBe(200);
     expect(quiz.questions).toHaveLength(1);
     expect(quiz.questions[0].stem).toContain("完全二叉树");
-    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["公式应用"] });
+    expect(quiz.grading[0]).toMatchObject({ tags: ["公式应用"] });
+    expect(quiz.questions[0].options?.[quiz.grading[0].answer.charCodeAt(0) - 65]).toBe(`${quiz.grading[0].answer}. 2i+1`);
   });
 
   it("超过单批题量时应分批调用真实模型并合并结果", async () => {
@@ -307,7 +314,8 @@ describe("题库与资源 API 闭环", () => {
 
     expect(response.status).toBe(200);
     expect(quiz.questions).toHaveLength(1);
-    expect(quiz.grading[0]).toMatchObject({ answer: "A", tags: ["修复序列", "格式修复"] });
+    expect(quiz.grading[0]).toMatchObject({ tags: ["修复序列", "格式修复"] });
+    expect(quiz.questions[0].options?.[quiz.grading[0].answer.charCodeAt(0) - 65]).toBe(`${quiz.grading[0].answer}. 选项一`);
   });
 
   it("应拒绝缺少 A-D 顺序前缀的 AI 选项", async () => {
