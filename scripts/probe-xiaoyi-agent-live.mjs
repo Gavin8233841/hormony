@@ -23,6 +23,7 @@ const compiled = ts.transpileModule(source, {
 }).outputText;
 
 let networkPromise;
+const receivedSources = [];
 class HttpRequestCancellation {
   child;
   cancel() { this.child?.kill(); }
@@ -62,6 +63,12 @@ const HttpClient = {
             .map((line) => line.slice(5).trimStart()).join('\n');
           if (data) {
             const event = JSON.parse(data);
+            if (event.type === 'citation' && typeof event.source?.doc === 'string') {
+              const name = event.source.doc.trim().replace(/\s+/g, ' ').slice(0, 80);
+              if (name && receivedSources.length < 3 && !receivedSources.includes(name)) {
+                receivedSources.push(name);
+              }
+            }
             onEvent(event);
             if (event.type === 'done') sawDone = true;
           }
@@ -112,11 +119,13 @@ assert.equal(artifact.taskId, frames[0].result.task.id);
 assert.equal(completed.result.statusUpdate.contextId, frames[0].result.task.contextId);
 const answer = artifact.artifact.parts[0].text;
 assert.ok(answer.length > 30);
-assert.match(answer, /参考资料：/);
-const sourceCount = answer.split('\n').filter((line) => /^\[\d\] /.test(line)).length;
-assert.ok(sourceCount >= 1 && sourceCount <= 3);
+assert.ok(receivedSources.length >= 1, 'Tutor SSE should include a real citation event');
+const sourceText = '\n\n参考资料：\n' + receivedSources
+  .map((name, index) => `[${index + 1}] ${name}`).join('\n');
+assert.ok(answer.endsWith(sourceText),
+  'The final A2A text must contain exactly the sources received from Tutor SSE');
 console.log(JSON.stringify({
   baseUrl, requestCount: 1, frameCount: frames.length,
   taskStates: [frames[0].result.task.status.state, completed.result.statusUpdate.status.state],
-  answerChars: answer.length, sourceCount,
+  answerChars: answer.length, sourceCount: receivedSources.length,
 }));

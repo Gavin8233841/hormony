@@ -8959,3 +8959,11 @@ API 26 直接 Hvigor 增量 `assembleHap --mode module -p product=default -p bui
 新增可复跑的 `node scripts/probe-xiaoyi-agent-live.mjs`，以合成 BST 问题运行实际 Extension ArkTS 源码，测试适配层请求当前公开 `/api/xiaoyi/tutor`。先用 Node 直连超时，同一域名 `curl` Health 为 200；探针改为 curl 通道后成功：1 个请求、3 帧（`SUBMITTED`、带讲解及资料名的 artifact、`COMPLETED`）、160 字正文、1 条引用。这是源码与线上接口的集成检查，非 HarmonyOS Extension 真实网络运行；小艺平台仍因本机锁屏无法重新导入 Card，小艺 App 实际对话和真机均未验证。
 
 涉及 `apps/harmonyos/entry/src/main/ets/agentability/XiaoyiAgentAbility.ets`、`scripts/test-xiaoyi-agent-protocol.mjs`、`scripts/probe-xiaoyi-agent-live.mjs`、`docs/HARMONY-AI-KNOWLEDGE-20260927.md`、`DEVLOG.md`。其他任务未提交文件保留。
+
+---
+
+## [2026-09-28T00:33:09Z] 线上引用探针绑定真实 SSE 来源与当前 HAP 签名复核
+
+前版线上探针只检查最终回答包含“参考资料”，无法排除模型正文本身写出该字样。现在在测试网络适配层记录 Tutor SSE 的 `citation.source.doc`，使用与 Extension 一致的规范化、去重和三条上限，并断言最终 A2A artifact 末尾逐项对应这些来源。`node --check scripts/probe-xiaoyi-agent-live.mjs` exit 0；线上合成 BST 问题复测 exit 0，1 个请求、3 个端 A2A 帧、231 字最终文本、1 条真实 SSE 来源。该探针运行实际 Extension 源码，但网络由测试适配层发起，不等同 HAP 或小艺 App 端到端运行。
+
+同版 `entry-default-signed.hap` SHA-256 `175b3ad7345b71dbf0d6b297df91ac800c2f9f95e1449a386f6f850e9365ae3b`，DevEco SDK `hap-sign-tool.jar verify-app` exit 0，出现 `verify codesign success`、`Digest verify result: true`、`Verify success`，内嵌 Profile 为 debug。证书链与 Profile 仅写入忽略目录 `.runtime/xiaoyi-current-hap-verify-20260928/`。本批未改 HAP 源码或重建；小艺平台新版 Card 仍因 Mac 锁屏无法导入，实际小艺会话仍未验证。本阶段按用户要求只用模拟器。
