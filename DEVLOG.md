@@ -9125,3 +9125,5 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 沿提交 `4094e99a266457ef940bd2fa815d9faad3cf9036` 的未签名 HAP（SHA-256 `4b91394c2e43e5d9bd10933f137a0eb45fe33ddb8f14287a1a74db82cae9957f`）在 Pura X View API 26 模拟器录得三段可播放、无音轨的 MP4 预演：210.022 秒主段、75.025 秒学习记录与进程重启段、45.033 秒手动通知回流段。首段在第二次 AI 出题等待页结束，没有拍到该次评分；`golden-video-quiz-result.json`、重启后的 95 题和 17:48 的 5/5 学习记录属于分项 UI 树与后续视频证据，不能写成首段连续画面。第三段显示用户点击首页铃铛创建即时系统通知、通知栏项目与点击回到错题本；不证明定时推送。三段原始总时长约 330 秒，正式五分钟成片仍未完成。
 
 忽略目录 `.runtime/semifinal-attachments/same-hap-preflight-evidence-4094e99.json` 记录 HAP、三段 MP4 和九项 UI 树的路径、字节数、SHA-256、证据范围与限制，索引自身 SHA-256 为 `1da1b0fc5473a48546d128ba8158ccdbabfa8df3ff8bde8eac390ea72a46e7ad`。更新 `docs/COMPETITION-SCORE-FIRST-PLAN.md`，把旧版分项与新 HAP 取证分开，纠正主录屏范围，以及操作系统错题问答与数据结构图遍历 AI 测验并非同一 Topic 的脚本表述。正式图、视频、同版待签 PDF、新 HEAD 源码 ZIP、NOTICE 权利确认、小艺 App 真实会话、真机和门户提交仍未验证。纯文档批次未重跑 Web/HAP 构建；相关应用代码自前一批构建后未改动。
+
+提交 `9874478` 已推送后，从该提交精确抽取 235 个清单源码文件并与本批 HAP 逐字节核对，生成预备 ZIP；最小依赖门禁和内容门禁 exit 0。完整 ZIP 门禁 exit 1，五项均来自 NOTICE/待人工标记与其导致的 Git manifest 快照级联失败。竞赛评分门禁首次 exit 1，报八项脚本锚点不符；其中 D05 的 `Topic 一致` 字样因本批改写遗漏，现补回且不更改实际主题边界，复测仍有七项失败。其余锚点涉及旧脚本与当前产品行为的差异，不能为求通过而虚构手动定时提醒或 Tutor 路由。该门禁与正式包继续按失败记录。
