@@ -9143,3 +9143,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 检查发现 `README.md` 仍指示 `npm install`、旧页面和 API 数量及无条件 Agent 容错；`apps/harmonyos/README.md` 建议仅复制 ETS 到新工程，并将定时通知、元服务、跨设备同步写为现有能力；`docs/DEPLOYMENT-GUIDE.md` 的 SDK 与 API 地址示例也与当前 API 26、`Constants.ets` 不符。本批仅修改这三份文档，按当前源码说明 pnpm 11.9.0、完整 DevEco 工程、公开 API 与模拟器宿主网关、服务卡片、用户触发即时通知及小艺 App 会话的证据边界，不改应用或发布配置。
 
 `/Users/Admin/.local/bin/python3.12 -B scripts/validate-competition-evidence.py` exit 0；`validate-competition-content.py` exit 0，但保留外部 URL 实时可达性和 NOTICE 人工项未验证提示；`validate-release-dependencies.py` exit 0；`git diff --check` exit 0。纯文档批次未重复 Web/HAP 生产构建。提交后还须从新 HEAD 重建预备 ZIP 并检查解包复现；正式签名、团队权利、正式媒体与门户提交未完成。
+
+---
+
+## [2026-09-28T21:27:40+08:00] 对齐评分计划与 121 秒审阅成片
+
+在 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 中将原 4:45 七段镜头表明确标为历史规划，补入实际 2:01 横屏配音字幕审阅版的时间轴、媒体 SHA-256、HAP SHA-256 与逐帧间隔。未改应用源码、HAP 或媒体；现有评分脚本仍校验历史规划结构，不能把它的通过结果当成对实际成片业务内容的自动验收。另核对设备助手相关包：`com.huawei.hmos.slassistant` 的主界面启动因可见性检查失败，`com.huawei.hmsapp.intelligent` 的启动命令虽返回成功，但未出现助手前台任务或小艺到鸿学伴 Extension 的调用回执；内部探测记录在 `.runtime/semifinal-attachments/xiaoyi-device-runtime-probe-20260928.json`。
+
+`/Users/Admin/.local/bin/python3.12 -B scripts/validate-competition-evidence.py` exit 0；`/Users/Admin/.local/bin/python3.12 -B -m unittest scripts.test_validate_competition_evidence` 11/11 通过；`validate-release-dependencies.py` exit 0；`validate-competition-content.py` exit 0，仍报告 NOTICE 人工项与外部 URL 实时可达性边界；`git diff --check` exit 0。正式源码 ZIP 门禁继续受权利与原创人工核对项阻断，审阅成片不是已签署或已上传的正式三文件。
