@@ -9213,3 +9213,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 独立发布分支提交 `ca04bb7bae648d95d19d04be71bc5e8c4e31e203` 已推送。由该提交精确读取 199 个 HarmonyOS/Web/本地网关工程文件，加入同批构建的未签名 HAP 和运行说明，生成忽略目录审阅包 `.runtime/release-evidence/03-鸿学伴+双子星-工程源码审阅版-v24.zip`，SHA-256 `b42c3ececba7b52e278a6ac6ef530e00322e9532e2181637705e59a6954eedf5`。独立脚本再次解包核对：201 项中 199 个工程文件逐字节等于 `HEAD`，HAP 哈希为 `54261918a6f115a28136bea6d30bb5eb684f43351521cf500833588ad192eadb`，ZIP CRC 全部通过。公开内容扫描覆盖工程文件、HAP 内部条目、文件名和说明，目标词组无命中。该 ZIP 尚未包含团队签署与第三方权利确认，只作为工程审阅包。
 
 从公开 HTTPS 域名连续发起四个合成学习请求，原始请求/响应封装为 HAR 1.2，保存在 `.runtime/release-evidence/online-four-api-20260928.har`，SHA-256 `b4a47e9456ea404739e488843179c89c1d05cb41dfce9d9de6629ed494af9d97`。Health、Chat、Plan、Quiz 均 HTTP 200；现有 `parse_online_capture` 从原始正文推导 16 项业务检查，错误 0。Chat 有非空正文、3 条引用、`done` 且无错误事件；Plan 任务日期/结构、Quiz 展示题与独立评分结构通过。人工抽看五题答案未见事实错判，但第 3、4 题均考查 BFS 最短路径，不能把结构校验写成教学多样性验收。`/Users/Admin/.local/bin/python3.12 -B scripts/validate-release-dependencies.py` 和内容门禁 exit 0；系统 `python3` 为 3.9.6，运行依赖门禁会因测试模块导入 TypeError 失败，因此正式复核固定使用 Python 3.12。当前终端无 Vercel CLI，因此本批只能证明公开域名当前服务版本 `1.0.1` 的四接口行为，不能从本次 HAR 推断精确部署 ID 或新源码提交已上线。新 HAP 对应的完整演示仍须重新录制；Mac 锁屏使 ScreenCaptureKit 窗口录制暂不可用。
+
+---
+
+## [2026-09-28T23:36:42+08:00] 新 HAP 客户端问答与对外稿文字核对
+
+沿当前已安装的 HAP（SHA-256 `54261918a6f115a28136bea6d30bb5eb684f43351521cf500833588ad192eadb`）从首页“开始复习”进入错题本，点击第一道“进程与线程”错题的“问学伴”，发送应用预填问题。UI tree 显示针对该题的非空讲解、“练习进程与线程”、“朗读回答”和“3 条参考资料”，未见连接失败；原始 UI tree SHA-256 `5382a406ee9a168e5141e577b95fc1135305c01fc3e89fc4695375c2535c641c`，保存在独立检出的 `.runtime/release-evidence/chat-response-v24-20260928.json`，连同 HAP/提交绑定审计 `chat-end-to-end-v24-audit.json`。这是客户端到云端问答的运行证据；没有小艺平台调用 Extension 的回执。
+
+尝试输入新问题时，系统“小艺输入法”首次使用弹出包含联网和个人信息权限的同意页；未代用户同意，关闭后重启应用，改用产品已有预填问题完成上述运行检查。使用 `pypdf` 读取现有 v14 说明 PDF 的 15 页提取文本，目标对外措辞零命中；也扫描了 v22 视频工程台词与字幕数据，目标词组零命中。Mac 仍锁屏，尚无法对该 HAP 录制完整 30 帧窗口视频。
