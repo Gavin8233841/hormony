@@ -9187,3 +9187,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 验证：`swiftc -O` exit 0；渲染程序 exit 0；ffprobe 显示 121 秒、1920×1080、H.264/AAC、3630 帧，视频时间戳 3630 个互异，最大间隔 33.334 毫秒且大于 50 毫秒的间隔为 0；开场 3、7、12、18 秒抽帧人工检查，第二轮修正后的 7、12 秒无上述重叠；33 条字幕非空、有序、无重叠；公开 PDF/DOCX/SRT/门户文案/源码审阅 ZIP 扫描 exit 0。右侧实录未修改，抽样画面变化沿用上一批验证。内部新增 `actual-demo-evidence-v21.json` 将实际 121 秒成片、原始连续录屏和 UI 树对应到七个历史检查点，并在 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 更新媒体哈希与实际时间轴。旧 285 秒表明确保留为历史规划，不能替代当前成片核验。`validate-competition-evidence.py` exit 0、对应 11 项单测通过、`validate-competition-content.py` exit 0；后者仍报告 NOTICE 人工项和外部 URL 实时可达性未在本命令核验。
 
 本批不修改应用源码或 HAP。严格发布证据索引的 golden-demo 尚未按实际视频重新绑定；D01 元数据仅在原始时间轴，D07 原规划的图 1 技术边界未出镜。签署和正式提交按工程证据收口后处理。
+
+---
+
+## [2026-09-28T23:04:16+08:00] 视频开场节奏与配音字幕加强
+
+按用户复审，在忽略目录中由 v21 派生 `render-review-v22.swift`，保留同版连续录屏与配音。前 20 秒新增双行标题光束揭示、设计路径节点的非线性扩散脉冲；保留曲线分叉和线性进度，使三段视觉叙事分别对应问题、路径、回环。把开场烧录字幕高度调整为 108 像素、字号调整为 42 像素，并对核心句使用青色强调。33 条逐句字幕的起止时间与原配音保持一致，另导出同文 `02-鸿学伴+双子星-配音字幕-v22.srt`。成片 `.runtime/semifinal-attachments/02-鸿学伴+双子星-横屏配音字幕演示审阅版-v22.mp4` 的 SHA-256 为 `a5e2204c42bcf8c4a57c0806d23d6e2b7ec4ac43067a52ad7308aec9f6a349ef`。内部新建 `actual-demo-evidence-v22.json` 与 `v26-release-readiness.json`，更新 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 的媒体哈希与实际时间轴。没有改应用源码或 HAP。
+
+验证：`swiftc -O` exit 0、渲染程序 exit 0、ffmpeg 音视频全片解码 exit 0；ffprobe 显示 121 秒、1920×1080、H.264/AAC、3630 帧与 3630 个唯一时间戳，最大帧间隔 33.334 毫秒，超过 50 毫秒的间隔为 0。开场 600 帧缩小采样相邻 599 组均不同；3、7、12、18 秒画面已人工查看字幕安全区和主视觉，未见遮挡。音频流 SHA-256 与 v21 相同，为 `40856e1c06538289fe28b3d31967d83a5634fd011afeae2f71619bb0664188d8`；字幕 JSON 33 条无重叠，v22 SRT 与 v21 文本逐字节相同。公开字幕与渲染文字禁用词扫描无命中。`validate-competition-evidence.py`、其 11 项单测和 `validate-competition-content.py` 均 exit 0；后者对外部 URL 当前可达性与 NOTICE 人工项仍单独保留原有证据等级。下一步继续工程门禁和正式附件收口，签署阶段按既定顺序处理。
