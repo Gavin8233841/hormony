@@ -8939,3 +8939,11 @@ API 26 直接 Hvigor 增量 `assembleHap --mode module -p product=default -p bui
 点击「重练这道题」进入 5 题图遍历练习，用 UI 树 bounds 选项、逐题前进并提交评分；结果 `.runtime/hbx-card-practice-result-20260928.json` 和截图 `.runtime/hbx-card-practice-result-20260928.jpeg` 显示 2/5 正确、错题解析、「已保存」及累计答题 45 题。返回桌面后，卡片截图 `.runtime/hbx-card-after-practice-20260928.jpeg` 从「数据结构 · 10 道待复习／图的表示与遍历」更新为「操作系统 · 6 道待复习／进程与线程」；再次实点卡片，`.runtime/hbx-card-next-review-20260928.json` 显示错题本「待复习 13 道 · 今天 6 道」和进程与线程错题。这是同包模拟器一次完整路径，不是对所有学习状态或长期持久性的验收。
 
 本批仅更新 `docs/HARMONY-AI-KNOWLEDGE-20260927.md` 和 `DEVLOG.md`；未修改源码或重建 HAP。平台 Card 重新导入仍待 Mac 解锁与账户会话恢复，小艺 App 真实会话及真机仍未验证。
+
+---
+
+## [2026-09-28T00:08:30Z] 同包模拟器进程重启后学习推荐保持
+
+沿用未签名 HAP SHA-256 `5e429e57aa07959eda26d9715588441ad47c44ff5e47926a24cdcd1c655457e1`，Pura X View 1320×2232、HDC `127.0.0.1:5555`。`aa force-stop com.c4ai.hormony` 返回 `force stop process successfully.`，随后 `aa start -a EntryAbility -b com.c4ai.hormony` 返回 `start ability successfully.`。返回桌面后 `.runtime/hbx-card-restart-20260928.jpeg` 仍显示「操作系统 · 6 道待复习／进程与线程」；从卡片进入错题本后 `.runtime/hbx-card-restart-clicked-20260928.json` 仍显示「待复习 13 道 · 今天 6 道」和进程与线程错题。结合上一条同包学习路径，这验证一次练习后的推荐至少跨应用进程重启保持；未测试卸载、数据清除、跨设备或所有学习状态。
+
+本批只修改知识卡与 `DEVLOG.md`，不改源码、不重建 HAP。Mac 仍锁屏，Safari 小艺平台 Card 导入与测试态核对无法继续；小艺 App 实际触发端 A2A 与系统意图仍未验证，本阶段按用户决定仅使用模拟器。
