@@ -9043,3 +9043,13 @@ Mac 解锁后经过两次失败探针（首条 180 秒录制在慢速人工操�
 ## [2026-09-28T07:26:00Z] AI 测验选项重排后解析字母保持一致
 
 新候选 `dpl_A6KaT1w6cNFAKvQGjkUGre27du5i` 的 Health、图遍历和数组与线性表 Quiz 均 HTTP 200，精确主题题目未再跨章节。逐题检查发现数组样本两道题的 `grading.answer` 与正确选项正文一致，但解析末尾仍引用模型输出重排前的字母，属于展示误导，故仍未提升公开域名。现在对解析中明确的“选项 A / A 正确 / 故选 A”等字母引用按同一选项位移映射，保留图顶点和 `A[i][j]` 等表达式；提示词要求解析尽量不引用选项字母。路由测试覆盖正确选项、错误选项引用和矩阵表达式不变。Web 495/495、lint、typecheck、build 均 exit 0；仍需新的受保护候选与上线复核。
+
+---
+
+## [2026-09-28T07:50:00Z] 新云端提升、模拟器复核与预备包门禁
+
+提交 `7faabbf` 的受保护部署 `dpl_GrVQfooMMk5cHgFb6TZXsJz9YPEy` 经图遍历与数组主题五题抽检后提升到 `hormony-ruddy.vercel.app`，`vercel inspect` 回读目标 ID 一致。公开 Health、Chat SSE、Quiz 均 HTTP 200；合成四接口 HAR 连续采集 Health、Chat、Plan、Quiz 均 HTTP 200，`scripts/validate-release-evidence.py` 的 HAR 解析推导 16 项业务检查且无结构错误。HAR SHA-256 为 `57d3155f99dbb59b4d29d68d6a4f8307487cc4aa2c63abc57d1276ed138186ce`，保存在忽略目录，不含私人作答。
+
+API 26 Hvigor 6.26.4 增量构建 exit 0，未签名 HAP SHA-256 仍为 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`。Pura X View 模拟器经现有宿主 API 网关生成图遍历挑战五题，逐题按 B/D/C/A/A 作答，UI 显示 5/5、结果已保存、累计答题 75→80；应用重启和一次模拟器冷启动恢复后，学习记录仍显示新结果。加载新题期间返回学习记录，等待 25 秒无新增结果。32 个 UI 树/截图及哈希索引见 `.runtime/semifinal-attachments/post-promote-simulator-20260928/run-evidence.json`。模拟器第 5 题的较松复杂度上界选项可能也成立，故人工教学正确性不能据 5/5 全部宣布通过；没有小艺 App 真实会话或真机证据。
+
+从 `7faabbf` Git tree 精确抽取 235 个清单文件，包内逐字节复核源码与 HAP，并生成七记录证据索引和预备 ZIP。包内证据索引用实际字节 resolver 验证 3 项有证据、4 项未验证、零结构错误。`validate-release-dependencies.py`、`validate-competition-content.py`、`validate-topic-relations.py` 均 exit 0；完整 `validate-release-bundle.py` exit 1，明确因 NOTICE、评分计划和发布结果中的 `CHECK-BEFORE-SUBMISSION` 人工标记而拒绝正式包。机器扫描本机 456 个已安装依赖，许可证全文草稿约 980 KB，26 个包未在包根找到许可文件；`pnpm licenses list` 因本地 store package index 缺失失败。所有候选、失败探针、旧 ZIP 与其他任务的未提交文件均保留。正式 PDF、视频、门户回执继续未验证。
