@@ -9221,3 +9221,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 沿当前已安装的 HAP（SHA-256 `54261918a6f115a28136bea6d30bb5eb684f43351521cf500833588ad192eadb`）从首页“开始复习”进入错题本，点击第一道“进程与线程”错题的“问学伴”，发送应用预填问题。UI tree 显示针对该题的非空讲解、“练习进程与线程”、“朗读回答”和“3 条参考资料”，未见连接失败；原始 UI tree SHA-256 `5382a406ee9a168e5141e577b95fc1135305c01fc3e89fc4695375c2535c641c`，保存在独立检出的 `.runtime/release-evidence/chat-response-v24-20260928.json`，连同 HAP/提交绑定审计 `chat-end-to-end-v24-audit.json`。这是客户端到云端问答的运行证据；没有小艺平台调用 Extension 的回执。
 
 尝试输入新问题时，系统“小艺输入法”首次使用弹出包含联网和个人信息权限的同意页；未代用户同意，关闭后重启应用，改用产品已有预填问题完成上述运行检查。使用 `pypdf` 读取现有 v14 说明 PDF 的 15 页提取文本，目标对外措辞零命中；也扫描了 v22 视频工程台词与字幕数据，目标词组零命中。Mac 仍锁屏，尚无法对该 HAP 录制完整 30 帧窗口视频。
+
+---
+
+## [2026-09-28T23:49:28+08:00] 公开源码包与内部证据包分流门禁
+
+背景：既有 `release-manifest.json` 门禁要求将内部工程证据与完整源码资料纳入同一 ZIP；对评审公开工程包需单独控制文件集合与措辞，同时继续保留内部审计强度。新增 `scripts/validate-public-source-bundle.py`，以 `public-package.json` 声明非 Git 文件，逐字对比当前 `HEAD` 的 HarmonyOS/Web/本地网关源码，检查 ZIP/HAP 容器、路径、摘要、敏感内容和对外目标词组。正式模式还要求第三方许可、原创声明、AI 使用说明三个角色各一份；角色齐全只证明包结构，不代替身份和签署真实性核实。原 `validate-release-bundle.py` 未删除；正式三文件门禁识别包根 manifest，分流到公开包的完整模式，保留旧内部包路径。同步更新源码清单、依赖闭包和测试。
+
+以 `170a0255cdcf82892615cf60191ec5e2ce709f4c` 精确应用源文件构建 v25 审阅 ZIP，199 项 Git 工程文件逐字节匹配，ZIP SHA-256 `189eb7d8c2a33360a19dfef2aded94ac8092d0b1714bcf9e955bbf07f3b49cdf`；公开包门禁普通模式 exit 0，完整模式因尚无三份权利/原创/AI 文件而按预期 exit 1。Python 3.12 的 156 项发布相关测试通过，依赖闭包 `directFiles=20,testFiles=8,runtimeEdges=13,testEdges=8,planCommands=8` 通过，内容门禁 exit 0 并保留 NOTICE/外部链接实时状态的内部提示。正式 PDF/视频/公开源码三件套未运行，当前 v25 不是最终提交包。Mac 锁屏仍阻止新 HAP 的完整窗口视频录制；三份声明须在工程与媒体收口后由团队核对并签署。

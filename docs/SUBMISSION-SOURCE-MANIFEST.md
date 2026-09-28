@@ -30,6 +30,7 @@
     "scripts/test_validate_competition_content.py",
     "scripts/test_validate_competition_release.py",
     "scripts/test_validate_official_deliverables.py",
+    "scripts/test_validate_public_source_bundle.py",
     "scripts/test_validate_release_bundle.py",
     "scripts/test_validate_release_dependencies.py",
     "scripts/test_validate_release_evidence.py",
@@ -37,6 +38,7 @@
     "scripts/validate-competition-evidence.py",
     "scripts/validate-competition-release.py",
     "scripts/validate-official-deliverables.py",
+    "scripts/validate-public-source-bundle.py",
     "scripts/validate-release-bundle.py",
     "scripts/validate-release-dependencies.py",
     "scripts/validate-release-evidence.py",
@@ -54,10 +56,13 @@
 清单内的新增文件，再运行 `python -B scripts/validate-competition-content.py`；未跟踪文件
 不会被目录项隐式纳入，也不得据此宣称最终 Demo ZIP 已通过。
 
-## 最终发布包 manifest
+## 内部发布证据包 manifest
 
-最终 Demo/源码 ZIP 的包根必须包含 `release-manifest.json`。这是鸿学伴为
-正式交付设置的内部加严门禁，不是两份官方 PDF 规定的独立上传文件。
+本节到“正式三文件门禁”之前描述保留在工程侧的完整证据包合同。
+面向评审的工程源码 ZIP 使用下文的公开包合同；内部证据资料不因公开包单独生成而丢弃。
+
+内部 Demo/源码证据 ZIP 的包根必须包含 `release-manifest.json`。这是鸿学伴为
+工程审计设置的加严门禁，不是两份官方 PDF 规定的独立上传文件。
 
 顶层必须且只能包含：
 
@@ -230,6 +235,29 @@ python -B scripts/validate-release-dependencies.py
 WS06 单独移植的文件。随后运行依赖闭包、内容门禁和 manifest 展开测试。最终
 `release-manifest.json` 的
 `sourceCommit` 必须填写完成上述校准后的主线完整 `HEAD`，不能沿用 WS06 分支哈希。
+
+## 公开工程源码包合同
+
+面向评审的源码 ZIP 使用包根 `public-package.json`，格式为
+`{schemaVersion:1, sourceCommit, files}`。源码集合固定为同一 `HEAD` 中的
+`apps/harmonyos/`、`apps/web/` 和 `scripts/local-api-gateway.mjs`，排除
+`apps/harmonyos/screenshot/` 与 Web 的两份后台开发日志。公开包门禁对
+199 项当前工程源码逐字节比对 Git，核验归档容器、HAP 内部结构、敏感信息和
+对外措辞；新增或减少工程源文件时，以提交时的 Git 树重新展开。
+
+`files` 逐项声明 `path`、`role`、`bytes`、`sha256`，审阅包要求
+`readme` 与 `hap`，正式三文件门禁还要求 `third-party-license-index`、
+`originality-declaration`、`ai-usage-declaration` 各一份。公开包不能
+用审阅包替代：正式门禁对 `public-package.json` 自动启用
+`--require-complete`；身份、权利与签署内容仍需真实团队核对。
+内部的 `release-manifest.json` 证据包和 `validate-release-evidence.py`
+继续服务工程审计，不进入公开工程源码包。
+
+```powershell
+python -B scripts/validate-public-source-bundle.py `
+  --bundle-path <公开工程源码 ZIP 路径> `
+  --require-complete
+```
 
 ## 正式三文件门禁
 

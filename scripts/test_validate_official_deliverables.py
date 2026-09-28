@@ -3,7 +3,9 @@ import importlib.util
 import io
 import json
 import subprocess
+import tempfile
 import unittest
+import zipfile
 from decimal import Decimal
 from pathlib import Path
 from unittest import mock
@@ -311,7 +313,7 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
         ):
             relative_errors = MODULE.tool_path_errors(Path("pdfinfo"), "pdfinfo")
             missing_errors = MODULE.tool_path_errors(
-                Path("C:/tools/missing-pdfinfo.exe"), "pdfinfo"
+                Path.cwd() / "missing-pdfinfo.exe", "pdfinfo"
             )
 
         self.assertIn("pdfinfo工具路径必须是绝对路径", relative_errors)
@@ -323,7 +325,7 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
             Path, "is_file", return_value=True
         ):
             symlink_errors = MODULE.tool_path_errors(
-                Path("C:/tools/pdfinfo.exe"),
+                Path.cwd() / "pdfinfo.exe",
                 "pdfinfo",
             )
         self.assertIn("pdfinfo工具拒绝符号链接", symlink_errors)
@@ -484,6 +486,20 @@ class OfficialDeliverablesGateTests(unittest.TestCase):
         rendered = "\n".join(errors) + outer.getvalue()
         self.assertIn("ZIP 未通过 validate-release-bundle.py，exit=1", rendered)
         self.assertNotIn(secret, rendered)
+
+    def test_public_source_archive_uses_complete_public_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "source.zip"
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("public-package.json", b"{}")
+            with mock.patch.object(
+                MODULE.PUBLIC_GATE, "validate_file", return_value=[]
+            ) as public_gate, mock.patch.object(
+                MODULE.RELEASE_GATE, "main"
+            ) as internal_gate:
+                self.assertEqual(MODULE.run_release_bundle_gate(path), [])
+            public_gate.assert_called_once_with(path, require_complete=True)
+            internal_gate.assert_not_called()
 
     def test_complete_validation_reuses_release_gate_and_reports_metrics(self) -> None:
         pdf = Path("01-作品说明文档+鸿学队.pdf")

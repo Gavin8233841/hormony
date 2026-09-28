@@ -34,6 +34,7 @@ RUNTIME_REQUIRED_FILES = frozenset(
         "scripts/validate-competition-evidence.py",
         "scripts/validate-competition-release.py",
         "scripts/validate-official-deliverables.py",
+        "scripts/validate-public-source-bundle.py",
         "scripts/validate-release-bundle.py",
         "scripts/validate-release-dependencies.py",
         "scripts/validate-release-evidence.py",
@@ -45,6 +46,7 @@ TEST_REQUIRED_FILES = frozenset(
         "scripts/test_validate_competition_evidence.py",
         "scripts/test_validate_competition_release.py",
         "scripts/test_validate_official_deliverables.py",
+        "scripts/test_validate_public_source_bundle.py",
         "scripts/test_validate_release_bundle.py",
         "scripts/test_validate_release_dependencies.py",
         "scripts/test_validate_release_evidence.py",
@@ -107,6 +109,14 @@ EXPECTED_RUNTIME_EDGES = {
         "scripts/validate-official-deliverables.py",
         "RELEASE_GATE_PATH",
     ): "scripts/validate-release-bundle.py",
+    (
+        "scripts/validate-official-deliverables.py",
+        "PUBLIC_GATE_PATH",
+    ): "scripts/validate-public-source-bundle.py",
+    (
+        "scripts/validate-public-source-bundle.py",
+        "LEGACY_PATH",
+    ): "scripts/validate-release-bundle.py",
 }
 EXPECTED_TEST_EDGES = {
     (
@@ -134,6 +144,10 @@ EXPECTED_TEST_EDGES = {
         "SCRIPT_PATH",
     ): "scripts/validate-official-deliverables.py",
     (
+        "scripts/test_validate_public_source_bundle.py",
+        "PATH",
+    ): "scripts/validate-public-source-bundle.py",
+    (
         "scripts/test_validate_release_dependencies.py",
         "SCRIPT_PATH",
     ): "scripts/validate-release-dependencies.py",
@@ -144,6 +158,7 @@ REQUIRED_PLAN_COMMANDS = frozenset(
         "python -B scripts/validate-competition-evidence.py",
         "python -B scripts/validate-competition-release.py",
         "python -B scripts/validate-official-deliverables.py",
+        "python -B scripts/validate-public-source-bundle.py",
         "python -B scripts/validate-release-bundle.py",
         "python -B scripts/validate-release-dependencies.py",
         "python -B scripts/validate-release-evidence.py",
@@ -154,12 +169,14 @@ MODULE_NAMES = {
     "scripts/validate-competition-evidence.py": "release_dependency_score_gate",
     "scripts/validate-competition-release.py": "release_dependency_preflight_gate",
     "scripts/validate-release-bundle.py": "release_dependency_bundle_gate",
+    "scripts/validate-public-source-bundle.py": "release_dependency_public_bundle_gate",
     "scripts/validate-official-deliverables.py": "release_dependency_media_gate",
     "scripts/test_validate_competition_content.py": "release_dependency_content_tests",
     "scripts/test_validate_competition_evidence.py": "release_dependency_score_tests",
     "scripts/test_validate_competition_release.py": "release_dependency_preflight_tests",
     "scripts/test_validate_release_evidence.py": "release_dependency_evidence_tests",
     "scripts/test_validate_release_bundle.py": "release_dependency_bundle_tests",
+    "scripts/test_validate_public_source_bundle.py": "release_dependency_public_bundle_tests",
     "scripts/test_validate_official_deliverables.py": "release_dependency_media_tests",
     "scripts/test_validate_release_dependencies.py": "release_dependency_closure_tests",
 }

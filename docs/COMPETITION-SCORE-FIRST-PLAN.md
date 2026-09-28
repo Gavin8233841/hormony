@@ -308,6 +308,7 @@ python -B scripts/validate-competition-release.py `
 python -B scripts/validate-competition-content.py
 python -B scripts/validate-competition-evidence.py
 python -B scripts/validate-official-deliverables.py
+python -B scripts/validate-public-source-bundle.py
 python -B scripts/validate-release-bundle.py
 python -B scripts/validate-release-dependencies.py
 python -B scripts/validate-release-evidence.py

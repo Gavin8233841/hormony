@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+import zipfile
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import BinaryIO, NamedTuple
@@ -30,6 +31,16 @@ if RELEASE_GATE_SPEC is None or RELEASE_GATE_SPEC.loader is None:
     raise RuntimeError(f"无法加载发布包门禁: {RELEASE_GATE_PATH}")
 RELEASE_GATE = importlib.util.module_from_spec(RELEASE_GATE_SPEC)
 RELEASE_GATE_SPEC.loader.exec_module(RELEASE_GATE)
+
+PUBLIC_GATE_PATH = Path(__file__).with_name("validate-public-source-bundle.py")
+PUBLIC_GATE_SPEC = importlib.util.spec_from_file_location(
+    "validate_public_source_bundle_for_official_deliverables",
+    PUBLIC_GATE_PATH,
+)
+if PUBLIC_GATE_SPEC is None or PUBLIC_GATE_SPEC.loader is None:
+    raise RuntimeError(f"无法加载公开源码包门禁: {PUBLIC_GATE_PATH}")
+PUBLIC_GATE = importlib.util.module_from_spec(PUBLIC_GATE_SPEC)
+PUBLIC_GATE_SPEC.loader.exec_module(PUBLIC_GATE)
 
 PDF_PAGE_LIMIT = 20
 VIDEO_DURATION_LIMIT_SECONDS = Decimal("300")
@@ -425,6 +436,22 @@ def run_release_bundle_gate(
     path: Path,
     ffprobe_path: Path | None = None,
 ) -> list[str]:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            public_package = PUBLIC_GATE.MANIFEST_PATH in archive.namelist()
+    except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile):
+        public_package = False
+    if public_package:
+        try:
+            public_errors = PUBLIC_GATE.validate_file(path, require_complete=True)
+        except Exception as error:  # pragma: no cover - defensive boundary
+            return [f"ZIP 公开源码包门禁异常 ({type(error).__name__})"]
+        if public_errors:
+            return [
+                "ZIP 未通过 validate-public-source-bundle.py，"
+                f"errors={len(public_errors)}"
+            ]
+        return []
     stdout = io.StringIO()
     stderr = io.StringIO()
     try:
