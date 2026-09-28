@@ -9205,3 +9205,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 公开附件扫描发现旧 HAP 的 `ets/modules.abc` 含旧开发环境标识。将 `Constants.ets` 中本地网关常量改为 `LOCAL_GATEWAY_URL`，保持 URL 与回退顺序；Web `.env.example`、middleware 注释及测验测试替身错误文字改为中性工程表述；HarmonyOS README 改为运行与 API 配置说明；新增与原脚本请求逻辑相同的 `scripts/local-api-gateway.mjs`，旧脚本原样保留供历史开发流程使用。新未签名 HAP SHA-256 `54261918a6f115a28136bea6d30bb5eb684f43351521cf500833588ad192eadb`；解包扫描的目标词组均无命中。当前 121 秒审阅视频仍绑定原 HAP，不能移作新 HAP 的同版视频证据。
 
 验证：API 26 Hvigor 增量 `assembleHap` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，仅有既有 syscap/deprecation 告警；新 HAP `hdc install -r` exit 0、`aa start` exit 0、`bm dump` 列出 `XiaoyiAgentAbility` 与 `ohos.extension.agent`，首页和学伴页 UI 树分别保存于独立检出的 `.runtime/release-evidence/`。宿主现有 API 网关 `/api/health` HTTP 200。Web `pnpm install --frozen-lockfile --offline`、lint、typecheck、501 项测试和生产 build 均 exit 0；Agent 协议 16/16、Topic 关系检查、`node --check scripts/local-api-gateway.mjs` 均通过。公开工程源文件的目标词组扫描无命中。新 HAP 的完整业务录屏、正式公开源码 ZIP 与严格三文件门禁继续在后续批次完成。
+
+---
+
+## [2026-09-28T23:25:51+08:00] 新源码包与线上四接口原始响应
+
+独立发布分支提交 `ca04bb7bae648d95d19d04be71bc5e8c4e31e203` 已推送。由该提交精确读取 199 个 HarmonyOS/Web/本地网关工程文件，加入同批构建的未签名 HAP 和运行说明，生成忽略目录审阅包 `.runtime/release-evidence/03-鸿学伴+双子星-工程源码审阅版-v24.zip`，SHA-256 `b42c3ececba7b52e278a6ac6ef530e00322e9532e2181637705e59a6954eedf5`。独立脚本再次解包核对：201 项中 199 个工程文件逐字节等于 `HEAD`，HAP 哈希为 `54261918a6f115a28136bea6d30bb5eb684f43351521cf500833588ad192eadb`，ZIP CRC 全部通过。公开内容扫描覆盖工程文件、HAP 内部条目、文件名和说明，目标词组无命中。该 ZIP 尚未包含团队签署与第三方权利确认，只作为工程审阅包。
+
+从公开 HTTPS 域名连续发起四个合成学习请求，原始请求/响应封装为 HAR 1.2，保存在 `.runtime/release-evidence/online-four-api-20260928.har`，SHA-256 `b4a47e9456ea404739e488843179c89c1d05cb41dfce9d9de6629ed494af9d97`。Health、Chat、Plan、Quiz 均 HTTP 200；现有 `parse_online_capture` 从原始正文推导 16 项业务检查，错误 0。Chat 有非空正文、3 条引用、`done` 且无错误事件；Plan 任务日期/结构、Quiz 展示题与独立评分结构通过。人工抽看五题答案未见事实错判，但第 3、4 题均考查 BFS 最短路径，不能把结构校验写成教学多样性验收。`/Users/Admin/.local/bin/python3.12 -B scripts/validate-release-dependencies.py` 和内容门禁 exit 0；系统 `python3` 为 3.9.6，运行依赖门禁会因测试模块导入 TypeError 失败，因此正式复核固定使用 Python 3.12。当前终端无 Vercel CLI，因此本批只能证明公开域名当前服务版本 `1.0.1` 的四接口行为，不能从本次 HAR 推断精确部署 ID 或新源码提交已上线。新 HAP 对应的完整演示仍须重新录制；Mac 锁屏使 ScreenCaptureKit 窗口录制暂不可用。
