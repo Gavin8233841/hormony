@@ -9109,3 +9109,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 ## [2026-09-28T09:10:00Z] 校正已提交错题的演示路由
 
 复核 `apps/web/src/lib/agents/orchestrator.ts` 发现，带题目上下文且 `submitted === true` 的 D04 问答被识别为 `evaluate`，执行 Profile、Evaluator 与 Safety；通用前置 Retrieval 在此意图下跳过。`apps/web/src/lib/agents/evaluator-agent.ts` 仅在错题分支内部按课程检索最多三段资料。评分计划先前写成 Profile + Retrieval + Tutor + Safety，会误导视频旁白，本批仅修正 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 对应行并追加本记录。`git diff --check` 退出码 0；纯文档修正不重复 Web 测试。v7 待签说明稿已按实际路由撰写；其正式 PDF 和同版视频仍待排版、人工核对与连续采集。
+
+---
+
+## [2026-09-28T09:41:43Z] 服务卡片错题本返回应用首页
+
+在同一 Pura X View API 26 模拟器上复核旧 HAP：卡片冷启动进入错题本后，页面返回箭头会直接回到系统桌面；连续演示因而无法自然进入后续课程和测验。只修改 `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`：路由栈有上级页面时保留原有 `back()`，错题本作为根页时改为 `replaceUrl('pages/Index')`；系统返回键与标题返回箭头共用同一逻辑，导航失败显示重试文案并记录错误。未修改用户或其他任务的签名配置。
+
+`node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs` 为 50/50，`git diff --check` exit 0。`DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli build` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 成功；新未签名 HAP SHA-256 `4b91394c2e43e5d9bd10933f137a0eb45fe33ddb8f14287a1a74db82cae9957f`，模拟器覆盖安装成功。实点桌面卡片后，标题返回箭头与系统返回键均到应用首页；首页“开始复习”进入错题本再返回也到首页。UI 树及截图保存在忽略目录 `.runtime/semifinal-attachments/card-return-*.json`、`.png`。网关未启动时 Chat 显示明确失败；启动 `NODE_USE_ENV_PROXY=1` 本机网关并核对 Health 200 后，预填错题重新发送获得正文和引用。此前评分计划与 v8 预审稿绑定旧 HAP，只能作为旧版预审，不可当新 HAP 的正式材料；本批尚未完成连续 MP4、新 HEAD ZIP、NOTICE 人工核验或门户提交。

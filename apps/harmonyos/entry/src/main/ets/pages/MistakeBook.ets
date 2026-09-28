@@ -116,12 +116,31 @@ struct MistakeBookPage {
     });
   }
 
+  private returnToHome(): void {
+    const appRouter = this.getUIContext().getRouter();
+    // 服务卡片可将错题本作为路由栈根页打开；此时 back() 会直接退出应用。
+    if (Number(appRouter.getLength()) > 1) {
+      appRouter.back();
+      return;
+    }
+    appRouter.replaceUrl({ url: 'pages/Index' }).catch((error: Error): void => {
+      this.message = '无法返回首页，请重试';
+      hilog.error(Constants.HILOG_DOMAIN, Constants.HILOG_TAG,
+        'MistakeBookPage home navigation failed: %{public}s', error.message);
+    });
+  }
+
+  onBackPress(): boolean {
+    this.returnToHome();
+    return true;
+  }
+
   build() {
     Column() {
       if (this.loading) {
-        TitleBar('错题本', '正在加载', () => this.getUIContext().getRouter().back())
+        TitleBar('错题本', '正在加载', () => this.returnToHome())
       } else {
-        TitleBar('错题本', this.reviewSummary, () => this.getUIContext().getRouter().back())
+        TitleBar('错题本', this.reviewSummary, () => this.returnToHome())
       }
       if (this.loading) {
         Column().width('90%').height(200).backgroundColor(Constants.COLOR_BG_SKELETON).borderRadius(Constants.RADIUS_LG)
