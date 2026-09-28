@@ -143,6 +143,7 @@
 - 取证要求：图中所有状态由正常用户操作产生，不通过数据库注入、静态替换或测试环境变量伪造。
 - 验收：服务卡片进入应用、用户触发通知、问答、引用和测验回写均能从原始视频帧或 UI 树追溯。
 - 分项证据：同一未签名 HAP（SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`）在 Pura X View API 26 模拟器已有服务卡片点击进入对应错题、错题上下文问答与引用、即时通知回流、AI 测验评分及重启后记录保持的 UI 树和截图。卡片与问答索引为 `.runtime/semifinal-attachments/final-chat-card-simulator-20260928/run-evidence.json`；测验持久化索引为 `.runtime/semifinal-attachments/post-promotion-f241a44-simulator-20260928/run-evidence.json`；通知索引为 `.runtime/semifinal-attachments/semifinal-practice-20260928/run-evidence.json`。云端对应 `dpl_UCgySHkemsVFT4oKrBuDAyRVNH1C`，经宿主网关访问，不能称为 HAP 直连公网。最终拼图、连续同版成片及签署仍为**未验证**。
+- 证据状态：`level=未验证; evidenceId=golden-demo; artifact=none; gap=最终图 2 拼图与连续同版成片尚未完成`。
 
 ## 七、黄金 5 分钟演示路径
 

@@ -9097,3 +9097,9 @@ Pura X View HarmonyOS 7 / API 26 / 1320×2232 模拟器沿原未签名 HAP 与�
 Pura X View HarmonyOS 7 / API 26 / 1320×2232 模拟器仍运行未签名 HAP SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`。桌面显示鸿学伴 2×2 服务卡片“操作系统 · 5 道待复习”，点击“开始复习”打开对应错题本，首题为“关于进程和线程的区别”。该题“问学伴”自动填入已提交作答上下文，点击发送后 UI 先显示正在回答；宿主网关记录 `GET /api/health → 200` 与 `POST /api/chat → 200`，随后应用显示非空解释、重练动作及 3 条参考资料。公开域名在本轮开始经 `vercel inspect` 确认为部署 `dpl_UCgySHkemsVFT4oKrBuDAyRVNH1C`。21 个原始 UI 树/截图的字节数和 SHA-256 记录于忽略目录 `.runtime/semifinal-attachments/final-chat-card-simulator-20260928/run-evidence.json`。
 
 DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺输入法”首次隐私同意，已取消并退出输入法，未同意权限，也未送出自由输入问题。故本批只证明**预填上下文点击发送**的模拟器路径；自由打字、HAP 直连公网、服务卡片定时刷新、小艺 App→AgentExtension、真机与连续五分钟成片继续未验证。仅更新评分计划的分项证据和 D04 可操作路径，不改代码、HAP 或评审门禁；文档变更按 `git diff --check` 和精确暂存扫描核对，Web 构建与测试不因该文档批次重复执行。
+
+---
+
+## [2026-09-28T08:54:00Z] 恢复图 2 结构化证据状态
+
+前一文档提交 `928305e` 后按新 HEAD 重建预备 ZIP，源码 235 项与 HAP 字节核对通过，但完整发布门禁比既有 NOTICE 人工标记多报 `figure-2 必须且只能包含一个结构化证据状态`。原因是更新分项证据时删除了该行。本批为图 2 补回 `level=未验证` 的结构化状态，同时保留分项模拟器证据；直接调用 `figure_evidence_requirements` 检查两图状态均可解析、零错误。正式图 2 和视频尚未制作，不能提前升级状态；新提交后须重建 ZIP 再跑完整门禁。文档批次不重复 Web 构建或测试。
