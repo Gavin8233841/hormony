@@ -9081,3 +9081,11 @@ API 26 Hvigor 6.26.4 增量构建 exit 0，未签名 HAP SHA-256 仍为 `8507122
 提交 `5be4aec` 的隔离候选 `dpl_HkGRuwApE8vc9QEvV7cjcEgnD6dN` 为 `READY`；图遍历中等两组、挑战一组五题均 HTTP 200，人工抽检未见前述重复 Big-O 选项。提升后 `vercel inspect` 确认公开域名指向该 ID；首轮公开四接口采集 Health、Chat、Plan 为 200，Quiz 为 502，线上日志仅记录“题目批次数量或结构不符合要求”。一次公开 Quiz 重试 200，第二轮完整 HAR 的四接口均 200、解析器 16 项业务检查零错误；HAR 在忽略目录 `.runtime/semifinal-attachments/public-four-api-5be4aec-20260928.har`。Pura X View 模拟器通过宿主网关请求该公开版 AI Quiz 又得到 502，UI 正确显示“题目生成失败，请重试”。该成功/失败样本证明当前默认五题不够稳定，不得只引用成功 HAR 宣称端侧测验通过。为保护主链，已将公开域名恢复到先前验证部署 `dpl_GrVQfooMMk5cHgFb6TZXsJz9YPEy`，`vercel inspect` 回读一致。失败 UI 树和截图保存在忽略目录 `.runtime/semifinal-attachments/post-promotion-5be4aec-simulator-20260928/`。
 
 针对部分题通过结构校验但整批不足时的丢弃问题，Quiz Agent 现保留有效题并按缺额继续调用模型；整批无有效题仍最多修复一次，默认五题模型调用总数最多四次，超出预算明确报错。新增部分补齐与调用上限测试；Web 501/501、lint、typecheck、build 均 exit 0。尚未部署该修复，正式 HAP 和源码 ZIP 未重建，小艺 App 真实会话、真机、正式附件仍未验证。
+
+---
+
+## [2026-09-28T08:38:00Z] 部分补齐版线上与模拟器复核
+
+`f241a44` 已推送；受保护部署 `dpl_UCgySHkemsVFT4oKrBuDAyRVNH1C` 为 `READY`，真实图遍历中等五题三组及挑战五题一组均 HTTP 200。人工抽检挑战样本发现“等权带权图”最短路径题遗漏非负权前提，保留教学正确性限制。提升后 `vercel inspect hormony-ruddy.vercel.app` 确认公开域名指向同一部署 ID。按精确命令再次采集的合成 HAR `.runtime/semifinal-attachments/public-four-api-f241a44-final-20260928.har` SHA-256 `6b937313be6d855058ad4c2adf464027e7c048a6cdc9781bf3249f9196bc252e`；Health、Chat、Plan、Quiz HTTP 200，`parse_online_capture` 推导 16 项业务检查且零错误。请求不含私人答题记录。
+
+Pura X View HarmonyOS 7 / API 26 / 1320×2232 模拟器沿原未签名 HAP 与宿主网关启动图遍历进阶五题，真实题目按 D/A/B/C/C 手动作答，UI 显示 5/5、测验结果已保存、累计答题 80→85；进程重启后“我的”为 85，学习记录 23 次并显示 16:33 新测验。18 个 UI 树/截图的逐文件 SHA-256 索引在 `.runtime/semifinal-attachments/post-promotion-f241a44-simulator-20260928/run-evidence.json`，索引自身 SHA-256 `32d0917904bc59853ae3f356e88e3427e85b353c0ceb019540877d0d1a16030e`。网关在应用重启附近两次 Health 代理出现短时 502，此后本机 Health 复查 200；不能把网关链路说成 HAP 直连公网或真机网络验收。HAP 字节未变，SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`。本次文档提交后还需按新 HEAD 重建预备 ZIP；NOTICE 人工签署与许可、最终 PDF/视频、门户上传和小艺 App 真实会话继续未验证。
