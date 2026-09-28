@@ -9167,3 +9167,13 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 重新对照仓库中的 2026 年鸿蒙高校创新赛竞赛规程第 5 页：复赛作品截止为 9 月 30 日 24:00；设计稿可提交创意效果图或交互流程图；Agent 方向须提供运行所需的工程源码或小艺平台测试态 Agent。当前选择工程源码路径，因此仅含 HAP 的预览 ZIP 不能代替正式 Agent 附件。`validate-official-deliverables.py` 的独立媒体探针读得待签 PDF 15 页、未加密，v16 MP4 为 121 秒、1920×1080、H.264、3630 帧，均没有格式项错误；正式三文件名和源码包总门禁没有宣称通过。
 
 新增两张 1920×1080 设计稿审阅图：`.runtime/semifinal-attachments/设计稿-鸿学伴-创意效果图-v3.png` 与 `设计稿-鸿学伴-交互流程图-v3.png`。两图只对五张同版 HAP 原始运行截图进行缩放、排版和矢量标注；五张输入与 `hdc-fulltake-37cf6f4-20260928-v3/capture-manifest.json` 的字节数和 SHA-256 逐项相符，输出哈希与来源见 `design-drafts-v3-provenance.json`。Swift Vision 识别两图分别 41 行和 23 行文字，禁用口径命中为 0；人工看图未见图文错位。只更新内部评分计划和本记录，不改应用源码、HAP 或原始采集。正式设计稿、团队签署、权利确认与工程源码 ZIP 发布门禁继续按后续收口。
+
+---
+
+## [2026-09-28T22:18:00+08:00] 动效成片与源码运行闭包审阅
+
+用户要求开场动效更有专业节奏，并为配音逐句配字幕。在忽略目录新建 Swift 合成脚本，前 20 秒加入曲线路径生长、分叉节点、局部聚焦、轨道回环及线性阶段进度；保留已有 AI Voice Generator 配音音轨与 33 条烧录字幕。v18 视频 `.runtime/semifinal-attachments/02-鸿学伴+双子星-横屏配音字幕演示审阅版-v18.mp4` 的 SHA-256 为 `ec38ab71addfc1ed3b8af0c6cadd72163f9b88f1be97570670738f774f3cf2a3`。ffprobe 解码为 121 秒、1920×1080、H.264/AAC、3630 帧与 3630 个唯一时间戳，最大间隔 33.334 毫秒；音轨 elementary stream 与 v16 哈希相同。右侧画面三个窗口相邻帧变化分别为 420/420、360/360、210/210，开场 4、10、18 秒画面已人工查看。v18 SRT 与烧录字幕均为 33 条，无空句或重叠。
+
+源码审阅包 v21 `.runtime/semifinal-attachments/03-鸿学伴+双子星-工程源码审阅版-v21.zip` 的 SHA-256 为 `d98ddcfca6ff4c4bf1a13a6bb94299ee16f17ac4aae60693c4e88833592d9434`，包含 159 项 HarmonyOS/Web 应用工程文件、中性命名的本地 API 转发脚本和运行说明。包内应用文件与独立解包构建过的 v19 副本逐字节相同；该副本的 `pnpm install --frozen-lockfile --offline`、`pnpm typecheck`、`pnpm lint`、`pnpm build` 和 API 26 `assembleHap` 均 exit 0。v21 转发脚本 `node --check` exit 0，当前宿主 3001 端口网关 `GET /api/health` 返回 200。源码包不含 HAP；三处应用源文件及网关日志/文件名的公开措辞调整已在独立 provenance JSON 记录，不能把此包说成与录制 HAP 逐字节同源或严格发布门禁已通过。
+
+直接网络只读探测中，Pura X View 的 OpenSSL 到公开域名 443 返回 `errno=111`，宿主机无代理直连也失败；宿主已配置代理到同一健康接口返回 200、`status=ready`、版本 `1.0.1`。这界定当前环境的网络路径，不改 HAP 或云端配置。小艺平台只读查看因 Mac 锁屏无法进入；本机 `bm dump` 仍列出 `XiaoyiAgentAbility` 和 `ohos.extension.agent`，源码 Card 为 1.1.0 两项 Skill，但平台实时状态与小艺 App 实际会话没有本批新证据。待解锁后复核平台；版权、团队签署和正式三文件门禁按原顺序处理。
