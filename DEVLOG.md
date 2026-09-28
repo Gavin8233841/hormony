@@ -9117,3 +9117,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 在同一 Pura X View API 26 模拟器上复核旧 HAP：卡片冷启动进入错题本后，页面返回箭头会直接回到系统桌面；连续演示因而无法自然进入后续课程和测验。只修改 `apps/harmonyos/entry/src/main/ets/pages/MistakeBook.ets`：路由栈有上级页面时保留原有 `back()`，错题本作为根页时改为 `replaceUrl('pages/Index')`；系统返回键与标题返回箭头共用同一逻辑，导航失败显示重试文案并记录错误。未修改用户或其他任务的签名配置。
 
 `node --test scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs` 为 50/50，`git diff --check` exit 0。`DEVECO_CLI_STUDIO_PATH=/Applications/DevEco-Studio.app devecocli build` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 成功；新未签名 HAP SHA-256 `4b91394c2e43e5d9bd10933f137a0eb45fe33ddb8f14287a1a74db82cae9957f`，模拟器覆盖安装成功。实点桌面卡片后，标题返回箭头与系统返回键均到应用首页；首页“开始复习”进入错题本再返回也到首页。UI 树及截图保存在忽略目录 `.runtime/semifinal-attachments/card-return-*.json`、`.png`。网关未启动时 Chat 显示明确失败；启动 `NODE_USE_ENV_PROXY=1` 本机网关并核对 Health 200 后，预填错题重新发送获得正文和引用。此前评分计划与 v8 预审稿绑定旧 HAP，只能作为旧版预审，不可当新 HAP 的正式材料；本批尚未完成连续 MP4、新 HEAD ZIP、NOTICE 人工核验或门户提交。
+
+---
+
+## [2026-09-28T10:00:00Z] 同版模拟器预演分段取证与评分计划校正
+
+沿提交 `4094e99a266457ef940bd2fa815d9faad3cf9036` 的未签名 HAP（SHA-256 `4b91394c2e43e5d9bd10933f137a0eb45fe33ddb8f14287a1a74db82cae9957f`）在 Pura X View API 26 模拟器录得三段可播放、无音轨的 MP4 预演：210.022 秒主段、75.025 秒学习记录与进程重启段、45.033 秒手动通知回流段。首段在第二次 AI 出题等待页结束，没有拍到该次评分；`golden-video-quiz-result.json`、重启后的 95 题和 17:48 的 5/5 学习记录属于分项 UI 树与后续视频证据，不能写成首段连续画面。第三段显示用户点击首页铃铛创建即时系统通知、通知栏项目与点击回到错题本；不证明定时推送。三段原始总时长约 330 秒，正式五分钟成片仍未完成。
+
+忽略目录 `.runtime/semifinal-attachments/same-hap-preflight-evidence-4094e99.json` 记录 HAP、三段 MP4 和九项 UI 树的路径、字节数、SHA-256、证据范围与限制，索引自身 SHA-256 为 `1da1b0fc5473a48546d128ba8158ccdbabfa8df3ff8bde8eac390ea72a46e7ad`。更新 `docs/COMPETITION-SCORE-FIRST-PLAN.md`，把旧版分项与新 HAP 取证分开，纠正主录屏范围，以及操作系统错题问答与数据结构图遍历 AI 测验并非同一 Topic 的脚本表述。正式图、视频、同版待签 PDF、新 HEAD 源码 ZIP、NOTICE 权利确认、小艺 App 真实会话、真机和门户提交仍未验证。纯文档批次未重跑 Web/HAP 构建；相关应用代码自前一批构建后未改动。
