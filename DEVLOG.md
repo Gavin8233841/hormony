@@ -9151,3 +9151,11 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 在 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 中将原 4:45 七段镜头表明确标为历史规划，补入实际 2:01 横屏配音字幕审阅版的时间轴、媒体 SHA-256、HAP SHA-256 与逐帧间隔。未改应用源码、HAP 或媒体；现有评分脚本仍校验历史规划结构，不能把它的通过结果当成对实际成片业务内容的自动验收。另核对设备助手相关包：`com.huawei.hmos.slassistant` 的主界面启动因可见性检查失败，`com.huawei.hmsapp.intelligent` 的启动命令虽返回成功，但未出现助手前台任务或小艺到鸿学伴 Extension 的调用回执；内部探测记录在 `.runtime/semifinal-attachments/xiaoyi-device-runtime-probe-20260928.json`。
 
 `/Users/Admin/.local/bin/python3.12 -B scripts/validate-competition-evidence.py` exit 0；`/Users/Admin/.local/bin/python3.12 -B -m unittest scripts.test_validate_competition_evidence` 11/11 通过；`validate-release-dependencies.py` exit 0；`validate-competition-content.py` exit 0，仍报告 NOTICE 人工项与外部 URL 实时可达性边界；`git diff --check` exit 0。正式源码 ZIP 门禁继续受权利与原创人工核对项阻断，审阅成片不是已签署或已上传的正式三文件。
+
+---
+
+## [2026-09-28T21:42:00+08:00] 开场动效与配音字幕审阅版 v16
+
+用户要求提升片头的视觉节奏，并让配音有同步字幕。在忽略目录的 Swift 合成脚本中，对前 20 秒加入题目卡片的分层弹性入场、曲线路径上的逐点激活、线性四阶段进度与短促转场扫光；保留已审阅的真实应用录屏、AI Voice Generator 配音和 33 条逐句字幕时轴。首轮预览暴露局部透明度覆盖场景淡出，已修正后重新导出并抽查 0.7、2、4.5、5.9、6.2、7、8.5、11、14.8、15.3、17、18.8、20.1 秒的画面，未见旧场景残留或字幕遮挡。
+
+审阅 MP4 为 `.runtime/semifinal-attachments/02-鸿学伴+双子星-横屏配音字幕演示审阅版-v16.mp4`，SHA-256 `0bc33fa410afb9a3308081bf67ba00f974644046b98ffe06453a4f060020d8bb`；同文字幕为 `.runtime/semifinal-attachments/02-鸿学伴+双子星-配音字幕-v16.srt`。ffprobe 读得 H.264 1920×1080、AAC、121 秒、3630 帧、3630 个唯一时间戳，中位间隔 33.333 毫秒，最大 33.334 毫秒，没有大于 50 毫秒的间隔。公开文案扫描对 15 页 PDF、DOCX、SRT、门户文案及 Demo ZIP/HAP 通过。仅媒体与评分计划更新，未改应用源码或 HAP；待签原件、严格源码包人工门禁和门户提交仍须后续收口。
