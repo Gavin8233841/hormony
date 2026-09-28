@@ -126,14 +126,14 @@ interface GenerateQuizQuestionsInput {
 async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise<QuizQuestion[]> {
   const questions: QuizQuestion[] = [];
   const usedStems = new Set<string>();
-  while (questions.length < input.count) {
+  const batchLimit = input.count <= 5 ? 3 : MAX_QUESTIONS_PER_MODEL_BATCH;
+  const maxModelCalls = Math.ceil(input.count / batchLimit) + 2;
+  let modelCalls = 0;
+  while (questions.length < input.count && modelCalls < maxModelCalls) {
     const remaining = input.count - questions.length;
     // The default five-question quiz is more reliable as two small model
     // responses. Keep the existing batch cap for larger explicit requests.
-    const batchSize = Math.min(
-      remaining,
-      input.count <= 5 ? 3 : MAX_QUESTIONS_PER_MODEL_BATCH
-    );
+    const batchSize = Math.min(remaining, batchLimit);
     const raw = await callModel(
       quizSystemPrompt(),
       quizUserPrompt(input, batchSize, questions),
@@ -143,6 +143,7 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
         signal: input.signal,
       }
     );
+    modelCalls += 1;
     let batch = parseQuestions(
       raw,
       batchSize,
@@ -151,8 +152,11 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
       input.focusTag,
       usedStems
     );
-    if (batch.length < batchSize) {
+    // Keep valid questions from a partial model response. Ask for the missing
+    // count on the next bounded call instead of discarding the whole batch.
+    if (batch.length === 0 && modelCalls < maxModelCalls) {
       const repairedRaw = await repairQuizJson(raw, batchSize, input, questions);
+      modelCalls += 1;
       batch = parseQuestions(
         repairedRaw,
         batchSize,
@@ -162,7 +166,7 @@ async function generateQuizQuestions(input: GenerateQuizQuestionsInput): Promise
         usedStems
       );
     }
-    if (batch.length !== batchSize) {
+    if (batch.length === 0) {
       throw new ModelInvalidResponseError("题目批次数量或结构不符合要求");
     }
     const beforeCount = questions.length;

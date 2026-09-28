@@ -38,11 +38,11 @@ afterEach(() => {
 });
 
 describe("Quiz Agent 模型输出边界", () => {
-  it("修复后仍不足完整批次时立即拒绝而不继续放大模型调用", async () => {
+  it("整批无有效题且一次修复仍无效时立即拒绝", async () => {
     process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：批次预算";
     process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
-      [modelQuestion()],
-      [modelQuestion({ stem: "平衡二叉树的高度约束是什么？" })],
+      "这不是 JSON",
+      "修复后仍不是 JSON",
     ]);
 
     await expect(
@@ -51,10 +51,40 @@ describe("Quiz Agent 模型输出边界", () => {
     expect(JSON.parse(process.env.TEST_MODEL_RESPONSE_SEQUENCE ?? "null")).toEqual([]);
   });
 
+  it("保留部分有效题并在剩余调用预算内补齐五题", async () => {
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：部分补齐";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      [modelQuestion({ stem: "部分补齐题 1" }), modelQuestion({ stem: "部分补齐题 2" })],
+      [modelQuestion({ stem: "部分补齐题 3" }), modelQuestion({ stem: "部分补齐题 4" })],
+      [modelQuestion({ stem: "部分补齐题 5" })],
+    ]);
+
+    const quiz = await runQuizAgent(
+      "quiz_test", "cs101", "二叉树与BST", 5, "medium", "部分补齐"
+    );
+    expect(quiz.questions.map((question) => question.stem)).toEqual(
+      Array.from({ length: 5 }, (_, index) => `部分补齐题 ${index + 1}`)
+    );
+    expect(JSON.parse(process.env.TEST_MODEL_RESPONSE_SEQUENCE ?? "null")).toEqual([]);
+  });
+
+  it("部分题持续不足时在固定模型调用预算内停止", async () => {
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：调用上限";
+    process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify(
+      Array.from({ length: 4 }, (_, index) => [modelQuestion({ stem: `调用上限题 ${index + 1}` })])
+    );
+
+    await expect(
+      runQuizAgent("quiz_test", "cs101", "二叉树与BST", 5, "medium", "调用上限")
+    ).rejects.toMatchObject({ code: "MODEL_INVALID_RESPONSE" });
+    expect(JSON.parse(process.env.TEST_MODEL_RESPONSE_SEQUENCE ?? "null")).toEqual([]);
+  });
+
   it("同批重复题修复后仍重复时立即拒绝", async () => {
     process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "重点标签：重复预算";
     const duplicateBatch = Array.from({ length: 5 }, () => modelQuestion());
     process.env.TEST_MODEL_RESPONSE_SEQUENCE = JSON.stringify([
+      duplicateBatch,
       duplicateBatch,
       duplicateBatch,
     ]);

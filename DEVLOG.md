@@ -9073,3 +9073,11 @@ API 26 Hvigor 6.26.4 增量构建 exit 0，未签名 HAP SHA-256 仍为 `8507122
 ## [2026-09-28T08:12:00Z] 默认五题改用 3＋2 模型批次
 
 提交 `11e1fdb` 已推送，其受保护候选 `dpl_AU2mLG73795x9MHPkAqvSU8FovFG` 为 `READY`，Health HTTP 200。真实图遍历中等难度五题返回 502 `MODEL_INVALID_RESPONSE`，挑战五题 HTTP 200 且样本选项未再出现相同 Big-O 表达式；同端点三题中等难度 HTTP 200。两次五题中等难度失败与三题成功表明默认单批五题的结构稳定性不足，但单次三题通过不能证明总体成功率。因此把总题量 1–5 的生成批次上限改为 3，默认五题按 3＋2 调用真实模型；显式 6–20 题保留原每批最多 5 题策略和 100 秒总预算。路由级测试同步验证五题分批、展示题与独立评分、服务端提交和 Chat Quiz 检索路径。Web 499/499、lint、typecheck、build 均 exit 0；还需新候选的五题真实请求与质量抽检。候选仍未提升公开域名。
+
+---
+
+## [2026-09-28T08:25:00Z] 新版上线后回退与部分有效题补齐
+
+提交 `5be4aec` 的隔离候选 `dpl_HkGRuwApE8vc9QEvV7cjcEgnD6dN` 为 `READY`；图遍历中等两组、挑战一组五题均 HTTP 200，人工抽检未见前述重复 Big-O 选项。提升后 `vercel inspect` 确认公开域名指向该 ID；首轮公开四接口采集 Health、Chat、Plan 为 200，Quiz 为 502，线上日志仅记录“题目批次数量或结构不符合要求”。一次公开 Quiz 重试 200，第二轮完整 HAR 的四接口均 200、解析器 16 项业务检查零错误；HAR 在忽略目录 `.runtime/semifinal-attachments/public-four-api-5be4aec-20260928.har`。Pura X View 模拟器通过宿主网关请求该公开版 AI Quiz 又得到 502，UI 正确显示“题目生成失败，请重试”。该成功/失败样本证明当前默认五题不够稳定，不得只引用成功 HAR 宣称端侧测验通过。为保护主链，已将公开域名恢复到先前验证部署 `dpl_GrVQfooMMk5cHgFb6TZXsJz9YPEy`，`vercel inspect` 回读一致。失败 UI 树和截图保存在忽略目录 `.runtime/semifinal-attachments/post-promotion-5be4aec-simulator-20260928/`。
+
+针对部分题通过结构校验但整批不足时的丢弃问题，Quiz Agent 现保留有效题并按缺额继续调用模型；整批无有效题仍最多修复一次，默认五题模型调用总数最多四次，超出预算明确报错。新增部分补齐与调用上限测试；Web 501/501、lint、typecheck、build 均 exit 0。尚未部署该修复，正式 HAP 和源码 ZIP 未重建，小艺 App 真实会话、真机、正式附件仍未验证。
