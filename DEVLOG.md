@@ -9177,3 +9177,13 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 源码审阅包 v21 `.runtime/semifinal-attachments/03-鸿学伴+双子星-工程源码审阅版-v21.zip` 的 SHA-256 为 `d98ddcfca6ff4c4bf1a13a6bb94299ee16f17ac4aae60693c4e88833592d9434`，包含 159 项 HarmonyOS/Web 应用工程文件、中性命名的本地 API 转发脚本和运行说明。包内应用文件与独立解包构建过的 v19 副本逐字节相同；该副本的 `pnpm install --frozen-lockfile --offline`、`pnpm typecheck`、`pnpm lint`、`pnpm build` 和 API 26 `assembleHap` 均 exit 0。v21 转发脚本 `node --check` exit 0，当前宿主 3001 端口网关 `GET /api/health` 返回 200。源码包不含 HAP；三处应用源文件及网关日志/文件名的公开措辞调整已在独立 provenance JSON 记录，不能把此包说成与录制 HAP 逐字节同源或严格发布门禁已通过。
 
 直接网络只读探测中，Pura X View 的 OpenSSL 到公开域名 443 返回 `errno=111`，宿主机无代理直连也失败；宿主已配置代理到同一健康接口返回 200、`status=ready`、版本 `1.0.1`。这界定当前环境的网络路径，不改 HAP 或云端配置。小艺平台只读查看因 Mac 锁屏无法进入；本机 `bm dump` 仍列出 `XiaoyiAgentAbility` 和 `ohos.extension.agent`，源码 Card 为 1.1.0 两项 Skill，但平台实时状态与小艺 App 实际会话没有本批新证据。待解锁后复核平台；版权、团队签署和正式三文件门禁按原顺序处理。
+
+---
+
+## [2026-09-28T22:44:25+08:00] 开场动效、配音字幕与实际演示证据映射
+
+用户复审认为开场视觉节奏偏平，要求增加线性与非线性动效并给配音配字幕。在忽略的 `.runtime/semifinal-attachments/video-v12/` 新建 Swift v21 合成脚本，前 20 秒增加错题卡聚焦扫线、标题双层入场、运动光栅、曲线分叉生长、任务/依据/行动信息卡及复习回环；修复抽帧发现的角标跨段残留和信息卡重叠。其余演示镜头沿用同版 HAP 录屏。审阅成片 `02-鸿学伴+双子星-横屏配音字幕演示审阅版-v21.mp4` 的 SHA-256 为 `17bae8383b6d0c948f727dd2b61bb45cf2b07659418c3b31e0b8703db8eb0d31`，含 33 条烧录配音字幕，另有同文 SRT。旧 v18 音轨与 v21 音轨 streamhash 均为 `40856e1c06538289fe28b3d31967d83a5634fd011afeae2f71619bb0664188d8`。
+
+验证：`swiftc -O` exit 0；渲染程序 exit 0；ffprobe 显示 121 秒、1920×1080、H.264/AAC、3630 帧，视频时间戳 3630 个互异，最大间隔 33.334 毫秒且大于 50 毫秒的间隔为 0；开场 3、7、12、18 秒抽帧人工检查，第二轮修正后的 7、12 秒无上述重叠；33 条字幕非空、有序、无重叠；公开 PDF/DOCX/SRT/门户文案/源码审阅 ZIP 扫描 exit 0。右侧实录未修改，抽样画面变化沿用上一批验证。内部新增 `actual-demo-evidence-v21.json` 将实际 121 秒成片、原始连续录屏和 UI 树对应到七个历史检查点，并在 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 更新媒体哈希与实际时间轴。旧 285 秒表明确保留为历史规划，不能替代当前成片核验。`validate-competition-evidence.py` exit 0、对应 11 项单测通过、`validate-competition-content.py` exit 0；后者仍报告 NOTICE 人工项和外部 URL 实时可达性未在本命令核验。
+
+本批不修改应用源码或 HAP。严格发布证据索引的 golden-demo 尚未按实际视频重新绑定；D01 元数据仅在原始时间轴，D07 原规划的图 1 技术边界未出镜。签署和正式提交按工程证据收口后处理。
