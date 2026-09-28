@@ -234,7 +234,7 @@ class MemoryRdbStore {
       "(state_key TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)") return;
     if (sql !== "INSERT OR REPLACE INTO app_state " +
       "(state_key, payload, updated_at) VALUES (?, ?, ?)") {
-      throw new Error(`未实现的 ArkData 写入 SQL: ${sql}`);
+      throw new Error(`未匹配的 ArkData 写入 SQL: ${sql}`);
     }
     const [key, payload, updatedAt] = bindArgs;
     if (typeof key !== "string" || typeof payload !== "string" || typeof updatedAt !== "number") {
@@ -252,7 +252,7 @@ class MemoryRdbStore {
   async querySql(sql: string, bindArgs: unknown[]): Promise<MemoryResultSet> {
     if (sql !== "SELECT payload FROM app_state WHERE state_key = ?" &&
       sql !== "SELECT payload, updated_at FROM app_state WHERE state_key = ?") {
-      throw new Error(`未实现的 ArkData 查询 SQL: ${sql}`);
+      throw new Error(`未匹配的 ArkData 查询 SQL: ${sql}`);
     }
     const [key] = bindArgs;
     if (typeof key !== "string") throw new Error("ArkData 查询键无效");

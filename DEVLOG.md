@@ -9195,3 +9195,13 @@ DevEco `ui text` 与 HDC `uitest uiInput inputText` 均触发模拟器“小艺�
 按用户复审，在忽略目录中由 v21 派生 `render-review-v22.swift`，保留同版连续录屏与配音。前 20 秒新增双行标题光束揭示、设计路径节点的非线性扩散脉冲；保留曲线分叉和线性进度，使三段视觉叙事分别对应问题、路径、回环。把开场烧录字幕高度调整为 108 像素、字号调整为 42 像素，并对核心句使用青色强调。33 条逐句字幕的起止时间与原配音保持一致，另导出同文 `02-鸿学伴+双子星-配音字幕-v22.srt`。成片 `.runtime/semifinal-attachments/02-鸿学伴+双子星-横屏配音字幕演示审阅版-v22.mp4` 的 SHA-256 为 `a5e2204c42bcf8c4a57c0806d23d6e2b7ec4ac43067a52ad7308aec9f6a349ef`。内部新建 `actual-demo-evidence-v22.json` 与 `v26-release-readiness.json`，更新 `docs/COMPETITION-SCORE-FIRST-PLAN.md` 的媒体哈希与实际时间轴。没有改应用源码或 HAP。
 
 验证：`swiftc -O` exit 0、渲染程序 exit 0、ffmpeg 音视频全片解码 exit 0；ffprobe 显示 121 秒、1920×1080、H.264/AAC、3630 帧与 3630 个唯一时间戳，最大帧间隔 33.334 毫秒，超过 50 毫秒的间隔为 0。开场 600 帧缩小采样相邻 599 组均不同；3、7、12、18 秒画面已人工查看字幕安全区和主视觉，未见遮挡。音频流 SHA-256 与 v21 相同，为 `40856e1c06538289fe28b3d31967d83a5634fd011afeae2f71619bb0664188d8`；字幕 JSON 33 条无重叠，v22 SRT 与 v21 文本逐字节相同。公开字幕与渲染文字禁用词扫描无命中。`validate-competition-evidence.py`、其 11 项单测和 `validate-competition-content.py` 均 exit 0；后者对外部 URL 当前可达性与 NOTICE 人工项仍单独保留原有证据等级。下一步继续工程门禁和正式附件收口，签署阶段按既定顺序处理。
+
+---
+
+## [2026-09-28T23:17:50+08:00] 独立发布检出与公开源码中性命名
+
+从 `b46e9f8` 建立独立发布检出，避免主工作区既有未提交配置进入工程包。录制 HAP 来源提交 `4094e99` 与 `b46e9f8` 的 `apps/harmonyos/entry`、`AppScope`、已提交 `build-profile.json5`、`apps/web` 四棵 Git 树分别逐项同哈希；仅 HarmonyOS README 后续变化。录制 HAP 的 SHA-256 仍为 `4b91394c2e43e5d9bd10933f137a0eb45fe33ddb8f14287a1a74db82cae9957f`。单独从干净 `b46e9f8` 构建成功，产物哈希不同，故不把重新构建包当作录制原件；私有审计见主工作区 `.runtime/semifinal-attachments/same-source-hap-audit-20260928.json`。
+
+公开附件扫描发现旧 HAP 的 `ets/modules.abc` 含旧开发环境标识。将 `Constants.ets` 中本地网关常量改为 `LOCAL_GATEWAY_URL`，保持 URL 与回退顺序；Web `.env.example`、middleware 注释及测验测试替身错误文字改为中性工程表述；HarmonyOS README 改为运行与 API 配置说明；新增与原脚本请求逻辑相同的 `scripts/local-api-gateway.mjs`，旧脚本原样保留供历史开发流程使用。新未签名 HAP SHA-256 `54261918a6f115a28136bea6d30bb5eb684f43351521cf500833588ad192eadb`；解包扫描的目标词组均无命中。当前 121 秒审阅视频仍绑定原 HAP，不能移作新 HAP 的同版视频证据。
+
+验证：API 26 Hvigor 增量 `assembleHap` exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck` 完成，仅有既有 syscap/deprecation 告警；新 HAP `hdc install -r` exit 0、`aa start` exit 0、`bm dump` 列出 `XiaoyiAgentAbility` 与 `ohos.extension.agent`，首页和学伴页 UI 树分别保存于独立检出的 `.runtime/release-evidence/`。宿主现有 API 网关 `/api/health` HTTP 200。Web `pnpm install --frozen-lockfile --offline`、lint、typecheck、501 项测试和生产 build 均 exit 0；Agent 协议 16/16、Topic 关系检查、`node --check scripts/local-api-gateway.mjs` 均通过。公开工程源文件的目标词组扫描无命中。新 HAP 的完整业务录屏、正式公开源码 ZIP 与严格三文件门禁继续在后续批次完成。

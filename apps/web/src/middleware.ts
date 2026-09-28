@@ -35,11 +35,11 @@ const SECURITY_HEADERS: Record<string, string> = {
 };
 
 // CORS 允许来源白名单
-// 默认允许：本地开发环境 + 鸿蒙模拟器访问宿主机
+// 默认允许：本地开发环境与本地网关
 // 可通过环境变量 ORIGIN_ALLOWLIST 覆盖（逗号分隔，例如 "https://a.com,https://b.com"）
 const DEFAULT_ORIGIN_ALLOWLIST = [
   "http://localhost:3000", // 开发环境
-  "http://10.0.2.2:3000",  // 鸿蒙模拟器访问宿主机
+  "http://10.0.2.2:3000",  // 本地网关来源
 ];
 
 function getOriginAllowlist(): string[] {
