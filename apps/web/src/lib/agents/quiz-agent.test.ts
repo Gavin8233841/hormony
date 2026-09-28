@@ -104,6 +104,14 @@ describe("Quiz Agent 模型输出边界", () => {
     expect(quiz.questions[0].stem).toBe(stem);
   });
 
+  it("拒绝不同选项重复列出相同的 Big-O 表达式", async () => {
+    await expectInvalidModelResponse([modelQuestion({
+      stem: "无向完全图采用邻接表存储，遍历所有边的最紧渐进时间复杂度是？",
+      options: ["A. O(n+e) 即 O(n²)", "B. O(e) 即 O(n)", "C. O(n)", "D. O(n²)"],
+      answer: "A",
+    })]);
+  });
+
   it("复杂度题缺少最紧限定时要求模型修复后才返回", async () => {
     const preciseStem = "用邻接表判断顶点 i 到 j 是否有边的最紧渐进上界复杂度是？";
     process.env.TEST_MODEL_RESPONSE_SEQUENCE_SCOPE = "主题：图的表示与遍历";
