@@ -2,6 +2,9 @@ import { AgentExtensionAbility, common, Want } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { HttpClient, HttpRequestCancellation, HttpStreamError } from '../common/HttpClient';
 import { Constants } from '../common/Constants';
+import { LearningContentRepository } from '../common/LearningContentRepository';
+import { LocalLearningRepository } from '../common/LocalLearningRepository';
+import { ProactiveLearningAction, ProactiveLearningService } from '../common/ProactiveLearningService';
 import { ChatMessage, StreamEvent } from '../model/DataModels';
 
 interface DevicePart {
@@ -265,6 +268,10 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
       return;
     }
     if (active.completed) return;
+    if (this.isNextLearningQuestion(question)) {
+      this.replyWithLocalNextAction(proxy, active, taskId, contextId);
+      return;
+    }
     HttpClient.postSSE(Constants.API_XIAOYI_TUTOR, JSON.stringify(body),
       (event: StreamEvent): void => {
         if (active.completed || active.failed) return;
@@ -312,7 +319,6 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
         const finalAnswer = active.answer.length + sourceText.length <= 8000 ?
           active.answer + sourceText : active.answer;
         if (!this.sendArtifactUpdate(proxy, active.requestId, taskId, contextId, finalAnswer)) return;
-        if (!this.sendStatusUpdate(proxy, active.requestId, taskId, contextId, 'TASK_STATE_COMPLETED')) return;
         const nextHistory: ChatMessage[] = [...history,
           { role: 'user', content: question.slice(0, 1000) },
           { role: 'assistant', content: active.answer.slice(0, 1000) }];
@@ -328,6 +334,7 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
             break;
           }
         }
+        this.sendStatusUpdate(proxy, active.requestId, taskId, contextId, 'TASK_STATE_COMPLETED');
       },
       (_error: HttpStreamError): void => {
         if (active.completed || active.failed) return;
@@ -337,6 +344,48 @@ export default class XiaoyiAgentAbility extends AgentExtensionAbility {
         this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
           'TASK_STATE_FAILED', '网络暂时不可用，请稍后重试');
       }, undefined, cancellation);
+  }
+
+  private isNextLearningQuestion(question: string): boolean {
+    const normalized = question.replace(/[\s？?。！!，,、]/g, '').replace(/^小鸿/, '');
+    return normalized === '今天学什么' || normalized === '下一步学什么' ||
+      normalized === '我该学什么' || normalized === '我接下来应该学什么' ||
+      normalized === '我现在该复习什么';
+  }
+
+  private async replyWithLocalNextAction(proxy: common.AgentHostProxy, active: ActiveTask,
+    taskId: string, contextId: string): Promise<void> {
+    try {
+      await LearningContentRepository.initialize(this.context.resourceManager);
+      await LocalLearningRepository.initialize(this.context);
+      const action: ProactiveLearningAction = await ProactiveLearningService.resolve();
+      if (active.completed) return;
+      active.completed = true;
+      this.removeActiveTask(proxy, taskId);
+      const answer = '根据鸿学伴本机当前学习状态，下一步建议：' + action.title + '。' +
+        action.subtitle + '。打开鸿学伴可选择「' + action.cta + '」。';
+      if (!this.sendArtifactUpdate(proxy, active.requestId, taskId, contextId, answer)) return;
+      this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_COMPLETED');
+      // 本机学习状态只用于当前答复，不写入后续云端 Tutor 对话历史。
+      const connectionHistories = this.histories.get(proxy);
+      if (connectionHistories && !connectionHistories.has(contextId)) {
+        connectionHistories.set(contextId, []);
+        if (connectionHistories.size > this.maxHistories) {
+          for (const oldestContextId of connectionHistories.keys()) {
+            connectionHistories.delete(oldestContextId);
+            break;
+          }
+        }
+      }
+      this.sendStatusUpdate(proxy, active.requestId, taskId, contextId, 'TASK_STATE_COMPLETED');
+    } catch (_) {
+      if (active.completed) return;
+      active.completed = true;
+      this.removeActiveTask(proxy, taskId);
+      this.rememberFinishedTask(proxy, taskId, contextId, 'TASK_STATE_FAILED');
+      this.sendStatusUpdate(proxy, active.requestId, taskId, contextId,
+        'TASK_STATE_FAILED', '暂时无法读取本机学习建议，请打开鸿学伴查看');
+    }
   }
 
   private cancelTask(proxy: common.AgentHostProxy, request: DeviceRequest): void {

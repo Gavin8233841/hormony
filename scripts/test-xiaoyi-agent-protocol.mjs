@@ -21,6 +21,11 @@ const compiled = ts.transpileModule(source, {
 
 function harness() {
   const calls = [];
+  const local = {
+    contentInitializations: 0, storeInitializations: 0, resolutions: 0,
+    action: { title: '错题复习', subtitle: '数据结构 · 2 道待复习', cta: '开始复习' },
+    failure: null, resolveGate: null,
+  };
   let nextId = 0;
   class HttpRequestCancellation {
     cancelled = false;
@@ -33,10 +38,26 @@ function harness() {
   };
   const module = { exports: {} };
   const imports = {
-    '@kit.AbilityKit': { AgentExtensionAbility: class {} },
+    '@kit.AbilityKit': { AgentExtensionAbility: class { context = { resourceManager: {} }; } },
     '@kit.ArkTS': { util: { generateRandomUUID: () => `uuid-${++nextId}` } },
     '../common/HttpClient': { HttpClient, HttpRequestCancellation },
     '../common/Constants': { Constants: { API_XIAOYI_TUTOR: '/api/xiaoyi/tutor' } },
+    '../common/LearningContentRepository': { LearningContentRepository: {
+      async initialize() { local.contentInitializations += 1; },
+    } },
+    '../common/LocalLearningRepository': { LocalLearningRepository: {
+      async initialize() {
+        local.storeInitializations += 1;
+        if (local.failure) throw local.failure;
+      },
+    } },
+    '../common/ProactiveLearningService': { ProactiveLearningService: {
+      async resolve() {
+        local.resolutions += 1;
+        if (local.resolveGate) await local.resolveGate;
+        return local.action;
+      },
+    } },
   };
   vm.runInNewContext(compiled, {
     module,
@@ -46,7 +67,7 @@ function harness() {
       return imports[id];
     },
   }, { filename: sourcePath });
-  return { agent: new module.exports.default(), calls };
+  return { agent: new module.exports.default(), calls, local };
 }
 
 function proxy() {
@@ -114,6 +135,56 @@ test('only received course sources are attached to the final text artifact', () 
     '二叉搜索树按节点大小决定查找方向。\n\n参考资料：\n' +
     '[1] 数据结构与算法分析\n[2] 课程讲义\n[3] 实验手册');
   assert.equal(client.responses[2].result.statusUpdate.status.state, 'TASK_STATE_COMPLETED');
+});
+
+test('next-study request uses local learning state and never sends it to Tutor', async () => {
+  assert.ok(agentCard.skills.some((skill) => skill.id === 'suggest_next_learning_action'));
+  const { agent, calls, local } = harness();
+  const client = proxy();
+  agent.onData(client, message('request-1', 'message-1', '小鸿，今天学什么？'));
+  assert.equal(client.responses[0].result.task.status.state, 'TASK_STATE_SUBMITTED');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(calls.length, 0);
+  assert.equal(local.contentInitializations, 1);
+  assert.equal(local.storeInitializations, 1);
+  assert.equal(local.resolutions, 1);
+  assert.match(client.responses[1].result.artifactUpdate.artifact.parts[0].text,
+    /下一步建议：错题复习。数据结构 · 2 道待复习/);
+  assert.equal(client.responses[2].result.statusUpdate.status.state, 'TASK_STATE_COMPLETED');
+  const contextId = client.responses[0].result.task.contextId;
+  agent.onData(client, JSON.stringify({ jsonrpc: '2.0', id: 'request-2', method: 'MessageStream',
+    params: { message: { messageId: 'message-2', contextId, role: 'ROLE_USER',
+      parts: [{ text: '什么是二叉搜索树？', mediaType: 'text/plain' }] } } }));
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body.history, []);
+});
+
+test('local learning-state failure returns a failed task without cloud fallback', async () => {
+  const { agent, calls, local } = harness();
+  local.failure = new Error('store unavailable');
+  const client = proxy();
+  agent.onData(client, message('request-1', 'message-1', '我现在该复习什么？'));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(calls.length, 0);
+  assert.equal(client.responses[1].result.statusUpdate.status.state, 'TASK_STATE_FAILED');
+  assert.match(client.responses[1].result.statusUpdate.status.message.parts[0].text,
+    /暂时无法读取本机学习建议/);
+});
+
+test('canceling a pending local recommendation suppresses its late answer', async () => {
+  const { agent, calls, local } = harness();
+  let release;
+  local.resolveGate = new Promise((resolve) => { release = resolve; });
+  const client = proxy();
+  agent.onData(client, message('request-1', 'message-1', '下一步学什么？'));
+  const taskId = client.responses[0].result.task.id;
+  await new Promise((resolve) => setImmediate(resolve));
+  agent.onData(client, cancel('cancel-local', taskId));
+  assert.equal(client.responses[1].result.status.state, 'TASK_STATE_CANCELED');
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(client.responses.length, 2);
+  assert.equal(calls.length, 0);
 });
 
 test('malformed JSON, invalid part and unsupported method return one protocol error', () => {

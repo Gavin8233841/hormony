@@ -8977,3 +8977,13 @@ API 26 直接 Hvigor 增量 `assembleHap --mode module -p product=default -p bui
 API 26 Hvigor 增量构建最终 exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 均完成，仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `aba7e4b469633bd97c9581d7ba941ae2efda446e5ff55f5d1be07fbb39b7b97c`；签名 HAP SHA-256 `a0c63bfef4ed25bd6130a5c5f5f9f1c71ecde9612eff95bfaf7569d7bb596273`。SDK `verify-app` exit 0，签名和摘要成功，提取物只在忽略目录 `.runtime/hbx-citation-verify-20260928/`。
 
 Pura X View 1320×2232 模拟器覆盖安装未签名包、启动成功。展开引用时 UI 树和截图分别在 `.runtime/hbx-citation-polish-scrolled-20260928.json` 与 `.runtime/hbx-citation-polish-expanded-20260928.png`，显示三条来源和“收起”；再点收起后 `.runtime/hbx-citation-polish-collapsed-20260928.json` 仅保留“3 条参考资料”与“展开”。失败消息详情没有做 UI 实点；小艺 Card 平台同步、真实小艺会话与真机仍未验证。工作区已有的签名配置和其他未提交文件均保持原状。
+
+---
+
+## [2026-09-28T02:40:10Z] 小鸿本机下一步学习技能
+
+在 `XiaoyiAgentAbility.ets` 增加对 Card 中明确列举的“今天学什么”等短句的本机行动路径：初始化课程资源和 ArkData，复用 `ProactiveLearningService.resolve()` 的当前错题／计划决策，返回具体任务与 App 内按钮名；不调用云端 Tutor，也不把本机学习状态写入后续云端历史。读取失败返回 `TASK_STATE_FAILED`，取消等待中的行动不会发送迟到正文。普通课程讲解路径保留。`agent_config.json` 更新描述、版本 `1.1.0` 与第二技能；测试文件增加成功、失败、取消及历史隔离用例。源码和技术依据记录于 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`。
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs` exit 0，66/66；JSON 解析及 `git diff --check` exit 0。API 26 Hvigor 增量 `assembleHap` exit 0，编译、打包检查、签名完成，仅既有 `TextInputController` syscap 告警。最终未签名 HAP SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`，签名 HAP SHA-256 `c4b75e4471bda2be545cbab8a24adee4e5a244e5ec7d0f61a4ade0db73136f01`；解包确认 Card `1.1.0`、两技能，SDK `verify-app` exit 0，签名和摘要有效。Pura X View 模拟器覆盖安装该批未签名包、启动成功；`.runtime/xiaoyi-next-action-final-home-20260928.json` 显示本机当前决策“错题复习／操作系统 · 6 道待复习／开始复习”。
+
+Extension 的平台真实调用、本机仓库在 Extension 运行时的访问与小艺端展示仍未验证；Mac 锁屏使新版 Card 暂不能同步到小艺平台，用户已被异步提醒解锁。真机留待决赛后。已有签名配置、脚本和其他未提交文档保持不动。

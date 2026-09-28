@@ -3,8 +3,8 @@
     {
       "agentId": "xiaohong_learning_tutor",
       "name": "小鸿",
-      "description": "讲解数据结构、操作系统和计算机网络的课程概念，帮助学生理解疑难知识点。",
-      "version": "1.0.0",
+      "description": "讲解数据结构、操作系统和计算机网络的课程概念，并根据鸿学伴本机学习状态建议下一步任务。",
+      "version": "1.1.0",
       "iconUrl": "https://hormony-ruddy.vercel.app/xiaohong-agent-opaque.png",
       "category": "education",
       "defaultInputModes": ["text/plain"],
@@ -20,6 +20,13 @@
           "description": "回答数据结构、操作系统和计算机网络课程中的概念与原理问题。",
           "tags": ["大学课程", "学习辅导", "概念讲解"],
           "examples": ["什么是二叉搜索树？", "进程与线程有什么区别？", "TCP 三次握手为什么需要三次？"]
+        },
+        {
+          "id": "suggest_next_learning_action",
+          "name": "推荐下一步学习",
+          "description": "根据鸿学伴本机已有的课程和复习状态，回答当前建议的下一步任务。",
+          "tags": ["大学课程", "学习计划", "错题复习"],
+          "examples": ["今天学什么？", "我现在该复习什么？", "我接下来应该学什么？"]
         }
       ]
     }

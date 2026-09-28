@@ -120,3 +120,11 @@
 API 26 Hvigor 增量构建完成 `CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap`，exit 0；仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `aba7e4b469633bd97c9581d7ba941ae2efda446e5ff55f5d1be07fbb39b7b97c`，签名 HAP SHA-256 `a0c63bfef4ed25bd6130a5c5f5f9f1c71ecde9612eff95bfaf7569d7bb596273`。SDK `verify-app` 对签名包 exit 0，含 `verify codesign success`、`Digest verify result: true`、`Verify success`；提取文件与完整日志保存在忽略目录 `.runtime/hbx-citation-verify-20260928/`。
 
 Pura X View 1320×2232 模拟器覆盖安装该批未签名 HAP 并启动。学伴页实点“3 条参考资料”后，截图 `.runtime/hbx-citation-polish-expanded-20260928.png` 和 UI 树 `.runtime/hbx-citation-polish-scrolled-20260928.json` 显示“收起”及三条课程资料标题；再实点收起，`.runtime/hbx-citation-polish-collapsed-20260928.json` 仅见“3 条参考资料”与“展开”，不再有资料标题。这证明该批 HAP 的原生引用折叠交互在模拟器可用；错误详情分支只经构建、未制造失败请求做 UI 实点。小艺平台 Card 同步、小艺 App 对话和真机均未由此验证。
+
+### 2026-09-28 小鸿接入本机下一步学习决策
+
+依照[小艺端 A2A 模式](https://developer.huawei.com/consumer/cn/doc/service/device-a2a-0000002640106106)和[AgentCard 规范](https://developer.huawei.com/consumer/cn/doc/service/agentcard-0000002678424557)，同一个 `XiaoyiAgentAbility` 增加受限的第二项技能：对 Card 示例中的“今天学什么”等明确短句，先初始化本机课程内容与 ArkData 仓库，调用已有 `ProactiveLearningService.resolve()`，把当前行动标题、课程摘要和 App 内按钮名作为文本答复。此路径不请求云端 Tutor；普通课程讲解仍按原 SSE 路径运行。本机学习状态不加入后续云端对话历史；随后同一 `contextId` 的普通课程问题仍可继续。读取失败给出失败终态，等待期间的 `TasksCancel` 不会产生迟到答复。Card 描述同步更新、版本改为 `1.1.0`，技能 ID 为 `suggest_next_learning_action`；**平台已发布的旧 Card 尚未导入此版本**。
+
+`node --test scripts/test-xiaoyi-agent-protocol.mjs scripts/test-proactive-learning-service.mjs scripts/test-proactive-delivery-contracts.mjs` exit 0，66/66；其中测试运行实际 Extension ArkTS 源码并模拟本机仓库边界，不等同 HarmonyOS 中小艺实际调用。API 26 Hvigor 增量构建 exit 0，完成 `CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap`，仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `8507122ccf4b16f8a812dd39b4520ad45fb6d65f2e97fcdac1ddf62f8dba2219`；签名 HAP SHA-256 `c4b75e4471bda2be545cbab8a24adee4e5a244e5ec7d0f61a4ade0db73136f01`。解包确认 Card `1.1.0` 与两项技能；SDK `verify-app` exit 0，签名与摘要成功，提取物仅在忽略目录 `.runtime/xiaoyi-next-action-final-verify-20260928/`。
+
+Pura X View 1320×2232 模拟器覆盖安装该批未签名 HAP、启动 `EntryAbility` 均成功；同包首页 UI 树 `.runtime/xiaoyi-next-action-final-home-20260928.json` 显示已有的“错题复习／操作系统 · 6 道待复习／开始复习”决策。这个页面与新 Extension 调用同一 `ProactiveLearningService`，可核对当前本机行动，但**尚无 Extension 在模拟器被小艺调用的回执**；不能把源码测试或首页状态写成小艺实测。Mac 仍锁屏，平台 Card `1.1.0` 同步与测试态核对待解锁后继续；真机按用户决定延后至决赛后。
