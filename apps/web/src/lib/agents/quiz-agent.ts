@@ -82,8 +82,20 @@ function balanceGeneratedChoiceOptions(questions: QuizQuestion[], quizId: string
         `${String.fromCharCode(65 + optionIndex)}. ${bodies[(optionIndex - shift + 4) % 4].trimStart()}`
       ),
       answer: String.fromCharCode(65 + targetIndex),
+      explanation: remapOptionReferences(question.explanation, shift),
     };
   });
+}
+
+function remapOptionReferences(explanation: string, shift: number): string {
+  // The model may mention option letters in its explanation. Only remap
+  // explicit option references; leave graph vertices and expressions intact.
+  return explanation.replace(
+    /选项\s*[A-D]|[A-D]\s*选项|[A-D]\s*项|(?:答案|故选|应选|选择)(?:是|为)?\s*[A-D]|[A-D]\s*(?:正确|错误|不正确)/g,
+    (reference) => reference.replace(/[A-D]/, (letter) =>
+      String.fromCharCode(65 + (letter.charCodeAt(0) - 65 + shift) % 4)
+    )
+  );
 }
 
 function shuffledPositions(seed: string): number[] {
@@ -165,7 +177,7 @@ function quizSystemPrompt(): string {
   const systemPrompt = `你是一位出题专家。根据指定主题生成选择题。
 输出 JSON 数组，每个元素：{"type":"choice","stem":"","options":["A. ","B. ","C. ","D. "],"answer":"A","explanation":"","tags":["概念理解","边界条件"]}
 题干、答案和解析必须与提供的课程资料一致，禁止引入资料外的事实。
-所有题目只考查指定主题；不要借用同一课程中其他主题的知识点。每题必须只有一个明确正确选项，写清影响答案的实现方式和前提条件。
+所有题目只考查指定主题；不要借用同一课程中其他主题的知识点。每题必须只有一个明确正确选项，写清影响答案的实现方式和前提条件。解析请解释知识点，不引用选项字母。
 难度规则：
 - easy：考查定义、术语、直接性质或一步识别，适合刚学完概念的学生。
 - medium：给出简短场景或对比，需要应用概念完成一步推理。

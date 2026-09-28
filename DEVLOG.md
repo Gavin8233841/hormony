@@ -9037,3 +9037,9 @@ Mac 解锁后经过两次失败探针（首条 180 秒录制在慢速人工操�
 受保护 Production 候选 `dpl_2XaBqih64XYjTXx6EusWaECbQrp9` 的 Health 为 HTTP 200、`ready`、`stateless`，模型 `doubao-seed-2-1-pro-260628`。合成 Quiz 请求的非法数量和跨主题分别返回 HTTP 400 `INVALID_COUNT`、`INVALID_TOPIC`。图遍历候选样本两次成功生成五题、评分键分布非全 A；另一次输出安全审核返回 HTTP 502 `SAFETY_BLOCKED`，未伪装成成功。数组与线性表样本混入归并排序题，且其空间复杂度题意存在实现前提歧义，因此未将此候选提升到应用公开域名。响应仅保存在忽略的 `.runtime/semifinal-attachments/`。
 
 `apps/web/src/lib/agents/quiz-agent.ts` 现在对精确主题使用同课程且 `topic` 相等的知识片；聊天自然语言出题仍使用原有检索。提示词要求题目留在指定主题并明确影响答案的实现前提。初版严格主题查找使聊天出题路径 2 项测试失败，补回自由文本检索后 Web 测试 495/495、lint、typecheck、build 全部 exit 0。此批只改 Quiz Agent 与本日志；新源码尚需受保护候选及上线端云复核，模型语义正确性不能靠提示词或测试保证。
+
+---
+
+## [2026-09-28T07:26:00Z] AI 测验选项重排后解析字母保持一致
+
+新候选 `dpl_A6KaT1w6cNFAKvQGjkUGre27du5i` 的 Health、图遍历和数组与线性表 Quiz 均 HTTP 200，精确主题题目未再跨章节。逐题检查发现数组样本两道题的 `grading.answer` 与正确选项正文一致，但解析末尾仍引用模型输出重排前的字母，属于展示误导，故仍未提升公开域名。现在对解析中明确的“选项 A / A 正确 / 故选 A”等字母引用按同一选项位移映射，保留图顶点和 `A[i][j]` 等表达式；提示词要求解析尽量不引用选项字母。路由测试覆盖正确选项、错误选项引用和矩阵表达式不变。Web 495/495、lint、typecheck、build 均 exit 0；仍需新的受保护候选与上线复核。

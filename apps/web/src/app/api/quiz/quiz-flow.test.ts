@@ -49,6 +49,10 @@ describe("题库与资源 API 闭环", () => {
   });
 
   it("生成接口应分离展示题目与本地评分数据", async () => {
+    process.env.TEST_MODEL_RESPONSE = JSON.stringify(Array.from({ length: 5 }, (_, index) => ({
+      ...modelQuestion(index + 1),
+      explanation: "因此A正确；选项B错误；A[i][j] 表示矩阵元素。",
+    })));
     const response = await generateQuiz(
       new Request("http://localhost/api/quiz", {
         method: "POST",
@@ -77,6 +81,10 @@ describe("题库与资源 API 闭环", () => {
       expect(question.options?.[quiz.grading[index].answer.charCodeAt(0) - 65]).toBe(
         `${quiz.grading[index].answer}. 选项一`
       );
+      const wrongAnswer = String.fromCharCode(65 + (quiz.grading[index].answer.charCodeAt(0) - 65 + 1) % 4);
+      expect(quiz.grading[index].explanation).toContain(`因此${quiz.grading[index].answer}正确`);
+      expect(quiz.grading[index].explanation).toContain(`选项${wrongAnswer}错误`);
+      expect(quiz.grading[index].explanation).toContain("A[i][j] 表示矩阵元素");
     });
   });
 
