@@ -83,6 +83,31 @@ export struct ChatContent {
   private speechRequestId: string = '';
   private speechSequence: number = 0;
 
+  private toggleMessageDetails(index: number, citations: boolean): void {
+    if (index < 0 || index >= this.messages.length) return;
+    const msg = this.messages[index];
+    const updated: DisplayMessage = {
+      role: msg.role,
+      content: msg.content,
+      citations: msg.citations,
+      agentTrace: msg.agentTrace,
+      thinking: msg.thinking,
+      citationExpanded: citations ? !msg.citationExpanded : msg.citationExpanded,
+      streaming: msg.streaming,
+      failed: msg.failed,
+      cancelled: msg.cancelled,
+      statusMessage: msg.statusMessage,
+      httpStatus: msg.httpStatus,
+      errorCode: msg.errorCode,
+      statusExpanded: citations ? msg.statusExpanded : !msg.statusExpanded,
+      retryQuestion: msg.retryQuestion,
+      action: msg.action
+    };
+    const next = this.messages.slice();
+    next[index] = updated;
+    this.messages = next;
+  }
+
   // 推荐问题
   private suggestions: string[] = [
     '什么是二叉搜索树？',
@@ -1004,9 +1029,9 @@ export struct ChatContent {
       } else {
         // 消息列表
         List({ scroller: this.scroller }) {
-          ForEach(this.messages.slice(this.contextStartIndex), (msg: DisplayMessage) => {
+          ForEach(this.messages.slice(this.contextStartIndex), (msg: DisplayMessage, index: number) => {
             ListItem() {
-              this.MessageBubble(msg)
+              this.MessageBubble(msg, index + this.contextStartIndex)
             }
           })
         }
@@ -1453,7 +1478,7 @@ export struct ChatContent {
   }
 
   @Builder
-  MessageBubble(msg: DisplayMessage) {
+  MessageBubble(msg: DisplayMessage, messageIndex: number) {
     Column() {
       if (msg.role === 'user') {
         // 用户消息右对齐
@@ -1551,7 +1576,7 @@ export struct ChatContent {
             }
 
             if (msg.failed || msg.cancelled) {
-              this.MessageStatus(msg)
+              this.MessageStatus(msg, messageIndex)
             }
 
             // 引用（折叠式）
@@ -1585,17 +1610,28 @@ export struct ChatContent {
                 msg.citations.length.toString() + ' 条')
               .accessibilityDescription('查看回答引用的课程资料')
               .onClick(() => {
-                msg.citationExpanded = !msg.citationExpanded;
-                this.messages = this.messages.slice();
+                this.toggleMessageDetails(messageIndex, true);
               })
 
               if (msg.citationExpanded) {
                 Column() {
                   ForEach(msg.citations, (c: Citation, i: number) => {
-                    Text('[' + (i + 1) + '] ' + c.doc + (c.snippet ? ' — ' + c.snippet : ''))
-                      .fontSize(11)
-                      .fontColor(Constants.COLOR_TEXT_SECONDARY)
-                      .margin({ bottom: 2 })
+                    Column({ space: 2 }) {
+                      Text('[' + (i + 1) + '] ' + c.doc)
+                        .fontSize(12)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+                      if (c.snippet) {
+                        Text(c.snippet)
+                          .fontSize(11)
+                          .fontColor(Constants.COLOR_TEXT_SECONDARY)
+                          .maxLines(2)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      }
+                    }
+                    .width('100%')
+                    .alignItems(HorizontalAlign.Start)
+                    .margin({ bottom: 8 })
                   })
                 }
                 .width('100%')
@@ -1676,7 +1712,7 @@ export struct ChatContent {
   }
 
   @Builder
-  MessageStatus(msg: DisplayMessage) {
+  MessageStatus(msg: DisplayMessage, messageIndex: number) {
     Column({ space: 8 }) {
       Row({ space: 8 }) {
         SymbolGlyph($r(msg.cancelled ? 'sys.symbol.stop_circle_fill' : 'sys.symbol.exclamationmark_triangle_fill'))
@@ -1716,8 +1752,7 @@ export struct ChatContent {
         .accessibilityText(msg.statusExpanded ? '收起这次回答的错误详情' : '展开这次回答的错误详情')
         .accessibilityDescription('查看 HTTP 状态和错误代码')
         .onClick((): void => {
-          msg.statusExpanded = !msg.statusExpanded;
-          this.messages = this.messages.slice();
+          this.toggleMessageDetails(messageIndex, false);
         })
 
         if (msg.statusExpanded) {

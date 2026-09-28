@@ -8967,3 +8967,13 @@ API 26 直接 Hvigor 增量 `assembleHap --mode module -p product=default -p bui
 前版线上探针只检查最终回答包含“参考资料”，无法排除模型正文本身写出该字样。现在在测试网络适配层记录 Tutor SSE 的 `citation.source.doc`，使用与 Extension 一致的规范化、去重和三条上限，并断言最终 A2A artifact 末尾逐项对应这些来源。`node --check scripts/probe-xiaoyi-agent-live.mjs` exit 0；线上合成 BST 问题复测 exit 0，1 个请求、3 个端 A2A 帧、231 字最终文本、1 条真实 SSE 来源。该探针运行实际 Extension 源码，但网络由测试适配层发起，不等同 HAP 或小艺 App 端到端运行。
 
 同版 `entry-default-signed.hap` SHA-256 `175b3ad7345b71dbf0d6b297df91ac800c2f9f95e1449a386f6f850e9365ae3b`，DevEco SDK `hap-sign-tool.jar verify-app` exit 0，出现 `verify codesign success`、`Digest verify result: true`、`Verify success`，内嵌 Profile 为 debug。证书链与 Profile 仅写入忽略目录 `.runtime/xiaoyi-current-hap-verify-20260928/`。本批未改 HAP 源码或重建；小艺平台新版 Card 仍因 Mac 锁屏无法导入，实际小艺会话仍未验证。本阶段按用户要求只用模拟器。
+
+---
+
+## [2026-09-28T01:24:06Z] 学伴课程引用折叠与可读性打磨
+
+在 `apps/harmonyos/entry/src/main/ets/pages/Chat.ets` 中，引用与错误详情的展开状态改为按消息索引替换完整数组项，避免仅修改 `@State` 数组内对象字段造成界面更新不稳定；引用区把资料标题和两行摘要分开排版。依据为华为 ArkUI 状态管理 FAQ；不改变检索或生成结果。相应证据与边界追加到 `docs/HARMONY-AI-KNOWLEDGE-20260927.md`。
+
+API 26 Hvigor 增量构建最终 exit 0，`CompileArkTS`、`PackageHap`、`PackingCheck`、`SignHap` 均完成，仅有既存 `TextInputController` syscap 告警。未签名 HAP SHA-256 `aba7e4b469633bd97c9581d7ba941ae2efda446e5ff55f5d1be07fbb39b7b97c`；签名 HAP SHA-256 `a0c63bfef4ed25bd6130a5c5f5f9f1c71ecde9612eff95bfaf7569d7bb596273`。SDK `verify-app` exit 0，签名和摘要成功，提取物只在忽略目录 `.runtime/hbx-citation-verify-20260928/`。
+
+Pura X View 1320×2232 模拟器覆盖安装未签名包、启动成功。展开引用时 UI 树和截图分别在 `.runtime/hbx-citation-polish-scrolled-20260928.json` 与 `.runtime/hbx-citation-polish-expanded-20260928.png`，显示三条来源和“收起”；再点收起后 `.runtime/hbx-citation-polish-collapsed-20260928.json` 仅保留“3 条参考资料”与“展开”。失败消息详情没有做 UI 实点；小艺 Card 平台同步、真实小艺会话与真机仍未验证。工作区已有的签名配置和其他未提交文件均保持原状。
